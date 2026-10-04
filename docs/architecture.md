@@ -31,26 +31,32 @@ model/tiny-yolov3-voc-int8/
     └── heads.json         # boîtes après décodage + NMS (référence de post-traitement)
 ```
 
-Schéma d'une entrée de `manifest.json` :
+Extrait de `manifest.json` (schéma : [manifest.schema.json](manifest.schema.json), exemple
+complet : `model/example_manifest.json`, sémantique : [conventions.md](conventions.md)) :
 
 ```json
 {
   "format_version": 1,
-  "network": "tiny-yolov3",
-  "input": {"shape": [1, 3, 416, 416], "scale": 0.0078125},
+  "network": "tiny-yolov3-voc",
+  "classes": 20,
+  "input": {"shape": [1, 3, 416, 416], "scale": 0.0078125, "buf": {"buf": "A", "offset": 0}},
   "anchors": [[10,14],[23,27],[37,58],[81,82],[135,169],[344,319]],
+  "blobs": {"weights.bin": 8707264, "bias.bin": 13376, "requant.bin": 13376},
+  "buffers": {"A": 519168, "B": 692224, "H13": 12675, "H26": 50700, "R": 259584, "S": 43264},
   "layers": [
-    {"id": 0, "type": "conv", "k": 3, "s": 1, "pad": 1, "cin": 3, "cout": 16,
-     "act": "leaky", "fused_pool": {"k": 2, "s": 2},
-     "w_offset": 0, "b_offset": 0, "m0_offset": 0, "shift": 31,
-     "in_scale": 0.0078125, "out_scale": 0.031, "in_buf": "A", "out_buf": "B"},
-    {"id": 20, "type": "route", "from": [19, 8], "layout": "contiguous"}
+    {"id": 0, "type": "conv", "k": 3, "s": 1, "pad": 1, "cin": 3, "cout": 16, "act": "leaky", "fused_pool": {"layer": 1, "k": 2, "s": 2}, "w_offset": 0, "b_offset": 0, "m0_offset": 0, "shift": 31, "in_scale": 0.0078125, "out_scale": 0.0625, "in": {"buf": "A", "offset": 0}, "out": {"buf": "B", "offset": 0}, "out_shape": [16, 208, 208]},
+    {"id": 1, "type": "maxpool", "k": 2, "s": 2, "fused_into": 0, "out_shape": [16, 208, 208]},
+    …
+    {"id": 8, "type": "conv", "k": 3, "s": 1, "pad": 1, "cin": 128, "cout": 256, "act": "leaky", "fused_pool": {"layer": 9, "k": 2, "s": 2}, "prepool_out": {"buf": "R", "offset": 86528}, "w_offset": 97216, "b_offset": 960, "m0_offset": 960, "shift": 31, "in_scale": 0.0625, "out_scale": 0.0625, "in": {"buf": "A", "offset": 0}, "out": {"buf": "B", "offset": 0}, "out_shape": [256, 13, 13]},
+    …
+    {"id": 20, "type": "route", "from": [19, 8], "layout": "contiguous", "scale": 0.0625, "out": {"buf": "R", "offset": 0}, "out_shape": [384, 26, 26]}
   ]
 }
 ```
 
-Les décalages pointent dans les blobs binaires. `in_buf`/`out_buf` décrivent l'allocation
-des tampons DDR (ping-pong entre couches, placement contigu pour la route 19+8 du §10.3).
+Les `*_offset` pointent dans les blobs binaires. `in`/`out`/`prepool_out` placent chaque
+tenseur dans un tampon DDR (ping-pong entre couches, placement contigu de 19 puis 8 pour la
+route 20 du §10.3).
 
 ## 3. Moteur matériel : couche par couche
 

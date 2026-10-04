@@ -10,7 +10,7 @@ MACs) qui confirment la lecture des architectures du §3.
 - **Acceptation** : `git status` propre après le premier commit ; `data/`, `weights/`,
   `model/` et `build/` ignorés
 
-### [ ] T0.2 — Environnement Python
+### [x] T0.2 — Environnement Python
 - **Spec** : — · **Dépend de** : T0.1 · **Taille** : S
 - **Livrables** : `python/pyproject.toml` (numpy ; dev : pytest, ruff), installation
   éditable
@@ -18,12 +18,12 @@ MACs) qui confirment la lecture des architectures du §3.
   passent
 - **Notes** : aucune bibliothèque d'apprentissage ([ADR 0001](../adr/0001-numpy-pur.md))
 
-### [ ] T0.3 — Toolchain C++
+### [x] T0.3 — Toolchain C++
 - **Spec** : — · **Dépend de** : T0.1 · **Taille** : S
 - **Livrables** : `cpp/golden/CMakeLists.txt`, Catch2 via FetchContent, test de fumée
 - **Acceptation** : `make test-cpp` compile et passe
 
-### [ ] T0.4 — Conventions et format d'échange
+### [x] T0.4 — Conventions et format d'échange
 - **Spec** : §0 (notations), §10.5 · **Dépend de** : T0.1 · **Taille** : M
 - **Livrables** : [conventions.md](../conventions.md) finalisé ;
   `model/example_manifest.json` (Tiny-YOLOv3 complet, valeurs fictives) ; schéma JSON
@@ -33,15 +33,17 @@ MACs) qui confirment la lecture des architectures du §3.
 - **Notes** : prévoir dès maintenant le placement contigu de la route 20 (couches 19 et 8)
   et le maxpool fusionné, pour ne pas changer le format plus tard
 
-### [ ] T0.5 — Comptage des paramètres et des MACs
+### [x] T0.5 — Comptage des paramètres et des MACs
 - **Spec** : §3.1, §3.2 · **Dépend de** : T0.2 · **Taille** : S
 - **Livrables** : `tools/count_macs.py` (lit une description de couches, imprime le tableau
   du §3)
 - **Acceptation** : Tiny-YOLOv2 VOC = **15,86 M** paramètres / **3,49 G** MACs ;
   Tiny-YOLOv3 VOC = **8,71 M** / **2,74 G** ; chaque ligne égale à celle des tableaux
-- **Notes** : BN = 2 paramètres par canal, pas de biais de conv avant BN (§4.2)
+- **Notes** : BN = 2 paramètres par canal, pas de biais de conv avant BN (§4.2). La ligne
+  « 0–11 » du §3.2 affichait 1 071,8 M (somme de valeurs arrondies) ; corrigée en 1 071,6 M
+  (1 071 562 752 MACs), les totaux sont inchangés.
 
-### [ ] T0.6 — Jeu de données PASCAL VOC
+### [x] T0.6 — Jeu de données PASCAL VOC
 - **Spec** : §1, §8.3 · **Dépend de** : T0.2 · **Taille** : M
 - **Livrables** : `python/yolo/data/voc.py` (parsing XML → boîtes normalisées),
   `tools/get_voc.sh` (VOC2007 + 2012 trainval, VOC2007 test)

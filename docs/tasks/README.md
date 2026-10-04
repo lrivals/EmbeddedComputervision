@@ -52,7 +52,7 @@ reporter ici l'avancement par jalon.
 
 | Jalon | Tâches | Faites |
 |---|---|---|
-| M0 | 6 | 1 |
+| M0 | 6 | 6 |
 | M1 | 9 | 0 |
 | M2 | 9 | 0 |
 | M3 | 4 | 0 |

@@ -1,0 +1,643 @@
+{
+ "format_version": 1,
+ "network": "tiny-yolov3-voc",
+ "classes": 20,
+ "input": {
+  "shape": [
+   1,
+   3,
+   416,
+   416
+  ],
+  "scale": 0.0078125,
+  "buf": {
+   "buf": "A",
+   "offset": 0
+  }
+ },
+ "anchors": [
+  [
+   10,
+   14
+  ],
+  [
+   23,
+   27
+  ],
+  [
+   37,
+   58
+  ],
+  [
+   81,
+   82
+  ],
+  [
+   135,
+   169
+  ],
+  [
+   344,
+   319
+  ]
+ ],
+ "blobs": {
+  "weights.bin": 8707264,
+  "bias.bin": 13376,
+  "requant.bin": 13376
+ },
+ "buffers": {
+  "A": 519168,
+  "B": 692224,
+  "H13": 12675,
+  "H26": 50700,
+  "R": 259584,
+  "S": 43264
+ },
+ "layers": [
+  {
+   "id": 0,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 3,
+   "cout": 16,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 1,
+    "k": 2,
+    "s": 2
+   },
+   "w_offset": 0,
+   "b_offset": 0,
+   "m0_offset": 0,
+   "shift": 31,
+   "in_scale": 0.0078125,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out_shape": [
+    16,
+    208,
+    208
+   ]
+  },
+  {
+   "id": 1,
+   "type": "maxpool",
+   "k": 2,
+   "s": 2,
+   "fused_into": 0,
+   "out_shape": [
+    16,
+    208,
+    208
+   ]
+  },
+  {
+   "id": 2,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 16,
+   "cout": 32,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 3,
+    "k": 2,
+    "s": 2
+   },
+   "w_offset": 448,
+   "b_offset": 64,
+   "m0_offset": 64,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out_shape": [
+    32,
+    104,
+    104
+   ]
+  },
+  {
+   "id": 3,
+   "type": "maxpool",
+   "k": 2,
+   "s": 2,
+   "fused_into": 2,
+   "out_shape": [
+    32,
+    104,
+    104
+   ]
+  },
+  {
+   "id": 4,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 32,
+   "cout": 64,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 5,
+    "k": 2,
+    "s": 2
+   },
+   "w_offset": 5056,
+   "b_offset": 192,
+   "m0_offset": 192,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out_shape": [
+    64,
+    52,
+    52
+   ]
+  },
+  {
+   "id": 5,
+   "type": "maxpool",
+   "k": 2,
+   "s": 2,
+   "fused_into": 4,
+   "out_shape": [
+    64,
+    52,
+    52
+   ]
+  },
+  {
+   "id": 6,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 64,
+   "cout": 128,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 7,
+    "k": 2,
+    "s": 2
+   },
+   "w_offset": 23488,
+   "b_offset": 448,
+   "m0_offset": 448,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out_shape": [
+    128,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 7,
+   "type": "maxpool",
+   "k": 2,
+   "s": 2,
+   "fused_into": 6,
+   "out_shape": [
+    128,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 8,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 128,
+   "cout": 256,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 9,
+    "k": 2,
+    "s": 2
+   },
+   "prepool_out": {
+    "buf": "R",
+    "offset": 86528
+   },
+   "w_offset": 97216,
+   "b_offset": 960,
+   "m0_offset": 960,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out_shape": [
+    256,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 9,
+   "type": "maxpool",
+   "k": 2,
+   "s": 2,
+   "fused_into": 8,
+   "out_shape": [
+    256,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 10,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 256,
+   "cout": 512,
+   "act": "leaky",
+   "fused_pool": {
+    "layer": 11,
+    "k": 2,
+    "s": 1
+   },
+   "w_offset": 392128,
+   "b_offset": 1984,
+   "m0_offset": 1984,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out_shape": [
+    512,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 11,
+   "type": "maxpool",
+   "k": 2,
+   "s": 1,
+   "fused_into": 10,
+   "out_shape": [
+    512,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 12,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 512,
+   "cout": 1024,
+   "act": "leaky",
+   "fused_pool": null,
+   "w_offset": 1571776,
+   "b_offset": 4032,
+   "m0_offset": 4032,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out_shape": [
+    1024,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 13,
+   "type": "conv",
+   "k": 1,
+   "s": 1,
+   "pad": 0,
+   "cin": 1024,
+   "cout": 256,
+   "act": "leaky",
+   "fused_pool": null,
+   "w_offset": 6290368,
+   "b_offset": 8128,
+   "m0_offset": 8128,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out": {
+    "buf": "S",
+    "offset": 0
+   },
+   "out_shape": [
+    256,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 14,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 256,
+   "cout": 512,
+   "act": "leaky",
+   "fused_pool": null,
+   "w_offset": 6552512,
+   "b_offset": 9152,
+   "m0_offset": 9152,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "S",
+    "offset": 0
+   },
+   "out": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out_shape": [
+    512,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 15,
+   "type": "conv",
+   "k": 1,
+   "s": 1,
+   "pad": 0,
+   "cin": 512,
+   "cout": 75,
+   "act": "linear",
+   "fused_pool": null,
+   "w_offset": 7732160,
+   "b_offset": 11200,
+   "m0_offset": 11200,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.125,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "H13",
+    "offset": 0
+   },
+   "out_shape": [
+    75,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 16,
+   "type": "yolo",
+   "mask": [
+    3,
+    4,
+    5
+   ],
+   "scale": 0.125,
+   "in": {
+    "buf": "H13",
+    "offset": 0
+   },
+   "out_shape": [
+    75,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 17,
+   "type": "route",
+   "from": [
+    13
+   ],
+   "layout": "contiguous",
+   "scale": 0.0625,
+   "out": {
+    "buf": "S",
+    "offset": 0
+   },
+   "out_shape": [
+    256,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 18,
+   "type": "conv",
+   "k": 1,
+   "s": 1,
+   "pad": 0,
+   "cin": 256,
+   "cout": 128,
+   "act": "leaky",
+   "fused_pool": null,
+   "w_offset": 7770560,
+   "b_offset": 11520,
+   "m0_offset": 11520,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "S",
+    "offset": 0
+   },
+   "out": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out_shape": [
+    128,
+    13,
+    13
+   ]
+  },
+  {
+   "id": 19,
+   "type": "upsample",
+   "s": 2,
+   "scale": 0.0625,
+   "in": {
+    "buf": "B",
+    "offset": 0
+   },
+   "out": {
+    "buf": "R",
+    "offset": 0
+   },
+   "out_shape": [
+    128,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 20,
+   "type": "route",
+   "from": [
+    19,
+    8
+   ],
+   "layout": "contiguous",
+   "scale": 0.0625,
+   "out": {
+    "buf": "R",
+    "offset": 0
+   },
+   "out_shape": [
+    384,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 21,
+   "type": "conv",
+   "k": 3,
+   "s": 1,
+   "pad": 1,
+   "cin": 384,
+   "cout": 256,
+   "act": "leaky",
+   "fused_pool": null,
+   "w_offset": 7803328,
+   "b_offset": 12032,
+   "m0_offset": 12032,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.0625,
+   "in": {
+    "buf": "R",
+    "offset": 0
+   },
+   "out": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out_shape": [
+    256,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 22,
+   "type": "conv",
+   "k": 1,
+   "s": 1,
+   "pad": 0,
+   "cin": 256,
+   "cout": 75,
+   "act": "linear",
+   "fused_pool": null,
+   "w_offset": 8688064,
+   "b_offset": 13056,
+   "m0_offset": 13056,
+   "shift": 31,
+   "in_scale": 0.0625,
+   "out_scale": 0.125,
+   "in": {
+    "buf": "A",
+    "offset": 0
+   },
+   "out": {
+    "buf": "H26",
+    "offset": 0
+   },
+   "out_shape": [
+    75,
+    26,
+    26
+   ]
+  },
+  {
+   "id": 23,
+   "type": "yolo",
+   "mask": [
+    0,
+    1,
+    2
+   ],
+   "scale": 0.125,
+   "in": {
+    "buf": "H26",
+    "offset": 0
+   },
+   "out_shape": [
+    75,
+    26,
+    26
+   ]
+  }
+ ]
+}

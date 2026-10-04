@@ -176,7 +176,7 @@ linéaires et toutes les autres couches utilisent la leaky ReLU [2026-fata#013.0
 
 | # | Couche | k/s | C_in→C_out | Sortie | Paramètres | MACs (M) |
 |---|---|---|---|---|---|---|
-| 0–11 | identiques à Tiny-YOLOv2 | | | 13×13×512 | 1 573 776 | 1 071,8 |
+| 0–11 | identiques à Tiny-YOLOv2 | | | 13×13×512 | 1 573 776 | 1 071,6 |
 | 12 | conv | 3×3/1 | 512→1024 | 13×13×1024 | 4 720 640 | 797,4 |
 | 13 | conv | 1×1/1 | 1024→256 | 13×13×256 | 262 656 | 44,3 |
 | 14 | conv | 3×3/1 | 256→512 | 13×13×512 | 1 180 672 | 199,4 |

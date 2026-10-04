@@ -43,7 +43,10 @@ d'acceptation mesurable.
 ## Démarrage rapide
 
 ```bash
-pip install -e "python[dev]"   # numpy, pytest, ruff
-make test-py                   # tests NumPy
-make test-cpp                  # build + tests du golden model (télécharge Catch2)
+pip install -e "python[dev,data]"   # numpy ; dev : pytest, ruff, jsonschema ; data : pillow
+make test-py                        # tests NumPy
+make test-cpp                       # build + tests du golden model (télécharge Catch2)
+make count-macs                     # tableaux du §3 (paramètres, MACs)
+tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
+python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
 ```

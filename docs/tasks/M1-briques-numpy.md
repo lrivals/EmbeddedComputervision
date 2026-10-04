@@ -61,7 +61,8 @@ Tiny-YOLOv2 et Tiny-YOLOv3. Interface commune : `forward(x) -> (y, cache)`,
 - **Livrables** : `python/yolo/models/tiny_yolo.py`, fichiers `.cfg` dans `python/yolo/models/cfg/`
 - **Acceptation** : formes de sortie et nombre de paramètres de chaque couche == tableaux du
   §3 ; passe avant 416×416 sans erreur ; initialisation He (§7.1)
-- **Notes** : les `.cfg` Darknet sont hors base : les citer comme tels
+- **Notes** : les `.cfg` Darknet sont hors base : les citer comme tels ; vérifier le réseau
+  construit contre `yolo.models.specs` (T0.5), déjà testé contre les tableaux du §3
 
 ### [ ] T1.9 — Chargeur de poids Darknet
 - **Spec** : §7.1 (pré-entraînement), §10.5 étape 1 · **Dépend de** : T1.8 · **Taille** : M

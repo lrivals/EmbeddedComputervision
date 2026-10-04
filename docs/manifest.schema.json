@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:yolo-embarque:manifest:1",
+  "title": "manifest.json — format d'échange du modèle entier (format_version 1)",
+  "description": "Produit par l'export Python (T4.7), lu par le golden C++ (T5.1), le testbench HLS et le driver ARM. Sémantique : docs/conventions.md, section « Format d'échange ».",
+  "type": "object",
+  "required": ["format_version", "network", "classes", "input", "anchors", "blobs", "buffers", "layers"],
+  "additionalProperties": false,
+  "properties": {
+    "format_version": {"const": 1},
+    "network": {"type": "string", "minLength": 1},
+    "classes": {"type": "integer", "minimum": 1},
+    "input": {
+      "type": "object",
+      "required": ["shape", "scale", "buf"],
+      "additionalProperties": false,
+      "properties": {
+        "shape": {
+          "type": "array",
+          "prefixItems": [{"const": 1}, {"const": 3}, {"$ref": "#/$defs/dim"}, {"$ref": "#/$defs/dim"}],
+          "items": false,
+          "minItems": 4
+        },
+        "scale": {"$ref": "#/$defs/scale"},
+        "buf": {"$ref": "#/$defs/bufref"}
+      }
+    },
+    "anchors": {
+      "description": "Ancres en pixels pour une entrée de 416, triées par aire croissante.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "prefixItems": [{"type": "integer", "minimum": 1}, {"type": "integer", "minimum": 1}],
+        "items": false,
+        "minItems": 2
+      }
+    },
+    "blobs": {
+      "description": "Taille en octets de chaque fichier binaire.",
+      "type": "object",
+      "required": ["weights.bin", "bias.bin", "requant.bin"],
+      "additionalProperties": false,
+      "properties": {
+        "weights.bin": {"$ref": "#/$defs/size"},
+        "bias.bin": {"$ref": "#/$defs/size"},
+        "requant.bin": {"$ref": "#/$defs/size"}
+      }
+    },
+    "buffers": {
+      "description": "Tampons d'activations en DDR : nom → taille en octets.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/bufname"},
+      "additionalProperties": {"$ref": "#/$defs/size"}
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/conv"},
+          {"$ref": "#/$defs/maxpool"},
+          {"$ref": "#/$defs/upsample"},
+          {"$ref": "#/$defs/route"},
+          {"$ref": "#/$defs/yolo"}
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "dim": {"type": "integer", "minimum": 1},
+    "size": {"type": "integer", "minimum": 0},
+    "id": {"type": "integer", "minimum": 0},
+    "scale": {"type": "number", "exclusiveMinimum": 0},
+    "offset64": {"type": "integer", "minimum": 0, "multipleOf": 64},
+    "bufname": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"},
+    "bufref": {
+      "description": "Position d'un tenseur (C, H, W) int8 contigu dans un tampon ; offset en octets.",
+      "type": "object",
+      "required": ["buf", "offset"],
+      "additionalProperties": false,
+      "properties": {
+        "buf": {"$ref": "#/$defs/bufname"},
+        "offset": {"type": "integer", "minimum": 0}
+      }
+    },
+    "shape": {
+      "description": "Forme de sortie (C, H, W).",
+      "type": "array",
+      "prefixItems": [{"$ref": "#/$defs/dim"}, {"$ref": "#/$defs/dim"}, {"$ref": "#/$defs/dim"}],
+      "items": false,
+      "minItems": 3
+    },
+    "pool": {
+      "description": "Maxpool 2×2 exécuté dans l'étage de sortie de la conv (§10.3). s = 1 : complétion par réplication à droite et en bas (§4.4).",
+      "type": "object",
+      "required": ["layer", "k", "s"],
+      "additionalProperties": false,
+      "properties": {
+        "layer": {"$ref": "#/$defs/id"},
+        "k": {"const": 2},
+        "s": {"enum": [1, 2]}
+      }
+    },
+    "conv": {
+      "type": "object",
+      "required": ["id", "type", "k", "s", "pad", "cin", "cout", "act", "fused_pool",
+                   "w_offset", "b_offset", "m0_offset", "shift", "in_scale", "out_scale",
+                   "in", "out", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "conv"},
+        "k": {"enum": [1, 3]},
+        "s": {"const": 1},
+        "pad": {"type": "integer", "minimum": 0},
+        "cin": {"$ref": "#/$defs/dim"},
+        "cout": {"$ref": "#/$defs/dim"},
+        "act": {"enum": ["leaky", "linear"]},
+        "fused_pool": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/pool"}]},
+        "prepool_out": {
+          "description": "Seconde sortie : la carte avant pooling, écrite pour une route.",
+          "$ref": "#/$defs/bufref"
+        },
+        "w_offset": {"$ref": "#/$defs/offset64"},
+        "b_offset": {"$ref": "#/$defs/offset64"},
+        "m0_offset": {"$ref": "#/$defs/offset64"},
+        "shift": {"type": "integer", "minimum": 1, "maximum": 62},
+        "in_scale": {"$ref": "#/$defs/scale"},
+        "out_scale": {"$ref": "#/$defs/scale"},
+        "in": {"$ref": "#/$defs/bufref"},
+        "out": {"$ref": "#/$defs/bufref"},
+        "out_shape": {"$ref": "#/$defs/shape"}
+      }
+    },
+    "maxpool": {
+      "type": "object",
+      "required": ["id", "type", "k", "s", "fused_into", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "maxpool"},
+        "k": {"const": 2},
+        "s": {"enum": [1, 2]},
+        "fused_into": {"$ref": "#/$defs/id"},
+        "out_shape": {"$ref": "#/$defs/shape"}
+      }
+    },
+    "upsample": {
+      "type": "object",
+      "required": ["id", "type", "s", "scale", "in", "out", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "upsample"},
+        "s": {"const": 2},
+        "scale": {"$ref": "#/$defs/scale"},
+        "in": {"$ref": "#/$defs/bufref"},
+        "out": {"$ref": "#/$defs/bufref"},
+        "out_shape": {"$ref": "#/$defs/shape"}
+      }
+    },
+    "route": {
+      "description": "Concaténation sur les canaux. contiguous : les sources sont déjà écrites bout à bout dans le même tampon, la route ne copie rien.",
+      "type": "object",
+      "required": ["id", "type", "from", "layout", "scale", "out", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "route"},
+        "from": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}},
+        "layout": {"const": "contiguous"},
+        "scale": {"$ref": "#/$defs/scale"},
+        "out": {"$ref": "#/$defs/bufref"},
+        "out_shape": {"$ref": "#/$defs/shape"}
+      }
+    },
+    "yolo": {
+      "type": "object",
+      "required": ["id", "type", "mask", "scale", "in", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "yolo"},
+        "mask": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
+        "scale": {"$ref": "#/$defs/scale"},
+        "in": {"$ref": "#/$defs/bufref"},
+        "out_shape": {"$ref": "#/$defs/shape"}
+      }
+    }
+  }
+}

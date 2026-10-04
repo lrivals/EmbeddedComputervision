@@ -21,7 +21,7 @@ lint:
 	ruff check python tools
 
 count-macs:
-	python tools/count_macs.py
+	python tools/count_macs.py --net all
 
 csim:
 	cd hls && vitis_hls -f scripts/csim.tcl
