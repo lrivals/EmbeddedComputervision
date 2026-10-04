@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.16)
+project(yolo_golden CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+add_compile_options(-Wall -Wextra)
+
+# Bibliothèque du golden model (T5.x) : en-têtes partagés avec hls/ et sw/.
+add_library(golden src/golden.cpp)
+target_include_directories(golden PUBLIC include)
+
+option(GOLDEN_TESTS "Construire les tests (Catch2 via FetchContent)" OFF)
+if(GOLDEN_TESTS)
+  include(FetchContent)
+  FetchContent_Declare(Catch2 GIT_REPOSITORY https://github.com/catchorg/Catch2.git GIT_TAG v3.5.4)
+  FetchContent_MakeAvailable(Catch2)
+  file(GLOB TEST_SOURCES tests/*.cpp)
+  add_executable(golden_tests ${TEST_SOURCES})
+  target_link_libraries(golden_tests PRIVATE golden Catch2::Catch2WithMain)
+  include(CTest)
+  add_test(NAME golden_tests COMMAND golden_tests)
+endif()

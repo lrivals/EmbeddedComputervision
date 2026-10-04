@@ -1,0 +1,23 @@
+[project]
+name = "yolo-embarque"
+version = "0.0.1"
+description = "Tiny-YOLOv2/v3 réécrits à la main en NumPy : modèle de référence flottant et entier bit-exact"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+data = ["pillow>=10"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["yolo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

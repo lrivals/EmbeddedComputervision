@@ -1,0 +1,29 @@
+# Données et poids (volumineux)
+data/*
+!data/.gitkeep
+weights/*
+!weights/.gitkeep
+model/*
+!model/.gitkeep
+!model/example_manifest.json
+
+# Builds
+build/
+cpp/golden/build/
+hls/**/proj*/
+hls/**/*.log
+*.jou
+.Xil/
+vivado*.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+
+# Dumps de test
+*.npy
+*.npz
