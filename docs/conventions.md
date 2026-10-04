@@ -22,6 +22,16 @@
 - Perte : somme sur le lot dans `yolo_loss`, divisée par N dans le trainer ; seuil *ignore*
   0,5 par défaut (§2.3 ; les `.cfg` Darknet utilisent 0,7).
 
+## Inférence et évaluation
+
+- Seuils : démo `conf = 0,25`, mAP `conf = 0,005` (toute la courbe P/R) ; NMS par classe
+  `iou = 0,45`, suppression si IoU > seuil (§8.2).
+- mAP : AP 11 points VOC2007, pixels VOC (largeur `x2 − x1 + 1`), apparié si IoU ≥ 0,5
+  (`VOCevaldet.m`), `difficult` ignorés (§8.3).
+- Référence flottante (T3.4) : Tiny-YOLOv2 VOC, poids Darknet, **redimensionnement direct**
+  416×416 (`--resize stretch`, sans letterbox) : mAP 56,30. M4 et M8 se comparent à elle
+  avec le même prétraitement.
+
 ## Nommage
 
 - Couches numérotées comme dans les tableaux du §3 (`L00` … `L23`), identiques au `.cfg`

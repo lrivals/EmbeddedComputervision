@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp lint count-macs bench-conv get-weights anchors csim clean
+.PHONY: help test test-py test-slow test-cpp lint count-macs bench-conv get-weights anchors detect eval-float csim clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -9,6 +9,8 @@ help:
 	@echo "bench-conv  temps de la conv 13×13×1024→1024 (T1.2)"
 	@echo "get-weights poids Darknet pré-entraînés dans weights/ (T1.9)"
 	@echo "anchors     ancres k-means sur VOC → results/anchors.md (T2.2)"
+	@echo "detect      démo Tiny-YOLOv2 VOC sur une image → build/detect/ (T3.4)"
+	@echo "eval-float  mAP VOC2007 test de Tiny-YOLOv2 VOC, poids Darknet (T3.4)"
 	@echo "csim        C-simulation HLS (T6.1, nécessite Vitis HLS)"
 
 test: test-py test-cpp
@@ -38,6 +40,12 @@ get-weights:
 
 anchors:
 	python tools/kmeans_anchors.py
+
+detect:
+	python tools/detect.py data/VOCdevkit/VOC2007/JPEGImages/000004.jpg
+
+eval-float:
+	python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights --resize stretch
 
 csim:
 	cd hls && vitis_hls -f scripts/csim.tcl

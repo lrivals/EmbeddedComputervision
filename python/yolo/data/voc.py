@@ -36,8 +36,9 @@ def parse_annotation(xml_path):
     """Lit un fichier Annotations/*.xml.
 
     Rend un dict : `filename`, `width`, `height`, `boxes` (n, 4) float64 `(cx, cy, w, h)`
-    normalisés, `labels` (n,) int64, `difficult` (n,) bool. Les objets `difficult` sont gardés :
-    c'est l'évaluation VOC qui les ignore (§8.3).
+    normalisés, `xyxy` (n, 4) coins en pixels VOC tels que lus (pour l'évaluation, §8.3),
+    `labels` (n,) int64, `difficult` (n,) bool. Les objets `difficult` sont gardés : c'est
+    l'évaluation VOC qui les ignore (§8.3).
     """
     root = ET.parse(xml_path).getroot()
     size = root.find("size")
@@ -54,6 +55,7 @@ def parse_annotation(xml_path):
         "width": width,
         "height": height,
         "boxes": xyxy_to_cxcywh(xyxy, width, height) if xyxy else np.zeros((0, 4)),
+        "xyxy": np.array(xyxy, dtype=np.float64).reshape(-1, 4),
         "labels": np.array(labels, dtype=np.int64),
         "difficult": np.array(difficult, dtype=bool),
     }
