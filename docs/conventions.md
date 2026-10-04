@@ -59,7 +59,7 @@ Validation : `pytest python/tests/test_manifest.py`.
 
 | Comparaison | Tolérance |
 |---|---|
-| gradcheck (différences centrées, h = 1e-6, float64) | erreur relative ≤ 1e-7 |
+| gradcheck (différences centrées, h = 1e-6, float64) | erreur relative ≤ 1e-7 (norme max du tenseur, `yolo.testing.gradcheck`) |
 | implémentation optimisée vs naïve (float64) | ≤ 1e-12 |
 | fusion BN vs conv + BN | ≤ 1e-12 |
 | entier Python vs golden C++ vs HLS vs carte | **égalité exacte** |

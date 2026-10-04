@@ -90,7 +90,7 @@ def infer_shapes(net):
                 raise ValueError(f"couche {i} : route de cartes de tailles différentes {srcs}")
             out = (sum(sh[0] for sh in srcs),) + srcs[0][1:]
             prev = out  # une route n'a pas d'entrée propre : elle lit ses sources
-        elif t == "yolo":
+        elif t in ("yolo", "region"):  # sorties : identité, décodées hors du réseau (§8.1)
             out = (c, h, w)
         else:
             raise ValueError(f"couche {i} : type inconnu {t!r}")
