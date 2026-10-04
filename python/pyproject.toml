@@ -21,6 +21,8 @@ include = ["yolo*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: tests longs (surapprentissage, T2.8) ; lancer avec -m slow"]
 
 [tool.ruff]
 line-length = 100

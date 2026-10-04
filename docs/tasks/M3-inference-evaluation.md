@@ -3,12 +3,14 @@
 Objectif : de la sortie brute du réseau aux boîtes finales, et une mAP VOC qui servira de
 référence à toutes les étapes suivantes.
 
-### [ ] T3.1 — Décodage des têtes
+### [x] T3.1 — Décodage des têtes
 - **Spec** : §8.1 · **Dépend de** : T1.8, T2.1 · **Taille** : S
 - **Livrables** : `python/yolo/infer/decode.py` + tests
 - **Acceptation** : décodage(encodage(boîte)) == boîte à 1e-9 près (cohérence avec T2.3) ;
   score v3 $\sigma(t_o)\sigma(t_c)$ et v2 $\sigma(t_o)\,\text{softmax}_c$ ; boîtes ramenées
   aux coordonnées de l'image d'origine (letterbox inverse)
+- **Fait** (avancé pour T2.8) : `decode_head`, `decode(outputs, net)` (v2 pour `region`),
+  `to_original` ; ordre des boîtes (ancre, ligne, colonne), têtes concaténées.
 
 ### [ ] T3.2 — Seuil et NMS
 - **Spec** : §8.2 · **Dépend de** : T3.1 · **Taille** : S

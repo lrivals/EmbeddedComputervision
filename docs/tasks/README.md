@@ -53,9 +53,9 @@ reporter ici l'avancement par jalon.
 | Jalon | Tâches | Faites |
 |---|---|---|
 | M0 | 6 | 6 |
-| M1 | 9 | 0 |
-| M2 | 9 | 0 |
-| M3 | 4 | 0 |
+| M1 | 9 | 8 |
+| M2 | 9 | 8 |
+| M3 | 4 | 1 |
 | M4 | 7 | 0 |
 | M5 | 6 | 0 |
 | M6 | 6 | 0 |

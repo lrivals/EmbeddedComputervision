@@ -17,6 +17,10 @@
   converties en fraction de l'image au moment de l'utilisation.
 - Ordre des ancres croissant par aire ; Tiny-YOLOv3 : indices 3-5 → tête 13×13,
   0-2 → tête 26×26.
+- Conversion en fraction : **toujours /416** (`yolo.data.targets.ANCHOR_REF`), y compris en
+  multi-échelle : une ancre couvre la même part de l'image à toutes les tailles d'entrée.
+- Perte : somme sur le lot dans `yolo_loss`, divisée par N dans le trainer ; seuil *ignore*
+  0,5 par défaut (§2.3 ; les `.cfg` Darknet utilisent 0,7).
 
 ## Nommage
 
