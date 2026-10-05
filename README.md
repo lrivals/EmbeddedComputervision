@@ -21,9 +21,18 @@ Détails : [docs/architecture.md](docs/architecture.md) · conventions :
 
 ## Plan de travail
 
-Le travail est découpé en jalons M0 à M9 dans [docs/tasks/](docs/tasks/README.md). Chaque
+Le travail est découpé en jalons M0 à M11 dans [docs/tasks/](docs/tasks/README.md). Chaque
 tâche indique la section de la spec, ses dépendances, ses livrables et un critère
 d'acceptation mesurable.
+
+- **M0 à M8** : la chaîne de base, du NumPy aux mesures sur carte.
+- **M9.1 à M9.4** : extensions de recherche (post-traitement matériel, REQ-YOLO, 4 bits,
+  streaming).
+- **[M10](docs/tasks/M10-ameliorations.md)** : améliorations d'ingénierie chiffrées par
+  `tools/perf_model.py` (ports m_axi larges, requantification parallèle, pipeline ARM, CI).
+- **[M11](docs/tasks/M11-jeux-de-donnees.md)** : jeux de données au-delà de VOC (COCO,
+  ExDark, KITTI, VisDrone, CrowdHuman, FLIR), chacun choisi pour éprouver une partie de la
+  chaîne.
 
 ## Arborescence
 
