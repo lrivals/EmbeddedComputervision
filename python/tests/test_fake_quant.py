@@ -116,3 +116,22 @@ def test_qat_backward_has_step_gradients():
     for i in qat.a_qmax:
         assert grads[i]["log2_s"].shape == (1,) and math.isfinite(grads[i]["log2_s"][0])
     assert "log2_s" not in grads[head]
+
+
+def test_layer_qmax_keeps_int8_layers():
+    """T12.4 : w4a4 avec la 1re et la dernière conv en INT8 (poids et sortie)."""
+    from yolo.models.tiny_yolo import load_cfg
+    from yolo.quant.lowbit import head_convs, layer_qmax
+
+    net = load_cfg("tiny-yolov2-voc")
+    convs = [i for i, layer in enumerate(net["layers"]) if layer["type"] == "conv"]
+    first, last = convs[0], convs[-1]
+    w, a = layer_qmax(net, 4, 4, int8_layers=(first, last))
+    assert w[first] == w[last] == a[first] == 127
+    assert set(head_convs(net)) == {last} and a[last] == 127
+    for i in convs[1:-1]:
+        assert w[i] == a[i] == 7
+    assert layer_qmax(net, 4, 4) == ({i: 7 for i in convs},
+                                     {i: 127 if i == last else 7 for i in convs})
+    with pytest.raises(ValueError, match="pas des convs"):
+        layer_qmax(net, 4, 4, int8_layers=(1,))  # couche 1 : maxpool

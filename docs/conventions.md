@@ -113,7 +113,9 @@ Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages
 
 - Python : fonctions `forward(x) -> (y, cache)` et `backward(dy, cache) -> (dx, grads)`.
   Pas de dépendance hors NumPy dans `python/yolo/` (Pillow toléré dans `data/` pour lire les
-  images).
+  images). CuPy est optionnel : importé seulement par `tools/train.py --device gpu`
+  (`yolo.backend`, T12.11) ; les couches prennent le module de leurs entrées
+  (`backend.get_xp`), si bien qu'un tableau NumPy reste calculé par NumPy.
 - C++ : C++17, en-têtes dans `cpp/golden/include/golden/` ; le code partagé avec HLS ne
   fait pas d'allocation dynamique.
 - HLS (`hls/kernels/`) : le noyau compile en C++14 (défaut Vitis), sans allocation ni

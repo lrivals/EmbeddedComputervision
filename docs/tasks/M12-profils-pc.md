@@ -51,8 +51,11 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   Chiffres de référence : flottant **56,30**, INT8 **55,66** ([map_stades](../../results/map_stades.md)).
 - **Sorties** : `build/m12/<profil>/` (journal, JSON des mAP de `--out`, CSV). On recopie
   dans `results/` uniquement les chiffres validés sur les 4 952 images.
+- **Exécution** : `tools/m12.sh <profil>` lance un profil (liste en tête du script), et
+  `tools/m12_report.py` produit les tables de synthèse (mAP, perte, ADMM, égalité des
+  détections).
 - **Backend d'entraînement** : `--device cpu` (défaut, référence) ou `--device gpu`
-  seulement sur demande (T12.11). L'option est **à ajouter** à `tools/train.py`. Les
+  seulement sur demande (T12.11, option de `tools/train.py`). Les
   évaluations (mAP, entier, golden, C-sim) restent toujours sur le CPU.
 - **Une seule variable à la fois** par rapport à la référence, sauf pour les grilles
   croisées annoncées.
@@ -75,6 +78,9 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - **Décision** : si un écart apparaît, `run_compare --layer N` localise la couche
   fautive, puis `tools/compare_dumps.py` sur cette couche. On ne lance aucun profil M ou N
   tant que *Bit-exact* n'est pas vert.
+
+- **Fait (code)** : `tools/m12.sh fumee | bitexact | avant-carte` (journal et durées dans
+  `build/m12/regress/log.txt`). À exécuter.
 
 ### [ ] T12.2 — mAP flottante et entière (M3, M4)
 - **Spec** : §8.3, §9.2 · **Dépend de** : T4.5, T8.2 · **Taille** : M · **Palier** : M puis N
@@ -127,6 +133,16 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - Grille : `tools/calibrate.py --head-scale` autour de la valeur par défaut (×0,5, ×1, ×2).
 - Critère : mAP entière et saturation de la tête.
 
+- **Fait (code)** : `tools/m12.sh map-c` (à lancer en premier), puis `map-a`, `map-b`,
+  `map-d` et `map-e`. `SUBSET=1000` passe tout le jalon à 1 000 images si T12.2-c l'exige.
+  - Le JSON de `eval_quant.py --out` donne maintenant `dets_per_image` par variante (b), ainsi
+    que `conf`, `iou` et `model_dir`.
+  - d) fait varier une seule variable autour de mse / 500 images / graine 0 : 5 choix, 100 et
+    2 000 images, graines 1 et 2. Les calibrations vont dans `build/m12/calib/<essai>/`, et
+    `--markdown` les garde hors de `results/`.
+  - e) teste `--head-scale` 1/16, 1/8 (défaut) et 1/4.
+  - Synthèse : `python tools/m12_report.py map build/m12/map/<motif>*.json`. À exécuter.
+
 ### [ ] T12.3 — Sensibilité par couche
 - **Spec** : §9.2, §10.5 étape 2 · **Dépend de** : T12.2-c · **Taille** : M · **Palier** : M
 - **Livrables** : `build/m12/sens/` ; classement des couches (table couche × schéma)
@@ -147,6 +163,9 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   `build/m12/sens/`), tableau dans [precision_mixte](../../results/precision_mixte.md).
   Plus de 1 point de perte : L00 (les trois schémas), L02 et L04 en 4 bits. Le complément
   en fake-quant reste à faire.
+
+- **Fait (code)** : `tools/m12.sh fq` (complément en fake-quant, `build/m12/sens/fq.json`).
+  À exécuter.
 
 ### [ ] T12.4 — PTQ basse précision (M9.2, M9.3)
 - **Spec** : §9.2, §9.3 · **Dépend de** : T12.3 · **Taille** : M · **Palier** : M puis N
@@ -173,6 +192,14 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - **Décision** :
   - si w8a4 ≪ w4a8, l'effort de QAT (T12.5) porte d'abord sur les pas d'activation ;
   - les deux meilleures variantes passent sur les 4 952 images (N).
+
+- **Fait (code)** :
+  - Nouvelle option `quant_lowbit.py --int8-layers 0,14` (`lowbit.layer_qmax`) : poids et
+    sortie de ces convs restent en INT8 dans un schéma wXaY. Elle couvre la dernière ligne
+    de la grille.
+  - `tools/m12.sh ptq` couvre les 8 variantes, avec le plan T12.3 = `{"0": "int8"}` (seule
+    L00 perd plus de 1 point en mixed6) ; puis `tools/m12.sh ptq-full <v1> <v2>` (palier N).
+  - À exécuter.
 
 ### [ ] T12.5 — QAT 4 bits
 - **Spec** : §7.1, §9.2 · **Dépend de** : T12.4 · **Taille** : M · **Palier** : M puis N
@@ -202,6 +229,11 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   - si la perte ne baisse pas à lr 1e-4, essayer 3e-4 ;
   - si la mAP reste sous 40 sur 500 images après 600 itérations, documenter « QAT court
     insuffisant » et chiffrer le coût de 2 000 itérations ou plus avant de les lancer.
+
+- **Fait (code)** : `tools/m12.sh qat <essai>`, avec l'essai parmi `ref`, `lr3e-4`, `lr1e-3`,
+  `it300`, `it2000`, `b16` et `nosteps`. Le script enchaîne entraînement, export, mAP sur
+  500 images et `m12_report.py loss` (moyenne glissante sur 50 itérations, début contre fin).
+  `DEVICE=gpu` ajoute `--device gpu`. **Aucun entraînement lancé.**
 
 ### [ ] T12.6 — ADMM REQ-YOLO
 - **Spec** : §9.2 · **Dépend de** : T12.4, T9.2.3 · **Taille** : M · **Palier** : M
@@ -242,6 +274,11 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
     à l'essai A ;
   - sinon, documenter le résultat « non convergé » dans T9.2.3 avec la table ci-dessus.
 
+- **Fait (code)** : `tools/train.py --admm-growth` existe, donc l'essai D est possible.
+  `tools/m12.sh admm <essai>` lance l'un des essais `ref`, `A`, `B`, `C`, `D` ou `E` de la
+  table : entraînement, projection, mAP sur 500 images, puis `m12_report.py admm` (dernière
+  ligne, résidu max, pente). **Aucun entraînement lancé.**
+
 ### [ ] T12.7 — Post-traitement matériel (M9.1)
 - **Spec** : §8.2, §10.3 · **Dépend de** : T9.1.3 · **Taille** : S · **Palier** : R puis M
 - **Livrables** : `build/m12/hwpp/` ; table capacité × débordements × mAP
@@ -261,6 +298,17 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - **Décision** : retenir la plus petite capacité dont la perte reste sous 0,05 point. Le
   coût en cycles et en BRAM de la capacité est noté pour T10.7.
 
+- **Fait (code)** :
+  - `tb_post --random N` fixe le nombre de têtes aléatoires (défaut 800 / 200), pour la nuit
+    à 10⁵ cas.
+  - `-DHWPP_CAP=N` (`golden/hw_postproc.hpp`) compile le noyau et le golden à une autre
+    capacité, pour les cycles du pire cas.
+  - `eval_quant.py` écrit les candidates perdues (`overflow`) dans le JSON.
+  - `tools/m12.sh hwpp` : capacité × seuil sur 500 images, puis `tb_post` compilé à 64, 128
+    et 256 dans `build/m12/hwpp/build_cap<N>`. `RANDOM_HEADS=100000` lance la version
+    longue.
+  - À exécuter.
+
 ### [ ] T12.8 — Performance estimée (M6, M8, M9.4, M10)
 - **Spec** : §10.2, §10.4 · **Dépend de** : T8.1, T9.4.1 · **Taille** : S · **Palier** : R
 - **Livrables** : une table des gains attendus par piste, à confirmer sur la carte
@@ -278,6 +326,10 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - **Décision** : classer les pistes de M10 par gain divisé par effort. Les écarts
   carte / projection de T8.1 seront lus face à cette table.
 
+- **Fait (code)** : `tools/m12.sh perf` lance perf-model, roofline (`--out build/m12/perf`),
+  `stream_model` (8/4 bits, poids et activations) et les autres réseaux s'ils sont
+  exportés. À exécuter.
+
 ### [ ] T12.9 — Chaîne carte simulée
 - **Spec** : §11 · **Dépend de** : T12.1, T8.2 · **Taille** : M · **Palier** : M puis N
 - **Livrables** : `build/m12/sim/<variante>/` (dets, temps) ; `make map-stades` relancé
@@ -294,6 +346,18 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 
 - **Décision** : un seul écart bloque la carte. On le localise avec `run_compare` sur
   l'image en cause avant toute autre mesure.
+
+- **Fait (code)** :
+  - `tools/bench_sim.sh` accepte `COUNT=N` (N premières images), `OUT=<dossier>` et
+    `EXTRA="--hw-post"`.
+  - `eval_quant.py --save-dets` accepte `int-hwpp` évalué seul.
+  - `m12_report.py dets REF GOT…` vérifie l'égalité exacte sur les images présentes.
+  - `tools/m12.sh sim` couvre :
+    - les paliers 100 et 500 (ap_int) ;
+    - `ACC_NO_APINT` sur 500 ;
+    - `--hw-post` contre `int-hwpp` ;
+    - les modèles basse précision (`MODELS="dir…"`, 100 images).
+  - `make bench-sim` reste le palier N. À exécuter.
 
 ### [ ] T12.10 — Répétition générale du protocole carte
 - **Spec** : §10.4 · **Dépend de** : T12.9 · **Taille** : S · **Palier** : M
@@ -313,6 +377,14 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
     seulement que `pre`, `load`, `acc` et `post` sont tous renseignés et que p99 est
     calculé.
 - **Décision** : tout format ou chemin cassé se corrige avant la carte, pas sur la carte.
+
+- **Fait (code)** : `tools/m12.sh repetition` (`COUNT=100` par défaut) couvre :
+  - JPEG décodé par stb contre entrées PIL, avec les détections dans
+    `build/m12/repetition/board/` ;
+  - la lecture des temps par `bench_report.py`, dans `build/m12/repetition/`.
+
+  `map_stades.py` demande les 4 952 images. Sur un sous-ensemble, l'égalité est vérifiée
+  par `m12_report.py dets`. À exécuter.
 
 ### [ ] T12.11 — Entraînement sur CPU ou GPU (au choix)
 - **Spec** : §7.1 · **Dépend de** : T2.7, T9.3.3 · **Taille** : M · **Palier** : M
@@ -382,6 +454,37 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
     (palier M au lieu de N), avec `--device gpu` explicite dans chaque commande ;
   - sinon, le GPU reste une option et on documente le gain mesuré.
 
+- **Fait (code)** :
+  - `python/yolo/backend.py` : `use("cpu" | "gpu")`, avec un arrêt clair sans CuPy, CUDA ou
+    GPU. Il fournit aussi `get_xp`, `to_device`, `to_numpy`, `copy_into`,
+    `sliding_window_view` (repli `as_strided`) et `add_at` (`cupyx.scatter_add`).
+  - Les couches prennent le module de leurs entrées, donc un tableau NumPy reste calculé
+    par NumPy.
+  - Code touché :
+    - `layers/` ;
+    - `models/graph.py` (`Network.to_device` / `to_numpy`) ;
+    - `train/trainer.py` : lot copié vers le GPU ; perte et cibles **sur le CPU**, sur les
+      sorties des têtes ; checkpoints en NumPy ;
+    - `train/optim.py` ;
+    - `train/admm.py` : Z et U sur le GPU, projection Π_S sur le CPU ;
+    - `quant/fake_quant.py`, `quant/quantize.weight_scales` ;
+    - `testing/gradcheck.py`.
+  - `loss.py`, `pow2.py` et `data/` sont inchangés.
+  - `tools/train.py --device cpu|gpu`, avec `cpu` par défaut.
+  - `docs/conventions.md` est amendé.
+  - Tests, `python/tests/test_backend.py` :
+    - Point f : 6 itérations sur le réseau de test, ADMM compris. Paramètres, état, vitesses
+      et checkpoint sont identiques à l'octet avec ou sans `use("cpu")` / `to_device()`.
+    - Points a, b et d (réduit) : sautés tant que CuPy est absent. Leur corps a été vérifié
+      avec NumPy à la place de CuPy.
+  - Reste à faire sur la machine :
+    - pilote NVIDIA et `pip install cupy-cuda12x` ;
+    - `make test-py` (a, b, d), le point c (`make test-slow` sur GPU, à brancher) et le
+      point e (vitesse) avant toute décision.
+
+---
+
+## Ordre conseillé
 ---
 
 ## Ordre conseillé

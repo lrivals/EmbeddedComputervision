@@ -11,6 +11,7 @@
 
 import numpy as np
 
+from yolo.backend import get_xp, to_device, to_numpy
 from yolo.layers.activations import leaky_backward, leaky_forward
 from yolo.layers.batchnorm import bn_backward, bn_forward, bn_init_state
 from yolo.layers.conv import conv_backward, conv_forward
@@ -60,6 +61,23 @@ class Network:
             else:
                 p["b"] = np.zeros(cout, dtype=self.dtype)
             self.params[i] = p
+
+    def to_device(self):
+        """Paramètres et état BN sur le backend de `yolo.backend.use` (T12.11)."""
+        self._move(to_device)
+        return self
+
+    def to_numpy(self):
+        """Paramètres et état BN ramenés en NumPy (sauvegarde Darknet, export)."""
+        self._move(to_numpy)
+        return self
+
+    def _move(self, fn):
+        for group in (self.params, self.state):
+            for d in group:
+                for k in d:
+                    d[k] = fn(d[k])
+        self._caches = None
 
     def num_params(self, i):
         """Paramètres entraînables de la couche `i` (comptage du §3)."""
@@ -127,8 +145,8 @@ class Network:
         """
         if self._caches is None:
             raise RuntimeError("backward() appelé sans forward()")
-        dout = {i: np.array(d, copy=True) for i, d in douts.items()}
-        grads = [{k: np.zeros_like(v) for k, v in p.items()} for p in self.params]
+        dout = {i: get_xp(d).array(d, copy=True) for i, d in douts.items()}
+        grads = [{k: get_xp(v).zeros_like(v) for k, v in p.items()} for p in self.params]
         for i in reversed(range(len(self.layers))):
             dy = dout.pop(i, None)
             if dy is None:

@@ -11,9 +11,13 @@
         --qat w4a4 --qat-steps build/m9/models/tiny-yolov2-voc-w4a4-ptq/steps.json \
         --lr 1e-4 --burn-in 100 --batch 8 --iters 4000 --out build/train/qat-w4a4
 
+    # même entraînement sur le GPU (CuPy, T12.11) ; le CPU reste le défaut et la référence
+    python tools/train.py … --device gpu
+
 Sorties dans `--out` : `checkpoint.npz` (reprise exacte), `loss.csv` (une ligne par
 itération), `final.weights` (format Darknet ; pas en QAT ni en ADMM : réseau à BN fusionnée,
-exporté par tools/quant_lowbit.py --checkpoint).
+exporté par tools/quant_lowbit.py --checkpoint). Les checkpoints sont en NumPy quel que
+soit le backend ; la reprise exacte n'est garantie que sur le même backend.
 """
 
 import json
@@ -27,6 +31,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
+from yolo import backend  # noqa: E402
 from yolo.data.loader import DataLoader, VOCDataset  # noqa: E402
 from yolo.data.voc import load_split  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights, save_darknet_weights  # noqa: E402
@@ -83,7 +88,16 @@ def main():
     ap.add_argument("--admm-rho", type=float, default=1e-3)
     ap.add_argument("--admm-every", type=int, default=100,
                     help="itérations entre deux pas Z / U de l'ADMM")
+    ap.add_argument("--admm-growth", type=float, default=1.3,
+                    help="facteur de ρ à chaque pas Z / U (plafond 1)")
+    ap.add_argument("--device", choices=("cpu", "gpu"), default="cpu",
+                    help="backend de l'entraînement : NumPy (défaut) ou CuPy (T12.11)")
     args = ap.parse_args()
+    if args.device == "gpu":
+        try:
+            backend.use("gpu")
+        except RuntimeError as exc:
+            sys.exit(str(exc))
 
     dtype = np.float32
     net = build(args.net, dtype=dtype, rng=args.seed)
@@ -101,14 +115,18 @@ def main():
             ap.error("--qat demande --qat-steps")
         net = qat_from_steps(fused, scheme, steps) if args.qat else fused
         no_decay = NO_DECAY + ("log2_s",)
-        if args.admm:
-            from yolo.train.admm import ADMM
+    elif not args.resume:
+        init_weights(net, args.net, args.init, dtype)
+    if args.device == "gpu":
+        net.to_device()  # avant l'ADMM et le SGD : Z, U et vitesses suivent les paramètres
+    if args.admm:
+        from yolo.train.admm import ADMM
 
-            from yolo.quant.pow2 import load_plan
+        from yolo.quant.pow2 import load_plan
 
-            admm = ADMM(net, load_plan(args.admm, net.net), args.admm_rho, args.admm_every,
-                        log_path=args.out / "admm.csv")
-            grad_hook = admm.hook
+        admm = ADMM(net, load_plan(args.admm, net.net), args.admm_rho, args.admm_every,
+                    growth=args.admm_growth, log_path=args.out / "admm.csv")
+        grad_hook = admm.hook
     steps = [int(s) for s in args.steps.split(",") if s]
     scales = [float(s) for s in args.scales.split(",") if s]
     trainer = Trainer(net, SGD(net.params, no_decay=no_decay),
@@ -122,8 +140,7 @@ def main():
         if args.admm:
             admm.load(args.out / "admm.npz")
         print(f"reprise à l'itération {trainer.it}")
-    elif not (args.qat or args.admm):
-        init_weights(net, args.net, args.init, dtype)
+    print(f"backend : {args.device}")
 
     samples = []
     for item in args.splits.split(","):
@@ -154,7 +171,7 @@ def main():
     if args.qat or args.admm:
         print(f"checkpoint : {ckpt} (export : tools/quant_lowbit.py --checkpoint)")
         return
-    save_darknet_weights(net, args.out / "final.weights")
+    save_darknet_weights(net.to_numpy(), args.out / "final.weights")
     print(f"poids : {args.out / 'final.weights'}")
 
 

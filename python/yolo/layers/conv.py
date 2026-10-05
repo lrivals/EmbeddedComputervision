@@ -10,7 +10,8 @@ Deux implémentations aux mêmes conventions :
 import itertools
 
 import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
+
+from yolo.backend import get_xp, sliding_window_view
 
 
 def _out_size(n, k, s, pad):
@@ -21,7 +22,7 @@ def _out_size(n, k, s, pad):
 def _pad(x, pad):
     if pad == 0:
         return x
-    return np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)))
+    return get_xp(x).pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)))
 
 
 def _unpad(xp, pad):
@@ -64,13 +65,14 @@ def conv_backward_naive(dy, cache):
 
 def conv_forward(x, W, b=None, s=1, pad=None):
     """§4.1 par im2col : Y = W[F×Ck²] · X_col[Ck²×HoWo]. Renvoie (y, cache)."""
+    xnp = get_xp(x, W)
     k = W.shape[2]
     pad = k // 2 if pad is None else pad
     xp = _pad(x, pad)
     # Fenêtres (N, C, Ho, Wo, k, k) : vue sans copie, sous-échantillonnée par le stride.
     cols = sliding_window_view(xp, (k, k), axis=(2, 3))[:, :, ::s, ::s]
-    y = np.tensordot(cols, W, axes=([1, 4, 5], [1, 2, 3]))  # (N, Ho, Wo, F)
-    y = np.ascontiguousarray(y.transpose(0, 3, 1, 2))
+    y = xnp.tensordot(cols, W, axes=([1, 4, 5], [1, 2, 3]))  # (N, Ho, Wo, F)
+    y = xnp.ascontiguousarray(y.transpose(0, 3, 1, 2))
     if b is not None:
         y += b[None, :, None, None]
     return y, (xp, W, b is not None, s, pad)
@@ -79,13 +81,14 @@ def conv_forward(x, W, b=None, s=1, pad=None):
 def conv_backward(dy, cache):
     """§4.1 : dW = corrélation de δY avec X_p, δX_p = Σ_f δY·W (col2im). Renvoie (dx, grads)."""
     xp, W, has_b, s, pad = cache
+    xnp = get_xp(dy, W)
     _, _, ho, wo = dy.shape
     k = W.shape[2]
     cols = sliding_window_view(xp, (k, k), axis=(2, 3))[:, :, ::s, ::s]
-    dW = np.tensordot(dy, cols, axes=([0, 2, 3], [0, 2, 3]))  # (F, C, k, k)
+    dW = xnp.tensordot(dy, cols, axes=([0, 2, 3], [0, 2, 3]))  # (F, C, k, k)
     # δX_p[n,c,is+u,js+v] += Σ_f δY[n,f,i,j] W[f,c,u,v] : une tranche par (u, v).
-    dxp = np.zeros_like(xp, dtype=np.result_type(dy, W))
-    dcols = np.tensordot(dy, W, axes=([1], [0]))  # (N, Ho, Wo, C, k, k)
+    dxp = xnp.zeros_like(xp, dtype=np.result_type(dy.dtype, W.dtype))
+    dcols = xnp.tensordot(dy, W, axes=([1], [0]))  # (N, Ho, Wo, C, k, k)
     dcols = dcols.transpose(0, 3, 1, 2, 4, 5)  # (N, C, Ho, Wo, k, k)
     for u in range(k):
         for v in range(k):

@@ -22,12 +22,14 @@ struct Args {
   std::vector<std::string> images;
   int layer = -1;  // tb_conv : une seule conv
   std::string csv;
+  int random = -1;  // tb_post : têtes aléatoires par réseau (-1 : défaut du banc)
 };
 
 inline const char* const ALL_NETS[] = {"tiny-yolov2-voc", "tiny-yolov3-coco"};
 inline const char* const ALL_IMAGES[] = {"000001", "000002", "000003"};
 
 // --model DIR  --net NAME (répétable)  --image ID (répétable)  --layer N  --csv FICHIER
+// --random N
 inline Args parse(int argc, char** argv) {
   Args a;
   for (int i = 1; i < argc; ++i) {
@@ -42,6 +44,7 @@ inline Args parse(int argc, char** argv) {
     else if (k == "--image") a.images.push_back(v);
     else if (k == "--layer") a.layer = std::atoi(v.c_str());
     else if (k == "--csv") a.csv = v;
+    else if (k == "--random") a.random = std::atoi(v.c_str());
     else {
       std::fprintf(stderr, "argument inconnu : %s\n", k.c_str());
       std::exit(2);

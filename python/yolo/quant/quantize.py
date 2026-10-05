@@ -10,6 +10,8 @@
 
 import numpy as np
 
+from yolo.backend import get_xp
+
 QMAX = 127
 INPUT_SCALE = 1.0 / QMAX  # pixels [0, 1] → [0, 127]
 SHIFT_MAX = 31
@@ -38,9 +40,11 @@ def quantize_input(x):
 
 
 def weight_scales(W, qmax=QMAX):
-    """s_w,f = max|W_f| / qmax ; un filtre nul reçoit l'échelle 1/qmax (poids tous nuls)."""
-    m = np.abs(np.asarray(W, dtype=np.float64)).reshape(len(W), -1).max(axis=1)
-    return np.where(m > 0, m, 1.0) / qmax
+    """s_w,f = max|W_f| / qmax ; un filtre nul reçoit l'échelle 1/qmax (poids tous nuls).
+    Sur le backend de W (QAT sur GPU, T12.11)."""
+    xnp = get_xp(W)
+    m = xnp.abs(xnp.asarray(W, dtype=np.float64)).reshape(len(W), -1).max(axis=1)
+    return xnp.where(m > 0, m, 1.0) / qmax
 
 
 def quantize_weights_per_channel(W, qmax=QMAX):

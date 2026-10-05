@@ -11,12 +11,16 @@ Avec Z ∈ S, U la variable duale réduite et ρ > 0, on itère :
 Le résidu primal ‖W − Z‖ / ‖W‖ de chaque couche doit tendre vers 0 ; on finit par la
 projection dure W → Π_S(W) (tools/quant_lowbit.py --weights pow2 --checkpoint).
 Les convs travaillent sur les poids **fusionnés** (BN comprise, §9.1).
+
+Backend (T12.11) : Z et U suivent les poids (GPU possible) ; la projection Π_S, tous les
+`every` pas seulement, est calculée en NumPy sur le CPU.
 """
 
 import csv
 
 import numpy as np
 
+from yolo.backend import get_xp, to_numpy
 from yolo.quant.pow2 import dequantize, project
 
 
@@ -32,9 +36,15 @@ class ADMM:
         self.Z, self.U = {}, {}
         for i, kind in self.plan.items():
             W = net.params[i]["W"]
-            self.Z[i] = dequantize(*project(W, kind)).astype(W.dtype)
-            self.U[i] = np.zeros_like(W)
+            self.Z[i] = self._project(W, kind)
+            self.U[i] = get_xp(W).zeros_like(W)
         self.updates = 0
+
+    @staticmethod
+    def _project(W, kind):
+        """Π_S(W) déquantifié, au type et sur le backend de W."""
+        z = dequantize(*project(to_numpy(W), kind)).astype(W.dtype)
+        return get_xp(W).asarray(z)
 
     def hook(self, trainer, grads):
         for i in self.plan:
@@ -48,13 +58,14 @@ class ADMM:
         out = {}
         for i in self.plan:
             W = self.net.params[i]["W"].astype(np.float64)
-            out[i] = float(np.linalg.norm(W - self.Z[i]) / max(np.linalg.norm(W), 1e-12))
+            norm = get_xp(W).linalg.norm
+            out[i] = float(norm(W - self.Z[i]) / max(float(norm(W)), 1e-12))
         return out
 
     def update(self, it=None):
         for i, kind in self.plan.items():
             W = self.net.params[i]["W"]
-            self.Z[i] = dequantize(*project(W + self.U[i], kind)).astype(W.dtype)
+            self.Z[i] = self._project(W + self.U[i], kind)
             self.U[i] += W - self.Z[i]
         self.rho = min(self.rho * self.growth, self.rho_max)
         self.updates += 1
@@ -70,8 +81,8 @@ class ADMM:
 
     def save(self, path):
         np.savez(path, rho=np.array(self.rho), updates=np.array(self.updates),
-                 **{f"Z/{i}": z for i, z in self.Z.items()},
-                 **{f"U/{i}": u for i, u in self.U.items()})
+                 **{f"Z/{i}": to_numpy(z) for i, z in self.Z.items()},
+                 **{f"U/{i}": to_numpy(u) for i, u in self.U.items()})
 
     def load(self, path):
         with np.load(path) as d:
@@ -79,7 +90,6 @@ class ADMM:
             self.updates = int(d["updates"])
             for k in d.files:
                 kind, _, i = k.partition("/")
-                if kind == "Z":
-                    self.Z[int(i)] = d[k]
-                elif kind == "U":
-                    self.U[int(i)] = d[k]
+                if kind in ("Z", "U"):
+                    xnp = get_xp(self.net.params[int(i)]["W"])
+                    getattr(self, kind)[int(i)] = xnp.asarray(d[k])

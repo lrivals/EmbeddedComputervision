@@ -3,6 +3,8 @@ QAT / ADMM, puis export (manifest, blobs, LUT, dumps) lisible par le golden et l
 
     # PTQ 4 bits (pas d'activation puissances de 2 calibrés) → build/m9/models/<net>-w4a4-ptq
     python tools/quant_lowbit.py --scheme w4a4
+    # 1re et dernière conv gardées en INT8 (poids et sortie, T12.4)
+    python tools/quant_lowbit.py --scheme w4a4 --int8-layers 0,14 --out build/m12/ptq/w4a4-int8ends
     # après QAT (tools/train.py --qat w4a4) : paramètres du checkpoint
     python tools/quant_lowbit.py --scheme w4a4 --checkpoint build/train/qat-w4a4/checkpoint.npz \\
         --out build/m9/models/tiny-yolov2-voc-w4a4-qat
@@ -47,11 +49,11 @@ def load_stats(net, fused, devkit, n=500):
     return values
 
 
-def lowbit_model(net, scheme, devkit, checkpoint=None):
-    """(QATNetwork, QuantModel) du schéma wXaY (T9.3)."""
+def lowbit_model(net, scheme, devkit, checkpoint=None, int8_layers=()):
+    """(QATNetwork, QuantModel) du schéma wXaY (T9.3) ; `int8_layers` : convs en INT8."""
     fused = load_fused(net)
     values = load_stats(net, fused, devkit)
-    qat = build_qat(fused, scheme, values.get)
+    qat = build_qat(fused, scheme, values.get, int8_layers=int8_layers)
     if checkpoint:
         load_params(qat, checkpoint)
     return qat, to_quant_model(qat)
@@ -84,9 +86,14 @@ def main():
                     help="schéma de poids par couche (JSON, T9.2)")
     ap.add_argument("--calib", type=Path, default=None,
                     help="échelles INT8 (--weights pow2 ; défaut build/quant/<net>/calib.json)")
+    ap.add_argument("--int8-layers", default="",
+                    help="convs gardées en INT8 en wXaY, ex. 0,14 (T12.4)")
     ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
+    int8_layers = [int(i) for i in args.int8_layers.split(",") if i]
+    if int8_layers and args.weights == "pow2":
+        ap.error("--int8-layers : schémas wXaY seulement (en pow2, passer par --weights-plan)")
     tag = ("admm" if args.weights == "pow2" else "qat") if args.checkpoint else "ptq"
     name = f"{args.net}-pow2" if args.weights == "pow2" else f"{args.net}-{args.scheme}"
     out = args.out or ROOT / "build" / "m9" / "models" / f"{name}-{tag}"
@@ -104,13 +111,14 @@ def main():
         print(f"modèle : {out}")
         return
 
-    qat, qm = lowbit_model(args.net, args.scheme, args.devkit, args.checkpoint)
+    qat, qm = lowbit_model(args.net, args.scheme, args.devkit, args.checkpoint, int8_layers)
     export_model(qm, out)
     write_dumps(qm, samples, out, 416)
     steps = steps_table(qat)
     (out / "steps.json").write_text(json.dumps({
         "scheme": args.scheme,
         "checkpoint": str(args.checkpoint) if args.checkpoint else None,
+        "int8_layers": int8_layers,
         "log2_steps": {str(i): k for i, _, k, learned in steps if learned},
         "layers": [{"id": i, "qmax": q, "log2_step": k, "learned": learned,
                     "w_qmax": qm.convs[i].wqmax,

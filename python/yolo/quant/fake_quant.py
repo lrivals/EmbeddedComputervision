@@ -22,13 +22,15 @@ carte), le facteur d'échelle de LSQ (hors base) ; désactivé pour l'entraînem
 `QATNetwork` : réseau **à BN fusionnée** (convs avec biais, `fuse_network`) dont chaque conv
 fake-quantifie ses poids, applique la leaky 13/128 du matériel et fake-quantifie sa sortie ;
 l'entrée est quantifiée à 1/127 comme par l'hôte. Les têtes gardent 8 bits au pas fixe des
-LUT (1/8). Même interface que `Network` : le `Trainer` l'entraîne tel quel.
+LUT (1/8). Même interface que `Network` : le `Trainer` l'entraîne tel quel, sur le CPU ou
+le GPU (`Network.to_device`, T12.11).
 """
 
 import math
 
 import numpy as np
 
+from yolo.backend import get_xp, to_numpy
 from yolo.layers.conv import conv_backward, conv_forward
 from yolo.models.graph import Network
 from yolo.quant.int_layers import LEAKY_MUL, LEAKY_SHIFT
@@ -45,14 +47,15 @@ def qmax_of_bits(bits):
 
 def pow2_step(log2_step):
     """Puissance de 2 la plus proche : 2^{⌊k + ½⌋}."""
-    return 2.0 ** math.floor(float(np.asarray(log2_step).reshape(-1)[0]) + 0.5)
+    return 2.0 ** math.floor(float(to_numpy(log2_step).reshape(-1)[0]) + 0.5)
 
 
 # ---------------------------------------------------------------------------- poids
 def fq_weight(W, qmax):
     """Poids fake-quantifiés par canal (même arrondi ⌊v + ½⌋ que `quantize`)."""
+    xnp = get_xp(W)
     sw = weight_scales(W, qmax).astype(W.dtype)[:, None, None, None]
-    return (np.clip(np.floor(W / sw + 0.5), -qmax, qmax) * sw).astype(W.dtype)
+    return (xnp.clip(xnp.floor(W / sw + 0.5), -qmax, qmax) * sw).astype(W.dtype)
 
 
 # ----------------------------------------------------------------------- activations
@@ -60,17 +63,18 @@ def fq_act_forward(x, log2_step, qmax, leaky=False):
     """Sortie d'une conv telle que le matériel la produit, à l'échelle s = 2^{round(k)} :
     r = round(x/s), puis leaky entière (r > 0 ? r : (13r + 64) ≫ 7) si `leaky`, puis
     clip(·, −qmax, qmax)·s (même ordre que `int_layers.conv_int`). Rend (ŷ, cache)."""
+    xnp = get_xp(x)
     s = pow2_step(log2_step)
     u = x / x.dtype.type(s)
-    r = np.floor(u + 0.5)
+    r = xnp.floor(u + 0.5)
     a = 1.0
     if leaky:
         neg = r <= 0
-        r = np.where(neg, np.floor((LEAKY_MUL * r + 64) / 128), r)
-        a = np.where(neg, LEAKY_SLOPE, 1.0)
+        r = xnp.where(neg, xnp.floor((LEAKY_MUL * r + 64) / 128), r)
+        a = xnp.where(neg, LEAKY_SLOPE, 1.0)
     v = a * u  # substitut continu de r
-    inside = np.abs(v) <= qmax
-    y = (np.clip(r, -qmax, qmax) * s).astype(x.dtype)
+    inside = xnp.abs(v) <= qmax
+    y = (xnp.clip(r, -qmax, qmax) * s).astype(x.dtype)
     return y, (v, r, a, inside, s, qmax)
 
 
@@ -78,9 +82,10 @@ def fq_act_backward(dy, cache, grad_scale=1.0):
     """Rend (δx, δk) : STE pour x (pente a de la leaky dans la plage, 0 hors plage), LSQ
     pour s, puis ∂s/∂k = s ln 2 ; δk × `grad_scale`."""
     v, r, a, inside, s, qmax = cache
-    dx = np.where(inside, dy * a, 0).astype(dy.dtype)
-    ds_local = np.where(inside, r - v, np.sign(v) * qmax)
-    dk = float(np.sum(dy.astype(np.float64) * ds_local)) * s * LN2 * grad_scale
+    xnp = get_xp(dy)
+    dx = xnp.where(inside, dy * a, 0).astype(dy.dtype)
+    ds_local = xnp.where(inside, r - v, xnp.sign(v) * qmax)
+    dk = float(xnp.sum(dy.astype(np.float64) * ds_local)) * s * LN2 * grad_scale
     return dx, dk
 
 
@@ -117,8 +122,9 @@ class QATNetwork(Network):
                 if layer["type"] == "conv"}
 
     def forward(self, x, train=True, all_outputs=False):
-        x = np.asarray(x)
-        q = np.clip(np.floor(x / x.dtype.type(self.input_scale) + 0.5), -QMAX, QMAX)
+        xnp = get_xp(x)
+        x = xnp.asarray(x)
+        q = xnp.clip(xnp.floor(x / x.dtype.type(self.input_scale) + 0.5), -QMAX, QMAX)
         return super().forward((q * self.input_scale).astype(x.dtype), train, all_outputs)
 
     def _conv_forward(self, i, x, train):
@@ -137,7 +143,7 @@ class QATNetwork(Network):
         dy, dk = fq_act_backward(dy, c_q, g)
         grads = {}
         if STEP_PARAM in self.params[i]:
-            grads[STEP_PARAM] = np.array([dk], dtype=self.dtype)
+            grads[STEP_PARAM] = get_xp(self.params[i][STEP_PARAM]).array([dk], dtype=self.dtype)
         dx, gc = conv_backward(dy, caches.pop())  # δŴ, transmis à W (STE)
         grads.update(gc)
         return [dx], grads

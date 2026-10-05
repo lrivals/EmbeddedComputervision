@@ -10,7 +10,11 @@ moyenne par image), ce qui rend le taux d'apprentissage indépendant de la taill
 
 La taille multi-échelle de l'itération `it` est une fonction pure de (graine, it // 10), et
 l'ordre des images une fonction de (graine, époque) : la reprise d'un checkpoint reproduit
-exactement la suite de l'entraînement.
+exactement la suite de l'entraînement (sur le même backend).
+
+Backend (T12.11) : si les paramètres sont sur le GPU (`Network.to_device`), le lot y est
+copié ; la perte et ses cibles restent calculées en NumPy sur les sorties des têtes
+(petites), dont les gradients repartent vers le GPU. Les checkpoints sont toujours en NumPy.
 """
 
 import csv
@@ -19,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
+from yolo.backend import copy_into, get_xp, to_numpy
 from yolo.data.targets import heads
 from yolo.train.loss import yolo_loss
 
@@ -54,6 +59,10 @@ class Trainer:
         self.log_path = Path(log_path) if log_path else None
         self.grad_hook = grad_hook
 
+    def array_module(self):
+        """numpy ou cupy, d'après les paramètres du réseau."""
+        return get_xp(*(v for p in self.net.params for v in p.values()))
+
     def size_for(self, it):
         return self.size if self.size else multiscale_size(it, self.seed)
 
@@ -61,10 +70,16 @@ class Trainer:
         """Une itération ; rend le `LossResult` (somme sur le lot) et le taux utilisé."""
         t0 = time.perf_counter()
         n = images.shape[0]
-        outputs = self.net.forward(images.astype(self.net.dtype, copy=False), train=True)
+        xnp = self.array_module()
+        x = images.astype(self.net.dtype, copy=False)
+        outputs = self.net.forward(x if xnp is np else xnp.asarray(x), train=True)
+        outputs = {h: to_numpy(o) for h, o in outputs.items()}
         res = yolo_loss(outputs, boxes, labels, self.net.net["anchors"], self.head_list,
                         self.net.net["classes"], **self.loss_kwargs)
-        _, grads = self.net.backward({h: d / n for h, d in res.douts.items()})
+        douts = {h: d / n for h, d in res.douts.items()}
+        if xnp is not np:
+            douts = {h: xnp.asarray(d) for h, d in douts.items()}
+        _, grads = self.net.backward(douts)
         lr = self.schedule(self.it)
         if self.grad_hook:
             self.grad_hook(self, grads)
@@ -108,9 +123,10 @@ class Trainer:
         """Paramètres, état BN, vitesses SGD et itération dans un `.npz`."""
         arrays = {"it": np.array(self.it), "seed": np.array(self.seed)}
         for i, (p, s) in enumerate(zip(self.net.params, self.net.state)):
-            arrays.update({f"param/{i}/{k}": v for k, v in p.items()})
-            arrays.update({f"state/{i}/{k}": v for k, v in s.items()})
-        arrays.update({f"velocity/{k}": v for k, v in self.optimizer.state_dict().items()})
+            arrays.update({f"param/{i}/{k}": to_numpy(v) for k, v in p.items()})
+            arrays.update({f"state/{i}/{k}": to_numpy(v) for k, v in s.items()})
+        arrays.update({f"velocity/{k}": to_numpy(v)
+                       for k, v in self.optimizer.state_dict().items()})
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp.npz")
@@ -126,10 +142,10 @@ class Trainer:
                 kind, _, rest = key.partition("/")
                 if kind == "param":
                     i, k = rest.split("/")
-                    self.net.params[int(i)][k][...] = data[key]
+                    copy_into(self.net.params[int(i)][k], data[key])
                 elif kind == "state":
                     i, k = rest.split("/")
-                    self.net.state[int(i)][k][...] = data[key]
+                    copy_into(self.net.state[int(i)][k], data[key])
                 elif kind == "velocity":
                     velocity[rest] = data[key]
             self.optimizer.load_state_dict(velocity)

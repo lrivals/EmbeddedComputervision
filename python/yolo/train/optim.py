@@ -5,7 +5,7 @@
 Pas de weight decay sur γ, β et les biais (convention usuelle, hors base).
 """
 
-import numpy as np
+from yolo.backend import copy_into, get_xp
 
 NO_DECAY = ("gamma", "beta", "b")
 
@@ -18,7 +18,7 @@ class SGD:
         self.momentum = momentum
         self.weight_decay = weight_decay
         self.no_decay = set(no_decay)
-        self.velocity = [{k: np.zeros_like(v) for k, v in p.items()} for p in params]
+        self.velocity = [{k: get_xp(v).zeros_like(v) for k, v in p.items()} for p in params]
 
     def step(self, grads, lr):
         mu = self.momentum
@@ -38,4 +38,4 @@ class SGD:
     def load_state_dict(self, state):
         for key, value in state.items():
             i, k = key.split("/")
-            self.velocity[int(i)][k][...] = value
+            copy_into(self.velocity[int(i)][k], value)

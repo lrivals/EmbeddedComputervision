@@ -11,7 +11,8 @@ Variantes : `float` (réseau fusionné, float32), `int` (modèle entier, `IntNet
 f64 bit-exact), `fq:all` (simulation flottante de toutes les couches quantifiées),
 `fq:<id>` (seule la conv <id> quantifiée), `fq:each` (toutes les `fq:<id>`), `int-hwpp`
 (modèle entier + post-traitement matériel tout entier et NMS sans tri, T9.1 ; `--hw-cap`
-emplacements de sélection, débordements comptés). `--model-dir` : évalue un modèle entier
+emplacements de sélection, débordements comptés). La table `--out` donne aussi le nombre
+moyen de détections par image (T12.2-b) et, pour `int-hwpp`, les candidates perdues. `--model-dir` : évalue un modèle entier
 exporté (manifest + blobs, ex. 4 bits ou puissances de 2, M9.2-M9.3) au lieu de celui de
 `--calib` ; seules les variantes `int` et `int-hwpp` s'appliquent alors.
 Même prétraitement (`--resize` letterbox | stretch, PIL) et même seuil (0,005) que
@@ -121,10 +122,17 @@ def _run(task):
             dets = detect(_Sim, x, [wh], mode, conf, iou)
         boxes, scores, labels = dets[0]
         out[v] = (labels, scores, to_voc_pixels(boxes, width, height))
-        if v == "int":  # boîtes normalisées, pour --save-dets (comparaison bit à bit, T8.2)
+        # Boîtes normalisées pour --save-dets (comparaison bit à bit, T8.2) : int, ou int-hwpp
+        # évalué seul (comparaison à yolo_bench --hw-post, T12.9).
+        if v == "int" or (v == "int-hwpp" and "int" not in variants):
             out["int:raw"] = (np.asarray(boxes, dtype=np.float64).reshape(-1, 4).tolist(),
                               [float(s) for s in scores], [int(c) for c in labels])
     return out
+
+
+def dets_per_image(per_class, n_images):
+    """Détections par image d'une variante ({classe: (ids, scores, boîtes)}, T12.2-b)."""
+    return sum(len(d[0]) for d in per_class.values()) / max(n_images, 1)
 
 
 def expand(variants, name):
@@ -173,8 +181,9 @@ def run(args, samples, variants):
         raw.close()
     if "int-hwpp" in variants:
         print(f"int-hwpp : {overflow} candidates perdues (sélection pleine, {args.hw_cap})")
-    return {v: {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4))
+    dets = {v: {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4))
                 for c, d in pc.items()} for v, pc in per.items()}
+    return dets, overflow
 
 
 def main():
@@ -201,8 +210,8 @@ def main():
     ap.add_argument("--save-dets", type=Path, default=None,
                     help="détections du modèle entier, une ligne JSON par image (T8.2)")
     args = ap.parse_args()
-    if args.save_dets and "int" not in args.variants.split(","):
-        ap.error("--save-dets demande la variante int")
+    if args.save_dets and not {"int", "int-hwpp"} & set(args.variants.split(",")):
+        ap.error("--save-dets demande la variante int ou int-hwpp")
     if args.model_dir and set(args.variants.split(",")) - {"int", "int-hwpp"}:
         ap.error("--model-dir : variantes int et int-hwpp seulement")
     from calibrate import net_tag
@@ -216,19 +225,24 @@ def main():
     if args.subset:
         samples = samples[:args.subset]
     variants = expand(args.variants.split(","), args.net)
-    dets = run(args, samples, variants)
+    dets, overflow = run(args, samples, variants)
 
     res = {}
     for v in variants:
         aps, m = evaluate(dets[v], samples, len(VOC_CLASSES), use_07=True)
-        res[v] = {"map": m, "aps": list(aps)}
-        print(f"{v:8s} mAP {m * 100:.2f}")
+        res[v] = {"map": m, "aps": list(aps),
+                  "dets_per_image": dets_per_image(dets[v], len(samples))}
+        if v == "int-hwpp":
+            res[v]["overflow"] = overflow
+        print(f"{v:8s} mAP {m * 100:.2f}  ({res[v]['dets_per_image']:.1f} détections par image)")
     out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / (
         f"eval_{split}_{len(samples)}_{args.resize}_"
         f"{'-'.join(v.replace(':', '') for v in variants)}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"net": args.net, "images": len(samples), "resize": args.resize,
-                               "calib": str(args.calib),
+                               "calib": str(args.calib), "conf": args.conf, "iou": args.iou,
+                               "model_dir": str(args.model_dir) if args.model_dir else None,
+                               "hw_cap": args.hw_cap if "int-hwpp" in variants else None,
                                "results": res}, indent=1) + "\n")
     print(f"résultats : {out}")
 

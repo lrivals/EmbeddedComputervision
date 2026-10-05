@@ -1,7 +1,7 @@
 // Testbench du post-traitement matériel (T9.1.2) : boîtes de `yolo_post` == `hwpp::run`
 // (golden) sur les têtes des dumps et sur des têtes aléatoires ; cycles estimés en C-sim.
 //
-//   tb_post [--model DIR] [--net NAME]… [--image ID]…
+//   tb_post [--model DIR] [--net NAME]… [--image ID]… [--random N]
 #include <cstdio>
 #include <random>
 
@@ -92,8 +92,8 @@ int main(int argc, char** argv) {
       failed += !check(m, heads, 0.25, "toutes cellules", true);
       ++checked;
     }
-    // Têtes aléatoires.
-    const int n_rand = net == "tiny-yolov2-voc" ? 800 : 200;
+    // Têtes aléatoires ; --random N pour une campagne longue (T12.7, ex. 100000).
+    const int n_rand = a.random >= 0 ? a.random : net == "tiny-yolov2-voc" ? 800 : 200;
     for (int r = 0; r < n_rand; ++r) {
       std::vector<std::vector<int8_t>> heads;
       std::uniform_int_distribution<int> u(-128, 127), bias(-60, 40);

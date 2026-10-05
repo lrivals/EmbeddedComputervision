@@ -12,6 +12,8 @@ d'une différence de deux grandes sommes.
 
 import numpy as np
 
+from yolo.backend import get_xp, to_numpy
+
 
 def numerical_grad(f, x, h=1e-6, idx=None):
     """Gradient de `L = Σ f()` par rapport à `x`, par différences centrées (§11).
@@ -19,7 +21,7 @@ def numerical_grad(f, x, h=1e-6, idx=None):
     `x` est modifié en place puis restauré. `idx` : liste d'indices (tuples) à évaluer ;
     `None` évalue tous les éléments. Renvoie un tableau de la forme de `x` (nul hors `idx`).
     """
-    grad = np.zeros_like(x, dtype=np.float64)
+    grad = np.zeros(x.shape, dtype=np.float64)
     indices = np.ndindex(x.shape) if idx is None else idx
     for i in indices:
         old = x[i]
@@ -28,7 +30,7 @@ def numerical_grad(f, x, h=1e-6, idx=None):
         x[i] = old - h
         fm = f()
         x[i] = old
-        grad[i] = np.sum(np.asarray(fp) - np.asarray(fm)) / (2 * h)
+        grad[i] = np.sum(to_numpy(fp) - to_numpy(fm)) / (2 * h)
     return grad
 
 
@@ -40,8 +42,8 @@ def rel_error(a, n, eps=1e-12):
     grande l'erreur relative d'un élément dont le gradient est accidentellement petit. Une
     erreur réelle sur un seul élément reste visible (≈ son poids relatif dans la norme).
     """
-    a = np.asarray(a, dtype=np.float64)
-    n = np.asarray(n, dtype=np.float64)
+    a = to_numpy(a).astype(np.float64)
+    n = to_numpy(n).astype(np.float64)
     if a.size == 0:
         return 0.0
     scale = max(np.max(np.abs(a)), np.max(np.abs(n)), eps)
@@ -68,7 +70,7 @@ def check_grad(f, x, analytic, h=1e-6, n_samples=None, rng=None, eps=1e-12):
         return 0.0
     num = numerical_grad(f, x, h=h, idx=idx)
     rows = tuple(np.array(c) for c in zip(*idx))
-    return rel_error(np.asarray(analytic)[rows], num[rows], eps=eps)
+    return rel_error(to_numpy(analytic)[rows], num[rows], eps=eps)
 
 
 def check_layer(fwd, bwd, x, params, n_samples=None, rng=0):
@@ -79,7 +81,7 @@ def check_layer(fwd, bwd, x, params, n_samples=None, rng=0):
     """
     rng = np.random.default_rng(rng)
     y, cache = fwd(x, params)
-    r = rng.standard_normal(y.shape)
+    r = get_xp(y).asarray(rng.standard_normal(y.shape))  # sur le backend de y (T12.11)
     dx, grads = bwd(r, cache)
 
     def loss():

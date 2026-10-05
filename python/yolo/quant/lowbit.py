@@ -38,24 +38,30 @@ def head_convs(net):
     return [i - 1 for i, layer in enumerate(layers) if layer["type"] in OUTPUT_TYPES]
 
 
-def layer_qmax(net, wbits, abits):
-    """({id conv: qmax des poids}, {id conv: qmax de la sortie}) ; têtes à 127."""
+def layer_qmax(net, wbits, abits, int8_layers=()):
+    """({id conv: qmax des poids}, {id conv: qmax de la sortie}) ; têtes à 127, ainsi que
+    poids et sortie des convs de `int8_layers` (1re et dernière couche en INT8, T12.4)."""
+
     layers = net["layers"]
     for layer in layers:
         if layer["type"] == "route" and len(layer["from"]) > 1:
             raise NotImplementedError("route à plusieurs sources : échelles à unifier (v3)")
     convs = [i for i, layer in enumerate(layers) if layer["type"] == "conv"]
     heads = set(head_convs(net))
-    w_qmax = {i: qmax_of_bits(wbits) for i in convs}
-    a_qmax = {i: qmax_of_bits(abits) if i not in heads else 127 for i in convs}
+    keep = set(int8_layers)
+    unknown = keep - set(convs)
+    if unknown:
+        raise ValueError(f"int8_layers : pas des convs : {sorted(unknown)}")
+    w_qmax = {i: 127 if i in keep else qmax_of_bits(wbits) for i in convs}
+    a_qmax = {i: 127 if i in heads or i in keep else qmax_of_bits(abits) for i in convs}
     return w_qmax, a_qmax
 
 
-def build_qat(fused, scheme, values_of, head_scale=HEAD_SCALE):
+def build_qat(fused, scheme, values_of, head_scale=HEAD_SCALE, int8_layers=()):
     """Réseau QAT initialisé en PTQ : pas 2^j minimisant l'erreur du fake-quant sur les
     valeurs de calibration `values_of(id conv)` (sorties flottantes du réseau fusionné)."""
     wb, ab = parse_scheme(scheme)
-    w_qmax, a_qmax = layer_qmax(fused.net, wb, ab)
+    w_qmax, a_qmax = layer_qmax(fused.net, wb, ab, int8_layers)
     heads = set(head_convs(fused.net))
     learned = [i for i in a_qmax if i not in heads]
     steps = pow2_act_steps(values_of, learned, a_qmax.get)

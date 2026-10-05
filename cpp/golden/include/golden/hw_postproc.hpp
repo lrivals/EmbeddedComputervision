@@ -25,7 +25,12 @@ constexpr int SOFTMAX_OFFSET = 255;
 constexpr int64_t W_MAX = (int64_t(1) << 20) - 1;
 constexpr int MAX_ANCHORS = 8;
 constexpr int MAX_CLASSES = 80;
-constexpr int CAP = 256;  // emplacements de sélection du noyau
+// Emplacements de sélection du noyau ; -DHWPP_CAP=N pour chiffrer une autre capacité en
+// C-sim (T12.7, tb_post compilé à part).
+#ifndef HWPP_CAP
+#define HWPP_CAP 256
+#endif
+constexpr int CAP = HWPP_CAP;
 
 // Boîte retenue : coins en pixels Q4, score Q16, classe.
 struct Box {
