@@ -58,7 +58,7 @@ reporter ici l'avancement par jalon.
 | M3 | 4 | 4 |
 | M4 | 7 | 7 (T4.6 sans objet) |
 | M5 | 6 | 6 |
-| M6 | 6 | 0 |
+| M6 | 6 | 1 (T6.0-T6.3 en C-sim ; synthèse et co-sim en attente de Vitis) |
 | M7 | 4 | 0 |
 | M8 | 3 | 0 |
 | M9 | 5 | 0 |

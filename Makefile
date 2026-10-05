@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -16,7 +16,13 @@ help:
 	@echo "calibrate   échelles INT8 sur 500 images VOC trainval → build/quant/ (T4.2)"
 	@echo "eval-int    mAP VOC2007 test du modèle entier et du flottant (T4.5)"
 	@echo "export      modèle entier + dumps → model/<net>/ (T4.7)"
-	@echo "csim        C-simulation HLS (T6.1, nécessite Vitis HLS)"
+	@echo "csim-gcc    C-sim du noyau HLS avec g++ (sans Vitis) : tb_conv + tb_net (T6.1-T6.4)"
+	@echo "hls-cycles  estimation de cycles par couche en C-sim → build/hls/cycles_conv.csv"
+	@echo "csim        C-simulation HLS dans Vitis (BOARD=$(BOARD))"
+	@echo "hls-synth   synthèse Vitis HLS (T6.5)"
+	@echo "hls-cosim   co-simulation RTL sur une image (T6.5, long)"
+	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
+	@echo "hls-report  results/hls_report.md (T6.5)"
 
 test: test-py test-cpp
 
@@ -76,8 +82,32 @@ eval-int:
 export:
 	for n in $(QNETS); do python tools/export_model.py --net $$n || exit 1; done
 
+BOARD ?= kv260
+
+csim-gcc:
+	cmake -S hls -B build/hls
+	cmake --build build/hls -j
+	cd build/hls && ctest --output-on-failure
+
+hls-cycles:
+	cmake -S hls -B build/hls
+	cmake --build build/hls -j --target tb_conv
+	build/hls/tb_conv --image 000001 --csv build/hls/cycles_conv.csv
+
 csim:
-	cd hls && vitis_hls -f scripts/csim.tcl
+	cd hls && vitis_hls -f scripts/csim.tcl -tclargs $(BOARD)
+
+hls-synth:
+	cd hls && vitis_hls -f scripts/synth.tcl -tclargs $(BOARD)
+
+hls-cosim:
+	cd hls && vitis_hls -f scripts/cosim.tcl -tclargs $(BOARD)
+
+hls-export:
+	cd hls && vitis_hls -f scripts/export.tcl -tclargs $(BOARD)
+
+hls-report:
+	python tools/hls_report.py --board $(BOARD)
 
 clean:
 	rm -rf build

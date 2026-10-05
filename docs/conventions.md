@@ -114,4 +114,10 @@ Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages
   images).
 - C++ : C++17, en-têtes dans `cpp/golden/include/golden/` ; le code partagé avec HLS ne
   fait pas d'allocation dynamique.
+- HLS (`hls/kernels/`) : le noyau compile en C++14 (défaut Vitis), sans allocation ni
+  bibliothèque non synthétisable ; il réutilise l'arithmétique de `golden/conv.hpp`
+  (`requantize`, `leaky_int`, `clip8`). Tuiles en macros `ACC_TM`, `ACC_TN`, `ACC_TR`,
+  `ACC_TC` (défauts KV260). Boucles nommées (`mac:`, `load_in:`…) pour lire leur II dans
+  les rapports. Le top est à portée globale (`set_top yolo_conv`). Testbenchs et driver :
+  C++17 ; code de sortie 0 = aucun écart.
 - Chaque formule implémentée cite sa section de la spec en commentaire (`# §6.2`).

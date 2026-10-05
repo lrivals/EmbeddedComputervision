@@ -72,8 +72,31 @@ Choix du §10.1 : **un moteur unique** plutôt qu'un pipeline dataflow. Il compr
 Le décodage et la NMS tournent d'abord sur l'ARM (§10.3), avec le code de
 `cpp/golden` réutilisé dans `sw/postproc`.
 
-La carte n'est pas choisie ([ADR 0003](adr/0003-choix-carte.md)). Les tailles de tuiles
-sont donc des paramètres (`hls/configs/<carte>.tcl`), fixés par l'outil roofline (T5.6).
+Carte : Kria KV260 ([ADR 0003](adr/0003-choix-carte.md)). Les tailles de tuiles restent
+des paramètres (`hls/configs/<carte>.tcl` → `-DACC_TM=…`), fixés par l'outil roofline (T5.6).
+
+### Noyau `yolo_conv` (M6)
+
+Un appel = une conv (+ maxpool fusionné), même parcours de tuiles que
+`golden::conv_layer` (row → col → to → ti), donc mêmes entiers.
+
+| Fichier | Rôle |
+|---|---|
+| `hls/kernels/layer_desc.hpp` | registres s_axilite (`LayerDesc`) : forme, 2 segments d'entrée `{offset, c, h, w, up}`, offsets de sortie et de paramètres — C++ simple, partagé avec le driver |
+| `hls/kernels/conv_pe.cpp` | top, chargeurs, PE Tm × Tn (`PIPELINE II=1`), ping-pong `in_buf`/`w_buf` sur ti et `out_buf` sur les tuiles |
+| `hls/kernels/output_stage.hpp` | biais + requantification + leaky + saturation, maxpool 2×2 s2/s1, carte avant pooling |
+| `sw/driver/program.hpp` | arène DDR contiguë (tampons du manifest bout à bout), vues par couche, un `LayerDesc` par conv |
+
+Interfaces : `m_axi` `gmem_in` / `gmem_out` (même arène d'activations, deux bundles pour
+recouvrir chargement et stockage), `gmem_w` (weights.bin), `gmem_p` (bias.bin puis
+requant.bin) ; adresses = indices dans ces tableaux. Upsample et route ne sont que des
+segments d'entrée de la conv suivante : aucun appel du noyau.
+
+Vérification : `hls/tb/tb_conv.cpp` (chaque conv seule) et `hls/tb/tb_net.cpp` (réseau via
+le driver, chaque couche contrôlée juste après son appel, avant que les tampons ping-pong
+A/B soient réécrits). C-sim avec g++ (`make csim-gcc`, en-têtes `ap_int` open source) ou
+Vitis (`make csim`) ; synthèse, co-sim, export : `make hls-synth | hls-cosim | hls-export`,
+rapport `make hls-report` → `results/hls_report.md`.
 
 ## 4. Golden model C++ (`cpp/golden/`, M5)
 
@@ -97,6 +120,6 @@ décrits dans [T5.2](tasks/M5-golden-cpp.md).
 pytest (gradcheck)          ─► étage 1 correct
 mAP flottant vs entier      ─► perte de quantification mesurée (§9)
 tools/compare_dumps.py      ─► golden == dumps Python, couche par couche (make golden-check)
-C-sim / co-sim HLS          ─► noyau == golden
+C-sim / co-sim HLS          ─► noyau == golden == dumps (make csim-gcc, make hls-cosim)
 test sur carte              ─► sortie DDR == golden ; mAP aux trois stades (§11)
 ```
