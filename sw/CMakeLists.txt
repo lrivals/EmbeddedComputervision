@@ -76,6 +76,8 @@ if(SW_BACKEND STREQUAL "sim")
   add_test(NAME run_compare COMMAND run_compare)
   # T9.1 : post-traitement par le noyau yolo_post == golden hwpp.
   add_test(NAME run_compare_hw_post COMMAND run_compare --image 000002 --hw-post)
+  # T10.7 : séquenceur (une fin par image) puis yolo_post == golden hwpp.
+  add_test(NAME run_compare_chain COMMAND run_compare --image 000001 --chain --hw-post)
   add_test(NAME yolo_app_input COMMAND yolo_app --model ${SW_MODEL_DIR}/tiny-yolov2-voc
            --input ${SW_MODEL_DIR}/tiny-yolov2-voc/dumps/000001/input.npy
            --out ${CMAKE_BINARY_DIR}/det_000001.json)
@@ -84,4 +86,15 @@ if(SW_BACKEND STREQUAL "sim")
            -DBENCH=$<TARGET_FILE:yolo_bench> -DMODEL=${SW_MODEL_DIR}/tiny-yolov2-voc
            -DIMAGE=000001 -DWORK=${CMAKE_BINARY_DIR}/bench_test
            -P ${CMAKE_CURRENT_SOURCE_DIR}/app/test_yolo_bench.cmake)
+  # T10.5 : --pipeline (deux arènes, deux threads) → mêmes détections qu'en séquentiel.
+  find_package(Python3 COMPONENTS Interpreter)
+  if(Python3_FOUND)
+    add_test(NAME yolo_bench_pipeline COMMAND ${CMAKE_COMMAND}
+             -DBENCH=$<TARGET_FILE:yolo_bench> -DMODEL=${SW_MODEL_DIR}/tiny-yolov2-voc
+             -DPYTHON=${Python3_EXECUTABLE} -DWORK=${CMAKE_BINARY_DIR}/bench_pipeline
+             -P ${CMAKE_CURRENT_SOURCE_DIR}/app/test_yolo_bench_pipeline.cmake)
+  endif()
+  add_test(NAME yolo_app_pipeline COMMAND yolo_app --model ${SW_MODEL_DIR}/tiny-yolov2-voc
+           --input ${SW_MODEL_DIR}/tiny-yolov2-voc/dumps/000001/input.npy --repeat 3
+           --pipeline --out ${CMAKE_BINARY_DIR}/det_000001_pipeline.json)
 endif()

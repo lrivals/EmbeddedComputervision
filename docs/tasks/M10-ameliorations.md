@@ -29,6 +29,27 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   n'apporte presque rien de plus (58,3 ms avec trim) : le goulot passe à l'étage de sortie
   (T10.2). Le second segment d'entrée (route) et l'adressage `up` (T6.4) doivent rester
   corrects quand une ligne n'est pas alignée sur 8 octets (w = 13, 26).
+- **Fait** :
+  - ports `act_in`, `act_out` et `wts` en mots de `ACC_WORD_BYTES` = 8 octets
+    (`hls/kernels/accel_config.hpp`). `in_buf` est chargé ligne par ligne, avec
+    `row_words(IC)` = 3 mots par (voie, ligne) quel que soit l'alignement (lignes non
+    alignées, second segment de route, adresse `up` divisée par 2).
+  - Poids réordonnés une fois dans l'ordre des tuiles (`hls/kernels/weight_layout.hpp`,
+    `Program::weights`). La tuile de poids est un bloc contigu, lu en mots pleins.
+  - Écritures de sortie en mots, ligne par ligne, avec masque d'octets sur les mots de
+    bord. Marge `ARENA_SLACK` après l'arène.
+  - Modèle de cycles **réaliste, ligne par ligne**, identique dans `count_cycles` et
+    `tools/perf_model.py`. Avec `ACC_WORD_BYTES=1` et les autres pistes coupées, la C-sim
+    redonne les compteurs M6 à l'identique.
+  - Tiny-YOLOv2, ports 64 bits seuls : 41,30 → 12,27 Mcycles, 206,5 → 61,3 ms
+    (16,3 img/s). Le modèle idéal `cdiv(octets, 8)` annonçait 59,4 ms.
+  - C-sim == golden et dumps (v2, v3, 3 images ; tuiles KV260 et Zybo, `tb_net_pow2`) ;
+    `perf_model --check` : 0 écart.
+- **Reste** :
+  - synthèse et co-sim (Vitis) ;
+  - masque d'octets (WSTRB) des écritures partielles ; repli possible : port de sortie
+    8 bits élargi par `m_axi_max_widen_bitwidth` ;
+  - II du chargeur en upsample (2·WORD colonnes par mot, L21 de v3).
 
 ### [ ] T10.2 — Requantification parallèle
 - **Spec** : §9.3, §10.3 · **Dépend de** : T10.1 · **Taille** : M
@@ -39,6 +60,12 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
 - **Notes** : aujourd'hui, un seul multiplieur 32 × 31 bits (4 DSP) traite les Tm canaux
   l'un après l'autre, soit Tm × 169 cycles par tuile. Le passage à 8 multiplieurs coûte
   +28 DSP, alors que 896 DSP sur 1 248 sont utilisés.
+- **Fait** :
+  - `store_tile` requantifie `ACC_RQ` = 8 canaux par cycle, avec 8 appels de
+    `golden::requantize` déroulés ;
+  - le modèle lit `requant` dans `accel_config.hpp` ;
+  - ports 64 bits + trim + requant ×8 : 9,29 Mcycles, 46,4 ms (21,5 img/s, 48,9 %).
+- **Reste** : DSP réellement ajoutés et fréquence tenue (synthèse).
 
 ### [ ] T10.3 — Canaux valides seulement (trim)
 - **Spec** : §10.2 · **Dépend de** : T6.2 · **Taille** : S
@@ -47,6 +74,11 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
 - **Notes** : L00 a cin = 3 mais le noyau charge Tn = 24 canaux, si bien que 87 % de son
   chargement est inutile. Le gain devient presque nul après T10.1 : ne faire cette tâche
   que si T10.1 est repoussée (Vitis absent).
+- **Fait** :
+  - `ACC_TRIM` : seules les voies valides de la dernière tuile ti sont chargées ; les
+    voies au-delà sont masquées dans `compute` (un mux par voie) ;
+  - avec les ports 64 bits, le gain est presque nul (12,27 → 12,27 Mcycles en v2) ;
+  - le trim reste actif parce qu'il réduit la taille des poids réordonnés.
 
 ### [ ] T10.4 — Pertes de tuilage
 - **Spec** : §10.2 · **Dépend de** : T10.2 · **Taille** : L
@@ -60,6 +92,23 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
     2 % des MACs. La PE 3×3 de 2025-kim est un modèle possible.
   - Avec un pooling 2×2/2 et Tr = Tc = 13, chaque tuile ne donne que 12 × 12 sorties utiles.
   - Le gain est à estimer avec `perf_model` avant d'écrire le moindre code HLS.
+- **Fait** :
+  - Estimation `perf_model` d'abord : pliage de L00 −10 % ; tuile 12 −6 % ; tuile 14
+    −11 %. La tuile 14 est retenue.
+  - **Pliage** (`ACC_FOLD`) à la place d'une PE dédiée : quand cin·k ≤ Tn (L00), les voies
+    portent (canal, ligne du noyau) et la conv devient 1 × k, d'où un calcul de L00 3 fois
+    plus court.
+  - **Tuile par couche** : nouveaux champs `tr`, `tc` et `fold` de `LayerDesc` (30 mots),
+    choisis par `driver::conv_desc`. Tr = Tc = 14 pour les convs suivies d'un maxpool de
+    stride 2 (tuile entière utile) ; 13 ailleurs, L11 de v3 (stride 1) comprise.
+  - Noyau actuel, Tiny-YOLOv2 : 7,44 Mcycles, **37,2 ms, 26,9 img/s, 187 GOPS, 61,0 %**.
+    C'est sous l'ancienne borne calcul (41,1 ms), parce que le pliage et la tuile 14
+    abaissent la borne elle-même (31,6 ms). L'écart au point roofline (31,9 ms) est de
+    5,3 ms. Tiny-YOLOv3 : 36,1 ms, 27,7 img/s.
+- **Reste** :
+  - L00 reste limitée par le stockage (requant de 2 groupes + écritures ≈ calcul) ;
+  - les convs 1×1 chargent IR lignes par voie au lieu de Tr ;
+  - tampons 14 × 14 : BRAM à confirmer en synthèse.
 
 ## B. Logiciel ARM
 
@@ -71,6 +120,20 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   ≈ max des étages au lieu de leur somme
 - **Notes** : le gain est à estimer avec les temps `pre` mesurés sur la KV260. Il
   augmente après T10.1-T10.2, car l'accélérateur cesse alors de dominer.
+- **Fait** :
+  - `Accelerator(dev, m, n_arenas)` : plusieurs arènes dans le même u-dma-buf, et des
+    descripteurs relatifs, partagés par toutes les arènes ;
+  - `--pipeline` dans `yolo_bench` : un thread producteur prépare l'image i + 1 (lecture,
+    prétraitement, `load_input`) dans l'arène libre pendant que le thread principal fait
+    accélérateur et post de l'image i ; les images sont rendues dans l'ordre ;
+  - `--pipeline` dans `yolo_app` : la copie de la passe suivante recouvre l'accélérateur,
+    avec `--repeat` ;
+  - `yolo_bench` affiche le débit mesuré à côté des débits attendus (somme et maximum des
+    étages) ;
+  - ctests `yolo_bench_pipeline` (détections identiques au mode séquentiel, 3 images) et
+    `yolo_app_pipeline`.
+- **Reste** : le gain de débit, mesurable seulement sur la KV260. En C-sim, l'accélérateur
+  prend 8 s par image et masque tout.
 
 ### [ ] T10.6 — Tampon DMA caché
 - **Spec** : §10.4 · **Dépend de** : T8.1 · **Taille** : S
@@ -80,6 +143,17 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   comparés au mode non caché
 - **Notes** : à faire seulement si `yolo_bench` montre que la copie DDR ou le
   post-traitement pèsent.
+- **Fait** :
+  - option `--cached` : u-dma-buf ouvert sans `O_SYNC` ;
+  - `Device::sync_for_device` et `sync_for_cpu` prennent une plage, écrite dans le sysfs
+    de u-dma-buf (`sync_offset`, `sync_size`, `sync_direction`), sous mutex pour le
+    pipeline ;
+  - `Accelerator` ne synchronise plus que l'arène du slot (après `load_input`, après le
+    noyau), la table de `yolo_post` et son résultat, au lieu du tampon entier à chaque
+    couche ;
+  - le backend uio compile (`make sw-board` sur PC).
+- **Reste** : sortie == golden sur la carte, temps de copie et de post-traitement comparés
+  au mode non caché.
 
 ### [ ] T10.7 — Enchaînement conv → post sans l'ARM
 - **Spec** : §10.3 · **Dépend de** : T9.1.3 · **Taille** : S
@@ -87,6 +161,23 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   est lue directement dans l'arène, et l'ARM n'attend qu'une seule IRQ par image.
 - **Acceptation** : boîtes == golden `hw_postproc` (backend sim) ; temps ARM par image
   rapporté
+- **Fait** :
+  - séquenceur dans `yolo_conv`, nouveaux arguments `descs` et `n_calls` :
+    - avec `n_calls > 0`, le noyau lit les descripteurs en DDR et enchaîne toutes les
+      convs : une seule fin, une seule IRQ ;
+    - avec `n_calls = 0`, le mode par registres est inchangé ;
+  - `regmap.hpp` : `DESCS` et `N_CALLS` ajoutés, offsets à vérifier par
+    `make check-regmap` ;
+  - `Accelerator::run_all` lance la passe, puis `run_post` lit les têtes directement dans
+    l'arène : 2 IRQ par image au lieu de N + 1 ;
+  - `yolo_bench` et `yolo_app` passent par le séquenceur ; colonne `arm_ms` (temps CPU du
+    thread pendant acc + post) ;
+  - ctest `run_compare_chain` : têtes == dumps et boîtes `yolo_post` == golden
+    `hw_postproc` (v2, v3).
+- **Reste** :
+  - offsets réels des registres (en-tête Vitis) ;
+  - temps ARM par image mesuré sur la carte : en C-sim, le noyau tourne dans le thread
+    appelant.
 
 ## C. Streaming (suite de M9.4)
 

@@ -7,6 +7,7 @@
 // Code de sortie 0 si aucun écart (convention C-sim Vitis). Imprime aussi l'estimation de
 // cycles par couche (accel::sim_cycles) pour la première image.
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 
 #include "accel.hpp"
@@ -29,8 +30,8 @@ int main(int argc, char** argv) {
   std::ofstream csv;
   if (!a.csv.empty()) {
     csv.open(a.csv);
-    csv << "net,layer,k,cin,cout,h,w,pool_s,macs,load_in,load_w,compute,store,sequential,"
-           "overlapped\n";
+    csv << "net,layer,k,cin,cout,h,w,pool_s,macs,tm,tn,tr,tc,fold,width,trim,rq,load_in,load_w,"
+           "compute,store,sequential,overlapped\n";
   }
   size_t total_diff = 0;
   int checked = 0;
@@ -42,6 +43,8 @@ int main(int argc, char** argv) {
     const Model m = Model::load(tb::net_dir(a, net));
     const driver::Program prog = driver::build(m);
     const int64_t m0_base = int64_t(m.bias.size());
+    std::vector<driver::Word> wts((prog.weights.size() + accel::WORD - 1) / accel::WORD, 0);
+    std::memcpy(wts.data(), prog.weights.data(), prog.weights.size());
     uint64_t net_ovl = 0, net_comp = 0;
 
     for (size_t ii = 0; ii < a.images.size(); ++ii) {
@@ -55,16 +58,19 @@ int main(int argc, char** argv) {
         const int64_t n_out = int64_t(p.cout) * p.pool_h() * p.pool_w();
         const int64_t n_pre = p.pooled() ? int64_t(p.cout) * p.out_h() * p.out_w() : 0;
 
-        // Arène : entrée | sortie | carte avant pooling.
-        std::vector<int8_t> arena(size_t(n_in + n_out + n_pre), 0);
-        std::copy(x.data.begin(), x.data.end(), arena.begin());
+        // Arène : entrée | sortie | carte avant pooling, bout à bout (sans alignement : le
+        // chargeur et les écritures en mots gèrent tout décalage), puis la marge.
+        const int64_t n_all = n_in + n_out + n_pre + driver::ARENA_SLACK;
+        std::vector<driver::Word> arena(size_t(n_all + accel::WORD - 1) / accel::WORD, 0);
+        int8_t* bytes = reinterpret_cast<int8_t*>(arena.data());
+        std::copy(x.data.begin(), x.data.end(), bytes);
         const driver::View in = driver::single_view(0, c, h, w);
         const accel::LayerDesc d =
             driver::conv_desc(l, in, n_in, p.pooled() ? n_in + n_out : -1, l.b_offset / 4,
-                              m0_base + l.m0_offset / 4);
-        yolo_conv(arena.data(), arena.data(), m.weights.data(), prog.params.data(), d);
-        const int8_t* k_out = arena.data() + n_in;
-        const int8_t* k_pre = arena.data() + n_in + n_out;
+                              m0_base + l.m0_offset / 4, prog.w_off.at(l.id));
+        yolo_conv(arena.data(), arena.data(), wts.data(), prog.params.data(), d, nullptr, 0);
+        const int8_t* k_out = bytes + n_in;
+        const int8_t* k_pre = bytes + n_in + n_out;
 
         std::vector<int8_t> g_out(static_cast<size_t>(n_out)), g_pre(static_cast<size_t>(n_pre));
         conv_layer<Tl>(p, golden::single_view(x.data.data(), c, h, w), m.conv_weights(l),
@@ -96,7 +102,9 @@ int main(int argc, char** argv) {
           if (csv.is_open())
             csv << net << ',' << l.id << ',' << p.k << ',' << p.cin << ',' << p.cout << ','
                 << h << ',' << w << ',' << p.pool_s << ',' << (long long)macs << ','
-                << s.load_in << ',' << s.load_w << ',' << s.compute << ',' << s.store << ','
+                << accel::TM << ',' << accel::TN << ',' << d.tr << ',' << d.tc << ','
+                << d.fold << ',' << accel::WORD << ',' << int(accel::TRIM) << ','
+                << accel::RQ << ',' << s.load_in << ',' << s.load_w << ',' << s.compute << ',' << s.store << ','
                 << s.sequential << ',' << s.overlapped << '\n';
         }
       }

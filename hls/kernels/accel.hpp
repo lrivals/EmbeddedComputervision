@@ -1,12 +1,15 @@
-// Noyau HLS « moteur unique couche par couche » (§10.1-§10.3, M6).
+// Noyau HLS « moteur unique couche par couche » (§10.1-§10.3, M6, M10).
 //
-// Un appel de `yolo_conv` exécute une couche conv entière (+ maxpool fusionné) avec le même
-// nid de boucles tuilé que le golden (`golden::conv_layer`, cpp/golden/include/golden/conv.hpp) :
-// tuiles row → col → to → ti, mêmes bornes de tuiles partielles, même recalcul de la dernière
-// ligne en maxpool stride 1. Le résultat est donc égal au golden à l'octet près.
+// Un appel de `yolo_conv` exécute une couche conv entière (+ maxpool fusionné) avec un nid de
+// boucles tuilé comme le golden (`golden::conv_layer`, cpp/golden/include/golden/conv.hpp) :
+// tuiles row → col → to → ti, tuiles partielles, recalcul de la dernière ligne en maxpool
+// stride 1. La tuile (d.tr, d.tc) et le pliage (d.fold) sont choisis par couche par le driver
+// (T10.4) ; une somme d'entiers ne dépendant pas de l'ordre, le résultat est égal au golden à
+// l'octet près quelle que soit la tuile.
 //
-// Tuiles : paramètres de compilation (hls/configs/<carte>.tcl → -DACC_TM=…), défauts KV260
-// (ADR 0003).
+// Configuration (tuiles, largeur des ports, trim, requant, pliage) : accel_config.hpp.
+// Séquenceur (T10.7) : avec n_calls > 0, le noyau lit n_calls descripteurs en DDR et enchaîne
+// les couches sans l'ARM (une seule fin, une seule IRQ).
 #pragma once
 
 #include <cstdint>
@@ -15,29 +18,26 @@
 #include <ap_int.h>
 #endif
 
+#include "accel_config.hpp"
 #include "golden/conv.hpp"
 #include "layer_desc.hpp"
-
-#ifndef ACC_TM
-#define ACC_TM 32
-#endif
-#ifndef ACC_TN
-#define ACC_TN 24
-#endif
-#ifndef ACC_TR
-#define ACC_TR 13
-#endif
-#ifndef ACC_TC
-#define ACC_TC 13
-#endif
+#include "weight_layout.hpp"
 
 namespace accel {
 
-constexpr int TM = ACC_TM, TN = ACC_TN, TR = ACC_TR, TC = ACC_TC;
-constexpr int K_MAX = golden::K_MAX;
-constexpr int IR = TR + K_MAX - 1;  // S = 1 : S·Tr + K − S
-constexpr int IC = TC + K_MAX - 1;
+static_assert(K_MAX == golden::K_MAX, "K_MAX");
 static_assert(TR >= 2 && TC >= 2, "une tuile doit contenir une fenêtre de maxpool 2×2");
+
+// Mot des ports m_axi act_in, act_out, wts : WORD octets, petit-boutiste (octet b = bits
+// 8b … 8b + 7), comme la DDR vue par l'ARM et le PC.
+template <int B> struct WordOf;
+template <> struct WordOf<1> { using type = uint8_t; };
+template <> struct WordOf<2> { using type = uint16_t; };
+template <> struct WordOf<4> { using type = uint32_t; };
+template <> struct WordOf<8> { using type = uint64_t; };
+using word_t = WordOf<WORD>::type;
+
+inline int8_t word_byte(word_t w, int b) { return int8_t(uint8_t(w >> (8 * b))); }
 
 #ifndef ACC_NO_APINT
 using act_t = ap_int<8>;
@@ -50,9 +50,9 @@ using acc_t = int32_t;
 #endif
 
 // Tampons sur puce : tailles des formules du §10.2 (vérifiées contre golden/conv.hpp).
-static_assert(TN * IR * IC == golden::buf_in_size(TN, TR, TC, K_MAX, 1), "B_in");
+static_assert(TN * IR * IC == golden::buf_in_size(TN, TRB, TCB, K_MAX, 1), "B_in");
 static_assert(TM * TN * K_MAX * K_MAX == golden::buf_w_size(TM, TN, K_MAX), "B_w");
-static_assert(TM * TR * TC == golden::buf_out_size(TM, TR, TC), "B_out");
+static_assert(TM * TRB * TCB == golden::buf_out_size(TM, TRB, TCB), "B_out");
 
 // Une tuile de sortie (row, col, to) et ses bornes partielles — mêmes formules que le golden.
 struct TileInfo {
@@ -68,14 +68,14 @@ struct TileInfo {
 // Estimation de cycles en C-sim (II = 1, profondeurs de pipeline ignorées) ; les cycles réels
 // viennent de la co-sim (T6.5).
 struct SimCycles {
-  uint64_t load_in = 0;     // in_buf : Tn·IR·IC par (tuile, ti)
-  uint64_t load_w = 0;      // w_buf : Tm·Tn·K² par (tuile, ti)
-  uint64_t compute = 0;     // K²·Tr·Tc par (tuile, ti)
+  uint64_t load_in = 0;     // in_buf : voies × lignes × mots par ligne, par (tuile, ti)
+  uint64_t load_w = 0;      // w_buf : mots du bloc de poids, par (tuile, ti)
+  uint64_t compute = 0;     // kh·k·Tr·Tc par (tuile, ti)
   uint64_t store = 0;       // étage de sortie
   uint64_t sequential = 0;  // somme sans recouvrement
   uint64_t overlapped = 0;  // ping-pong : max(chargement ti+1, calcul ti), max(conv t+1, store t)
 };
-extern SimCycles sim_cycles;  // remis à zéro à chaque appel de yolo_conv
+extern SimCycles sim_cycles;  // remis à zéro à chaque appel de yolo_conv (cumul du séquenceur)
 #endif
 
 // Produit poids × activation de la PE. Mode `ACC_WMODE_POW2` (T9.2.4, REQ-YOLO) : poids sur
@@ -104,6 +104,10 @@ inline int32_t mul_w(int w, int x) { return w * x; }
 
 // Top (portée globale pour `set_top`) : `act_in` et `act_out` désignent la même arène DDR
 // (deux bundles pour que chargement et stockage se recouvrent) ; une conv ne lit jamais ce
-// qu'elle écrit (allocation du manifest, docs/conventions.md).
-void yolo_conv(const int8_t* act_in, int8_t* act_out, const int8_t* wts, const int32_t* prm,
-               accel::LayerDesc d);
+// qu'elle écrit (allocation du manifest, docs/conventions.md). Arène et poids alignés sur un
+// mot ; le chargeur lit jusqu'à 2 mots au-delà d'une ligne, d'où une marge après l'arène
+// (driver::ARENA_SLACK). `wts` : poids dans l'ordre des tuiles (weight_layout.hpp).
+// n_calls = 0 : une couche, décrite par `d` ; n_calls > 0 : `descs` contient n_calls
+// descripteurs de D_WORDS mots, exécutés dans l'ordre (`d` ignoré).
+void yolo_conv(const accel::word_t* act_in, accel::word_t* act_out, const accel::word_t* wts,
+               const int32_t* prm, accel::LayerDesc d, const int32_t* descs, int32_t n_calls);

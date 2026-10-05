@@ -3,8 +3,11 @@
 // - Le dtbo (hw/boards/kv260/pl.dtsi) déclare `s_axi_control` en `generic-uio` avec
 //   l'interruption du noyau, et un nœud `u-dma-buf` (CMA) assez grand pour arène + poids +
 //   paramètres.
-// - Les ports HP ne sont pas cohérents avec les caches de l'ARM : le u-dma-buf est ouvert en
-//   O_SYNC (non caché), ce qui rend `sync_for_*` inutiles au prix d'accès CPU plus lents.
+// - Les ports HP ne sont pas cohérents avec les caches de l'ARM. Par défaut, le u-dma-buf est
+//   ouvert en O_SYNC (non caché), ce qui rend `sync_for_*` inutiles au prix d'accès CPU plus
+//   lents. Option `cached` (T10.6) : ouverture sans O_SYNC (caché), et `sync_for_*` vident ou
+//   invalident la plage demandée par le sysfs de u-dma-buf (sync_offset, sync_size,
+//   sync_direction, puis sync_for_device / sync_for_cpu).
 // - Interruption UIO : écrire 1 dans le fd la démasque, `read` bloque jusqu'à la suivante ;
 //   l'ISR du noyau HLS est acquittée par écriture de 1.
 // - `yolo_post` (T9.1, option `uio_post`) : second nœud UIO, même protocole.
@@ -15,6 +18,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
@@ -88,7 +92,8 @@ struct UioRegs {
 
 class UioDevice : public Device {
  public:
-  explicit UioDevice(const DeviceOptions& o) : irq_(o.irq), udmabuf_(o.udmabuf) {
+  explicit UioDevice(const DeviceOptions& o)
+      : irq_(o.irq), cached_(o.cached), udmabuf_(o.udmabuf) {
     conv_.open(o.uio, "yolo_conv", irq_);
     if (!o.uio_post.empty()) post_.open(o.uio_post, "yolo_post", irq_);
   }
@@ -114,12 +119,19 @@ class UioDevice : public Device {
     if (!(f >> hex)) throw std::runtime_error("lecture impossible : " + sys + "phys_addr");
     const uint64_t phys = std::stoull(hex, nullptr, 16);
     const std::string dev = "/dev/" + udmabuf_;
-    dma_fd_ = ::open(dev.c_str(), O_RDWR | O_SYNC);
+    dma_fd_ = ::open(dev.c_str(), cached_ ? O_RDWR : O_RDWR | O_SYNC);
     if (dma_fd_ < 0) throw sys_error("ouverture de " + dev);
     void* p = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, dma_fd_, 0);
     if (p == MAP_FAILED) throw sys_error("mmap de " + dev);
     buf_ = Buffer{static_cast<uint8_t*>(p), phys, size};
     return buf_;
+  }
+
+  void sync_for_device(const Buffer& b, size_t off, size_t len) override {
+    sync(b, off, len, 1, "sync_for_device");
+  }
+  void sync_for_cpu(const Buffer& b, size_t off, size_t len) override {
+    sync(b, off, len, 2, "sync_for_cpu");
   }
 
   void write32(uint32_t off, uint32_t v) override { conv_.regs[off / 4] = v; }
@@ -146,7 +158,27 @@ class UioDevice : public Device {
   }
 
  private:
+  // direction : 1 vers le noyau (vidage), 2 vers l'ARM (invalidation).
+  void sync(const Buffer& b, size_t off, size_t len, int direction, const char* what) {
+    if (!cached_ || len == 0) return;
+    if (b.virt != buf_.virt || off + len > buf_.size)
+      throw std::runtime_error("uio : plage de synchronisation hors du u-dma-buf");
+    const std::lock_guard<std::mutex> lock(sync_mutex_);  // séquence sysfs atomique
+    const std::string sys = "/sys/class/u-dma-buf/" + udmabuf_ + "/";
+    write_sysfs(sys + "sync_offset", std::to_string(off));
+    write_sysfs(sys + "sync_size", std::to_string(len));
+    write_sysfs(sys + "sync_direction", std::to_string(direction));
+    write_sysfs(sys + what, "1");
+  }
+
+  static void write_sysfs(const std::string& path, const std::string& v) {
+    std::ofstream f(path);
+    if (!(f << v) || !f.flush()) throw std::runtime_error("écriture impossible : " + path);
+  }
+
   bool irq_;
+  bool cached_;
+  std::mutex sync_mutex_;
   std::string udmabuf_;
   int dma_fd_ = -1;
   UioRegs conv_, post_;

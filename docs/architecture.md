@@ -78,18 +78,25 @@ des paramètres (`hls/configs/<carte>.tcl` → `-DACC_TM=…`), fixés par l'out
 ### Noyau `yolo_conv` (M6)
 
 Un appel = une conv (+ maxpool fusionné), même parcours de tuiles que
-`golden::conv_layer` (row → col → to → ti), donc mêmes entiers.
+`golden::conv_layer` (row → col → to → ti), donc mêmes entiers. La tuile (Tr = Tc = 13,
+ou 14 pour les convs suivies d'un maxpool de stride 2) et le pliage de L00 (voies = canal ×
+ligne du noyau) sont choisis par couche par le driver (M10, T10.4). Avec `n_calls > 0`, un
+seul appel enchaîne toutes les convs à partir d'une table de descripteurs en DDR
+(séquenceur, T10.7).
 
 | Fichier | Rôle |
 |---|---|
-| `hls/kernels/layer_desc.hpp` | registres s_axilite (`LayerDesc`) : forme, 2 segments d'entrée `{offset, c, h, w, up}`, offsets de sortie et de paramètres — C++ simple, partagé avec le driver |
-| `hls/kernels/conv_pe.cpp` | top, chargeurs, PE Tm × Tn (`PIPELINE II=1`), ping-pong `in_buf`/`w_buf` sur ti et `out_buf` sur les tuiles |
-| `hls/kernels/output_stage.hpp` | biais + requantification + leaky + saturation, maxpool 2×2 s2/s1, carte avant pooling |
-| `sw/driver/program.hpp` | arène DDR contiguë (tampons du manifest bout à bout), vues par couche, un `LayerDesc` par conv |
+| `hls/kernels/accel_config.hpp` | configuration de compilation : tuiles, octets par mot des ports, trim, requant ×RQ, pliage, tuile des convs poolées — lue aussi par le driver et `tools/perf_model.py` |
+| `hls/kernels/layer_desc.hpp` | registres s_axilite (`LayerDesc`, 30 mots) : forme, 2 segments d'entrée `{offset, c, h, w, up}`, offsets de sortie et de paramètres, tuile et pliage de la couche — C++ simple, partagé avec le driver |
+| `hls/kernels/weight_layout.hpp` | poids dans l'ordre des tuiles : un bloc contigu par (to, ti), réordonné une fois par le driver (T10.1) |
+| `hls/kernels/conv_pe.cpp` | top, séquenceur, chargeurs en mots de 64 bits ligne par ligne, PE Tm × Tn (`PIPELINE II=1`), ping-pong `in_buf`/`w_buf` sur ti et `out_buf` sur les tuiles |
+| `hls/kernels/output_stage.hpp` | biais + requantification (8 canaux par cycle) + leaky + saturation, maxpool 2×2 s2/s1, carte avant pooling, écritures en mots |
+| `sw/driver/program.hpp` | arène DDR contiguë (tampons du manifest bout à bout, plus une marge de lecture), vues par couche, un `LayerDesc` par conv, poids réordonnés, table du séquenceur |
 
 Interfaces : `m_axi` `gmem_in` / `gmem_out` (même arène d'activations, deux bundles pour
-recouvrir chargement et stockage), `gmem_w` (weights.bin), `gmem_p` (bias.bin puis
-requant.bin) ; adresses = indices dans ces tableaux. Upsample et route ne sont que des
+recouvrir chargement et stockage), `gmem_w` (poids dans l'ordre des tuiles), en mots de
+64 bits ; `gmem_p` (bias.bin puis requant.bin, et la table des descripteurs) ; adresses =
+indices d'octet dans ces tableaux. Upsample et route ne sont que des
 segments d'entrée de la conv suivante : aucun appel du noyau.
 
 Vérification : `hls/tb/tb_conv.cpp` (chaque conv seule) et `hls/tb/tb_net.cpp` (réseau via
@@ -114,12 +121,13 @@ DDR ◄─ HP0_FPD ◄─ gmem_in, gmem_out ────────────
 |---|---|
 | `hw/boards/kv260/build.tcl` | block design, bitstream, `.xsa`, rapports ; échoue si le timing n'est pas tenu (`make vivado-build`) |
 | `hw/boards/kv260/pl.dtsi`, `firmware.sh` | overlay (UIO + IRQ, u-dma-buf 32 Mo, horloge) et paquet `xmutil` (`make fpga-firmware`) |
-| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 27 mots (`qmax` ajouté en T9.3) ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
-| `sw/driver/device.hpp` | accès matériel : `uio` (carte) ou `sim` (PC : registres émulés → noyau C-sim) |
-| `sw/driver/accel_driver.hpp` | `Accelerator` : un tampon contigu [arène \| poids \| paramètres], bornes de chaque `LayerDesc` vérifiées, une conv par `run_layer` |
+| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 30 mots (`qmax` en T9.3, `tr`, `tc`, `fold` en T10.4), puis `DESCS` et `N_CALLS` (séquenceur, T10.7) ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
+| `sw/driver/device.hpp` | accès matériel : `uio` (carte ; `--cached` : u-dma-buf caché et synchronisations par plage, T10.6) ou `sim` (PC : registres émulés → noyau C-sim) |
+| `sw/driver/accel_driver.hpp` | `Accelerator` : un tampon contigu [arène(s) \| poids \| paramètres \| descripteurs], bornes de chaque `LayerDesc` vérifiées ; une conv par `run_layer`, ou toute la passe par `run_all` (une IRQ) ; deux arènes pour le pipeline inter-images (T10.5) |
 | `sw/postproc/heads.hpp` | têtes lues en place dans l'arène → `postproc.hpp` (décodage + NMS sur l'ARM) |
 | `sw/app/run_compare.cpp` | chaque couche en DDR == dump, puis détections == `detections.json` ; `--layer N` : une conv isolée |
-| `sw/app/yolo_app.cpp` | démo image → boîtes, temps prétraitement / accélérateur / post-traitement |
+| `sw/app/yolo_app.cpp` | démo image → boîtes, temps prétraitement / accélérateur / post-traitement ; `--pipeline` |
+| `sw/app/yolo_bench.cpp` | mesures par étage (pre, load, acc, post, temps ARM) sur une suite d'images ; `--pipeline` : deux threads, deux arènes |
 
 Le backend `sim` passe par le même chemin que la carte (encodage des registres, adresses
 physiques, ap_start / ap_done) : `make sw-sim` valide tout sauf le matériel lui-même.

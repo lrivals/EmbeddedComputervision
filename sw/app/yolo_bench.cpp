@@ -3,9 +3,9 @@
 //
 //   yolo_bench --model DIR (--inputs inputs.bin --ids ids.txt | --images liste.txt)
 //              [--start 0] [--count N] [--warmup 5] [--conf 0.005] [--iou 0.45]
-//              [--times temps.csv] [--dets det.jsonl] [--hw-post]
+//              [--times temps.csv] [--dets det.jsonl] [--hw-post] [--pipeline]
 //              [--power /sys/class/hwmon/hwmonN/power1_input] [--idle-s 5]
-//              [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
+//              [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll] [--cached]
 //
 // --inputs : entrées int8 (3, S, S) concaténées, produites par tools/make_inputs.py avec le
 // prétraitement du modèle entier Python : sortie comparable bit à bit (mAP au stade FPGA).
@@ -15,14 +15,22 @@
 //
 // Étages (ms, par image) : pre = lecture de l'entrée (et décodage + redimensionnement +
 // quantification en --images) ; load = mise à zéro de l'arène et copie de l'entrée en DDR ;
-// acc = somme des convs (registres + calcul + attente) ; post = décodage + NMS (sur l'ARM, ou
-// par le noyau `yolo_post` avec --hw-post, T9.1).
+// acc = toutes les convs, enchaînées par le séquenceur du noyau (une seule fin à attendre,
+// T10.7) ; post = décodage + NMS (sur l'ARM, ou par le noyau `yolo_post` avec --hw-post,
+// T9.1) ; arm = temps CPU du thread pendant acc + post (attentes d'IRQ exclues).
+// --pipeline (T10.5) : deux arènes, deux threads ; pre + load de l'image i + 1 recouvrent
+// acc + post de l'image i. Le débit tend vers l'inverse du plus lent des deux étages au lieu
+// de leur somme ; détections identiques au mode séquentiel.
 // --power : µW lus dans hwmon (INA260 du SOM KV260) toutes les 10 ms, au repos pendant
 // --idle-s secondes puis pendant la boucle mesurée.
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <exception>
+#include <mutex>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -48,9 +56,10 @@ int usage() {
                "usage : yolo_bench --model DIR (--inputs x.bin --ids ids.txt | --images l.txt)\n"
                "                   [--start 0] [--count N] [--warmup 5] [--conf 0.005]\n"
                "                   [--iou 0.45] [--times t.csv] [--dets d.jsonl] [--hw-post]\n"
+               "                   [--pipeline]\n"
                "                   [--power .../power1_input] [--idle-s 5]\n"
                "                   [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] "
-               "[--poll]\n");
+               "[--poll] [--cached]\n");
   return 2;
 }
 
@@ -126,12 +135,12 @@ int main(int argc, char** argv) {
   double conf = 0.005, iou = 0.45, idle_s = 5.0;
   long start = 0, count = -1;
   int warmup = 5;
-  bool hw_post = false;
+  bool hw_post = false, pipeline = false;
   for (int i = 1; i < argc; ++i) {
     if (sw::parse_device_option(argc, argv, i, dopt)) continue;
     const std::string k = argv[i];
-    if (k == "--hw-post") {
-      hw_post = true;
+    if (k == "--hw-post" || k == "--pipeline") {
+      (k == "--pipeline" ? pipeline : hw_post) = true;
       continue;
     }
     if (i + 1 >= argc) return usage();
@@ -157,7 +166,7 @@ int main(int argc, char** argv) {
   try {
     const golden::Model m = golden::Model::load(model_dir);
     const auto dev = driver::make_device(dopt);
-    driver::Accelerator acc(*dev, m);
+    driver::Accelerator acc(*dev, m, pipeline ? 2 : 1);
     const size_t in_bytes = size_t(m.in_c) * m.in_h * m.in_w;
     if (!images.empty() && (m.in_h != m.in_w || m.in_c != 3))
       throw std::runtime_error("entrée carrée RGB attendue");
@@ -184,7 +193,8 @@ int main(int argc, char** argv) {
                                  " entrées de " + std::to_string(in_bytes) + " octets");
     }
 
-    // Lecture (et prétraitement) de l'image k → entrée int8 ; rend l'identifiant.
+    // Lecture (et prétraitement) de l'image k → entrée int8 `x` ; rend l'identifiant. Appelée
+    // par un seul thread à la fois (le producteur en --pipeline).
     std::vector<int8_t> x(in_bytes);
     auto fetch = [&](long k) -> std::string {
       if (npy) {
@@ -206,9 +216,11 @@ int main(int argc, char** argv) {
     };
     auto forward = [&]() {
       acc.load_input(x.data());
-      double s = 0.0;
-      for (const driver::ConvCall& c : acc.program().calls) s += acc.run_layer(c);
-      return s;
+      return acc.run_all();
+    };
+    auto detect = [&](int slot) {
+      return hw_post ? sw::hw_detections(acc.run_post(conf, iou, nullptr, nullptr, slot))
+                     : sw::detect(m, acc.program(), acc.arena(slot), conf, iou);
     };
 
     std::FILE* times = nullptr;
@@ -216,15 +228,16 @@ int main(int argc, char** argv) {
     if (!times_path.empty()) {
       times = std::fopen(times_path.c_str(), "w");
       if (!times) throw std::runtime_error("impossible d'écrire " + times_path);
-      std::fprintf(times, "id,pre_ms,load_ms,acc_ms,post_ms\n");
+      std::fprintf(times, "id,pre_ms,load_ms,acc_ms,post_ms,arm_ms\n");
     }
     if (!dets_path.empty()) {
       dets = std::fopen(dets_path.c_str(), "w");
       if (!dets) throw std::runtime_error("impossible d'écrire " + dets_path);
     }
 
-    std::printf("%s (%s) : images [%ld, %ld) de %s\n", m.network.c_str(), dev->name(), start,
-                end, inputs.empty() ? images.c_str() : inputs.c_str());
+    std::printf("%s (%s%s) : images [%ld, %ld) de %s\n", m.network.c_str(), dev->name(),
+                pipeline ? ", pipeline" : "", start, end,
+                inputs.empty() ? images.c_str() : inputs.c_str());
     for (int w = 0; w < warmup && start < end; ++w) {  // caches, pages du u-dma-buf, IRQ
       fetch(start);
       forward();
@@ -239,30 +252,25 @@ int main(int argc, char** argv) {
       power.start();
     }
 
-    std::vector<double> t_pre, t_load, t_acc, t_post, t_tot;
-    const auto t_run = std::chrono::steady_clock::now();
-    for (long k = start; k < end; ++k) {
+    std::vector<double> t_pre, t_load, t_acc, t_post, t_arm, t_tot;
+    // Étage 2 (thread principal) : accélérateur + post-traitement sur l'arène `slot`.
+    auto finish = [&](long k, const std::string& id, int slot, double pre, double load) {
+      const double cpu0 = sw::thread_cpu_seconds();
+      const double a = acc.run_all(slot);
       auto t0 = std::chrono::steady_clock::now();
-      const std::string id = fetch(k);
-      const double pre = sw::seconds_since(t0);
-      t0 = std::chrono::steady_clock::now();
-      acc.load_input(x.data());
-      const double load = sw::seconds_since(t0);
-      double a = 0.0;
-      for (const driver::ConvCall& c : acc.program().calls) a += acc.run_layer(c);
-      t0 = std::chrono::steady_clock::now();
-      const auto d = hw_post ? sw::hw_detections(acc.run_post(conf, iou))
-                             : sw::detect(m, acc.program(), acc.arena(), conf, iou);
+      const auto d = detect(slot);
       const double post = sw::seconds_since(t0);
+      const double arm = sw::thread_cpu_seconds() - cpu0;
 
       t_pre.push_back(1e3 * pre);
       t_load.push_back(1e3 * load);
       t_acc.push_back(1e3 * a);
       t_post.push_back(1e3 * post);
+      t_arm.push_back(1e3 * arm);
       t_tot.push_back(1e3 * (pre + load + a + post));
       if (times)
-        std::fprintf(times, "%s,%.6f,%.6f,%.6f,%.6f\n", id.c_str(), 1e3 * pre, 1e3 * load,
-                     1e3 * a, 1e3 * post);
+        std::fprintf(times, "%s,%.6f,%.6f,%.6f,%.6f,%.6f\n", id.c_str(), 1e3 * pre, 1e3 * load,
+                     1e3 * a, 1e3 * post, 1e3 * arm);
       if (dets) {
         std::fprintf(dets, "%s\n",
                      golden::detections_json(d, "\"image\": \"" + id + "\", ").c_str());
@@ -272,6 +280,85 @@ int main(int argc, char** argv) {
         std::printf("%ld/%ld images\n", k - start + 1, end - start);
         std::fflush(stdout);
       }
+    };
+    // Étage 1 : lecture, prétraitement, copie dans l'arène `slot`.
+    struct Ready {
+      long k;
+      std::string id;
+      int slot;
+      double pre, load;
+    };
+    auto prepare = [&](long k, int slot) {
+      auto t0 = std::chrono::steady_clock::now();
+      Ready r{k, fetch(k), slot, sw::seconds_since(t0), 0.0};
+      t0 = std::chrono::steady_clock::now();
+      acc.load_input(x.data(), slot);
+      r.load = sw::seconds_since(t0);
+      return r;
+    };
+
+    const auto t_run = std::chrono::steady_clock::now();
+    if (!pipeline) {
+      for (long k = start; k < end; ++k) {
+        const Ready r = prepare(k, 0);
+        finish(k, r.id, 0, r.pre, r.load);
+      }
+    } else {
+      // Deux arènes : le producteur remplit une arène libre pendant que le thread principal
+      // fait tourner le noyau sur l'autre ; images rendues dans l'ordre.
+      std::mutex mu;
+      std::condition_variable cv;
+      std::deque<int> free_slots{0, 1};
+      std::deque<Ready> ready;
+      std::exception_ptr error;
+      std::thread producer([&] {
+        try {
+          for (long k = start; k < end; ++k) {
+            int slot;
+            {
+              std::unique_lock<std::mutex> lk(mu);
+              cv.wait(lk, [&] { return !free_slots.empty() || error; });
+              if (error) return;
+              slot = free_slots.front();
+              free_slots.pop_front();
+            }
+            Ready r = prepare(k, slot);
+            {
+              const std::lock_guard<std::mutex> lk(mu);
+              ready.push_back(std::move(r));
+            }
+            cv.notify_all();
+          }
+        } catch (...) {
+          const std::lock_guard<std::mutex> lk(mu);
+          error = std::current_exception();
+          cv.notify_all();
+        }
+      });
+      try {
+        for (long k = start; k < end; ++k) {
+          Ready r;
+          {
+            std::unique_lock<std::mutex> lk(mu);
+            cv.wait(lk, [&] { return !ready.empty() || error; });
+            if (error) break;
+            r = std::move(ready.front());
+            ready.pop_front();
+          }
+          finish(r.k, r.id, r.slot, r.pre, r.load);
+          {
+            const std::lock_guard<std::mutex> lk(mu);
+            free_slots.push_back(r.slot);
+          }
+          cv.notify_all();
+        }
+      } catch (...) {
+        const std::lock_guard<std::mutex> lk(mu);
+        error = std::current_exception();
+        cv.notify_all();
+      }
+      producer.join();
+      if (error) std::rethrow_exception(error);
     }
     const double wall = sw::seconds_since(t_run);
     const double p_run = power_path.empty() ? 0.0 : power.stop();
@@ -281,11 +368,18 @@ int main(int argc, char** argv) {
     const size_t n = t_tot.size();
     std::printf("%zu images, %.1f s\n", n, wall);
     std::printf("%-6s %10s %10s\n", "étage", "moy. ms", "p99 ms");
-    const char* names[] = {"pre", "load", "acc", "post", "total"};
-    const std::vector<double>* cols[] = {&t_pre, &t_load, &t_acc, &t_post, &t_tot};
-    for (int c = 0; c < 5; ++c)
+    const char* names[] = {"pre", "load", "acc", "post", "arm", "total"};
+    const std::vector<double>* cols[] = {&t_pre, &t_load, &t_acc, &t_post, &t_arm, &t_tot};
+    for (int c = 0; c < 6; ++c)
       std::printf("%-6s %10.3f %10.3f\n", names[c], mean(*cols[c]), quantile(*cols[c], 0.99));
-    if (n) std::printf("débit : %.2f images/s (passes enchaînées)\n", double(n) / wall);
+    if (n) {
+      // Étages du pipeline : (pre + load) et (acc + post).
+      const double s1 = mean(t_pre) + mean(t_load), s2 = mean(t_acc) + mean(t_post);
+      std::printf("débit : %.2f images/s mesuré (%s) ; attendu %.2f en séquentiel (somme des "
+                  "étages), %.2f en pipeline (étage le plus lent)\n",
+                  double(n) / wall, pipeline ? "pipeline" : "séquentiel", 1e3 / (s1 + s2),
+                  1e3 / std::max(s1, s2));
+    }
     if (!power_path.empty())
       std::printf("puissance : repos %.3f W, en charge %.3f W (%ld échantillons)\n", p_idle,
                   p_run, power.samples());

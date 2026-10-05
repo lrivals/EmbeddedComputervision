@@ -7,5 +7,5 @@ travail,modele,fpga,format,fps,latence_ms,gops,puissance_w,perimetre_puissance,l
 2019-ding,"Tiny-YOLOv2, ADMM hétérogène",Virtex-7 690T,FFT + puissances de 2,314.2,,,21,unspec.,,,,,,Tables 1-2 (high)
 2026-fata,YOLOv3-tiny élagué à 70 % (DPU Vitis AI),Kria KV260 (DPU),INT8 QAT,24.3,,60.18,2.13,unspec.,,,,,,Tables 7-10 (medium)
 2025-kim,YOLOv2 complet (prototype),Zybo Z7-20,INT16,0.083,12000,,,,,,,,,"§10.4 : ≈ 12 s par image, pas une référence de performance"
-ce travail (projection C-sim),Tiny-YOLOv2 VOC 416,Kria KV260 (XCK26),"INT8 (W8A8, par canal)",4.84,206.5,33.8,,à mesurer,,,,200,55.66,"tools/perf_model.py (accélérateur seul, ports 8 bits) ; ressources après synthèse"
-ce travail (projection C-sim),Tiny-YOLOv3 COCO 416,Kria KV260 (XCK26),"INT8 (W8A8, par canal)",4.92,203.2,27.4,,à mesurer,,,,200,,"tools/perf_model.py (accélérateur seul, ports 8 bits) ; ressources après synthèse"
+ce travail (projection C-sim),Tiny-YOLOv2 VOC 416,Kria KV260 (XCK26),"INT8 (W8A8, par canal)",26.87,37.2,187.3,,à mesurer,,,,200,55.66,"tools/perf_model.py (accélérateur seul, ports 64 bits, trim, requant ×8, pliage L00, tuiles 14 poolées) ; ressources après synthèse"
+ce travail (projection C-sim),Tiny-YOLOv3 COCO 416,Kria KV260 (XCK26),"INT8 (W8A8, par canal)",27.72,36.1,154.3,,à mesurer,,,,200,,"tools/perf_model.py (accélérateur seul, ports 64 bits, trim, requant ×8, pliage L00, tuiles 14 poolées) ; ressources après synthèse"

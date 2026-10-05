@@ -1,10 +1,12 @@
 #include "program.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
 #include <stdexcept>
 
 #include "golden/engine.hpp"
+#include "weight_layout.hpp"
 
 namespace driver {
 
@@ -46,7 +48,7 @@ static int32_t i32(int64_t x, const char* what) {
 }
 
 accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int64_t prepool_off,
-                           int64_t b_index, int64_t m0_index) {
+                           int64_t b_index, int64_t m0_index, int64_t w_off) {
   const golden::ConvParams p = golden::conv_params(l, in.h, in.w);
   if (p.pooled() && (p.pool_k > 2 || p.pool_s > 2))
     throw std::runtime_error("maxpool fusionné : 2×2 seulement");
@@ -81,9 +83,16 @@ accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int6
   }
   d.out_off = i32(out_off, "out_off");
   d.prepool_off = prepool_off < 0 ? -1 : i32(prepool_off, "prepool_off");
-  d.w_off = i32(l.w_offset, "w_off");
+  if (w_off % accel::WORD) throw std::runtime_error("poids non alignés sur un mot");
+  d.w_off = i32(w_off, "w_off");
   d.b_off = i32(b_index, "b_off");
   d.m0_off = i32(m0_index, "m0_off");
+  // T10.4 : tuile agrandie pour les convs suivies d'un maxpool de stride 2 (tuile entière
+  // utile), pliage de la conv d'entrée (cin·k ≤ Tn) ; sinon tuile Tr × Tc.
+  const bool big = accel::TILE_POOL > 0 && p.pooled() && p.pool_s == 2;
+  d.tr = big ? accel::TILE_POOL : accel::TR;
+  d.tc = big ? accel::TILE_POOL : accel::TC;
+  d.fold = accel::FOLD && p.k > 1 && p.cin * p.k <= accel::TN;
   return d;
 }
 
@@ -94,6 +103,7 @@ Program build(const golden::Model& m) {
     p.arena_size += (kv.second + ARENA_ALIGN - 1) / ARENA_ALIGN * ARENA_ALIGN;
   }
   auto addr = [&](const golden::BufRef& r) { return p.base.at(r.buf) + r.offset; };
+  p.arena_size += ARENA_SLACK;
   p.input_off = addr(m.input);
   p.params = m.bias;
   p.params.insert(p.params.end(), m.m0.begin(), m.m0.end());
@@ -160,18 +170,33 @@ Program build(const golden::Model& m) {
     const View in = l.id == 0 ? single_view(p.input_off, m.in_c, m.in_h, m.in_w)
                               : p.views[size_t(l.id - 1)];
     const int64_t pre = l.prepool_out.valid() ? addr(l.prepool_out) : -1;
-    p.calls.push_back({l.id, conv_desc(l, in, addr(l.out), pre, l.b_offset / 4,
-                                       m0_base + l.m0_offset / 4)});
+    const int64_t w_off = int64_t(p.weights.size());
+    accel::LayerDesc d =
+        conv_desc(l, in, addr(l.out), pre, l.b_offset / 4, m0_base + l.m0_offset / 4, w_off);
+    accel::reorder_weights(d, m.conv_weights(l), p.weights);
+    p.w_off[l.id] = w_off;
+    p.calls.push_back({l.id, d});
   }
   return p;
 }
 
-void run(const Program& p, const golden::Model& m, std::vector<int8_t>& arena,
+std::vector<int32_t> desc_table(const Program& p) {
+  std::vector<int32_t> t(p.calls.size() * accel::D_WORDS);
+  for (size_t i = 0; i < p.calls.size(); ++i)
+    std::memcpy(&t[i * accel::D_WORDS], &p.calls[i].desc, sizeof(accel::LayerDesc));
+  return t;
+}
+
+void run(const Program& p, const golden::Model& m, std::vector<Word>& arena,
          const int8_t* input, Kernel kernel, const std::function<void(const ConvCall&)>& after) {
-  arena.assign(size_t(p.arena_size), 0);
-  std::copy(input, input + size_t(m.in_c) * m.in_h * m.in_w, arena.begin() + p.input_off);
+  arena.assign(size_t(p.arena_size + accel::WORD - 1) / accel::WORD, 0);
+  std::memcpy(reinterpret_cast<int8_t*>(arena.data()) + p.input_off, input,
+              size_t(m.in_c) * m.in_h * m.in_w);
+  // Poids réordonnés, copiés dans des mots (alignement du port m_axi).
+  std::vector<Word> wts((p.weights.size() + accel::WORD - 1) / accel::WORD, 0);
+  std::memcpy(wts.data(), p.weights.data(), p.weights.size());
   for (const ConvCall& c : p.calls) {
-    kernel(arena.data(), arena.data(), m.weights.data(), p.params.data(), c.desc);
+    kernel(arena.data(), arena.data(), wts.data(), p.params.data(), c.desc, nullptr, 0);
     if (after) after(c);
   }
 }

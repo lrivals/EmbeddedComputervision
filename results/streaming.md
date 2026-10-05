@@ -84,8 +84,8 @@ Hypothèse : 2 MAC 4 bits par DSP.
 
 | | Moteur unique (M6-M8) | Streaming 8 bits | Streaming 4 bits |
 |---|---|---|---|
-| cycles par image | 41,3 M (ports 8 bits) ; 8,6 M (meilleure piste de `perf_model`) | II = 6,23 M | II = 3,12 M |
-| débit | 4,8 img/s ; 23,2 img/s | **32,1 img/s** | **64,2 img/s** |
+| cycles par image | 41,3 M (noyau M6, ports 8 bits) ; 7,44 M (noyau M10) | II = 6,23 M | II = 3,12 M |
+| débit | 4,8 img/s ; 26,9 img/s | **32,1 img/s** | **64,2 img/s** |
 | latence | 206 ms ; 43 ms | ≈ 85 ms | ≈ 50 ms |
 | DSP | 896 (Tm·Tn = 768 + 4·Tm requantification) | 968 | 996 |
 | mémoire sur puce | tampons ping-pong (roofline : 112 BRAM18 ≈ 0,25 Mo) | 1,9 Mo (L12-L13 : cartes entières) | 1,0 Mo |

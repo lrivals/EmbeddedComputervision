@@ -2,9 +2,11 @@
 //
 // Disposition produite par Vitis HLS pour le top de conv_pe.cpp : bloc de contrôle
 // ap_ctrl_hs, puis les 4 pointeurs m_axi (64 bits, `config_interface -m_axi_addr64`, un mot
-// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 27 champs int32, le
-// champ i au mot i (premier champ = bits de poids faible). À vérifier contre l'en-tête généré
-// `xyolo_conv_hw.h` après `make hls-export` : `make check-regmap` (tools/check_regmap.py).
+// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 30 champs int32, le
+// champ i au mot i (premier champ = bits de poids faible), puis le séquenceur (T10.7) :
+// pointeur `descs` et `n_calls`. À vérifier contre l'en-tête généré `xyolo_conv_hw.h` après
+// `make hls-export` : `make check-regmap` (tools/check_regmap.py) ; les offsets de DESCS et
+// N_CALLS supposent un mot réservé après `d`, comme après chaque argument.
 #pragma once
 
 #include <cstdint>
@@ -24,19 +26,21 @@ constexpr uint32_t ACT_OUT = 0x1c;
 constexpr uint32_t WTS = 0x28;
 constexpr uint32_t PRM = 0x34;
 constexpr uint32_t D = 0x40;
+constexpr uint32_t DESCS = 0xbc;    // table des descripteurs (T10.7)
+constexpr uint32_t N_CALLS = 0xc8;  // 0 : une couche décrite par D
 
 constexpr uint32_t AP_START = 1u << 0;
 constexpr uint32_t AP_DONE = 1u << 1;
 constexpr uint32_t AP_IDLE = 1u << 2;
 constexpr uint32_t AP_READY = 1u << 3;
 
-constexpr int D_WORDS = int(sizeof(accel::LayerDesc) / 4);
+constexpr int D_WORDS = accel::D_WORDS;
 constexpr uint32_t END = D + 4 * D_WORDS;  // premier octet après `d`
 constexpr uint32_t SPAN = 0x1000;          // fenêtre AXI-Lite (assign_bd_address, 4 Ko)
 
-static_assert(D_WORDS == 27 && sizeof(accel::LayerDesc) == 4 * 27, "LayerDesc : 27 × int32");
+static_assert(DESCS == END + 4 && N_CALLS == DESCS + 12, "séquenceur après d");
 static_assert(std::is_trivially_copyable<accel::LayerDesc>::value, "LayerDesc copiable");
-static_assert(END <= SPAN, "registres hors de la fenêtre");
+static_assert(N_CALLS + 4 <= SPAN, "registres hors de la fenêtre");
 
 inline void desc_to_words(const accel::LayerDesc& d, uint32_t w[D_WORDS]) {
   std::memcpy(w, &d, sizeof d);

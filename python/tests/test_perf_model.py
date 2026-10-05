@@ -55,3 +55,20 @@ def test_scenarios_ordered():
     # Seule L08 de Tiny-YOLOv3 écrit sa carte avant pooling dans le programme réel.
     v3 = _layers("tiny-yolov3-coco")
     assert [d["layer"] for d in v3 if d["prepool"]] == [8]
+
+
+def test_m10_kernel():
+    # T10.1-T10.4 : chaque piste du noyau actuel réduit les cycles ; avec width = 1 et sans les
+    # pistes, le modèle redonne le noyau M6 (test_totals_match_hls_report).
+    assert pm.KERNEL["width"] == 8 and pm.KERNEL["trim"] and pm.KERNEL["requant"] == 8
+    layers = _layers("tiny-yolov2-voc")
+    m6 = pm.net_cycles(layers, **pm.M6)
+    p64 = pm.net_cycles(layers, **pm.P64)
+    rq = pm.net_cycles(layers, **dict(pm.P64, trim=True, requant=8))
+    fold = pm.net_cycles(layers, **dict(pm.P64, trim=True, requant=8, fold=True))
+    kern = sum(pm.kernel_cycles(d)["overlapped"] for d in layers)
+    assert kern < fold < rq < p64 < m6
+    # Pliage : seule L00 (cin·k = 9 ≤ Tn) est pliée ; tuile 14 : convs poolées en stride 2.
+    tiling = [pm.layer_tiling(d, fold=True, tile_pool=14) for d in layers]
+    assert [d["layer"] for d, t in zip(layers, tiling) if t[2]] == [0]
+    assert [d["layer"] for d, t in zip(layers, tiling) if t[0] == 14] == [0, 2, 4, 6, 8]

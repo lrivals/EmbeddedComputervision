@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
       // par les couches suivantes. Après la conv L, on contrôle les couches L … (conv
       // suivante − 1) : la conv, son maxpool fusionné, puis les vues sans calcul (upsample,
       // route, têtes) tant que leurs sources sont en place — comme Engine::record.
-      std::vector<int8_t> arena;
+      std::vector<driver::Word> arena;
       uint64_t cycles = 0;
       size_t nd_img = 0;
       size_t next = 1;
@@ -62,7 +62,8 @@ int main(int argc, char** argv) {
           const Layer& l = m.layers[size_t(id)];
           const driver::View& v = prog.views[size_t(id)];
           if (v.nseg == 0) continue;  // conv poolée sans carte avant pooling en DDR
-          const std::vector<int8_t> got = driver::materialize(arena.data(), v);
+          const std::vector<int8_t> got =
+              driver::materialize(reinterpret_cast<const int8_t*>(arena.data()), v);
           const Tensor& g = ref.recorded()[size_t(id)];
           const NpyInt8 want = tb::dump(a, net, image, id);
           char what[48];

@@ -1,39 +1,56 @@
-"""Modèle de cycles du noyau HLS et pistes d'optimisation chiffrées (T8.1, T8.3).
+"""Modèle de cycles du noyau HLS et pistes d'optimisation chiffrées (T8.1, T8.3, M10).
 
     python tools/perf_model.py                       # scénarios, Tiny-YOLOv2 et v3
     python tools/perf_model.py --check build/hls/cycles_conv.csv   # == compteurs C-sim
 
 Réplique en Python de `count_cycles` (hls/kernels/conv_pe.cpp) : même parcours des tuiles
 (row → col → to, tuiles partielles, maxpool fusionné), mêmes hypothèses (II = 1, profondeurs
-de pipeline ignorées, deux bundles de chargement en parallèle, ping-pong ti / tuile). Avec
-`width = 1` octet/cycle et `trim = False`, les cycles sont **identiques** à ceux de
-`make hls-cycles` (vérifié par `--check` et `python/tests/test_perf_model.py`), à un détail
-près : `tb_conv` écrit la carte avant pooling de **toute** conv poolée (`prepool_all`), le
-programme du driver seulement quand le manifest la demande (L08 de Tiny-YOLOv3). Les
-scénarios suivent le programme réel.
+de pipeline ignorées, deux bundles de chargement en parallèle, ping-pong ti / tuile). Les
+cycles sont **identiques** à ceux de `make hls-cycles` (vérifié par `--check` et
+`python/tests/test_perf_model.py`), à un détail près : `tb_conv` écrit la carte avant pooling
+de **toute** conv poolée (`prepool_all`), le programme du driver seulement quand le manifest la
+demande (L08 de Tiny-YOLOv3). Les scénarios suivent le programme réel.
 
-Paramètres des pistes (hors base, à confirmer par synthèse et co-sim) :
-- `width` : octets transférés par cycle sur les ports m_axi (1 = ports 8 bits actuels ;
-  8 = 64 bits ; 16 = 128 bits, poids réordonnés par le driver dans l'ordre des tuiles) ;
-  s'applique aux chargements et aux écritures de sortie ;
-- `trim` : ne charger que les canaux d'entrée valides de la dernière tuile ti (Tn = 24 pour
-  cin = 3 en L00 : 21 canaux chargés pour rien) ;
-- `requant` : canaux requantifiés par cycle dans l'étage de sortie (1 aujourd'hui : un seul
-  multiplieur 32 × 31 bits, 4 DSP, partagé par les Tm canaux ; `output_stage.hpp`).
+Paramètres (défauts de `layer_cycles` = noyau M6, ports 8 bits ; `KERNEL` = noyau actuel,
+lu dans hls/kernels/accel_config.hpp) :
+- `width` : octets par mot sur les ports m_axi (1 = 8 bits ; 8 = 64 bits, T10.1). Lecture
+  ligne par ligne : chaque (voie, ligne) de `in_buf` coûte `cdiv(IC + width − 1, width)` mots
+  (assez pour tout alignement de la ligne en DDR) ; une tuile de poids, réordonnée par le
+  driver en bloc contigu, `cdiv(Tm·n·K², width)` mots ; une ligne de sortie de n octets,
+  `cdiv(n + width − 1, width)` mots ;
+- `trim` : ne charger que les canaux d'entrée valides de la dernière tuile ti (T10.3) ;
+- `requant` : canaux requantifiés par cycle dans l'étage de sortie (T10.2) ;
+- `fold` : pliage de la première conv (cin·k ≤ Tn) : les voies portent (canal, ligne du
+  noyau), la conv devient 1 × k (T10.4) ;
+- `tile_pool` : Tr = Tc des convs suivies d'un maxpool de stride 2 (None : Tr, Tc ; T10.4).
 """
 
 import argparse
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-
-TILES = {"tm": 32, "tn": 24, "tr": 13, "tc": 13}  # KV260 (ADR 0003, hls/configs/kv260.tcl)
 K_MAX = 3
 FREQ_HZ = 200e6
 NETS = ("tiny-yolov2-voc", "tiny-yolov3-coco")
+
+
+def kernel_config(path=ROOT / "hls" / "kernels" / "accel_config.hpp"):
+    """Valeurs par défaut des `#define ACC_*` du noyau (tuiles KV260, ports, requant…)."""
+    found = dict(re.findall(r"#define (ACC_\w+) (\d+)", Path(path).read_text()))
+    v = {k: int(x) for k, x in found.items()}
+    return {"tm": v["ACC_TM"], "tn": v["ACC_TN"], "tr": v["ACC_TR"], "tc": v["ACC_TC"],
+            "width": v["ACC_WORD_BYTES"], "trim": bool(v["ACC_TRIM"]),
+            "requant": v["ACC_RQ"], "fold": bool(v["ACC_FOLD"]),
+            "tile_pool": v["ACC_TILE_POOL"] or None}
+
+
+KERNEL = kernel_config()
+TILES = {k: KERNEL[k] for k in ("tm", "tn", "tr", "tc")}  # KV260 (ADR 0003)
+M6 = dict(width=1, trim=False, requant=1, fold=False, tile_pool=None)
 
 
 def _cdiv(a, b):
@@ -60,11 +77,23 @@ def conv_layers(manifest):
     return out
 
 
+def layer_tiling(d, tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"], fold=False,
+                 tile_pool=None):
+    """Choix du driver (`driver::conv_desc`) : tuile (tr, tc) et pliage de la conv."""
+    if tile_pool and d["pool_k"] > 0 and d["pool_s"] == 2:
+        tr = tc = tile_pool
+    folded = fold and d["k"] > 1 and d["cin"] * d["k"] <= tn
+    return tr, tc, folded
+
+
 def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"],
-                 width=1, trim=False, requant=1, prepool_all=False):
+                 width=1, trim=False, requant=1, prepool_all=False, fold=False,
+                 tile_pool=None):
     """Cycles d'une conv : dict load_in, load_w, compute, store, sequential, overlapped."""
+    tr, tc, folded = layer_tiling(d, tn, tr, tc, fold, tile_pool)
     k, cin, cout = d["k"], d["cin"], d["cout"]
-    kk = k * k
+    kh = 1 if folded else k  # lignes du noyau parcourues par le calcul
+    lanes = cin * k if folded else cin
     ir, ic = tr + K_MAX - 1, tc + K_MAX - 1
     R = d["h"] + 2 * d["pad"] - k + 1
     C = d["w"] + 2 * d["pad"] - k + 1
@@ -74,10 +103,15 @@ def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc
     Cp = C if ps == 1 else (C - pk) // ps + 1
     Pr, Pc = (tr - pk) // ps + 1, (tc - pk) // ps + 1
     n_r, n_c, n_m = _cdiv(Rp, Pr), _cdiv(Cp, Pc), _cdiv(cout, tm)
-    nti = _cdiv(cin, tn)
+    nti = _cdiv(lanes, tn)
 
-    # Chargements par ti : Tn·IR·IC et Tm·Tn·K² octets (ou les seuls canaux valides).
-    tns = [min(tn, cin - t * tn) if trim else tn for t in range(nti)]
+    def words(n):  # une ligne de n octets, alignement quelconque
+        return _cdiv(n + width - 1, width)
+
+    # Chargements par ti : voies × lignes × mots par ligne, et un bloc de poids contigu.
+    tns = [min(tn, lanes - t * tn) if trim else tn for t in range(nti)]
+    lds = [(n * ir * words(ic), _cdiv(tm * n * kh * k, width)) for n in tns]
+    comp = kh * k * tr * tc
     s = dict(load_in=0, load_w=0, compute=0, store=0, sequential=0, overlapped=0)
     prev_store = 0
     for ir_ in range(n_r):
@@ -89,13 +123,11 @@ def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc
                 np_r = min(Pr, Rp - ir_ * Pr)
                 np_c = min(Pc, Cp - ic_ * Pc)
                 tm_n = min(tm, cout - im * tm)
-                comp = kk * tr * tc
-                lds = [(_cdiv(n * ir * ic, width), _cdiv(tm * n * kk, width)) for n in tns]
-                own = (min(tr_n, Pr * ps) * min(tc_n, Pc * ps)
-                       if pooled and (d["prepool"] or prepool_all) else 0)
-                # Étage de sortie : passe de requantification TR·TC par groupe de `requant`
-                # canaux (un multiplieur aujourd'hui), puis écritures canal par canal.
-                st = _cdiv(tm_n, requant) * tr * tc + tm_n * _cdiv(own + np_r * np_c, width)
+                pre = pooled and (d["prepool"] or prepool_all)
+                own = min(tr_n, Pr * ps) * words(min(tc_n, Pc * ps)) if pre else 0
+                # Étage de sortie : passe de requantification Tr·Tc par groupe de `requant`
+                # canaux, puis écritures canal par canal, ligne par ligne.
+                st = _cdiv(tm_n, requant) * tr * tc + tm_n * (own + np_r * words(np_c))
                 s["load_in"] += sum(a for a, _ in lds)
                 s["load_w"] += sum(b for _, b in lds)
                 s["compute"] += nti * comp
@@ -120,13 +152,24 @@ def net_cycles(layers, **kw):
     return sum(layer_cycles(d, **kw)["overlapped"] for d in layers)
 
 
+def kernel_cycles(d, **kw):
+    """Cycles d'une conv avec le noyau actuel (`KERNEL`)."""
+    return layer_cycles(d, **{**KERNEL, **kw})
+
+
+P64 = dict(M6, width=8)
 SCENARIOS = [
-    ("actuel (ports 8 bits)", dict(width=1)),
-    ("canaux valides seulement (trim)", dict(width=1, trim=True)),
-    ("ports 64 bits", dict(width=8)),
-    ("ports 64 bits + trim", dict(width=8, trim=True)),
-    ("ports 128 bits + trim", dict(width=16, trim=True)),
-    ("ports 128 bits + trim + requant ×8 (+28 DSP)", dict(width=16, trim=True, requant=8)),
+    ("M6 : ports 8 bits", M6),
+    ("canaux valides seulement (trim)", dict(M6, trim=True)),
+    ("ports 64 bits", P64),
+    ("ports 64 bits + trim", dict(P64, trim=True)),
+    ("ports 128 bits + trim", dict(M6, width=16, trim=True)),
+    ("ports 64 bits + trim + requant ×8 (+28 DSP)", dict(P64, trim=True, requant=8)),
+    ("… + pliage de L00", dict(P64, trim=True, requant=8, fold=True)),
+    ("… + pliage + tuiles 12 (convs poolées)",
+     dict(P64, trim=True, requant=8, fold=True, tile_pool=12)),
+    ("… + pliage + tuiles 14 (convs poolées)",
+     dict(P64, trim=True, requant=8, fold=True, tile_pool=14)),
 ]
 
 
@@ -136,15 +179,32 @@ def scenario_table(net, freq_hz=FREQ_HZ, tiles=TILES):
     total_macs = sum(macs(d) for d in layers)
     ideal = total_macs / (tiles["tm"] * tiles["tn"])
     rows = []
-    for name, kw in SCENARIOS:
-        cyc = net_cycles(layers, **tiles, **kw)
+
+    def row(name, cyc):
         t = cyc / freq_hz
         rows.append((name, cyc, 1e3 * t, 1 / t, 2 * total_macs / t / 1e9, ideal / cyc))
-    comp = sum(layer_cycles(d, **tiles)["compute"] for d in layers)
-    t = comp / freq_hz
-    rows.append(("borne calcul (chargements gratuits)", comp, 1e3 * t, 1 / t,
-                 2 * total_macs / t / 1e9, ideal / comp))
+
+    for name, kw in SCENARIOS:
+        row(name, net_cycles(layers, **tiles, **kw))
+    row(f"**noyau actuel** ({kernel_label()})",
+        sum(kernel_cycles(d)["overlapped"] for d in layers))
+    row("borne calcul M6 (chargements gratuits)",
+        sum(layer_cycles(d, **tiles)["compute"] for d in layers))
+    row("borne calcul du noyau actuel", sum(kernel_cycles(d)["compute"] for d in layers))
     return total_macs, rows
+
+
+def kernel_label(k=KERNEL):
+    parts = [f"ports {8 * k['width']} bits"]
+    if k["trim"]:
+        parts.append("trim")
+    if k["requant"] > 1:
+        parts.append(f"requant ×{k['requant']}")
+    if k["fold"]:
+        parts.append("pliage L00")
+    if k["tile_pool"]:
+        parts.append(f"tuiles {k['tile_pool']} poolées")
+    return ", ".join(parts)
 
 
 def check(path):
@@ -154,8 +214,12 @@ def check(path):
     layers = {net: {d["layer"]: d for d in conv_layers(ROOT / "model" / net / "manifest.json")}
               for net in {r["net"] for r in want}}
     for r in want:
+        # Configuration du noyau qui a produit la ligne (colonnes écrites par tb_conv).
+        kw = dict(tm=int(r["tm"]), tn=int(r["tn"]), tr=int(r["tr"]), tc=int(r["tc"]),
+                  width=int(r["width"]), trim=bool(int(r["trim"])), requant=int(r["rq"]),
+                  fold=bool(int(r["fold"])))
         # tb_conv écrit la carte avant pooling de toute conv poolée (test du chemin prépool)
-        got = layer_cycles(layers[r["net"]][int(r["layer"])], prepool_all=True)
+        got = layer_cycles(layers[r["net"]][int(r["layer"])], prepool_all=True, **kw)
         for key, v in got.items():
             if int(r[key]) != v:
                 print(f"{r['net']} L{int(r['layer']):02d} {key} : {v} au lieu de {r[key]}")

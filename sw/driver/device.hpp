@@ -32,9 +32,13 @@ class Device {
   virtual uint32_t read32(uint32_t off) = 0;
   // Après ap_start : rend la main quand ap_done est levé (interruption ou sondage).
   virtual void wait_done() = 0;
-  // Cohérence : tampons non cachés en `uio` (O_SYNC), rien à faire en `sim`.
-  virtual void sync_for_device(const Buffer&) {}
-  virtual void sync_for_cpu(const Buffer&) {}
+  // Cohérence d'une plage [off, off + len) du tampon : rien à faire en `sim` ni en `uio` non
+  // caché (O_SYNC) ; en `uio --cached` (T10.6), vidage ou invalidation des caches de l'ARM.
+  // Appelables depuis plusieurs threads (pipeline, T10.5).
+  virtual void sync_for_device(const Buffer&, size_t /*off*/, size_t /*len*/) {}
+  virtual void sync_for_cpu(const Buffer&, size_t /*off*/, size_t /*len*/) {}
+  void sync_for_device(const Buffer& b) { sync_for_device(b, 0, b.size); }
+  void sync_for_cpu(const Buffer& b) { sync_for_cpu(b, 0, b.size); }
 
   // Second noyau `yolo_post` (T9.1), dans sa propre fenêtre de registres ; absent par défaut.
   virtual bool has_post() const { return false; }
@@ -55,6 +59,7 @@ struct DeviceOptions {
   std::string uio = "/dev/uio0";       // registres de yolo_conv (nœud generic-uio du dtbo)
   std::string udmabuf = "udmabuf0";    // /dev/<nom>, /sys/class/u-dma-buf/<nom>/phys_addr
   bool irq = true;                     // uio : interruption ; false : sondage d'ap_done
+  bool cached = false;                 // uio : u-dma-buf caché + sync explicites (T10.6)
   std::string uio_post;                // registres de yolo_post (T9.1) ; vide : absent en uio
 };
 

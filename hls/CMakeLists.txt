@@ -14,6 +14,8 @@ set(ACC_TM 32 CACHE STRING "Tm")
 set(ACC_TN 24 CACHE STRING "Tn")
 set(ACC_TR 13 CACHE STRING "Tr")
 set(ACC_TC 13 CACHE STRING "Tc")
+# Options M10 (accel_config.hpp), ex. "ACC_WORD_BYTES=1;ACC_RQ=1" ; vide : défauts du fichier.
+set(ACC_OPTIONS "" CACHE STRING "définitions supplémentaires du noyau")
 
 include(FetchContent)
 FetchContent_Declare(hls_ap_types
@@ -23,17 +25,22 @@ FetchContent_MakeAvailable(hls_ap_types)
 
 add_subdirectory(../cpp/golden ${CMAKE_BINARY_DIR}/golden)
 
+# Configuration du noyau, partagée par le noyau et le driver (ordre des poids, tuiles).
+# Les ports sont lus en mots : accès int8 ↔ mots sur la même mémoire.
+add_library(accel_config INTERFACE)
+target_compile_definitions(accel_config INTERFACE ACC_TM=${ACC_TM} ACC_TN=${ACC_TN}
+                           ACC_TR=${ACC_TR} ACC_TC=${ACC_TC} ${ACC_OPTIONS})
+target_compile_options(accel_config INTERFACE -fno-strict-aliasing)
+
 add_library(driver ../sw/driver/program.cpp)
 target_include_directories(driver PUBLIC ../sw/driver kernels)
-target_link_libraries(driver PUBLIC golden)
+target_link_libraries(driver PUBLIC golden accel_config)
 target_compile_options(driver PRIVATE -Wall -Wextra)
 
 add_library(accel kernels/conv_pe.cpp kernels/postproc.cpp)
 target_include_directories(accel PUBLIC kernels)
 target_include_directories(accel SYSTEM PUBLIC ${hls_ap_types_SOURCE_DIR}/include)
-target_link_libraries(accel PUBLIC golden)
-target_compile_definitions(accel PUBLIC ACC_TM=${ACC_TM} ACC_TN=${ACC_TN} ACC_TR=${ACC_TR}
-                                        ACC_TC=${ACC_TC})
+target_link_libraries(accel PUBLIC golden accel_config)
 target_compile_options(accel PRIVATE -Wall -Wextra -Wno-unused-label)
 # Faux positifs de ap_private.h (en-têtes 2019) avec g++ récent en -O3.
 target_compile_options(accel PUBLIC -Wno-unknown-pragmas -Wno-maybe-uninitialized
@@ -63,9 +70,8 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   add_library(accel_pow2 kernels/conv_pe.cpp kernels/postproc.cpp)
   target_include_directories(accel_pow2 PUBLIC kernels)
   target_include_directories(accel_pow2 SYSTEM PUBLIC ${hls_ap_types_SOURCE_DIR}/include)
-  target_link_libraries(accel_pow2 PUBLIC golden)
-  target_compile_definitions(accel_pow2 PUBLIC ACC_TM=${ACC_TM} ACC_TN=${ACC_TN}
-                             ACC_TR=${ACC_TR} ACC_TC=${ACC_TC} ACC_WMODE_POW2)
+  target_link_libraries(accel_pow2 PUBLIC golden accel_config)
+  target_compile_definitions(accel_pow2 PUBLIC ACC_WMODE_POW2)
   target_compile_options(accel_pow2 PUBLIC -Wno-unknown-pragmas -Wno-maybe-uninitialized
                                            -Wno-uninitialized)
   add_executable(tb_net_pow2 tb/tb_net.cpp)

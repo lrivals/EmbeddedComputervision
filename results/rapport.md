@@ -18,9 +18,10 @@ dépendent sont marquées *à mesurer*.
 |---|---|---|
 | MACs (convolutions) | 3,486 G | 2,782 G |
 | Format | INT8 (poids par canal, activations par couche), accumulateur 32 bits | idem |
-| Tuiles, MAC/cycle | Tm = 32, Tn = 24, Tr = Tc = 13 → 768 | idem |
+| Tuiles, MAC/cycle | Tm = 32, Tn = 24, Tr = Tc = 13 (14 pour les convs poolées en stride 2) → 768 | idem |
 | Horloge | 200 MHz (timing à confirmer, T7.1) | idem |
-| Accélérateur, projection | **206,5 ms**, 4,8 img/s, **33,8 GOPS**, efficacité 11,0 % | 203,2 ms, 4,9 img/s, 27,4 GOPS, 8,9 % |
+| Accélérateur, projection (noyau M10) | **37,2 ms**, 26,9 img/s, **187,3 GOPS**, efficacité 61,0 % | 36,1 ms, 27,7 img/s, 154,3 GOPS, 50,2 % |
+| Accélérateur, projection (noyau M6, ports 8 bits) | 206,5 ms, 4,8 img/s, 33,8 GOPS, 11,0 % | 203,2 ms, 4,9 img/s, 27,4 GOPS, 8,9 % |
 | Post-traitement ARM | < 0,02 ms sur x86 (T7.3) ; A53 *à mesurer* | idem |
 | Puissance | *à mesurer* (puce : `power.rpt` ; SOM : INA260) | — |
 | LUT / DSP / BRAM | *après synthèse* ; modèle roofline : 896 DSP, 112 BRAM18 | — |
@@ -41,8 +42,8 @@ contraire de l'article.
 
 | Travail | Modèle | FPGA | Format | img/s | ms | GOPS | W (périmètre) | Ce qui empêche la comparaison directe |
 |---|---|---|---|---|---|---|---|---|
-| **ce travail** (projection) | Tiny-YOLOv2 VOC 416 | KV260 (XCK26), 200 MHz | INT8 | 4,8 | 206,5 (accél.) | 33,8 | *à mesurer* | projection C-sim, accélérateur seul, pas de mesure |
-| **ce travail** (projection) | Tiny-YOLOv3 COCO 416 | KV260 | INT8 | 4,9 | 203,2 (accél.) | 27,4 | *à mesurer* | idem ; poids COCO (80 classes) |
+| **ce travail** (projection, noyau M10) | Tiny-YOLOv2 VOC 416 | KV260 (XCK26), 200 MHz | INT8 | 26,9 | 37,2 (accél.) | 187,3 | *à mesurer* | projection C-sim, accélérateur seul, pas de mesure ; ressources après synthèse |
+| **ce travail** (projection, noyau M10) | Tiny-YOLOv3 COCO 416 | KV260 | INT8 | 27,7 | 36,1 (accél.) | 154,3 | *à mesurer* | idem ; poids COCO (80 classes) |
 | 2024-zhang | YOLOv2-Tiny 416, lot 1 | Kintex-7 325T | INT8 | n/r | 14,49 | 406 | 12,3 (carte) ; puce 7,8 (Vivado) | FPGA sans ARM, 687 DSP avec deux MAC par DSP (*packing*), post-traitement matériel compris ; jeu de données à vérifier ; fréquence non relevée |
 | 2024-zhang | YOLOv3-Tiny 416, lot 1 | Kintex-7 325T | INT8 | n/r | 15,2 | 401 | 12,3 (carte) | idem |
 | 2023-zhai | YOLOv3-tiny **élagué**, 1 module | Zynq XC7Z035 | INT16 | 91,65 | — | 67,91 | 12,51 (non précisé) | réseau élagué (moins de MACs : GOPS et img/s ne se convertissent pas), INT16, jeu de véhicules (détection et suivi), périmètre de puissance inconnu |
@@ -53,11 +54,12 @@ contraire de l'article.
 **Lecture.**
 
 - **2024-zhang** est la seule référence au même modèle (Tiny-YOLOv2 416, INT8, lot 1). Elle
-  est **14× plus rapide** que notre projection (14,49 contre 206,5 ms). Elle n'a pourtant
-  que 1,8× plus de multiplieurs (687 DSP en *packing*, soit environ 1 374 MAC/cycle, contre
-  768). L'essentiel de l'écart ne tient donc pas au calcul : notre noyau passe 80 % de son
-  temps hors de la boucle MAC (41,3 Mcycles, dont 8,2 de calcul), à attendre ses ports
-  mémoire et son étage de sortie (section 3).
+  était **14× plus rapide** que la projection du noyau M6 (14,49 contre 206,5 ms) avec
+  seulement 1,8× plus de multiplieurs (687 DSP en *packing*, soit environ 1 374 MAC/cycle,
+  contre 768). Le noyau M6 passait 80 % de son temps hors de la boucle MAC (41,3 Mcycles,
+  dont 8,2 de calcul), à attendre ses ports mémoire et son étage de sortie. Le noyau M10
+  (section 3) ramène l'écart à 2,6× (37,2 ms) : il reste à peu près l'écart de multiplieurs
+  (1,8×) et 39 % du temps hors de la boucle MAC.
 - **2026-fata** tourne sur la **même carte** : 60 GOPS et 24 img/s avec un DPU sur un
   YOLOv3-tiny élagué à 70 %. Nos 27,4 GOPS projetés sur Tiny-YOLOv3 non élagué sont 2,2×
   en dessous. Les img/s ne se comparent pas : l'élagage divise les MACs par environ 3.
@@ -77,36 +79,51 @@ contraire de l'article.
 
 ## 3. Où part le temps, et pistes chiffrées
 
-Modèle : `python tools/perf_model.py` (`make perf-model`). Scénarios appliqués au noyau
-actuel, sans changer les tuiles ; cycles à 200 MHz, accélérateur seul.
+Modèle : `python tools/perf_model.py` (`make perf-model`), égal aux compteurs C-sim cycle
+pour cycle. Cycles à 200 MHz, accélérateur seul. Les ports larges suivent un modèle réaliste,
+ligne par ligne : une ligne de n octets coûte `cdiv(n + 7, 8)` mots de 64 bits, quel que soit
+son alignement.
 
 ### Tiny-YOLOv2 VOC
 
 | Scénario | Mcycles | ms | img/s | GOPS | efficacité MAC |
 |---|---|---|---|---|---|
-| actuel (ports 8 bits) | 41,30 | 206,5 | 4,8 | 33,8 | 11,0 % |
+| M6 : ports 8 bits | 41,30 | 206,5 | 4,8 | 33,8 | 11,0 % |
 | canaux valides seulement (trim) | 32,67 | 163,3 | 6,1 | 42,7 | 13,9 % |
-| ports 64 bits | 11,89 | 59,4 | 16,8 | 117,3 | 38,2 % |
-| ports 128 bits + trim | 11,67 | 58,3 | 17,1 | 119,5 | 38,9 % |
-| ports 128 bits + trim + requantification ×8 (+28 DSP) | 8,62 | 43,1 | 23,2 | 161,7 | 52,6 % |
-| borne calcul (chargements gratuits) | 8,23 | 41,1 | 24,3 | 169,5 | 55,2 % |
+| ports 64 bits | 12,27 | 61,3 | 16,3 | 113,6 | 37,0 % |
+| ports 128 bits + trim | 12,13 | 60,6 | 16,5 | 115,0 | 37,4 % |
+| ports 64 bits + trim + requantification ×8 (+28 DSP) | 9,29 | 46,4 | 21,5 | 150,1 | 48,9 % |
+| … + pliage de L00 | 8,38 | 41,9 | 23,9 | 166,4 | 54,2 % |
+| **… + tuiles 14 pour les convs poolées (noyau M10)** | **7,44** | **37,2** | **26,9** | **187,3** | **61,0 %** |
+| borne calcul M6 (chargements gratuits) | 8,23 | 41,1 | 24,3 | 169,5 | 55,2 % |
+| borne calcul du noyau M10 | 6,32 | 31,6 | 31,7 | 220,7 | 71,8 % |
 | point roofline KV260 ([roofline.md](roofline.md)) | — | 31,9 | 31,3 | 218,5 | — |
 | idéal (MACs / 768, efficacité 100 %) | 4,54 | 22,7 | 44,1 | 307,2 | 100 % |
 
-Tiny-YOLOv3 suit la même échelle : 203,2 → 56,9 ms (ports 64 bits) → 39,2 ms (+ requantification
-×8) ; borne calcul 36,5 ms.
+Tiny-YOLOv3 suit la même échelle : 203,2 → 60,4 ms (ports 64 bits) → 45,3 ms (+ requantification
+×8) → 36,1 ms (noyau M10) ; borne calcul du noyau M10 : 27,0 ms.
+
+**Noyau M10 (T10.1 à T10.4, C-sim == golden à l'octet).**
+- **Ce qu'il contient** : ports de 64 bits, poids réordonnés dans l'ordre des tuiles, trim,
+  requantification ×8, pliage de L00 et tuiles 14 × 14 pour les convs poolées en stride 2.
+- **Débit** : Tiny-YOLOv2 passe de 206,5 à 37,2 ms, soit ×5,6. Il dépasse 2026-fata
+  (24,3 img/s) en débit d'images, sans élagage.
+- **Ce qu'il reste** : 5,3 ms le séparent du point roofline. L00 reste limitée par son
+  étage de sortie, et les convs 1×1 par le chargement de `in_buf` (IR lignes par voie).
+- **Ce qui manque** : les ressources (DSP, BRAM des tampons 14 × 14) et le masque
+  d'octets des écritures partielles. Seules la synthèse et la co-sim les diront.
 
 **Pistes, par gain décroissant :**
 
-1. **Ports m_axi larges (×3,5).** Les quatre ports lisent et écrivent un octet par cycle,
+1. **Ports m_axi larges (×3,4).** Les quatre ports lisent et écrivent un octet par cycle,
    soit 0,2 Go/s par bundle, alors que le roofline suppose 13,4 Go/s de DDR. Les charger
    en 64 bits (`in_buf` par lignes, `w_buf` dans l'ordre des tuiles, réordonné une fois par
-   le driver) ramène Tiny-YOLOv2 de 206,5 à 59,4 ms. Passer à 128 bits n'apporte presque
-   rien de plus (58,3 ms) : le goulot passe alors à l'étage de sortie.
-2. **Requantification parallèle (−26 %, après la piste 1).** `store_tile` requantifie un
+   le driver) ramène Tiny-YOLOv2 de 206,5 à 61,3 ms. Passer à 128 bits n'apporte presque
+   rien de plus (60,6 ms) : le goulot passe alors à l'étage de sortie.
+2. **Requantification parallèle (−24 %, après la piste 1).** `store_tile` requantifie un
    canal à la fois avec un seul multiplieur 32 × 31 bits (4 DSP), soit Tm × 169 cycles par
    tuile. Avec 8 multiplieurs (+28 DSP, ressource abondante : 896 utilisés sur 1 248), on
-   descend à 43,1 ms, à 5 % de la borne calcul.
+   descend à 46,4 ms.
 3. **Canaux valides seulement (−21 % sur le noyau actuel, ≈ 0 après la piste 1).** L00 a
    cin = 3, mais le noyau charge Tn = 24 canaux : 87 % du chargement de L00 est inutile.
    La piste ne compte qu'aussi longtemps que les ports restent étroits.
@@ -122,8 +139,10 @@ Tiny-YOLOv3 suit la même échelle : 203,2 → 56,9 ms (ports 64 bits) → 39,2 
    la copie et le post-traitement en mémoire non cachée (`O_SYNC`) pèsent, il faudra passer
    à un tampon caché avec `sync_for_cpu/device` (u-dma-buf).
 
-Après les pistes 1 et 2, Tiny-YOLOv2 projeté atteint **≈ 23 img/s et ≈ 160 GOPS**, au niveau
-de 2026-fata (DPU, même carte, réseau élagué) en débit de calcul, et sans élagage.
+Pistes 1 à 4 réalisées en C-sim dans le noyau M10 (voir le tableau). Tiny-YOLOv2 projeté y
+atteint **26,9 img/s et 187 GOPS**, au-delà de 2026-fata (DPU, même carte, réseau élagué),
+et sans élagage. La piste 5 est outillée (`yolo_bench --pipeline`, `--cached`) et attend la
+carte.
 
 Note : `results/hls_report.md` donne 210,5 ms au lieu de 206,5 ms. Son `tb_conv` écrit la
 carte avant pooling de toutes les convs poolées pour tester ce chemin. Le programme du

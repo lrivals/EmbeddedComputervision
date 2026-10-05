@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import numpy as np  # noqa: E402
-from perf_model import FREQ_HZ, TILES, conv_layers, layer_cycles, macs  # noqa: E402
+from perf_model import FREQ_HZ, TILES, conv_layers, kernel_cycles, kernel_label, macs  # noqa: E402,E501
 
 COLUMNS = ["travail", "modele", "fpga", "format", "fps", "latence_ms", "gops", "puissance_w",
            "perimetre_puissance", "lut", "dsp", "bram", "frequence_mhz", "map_voc", "source"]
@@ -115,7 +115,7 @@ def per_layer(layers, layer_csv, net):
             continue
         t = float(np.mean(acc[d["layer"]]))
         th = macs(d) / (TILES["tm"] * TILES["tn"])
-        pred = layer_cycles(d)["overlapped"]
+        pred = kernel_cycles(d)["overlapped"]
         out.append((d["layer"], macs(d), 1e3 * t, t * FREQ_HZ, pred, th / (t * FREQ_HZ)))
     return out
 
@@ -167,19 +167,19 @@ def main():
 
     md = ["# Mesures de ce travail (T8.1)", "",
           "Généré par `python tools/bench_report.py` (`make bench-report`) ; protocole : "
-          "[protocole.md](protocole.md). Kria KV260, tuiles Tm = 32, Tn = 24, Tr = Tc = 13, "
+          "[protocole.md](protocole.md). Kria KV260, tuiles Tm = 32, Tn = 24, Tr = Tc = 13 (14 pour les convs poolées en stride 2), "
           f"{FREQ_HZ / 1e6:.0f} MHz.", ""]
 
     # Projection (toujours) : modèle de cycles == compteurs C-sim, chaque réseau.
     ours = []
     md += ["## Projection (modèle de cycles, accélérateur seul)", "",
-           "`tools/perf_model.py`, ports m_axi de 8 bits, II = 1, profondeurs de pipeline et "
-           "pilotage ARM ignorés : borne basse du temps accélérateur mesurable.", "",
+           f"`tools/perf_model.py`, noyau actuel ({kernel_label()}), II = 1, profondeurs de "
+           "pipeline et pilotage ARM ignorés : borne basse du temps accélérateur mesurable.", "",
            "| Réseau | GMAC | Mcycles | ms | img/s | GOPS | efficacité |", "|---|---|---|---|---|---|---|"]
     for net in MODEL_NAME:
         layers = conv_layers(ROOT / "model" / net / "manifest.json")
         n_macs = sum(macs(d) for d in layers)
-        cyc = sum(layer_cycles(d)["overlapped"] for d in layers)
+        cyc = sum(kernel_cycles(d)["overlapped"] for d in layers)
         t = cyc / FREQ_HZ
         eff = n_macs / (TILES["tm"] * TILES["tn"]) / cyc
         md.append(f"| {net} | {n_macs / 1e9:.3f} | {cyc / 1e6:.2f} | {1e3 * t:.1f} | "
@@ -189,7 +189,7 @@ def main():
                      "gops": fmt(2 * n_macs / t / 1e9, 1), "perimetre_puissance": "à mesurer",
                      "frequence_mhz": f"{FREQ_HZ / 1e6:.0f}",
                      "map_voc": read_map(net) if net.endswith("voc") else "",
-                     "source": "tools/perf_model.py (accélérateur seul, ports 8 bits) ; "
+                     "source": f"tools/perf_model.py (accélérateur seul, {kernel_label()}) ; "
                                "ressources après synthèse"})
     md.append("")
 

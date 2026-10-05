@@ -111,10 +111,17 @@ class SimDevice : public Device {
   void start() {
     regs_[regmap::CTRL / 4] &= ~(regmap::AP_IDLE | regmap::AP_DONE);
     const accel::LayerDesc d = regmap::words_to_desc(&regs_[regmap::D / 4]);
-    yolo_conv(reinterpret_cast<const int8_t*>(virt(reg64(regmap::ACT_IN))),
-              reinterpret_cast<int8_t*>(virt(reg64(regmap::ACT_OUT))),
-              reinterpret_cast<const int8_t*>(virt(reg64(regmap::WTS))),
-              reinterpret_cast<const int32_t*>(virt(reg64(regmap::PRM))), d);
+    const int32_t n_calls = int32_t(regs_[regmap::N_CALLS / 4]);
+    // Mots du port m_axi : adresses alignées (driver), accès int8 ↔ mots (-fno-strict-aliasing).
+    auto word = [&](uint32_t off) {
+      const uint64_t phys = reg64(off);
+      if (phys % accel::WORD) throw std::runtime_error("sim : pointeur m_axi non aligné");
+      return reinterpret_cast<accel::word_t*>(virt(phys));
+    };
+    yolo_conv(word(regmap::ACT_IN), word(regmap::ACT_OUT), word(regmap::WTS),
+              reinterpret_cast<const int32_t*>(virt(reg64(regmap::PRM))), d,
+              n_calls ? reinterpret_cast<const int32_t*>(virt(reg64(regmap::DESCS))) : nullptr,
+              n_calls);
     regs_[regmap::CTRL / 4] |= regmap::AP_DONE | regmap::AP_IDLE | regmap::AP_READY;
     if ((regs_[regmap::IER / 4] & 1)) regs_[regmap::ISR / 4] |= 1;
   }

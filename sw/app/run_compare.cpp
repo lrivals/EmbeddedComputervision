@@ -2,13 +2,15 @@
 // golden, puis détections du post-traitement ARM == detections.json (T7.3).
 //
 //   run_compare [--model DIR] [--net NAME]… [--image ID]… [--layer N] [--csv temps.csv]
-//               [--hw-post] [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
-//               [--uio-post /dev/uioN]
+//               [--hw-post] [--chain] [--backend sim|uio] [--uio /dev/uioN]
+//               [--udmabuf udmabufN] [--poll] [--cached] [--uio-post /dev/uioN]
 //
 // --layer N (T7.2, couche isolée) : l'arène est d'abord remplie avec les dumps des couches
 // < N, aux places où les convs précédentes les auraient écrites, puis seule la conv N tourne.
 // --hw-post (T9.1) : en plus, boîtes du noyau `yolo_post` == `hwpp::run` (golden) sur les
 // têtes en DDR, aux seuils 0,25 et 0,005.
+// --chain (T10.7) : toutes les convs par le séquenceur du noyau (une seule fin à attendre) ;
+// seules les têtes, encore en DDR à la fin, sont comparées aux dumps.
 // Code de sortie 0 = aucun écart.
 #include <chrono>
 #include <cstdio>
@@ -32,6 +34,7 @@ struct Args {
   tb::Args tb;
   driver::DeviceOptions dev;
   bool hw_post = false;
+  bool chain = false;
 };
 
 Args parse(int argc, char** argv) {
@@ -40,8 +43,8 @@ Args parse(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     if (sw::parse_device_option(argc, argv, i, a.dev)) continue;
     const std::string k = argv[i];
-    if (k == "--hw-post") {
-      a.hw_post = true;
+    if (k == "--hw-post" || k == "--chain") {
+      (k == "--chain" ? a.chain : a.hw_post) = true;
       continue;
     }
     if (i + 1 >= argc) {
@@ -153,11 +156,27 @@ int main(int argc, char** argv) {
           continue;
         }
 
-        size_t k = 0;
-        acc.run(x.data.data(), [&](const driver::ConvCall& c, double s) {
-          log(c.layer, s);
-          check(k++);
-        });
+        if (a.chain) {
+          acc.load_input(x.data.data());
+          log(-1, acc.run_all());
+          for (int id : m.heads()) {
+            const std::vector<int8_t> got =
+                driver::materialize(acc.arena(), prog.views[size_t(id)]);
+            const NpyInt8 want = tb::dump(a.tb, net, image, id);
+            char what[48];
+            std::snprintf(what, sizeof what, "L%02d tête (séquenceur)", id);
+            nd_img += want.data.size() != got.size()
+                          ? 1
+                          : tb::compare(what, got.data(), want.data.data(), got.size());
+            ++checked;
+          }
+        } else {
+          size_t k = 0;
+          acc.run(x.data.data(), [&](const driver::ConvCall& c, double s) {
+            log(c.layer, s);
+            check(k++);
+          });
+        }
 
         const auto t0 = std::chrono::steady_clock::now();
         const auto dets = sw::detect(m, prog, acc.arena());
