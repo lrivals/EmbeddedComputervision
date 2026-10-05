@@ -37,7 +37,7 @@ d'acceptation mesurable.
 | `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
 | `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
 | `model/` | modèles exportés (non versionnés) |
-| `results/` | `benchmarks.csv` des mesures (format du §10.4), rapports mAP, roofline, rapport HLS |
+| `results/` | `benchmarks.csv` des mesures (format du §10.4), protocole, rapports mAP, roofline, rapport HLS, rapport comparatif (`rapport.md`) |
 | `data/`, `weights/` | jeux de données et poids (non versionnés) |
 
 ## Démarrage rapide
@@ -53,6 +53,9 @@ make hls-cycles hls-report          # cycles par couche (C-sim) → results/hls_
 make csim hls-synth hls-cosim       # même chose dans Vitis HLS (BOARD=kv260 par défaut)
 make sw-sim                         # driver ARM sur PC (registres émulés) : DDR == dumps, détections
 make vivado-build fpga-firmware     # bitstream + overlay KV260 (Vivado), puis make sw-board sur la carte
+make perf-model                     # modèle de cycles == C-sim, pistes d'optimisation (M8)
+make m8-inputs m8-int bench-sim map-stades   # mAP flottant / entier / FPGA (C-sim) → results/map_stades.md
+make bench-report                   # results/benchmarks.csv, results/mesures.md (protocole : results/protocole.md)
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/

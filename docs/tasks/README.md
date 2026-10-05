@@ -60,5 +60,5 @@ reporter ici l'avancement par jalon.
 | M5 | 6 | 6 |
 | M6 | 6 | 1 (T6.0-T6.3 en C-sim ; synthèse et co-sim en attente de Vitis) |
 | M7 | 4 | 0 (T7.1-T7.4 écrits et vérifiés sur PC, backend sim ; carte et Vivado en attente) |
-| M8 | 3 | 0 |
+| M8 | 3 | 0 (T8.1-T8.3 outillés ; projection C-sim et mAP FPGA en C-sim = entier (55,66, 4 952 images identiques) ; mesures carte en attente) |
 | M9 | 5 | 0 |

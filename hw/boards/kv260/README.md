@@ -51,6 +51,13 @@ sudo build/sw-board/yolo_app --uio /dev/uioN --model model/tiny-yolov2-voc \
 `--poll` remplace l'interruption par un sondage d'`ap_done` (utile pour isoler un problème
 d'IRQ). `model/` (export T4.7 et dumps) doit être copié sur la carte.
 
+## 4. Mesures (M8)
+
+Latence par étage (1 000 images, p99), puissance du SOM (INA260 par hwmon), stade FPGA de
+la mAP : commandes et périmètres dans [`results/protocole.md`](../../../results/protocole.md)
+(`yolo_bench`, `run_compare --csv`), puis `make map-stades` et `tools/bench_report.py` sur
+le PC.
+
 ## Points à vérifier au premier essai
 
 - Numéro de l'UIO : plusieurs nœuds `generic-uio` peuvent exister ; prendre celui dont

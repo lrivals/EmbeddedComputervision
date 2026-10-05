@@ -12,19 +12,32 @@
 
 namespace golden {
 
+// Objet JSON {"boxes", "scores", "labels"} sur une ligne ; `extra` (ex. `"image": "000001", `)
+// est inséré en tête tel quel.
+inline std::string detections_json(const std::vector<postproc::Detection>& d,
+                                   const std::string& extra = "") {
+  std::string s = "{" + extra + "\"boxes\": [";
+  char buf[128];
+  for (size_t k = 0; k < d.size(); ++k) {
+    std::snprintf(buf, sizeof buf, "%s[%.17g, %.17g, %.17g, %.17g]", k ? ", " : "", d[k].box[0],
+                  d[k].box[1], d[k].box[2], d[k].box[3]);
+    s += buf;
+  }
+  s += "], \"scores\": [";
+  for (size_t k = 0; k < d.size(); ++k) {
+    std::snprintf(buf, sizeof buf, "%s%.17g", k ? ", " : "", d[k].score);
+    s += buf;
+  }
+  s += "], \"labels\": [";
+  for (size_t k = 0; k < d.size(); ++k) s += (k ? ", " : "") + std::to_string(d[k].label);
+  return s + "]}";
+}
+
 inline void write_detections(const std::string& path,
                              const std::vector<postproc::Detection>& d) {
   FILE* f = std::fopen(path.c_str(), "w");
   if (!f) throw std::runtime_error("impossible d'écrire " + path);
-  std::fprintf(f, "{\"boxes\": [");
-  for (size_t k = 0; k < d.size(); ++k)
-    std::fprintf(f, "%s[%.17g, %.17g, %.17g, %.17g]", k ? ", " : "", d[k].box[0], d[k].box[1],
-                 d[k].box[2], d[k].box[3]);
-  std::fprintf(f, "], \"scores\": [");
-  for (size_t k = 0; k < d.size(); ++k) std::fprintf(f, "%s%.17g", k ? ", " : "", d[k].score);
-  std::fprintf(f, "], \"labels\": [");
-  for (size_t k = 0; k < d.size(); ++k) std::fprintf(f, "%s%d", k ? ", " : "", d[k].label);
-  std::fprintf(f, "]}\n");
+  std::fprintf(f, "%s\n", detections_json(d).c_str());
   std::fclose(f);
 }
 

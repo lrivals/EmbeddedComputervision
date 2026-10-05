@@ -125,6 +125,20 @@ Le backend `sim` passe par le même chemin que la carte (encodage des registres,
 physiques, ap_start / ap_done) : `make sw-sim` valide tout sauf le matériel lui-même.
 Procédure carte : [hw/boards/kv260/README.md](../hw/boards/kv260/README.md).
 
+### Mesures (M8)
+
+| Fichier | Rôle |
+|---|---|
+| `sw/app/yolo_bench.cpp` | suite d'images (`--images` JPEG ou `--inputs` int8) : temps par étage et par image (pre, load, acc, post), moyenne et p99, détections JSONL au seuil de la mAP, puissance INA260 du SOM (`--power`) |
+| `tools/perf_model.py` | modèle de cycles du noyau, égal aux compteurs C-sim (`make perf-model`) ; scénarios d'optimisation chiffrés |
+| `tools/make_inputs.py` | entrées int8 de VOC2007 test (prétraitement du modèle entier), lues par la carte à la place des JPEG |
+| `tools/bench_sim.sh` | stade FPGA en C-sim sur PC : paquets distribués aux cœurs, reprise (`make bench-sim`) |
+| `tools/map_stades.py` | mAP flottant / entier / FPGA, égalité image par image → `results/map_stades.md` |
+| `tools/bench_report.py` | `results/benchmarks.csv` (base + ce travail), `results/mesures.md` ; lit `times*.csv`, `utilization.rpt`, `power.rpt` |
+
+Périmètres de mesure : [results/protocole.md](../results/protocole.md) ; comparaison et
+pistes : [results/rapport.md](../results/rapport.md).
+
 ## 4. Golden model C++ (`cpp/golden/`, M5)
 
 Le golden exécute le réseau comme le moteur matériel et sert de testbench au HLS :
@@ -149,5 +163,6 @@ mAP flottant vs entier      ─► perte de quantification mesurée (§9)
 tools/compare_dumps.py      ─► golden == dumps Python, couche par couche (make golden-check)
 C-sim / co-sim HLS          ─► noyau == golden == dumps (make csim-gcc, make hls-cosim)
 run_compare (sim puis uio)  ─► sortie DDR == golden == dumps (make sw-sim, puis sur carte)
-mesures sur carte           ─► mAP aux trois stades (§11), benchmarks.csv (M8)
+yolo_bench + map_stades     ─► mAP aux trois stades (§11), FPGA == entier image par image (M8)
+bench_report                ─► benchmarks.csv : mesures carte, ou projection perf_model (M8)
 ```

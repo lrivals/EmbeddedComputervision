@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -28,6 +28,12 @@ help:
 	@echo "fpga-firmware yolo.bit.bin + yolo.dtbo pour xmutil (T7.1)"
 	@echo "sw-sim      driver ARM sur PC (backend sim) : run_compare + yolo_app (T7.2-T7.4)"
 	@echo "sw-board    build natif sur la KV260 (backend uio)"
+	@echo "perf-model  modèle de cycles == C-sim, pistes d'optimisation chiffrées (T8.1, T8.3)"
+	@echo "m8-inputs   entrées int8 de VOC2007 test (stretch) → build/m8/<net>/ (T8.2)"
+	@echo "m8-int      mAP flottante + entière, détections entières par image (T8.2)"
+	@echo "bench-sim   stade FPGA en C-sim sur PC, paquets parallèles (T8.2, ~40 min sur 22 threads)"
+	@echo "map-stades  results/map_stades.md : mAP aux trois stades, égalité entier == FPGA"
+	@echo "bench-report results/benchmarks.csv (ce travail) : mesures carte ou projection"
 
 test: test-py test-cpp
 
@@ -134,6 +140,34 @@ sw-sim:
 sw-board:
 	cmake -S sw -B build/sw-board -DSW_BACKEND=uio
 	cmake --build build/sw-board -j
+
+M8_NET ?= tiny-yolov2-voc
+M8_DIR = build/m8/$(M8_NET)
+M8_JOBS ?= $(shell nproc)
+
+perf-model: hls-cycles
+	python tools/perf_model.py --check build/hls/cycles_conv.csv
+	python tools/perf_model.py
+
+m8-inputs:
+	python tools/make_inputs.py --net $(M8_NET)
+
+m8-int:
+	python tools/eval_quant.py --net $(M8_NET) --variants float,int --resize stretch \
+	  --save-dets $(M8_DIR)/int.jsonl --out $(M8_DIR)/eval_float_int.json
+
+# Noyau C-sim en entiers natifs (-DACC_NO_APINT, même arithmétique qu'ap_int, ≈ 7× plus
+# rapide en charge) ; paquets distribués au fil de l'eau, reprise après interruption.
+bench-sim:
+	CXXFLAGS="-DACC_NO_APINT -march=native" cmake -S sw -B build/sw-fast -DSW_BACKEND=sim
+	cmake --build build/sw-fast -j --target yolo_bench
+	BENCH=build/sw-fast/yolo_bench tools/bench_sim.sh $(M8_DIR) model/$(M8_NET) $(M8_JOBS)
+
+map-stades:
+	python tools/map_stades.py --net $(M8_NET)
+
+bench-report:
+	python tools/bench_report.py
 
 clean:
 	rm -rf build

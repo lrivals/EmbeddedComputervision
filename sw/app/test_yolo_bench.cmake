@@ -1,0 +1,26 @@
+# ctest yolo_bench_input : yolo_bench sur dumps/<IMAGE>/input.npy au seuil des dumps (0,25)
+# → la ligne JSONL contient les détections de dumps/<IMAGE>/detections.json.
+file(MAKE_DIRECTORY ${WORK})
+file(WRITE ${WORK}/ids.txt "${IMAGE}\n")
+execute_process(COMMAND ${BENCH} --model ${MODEL} --inputs ${MODEL}/dumps/${IMAGE}/input.npy
+                        --ids ${WORK}/ids.txt --warmup 0 --conf 0.25
+                        --times ${WORK}/times.csv --dets ${WORK}/dets.jsonl
+                RESULT_VARIABLE rc)
+if(NOT rc EQUAL 0)
+  message(FATAL_ERROR "yolo_bench : code ${rc}")
+endif()
+file(READ ${WORK}/dets.jsonl got)
+file(READ ${MODEL}/dumps/${IMAGE}/detections.json want)
+foreach(key boxes scores labels)
+  string(JSON g GET "${got}" ${key})
+  string(JSON w GET "${want}" ${key})
+  string(JSON eq EQUAL "${g}" "${w}")
+  if(NOT eq)
+    message(FATAL_ERROR "${key} différents :\n${g}\n${w}")
+  endif()
+endforeach()
+file(STRINGS ${WORK}/times.csv rows)
+list(LENGTH rows n)
+if(NOT n EQUAL 2)
+  message(FATAL_ERROR "times.csv : ${n} lignes au lieu de 2")
+endif()

@@ -58,6 +58,13 @@ target_include_directories(yolo_app SYSTEM PRIVATE ${stb_SOURCE_DIR})
 target_link_libraries(yolo_app PRIVATE sw_driver)
 target_compile_options(yolo_app PRIVATE -Wall -Wextra)
 
+# Mesures M8 : temps par étage, détections au seuil de la mAP, puissance (T8.1, T8.2).
+find_package(Threads REQUIRED)
+add_executable(yolo_bench app/yolo_bench.cpp)
+target_include_directories(yolo_bench SYSTEM PRIVATE ${stb_SOURCE_DIR})
+target_link_libraries(yolo_bench PRIVATE sw_driver Threads::Threads)
+target_compile_options(yolo_bench PRIVATE -Wall -Wextra)
+
 # Tests sur PC (backend sim) : 0 écart couche par couche et détections == dumps (T7.2-T7.4).
 include(CTest)
 if(SW_BACKEND STREQUAL "sim")
@@ -70,4 +77,9 @@ if(SW_BACKEND STREQUAL "sim")
   add_test(NAME yolo_app_input COMMAND yolo_app --model ${SW_MODEL_DIR}/tiny-yolov2-voc
            --input ${SW_MODEL_DIR}/tiny-yolov2-voc/dumps/000001/input.npy
            --out ${CMAKE_BINARY_DIR}/det_000001.json)
+  # yolo_bench (T8.2) : une entrée de dump au seuil des dumps → mêmes détections.
+  add_test(NAME yolo_bench_input COMMAND ${CMAKE_COMMAND}
+           -DBENCH=$<TARGET_FILE:yolo_bench> -DMODEL=${SW_MODEL_DIR}/tiny-yolov2-voc
+           -DIMAGE=000001 -DWORK=${CMAKE_BINARY_DIR}/bench_test
+           -P ${CMAKE_CURRENT_SOURCE_DIR}/app/test_yolo_bench.cmake)
 endif()

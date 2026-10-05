@@ -124,4 +124,9 @@ Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages
   par `driver::Device` (backends `sim` et `uio`), jamais par des pointeurs bruts ailleurs.
   Les offsets de registres de `sw/driver/regmap.hpp` doivent égaler ceux de l'en-tête
   généré `xyolo_conv_hw.h` (`make check-regmap`) : en cas d'écart, l'en-tête fait foi.
+- Mesures (M8) : les périmètres de [results/protocole.md](../results/protocole.md) font foi.
+  FPS = 1 000 / latence moyenne de bout en bout (séquentiel) ; GOPS = 2 × MACs (convs) /
+  temps accélérateur ; p99 au rang le plus proche ; puissance toujours avec son périmètre
+  (puce estimée Vivado, SOM mesuré, carte entière). Une valeur non mesurée est marquée
+  « projection » ou laissée vide, jamais estimée sans le dire.
 - Chaque formule implémentée cite sa section de la spec en commentaire (`# §6.2`).

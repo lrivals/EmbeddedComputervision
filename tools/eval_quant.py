@@ -2,6 +2,8 @@
 
     # mAP INT8 (modèle entier bit-exact) et flottante sur VOC2007 test complet
     python tools/eval_quant.py --variants float,int
+    # détections entières par image (comparaison au stade FPGA, T8.2)
+    python tools/eval_quant.py --variants int --resize stretch --save-dets build/m8/int.jsonl
     # sensibilité : une seule couche quantifiée à la fois (fake-quant), 1 000 images
     python tools/eval_quant.py --variants float,fq:all,fq:each --subset 1000
 
@@ -13,6 +15,7 @@ Même prétraitement (`--resize` letterbox | stretch, PIL) et même seuil (0,005
 """
 
 import argparse
+import json
 import multiprocessing as mp
 import os
 import sys
@@ -87,6 +90,9 @@ def _run(task):
             dets = detect(_Sim, x, [wh], mode, conf, iou)
         boxes, scores, labels = dets[0]
         out[v] = (labels, scores, to_voc_pixels(boxes, width, height))
+        if v == "int":  # boîtes normalisées, pour --save-dets (comparaison bit à bit, T8.2)
+            out["int:raw"] = (np.asarray(boxes, dtype=np.float64).reshape(-1, 4).tolist(),
+                              [float(s) for s in scores], [int(c) for c in labels])
     return out
 
 
@@ -111,9 +117,15 @@ def run(args, samples, variants):
     tasks = [(s["image"], s["width"], s["height"], args.size, args.resize, variants)
              for s in samples]
     t0 = time.time()
+    raw = open(args.save_dets, "w") if args.save_dets else None  # noqa: SIM115
     with ctx.Pool(args.jobs, initializer=_init,
                   initargs=(args.net, args.weights, args.calib, args.conf, args.iou)) as pool:
         for k, (s, res) in enumerate(zip(samples, pool.imap(_run, tasks, chunksize=2)), 1):
+            if raw is not None:
+                boxes, scores, labels = res["int:raw"]
+                raw.write(json.dumps({"image": s["id"], "boxes": boxes, "scores": scores,
+                                      "labels": labels}) + "\n")
+            res.pop("int:raw", None)
             for v, (labels, scores, px) in res.items():
                 for c, sc, b in zip(labels, scores, px):
                     per[v][c][0].append(s["id"])
@@ -123,6 +135,8 @@ def run(args, samples, variants):
                 el = time.time() - t0
                 print(f"{k}/{len(samples)} images  {el:6.0f} s  ({el / k * 1000:.0f} ms/image)",
                       flush=True)
+    if raw is not None:
+        raw.close()
     return {v: {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4))
                 for c, d in pc.items()} for v, pc in per.items()}
 
@@ -144,7 +158,11 @@ def main():
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--blas-threads", type=int, default=2)
     ap.add_argument("--out", type=Path, default=None, help="table JSON des mAP")
+    ap.add_argument("--save-dets", type=Path, default=None,
+                    help="détections du modèle entier, une ligne JSON par image (T8.2)")
     args = ap.parse_args()
+    if args.save_dets and "int" not in args.variants.split(","):
+        ap.error("--save-dets demande la variante int")
     args.weights = args.weights or ROOT / "weights" / PRETRAINED[args.net]
     args.calib = args.calib or ROOT / "build" / "quant" / args.net / "calib.json"
 
@@ -154,8 +172,6 @@ def main():
         samples = samples[:args.subset]
     variants = expand(args.variants.split(","), args.net)
     dets = run(args, samples, variants)
-
-    import json
 
     res = {}
     for v in variants:
