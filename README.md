@@ -21,7 +21,7 @@ Détails : [docs/architecture.md](docs/architecture.md) · conventions :
 
 ## Plan de travail
 
-Le travail est découpé en jalons M0 à M11 dans [docs/tasks/](docs/tasks/README.md). Chaque
+Le travail est découpé en jalons M0 à M13 dans [docs/tasks/](docs/tasks/README.md). Chaque
 tâche indique la section de la spec, ses dépendances, ses livrables et un critère
 d'acceptation mesurable.
 
@@ -33,6 +33,10 @@ d'acceptation mesurable.
 - **[M11](docs/tasks/M11-jeux-de-donnees.md)** : jeux de données au-delà de VOC (COCO,
   ExDark, KITTI, VisDrone, CrowdHuman, FLIR), chacun choisi pour éprouver une partie de la
   chaîne.
+- **[M12](docs/tasks/M12-profils-pc.md)** : profils de test sur PC (R/M/N), avec un critère
+  et une décision par évaluation, avant de passer sur la carte.
+- **[M13](docs/tasks/M13-figures.md)** : figures régénérables par `make figures`
+  (architecture des modèles et de l'accélérateur, résultats, suivi du projet).
 
 ## Arborescence
 
