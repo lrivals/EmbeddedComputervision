@@ -3,11 +3,14 @@
 Objectif : expliquer le projet en images. Les chiffres existent déjà dans `results/*.md`,
 [benchmarks.csv](../../results/benchmarks.csv), `build/` et `tools/perf_model.py`, mais une
 seule famille de figures est produite aujourd'hui : les roofline de `tools/roofline.py`
-(`results/roofline_*.png`). M13 ajoute des figures sur trois axes :
+(`results/roofline_*.png`). M13 ajoute des figures sur cinq axes :
 
-- l'**architecture** des modèles et de l'accélérateur ;
-- les **résultats** des tests et des mesures ;
-- le **développement** du projet.
+- l'**architecture** des modèles et de l'accélérateur (sections B, C) ;
+- les **résultats** des tests et des mesures (D) ;
+- le **développement** du projet (E) ;
+- la **réimplémentation de zéro** : chaque brique essentielle reprogrammée en NumPy pur,
+  sans PyTorch, OpenCV, scikit-learn ni devkit, expliquée par ses fonctions mathématiques (F) ;
+- l'**architecture des réseaux en détail**, couche par couche et tenseur par tenseur (G).
 
 Chaque figure est **régénérable par une commande** et lit ses données dans un fichier
 versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la main.
@@ -17,7 +20,8 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 ### Outillage
 
 - **Paquet** : `tools/figures/`. Il contient un module par famille (`modeles.py`,
-  `materiel.py`, `resultats.py`, `projet.py`) et un `style.py` commun.
+  `materiel.py`, `resultats.py`, `projet.py`, `maths.py`, `reseaux.py`) et un `style.py`
+  commun.
 - **Commandes** : `python -m tools.figures <nom|famille|all>`, et `make figures` qui
   régénère tout ce dont les données sont présentes. Une figure dont la source manque est
   sautée avec un message ; ce n'est pas une erreur.
@@ -58,6 +62,16 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - elle est référencée dans `results/figures.md` ;
   - ses valeurs sont égales à celles de la source (un test relit la source) ;
   - elle reste lisible en niveaux de gris.
+- **Fiche mathématique** (sections F et G) : chaque planche porte, en plus de la figure :
+  - les **équations** exactes, en mathtext matplotlib, recopiées de la docstring du module
+    (une seule source : la docstring) ;
+  - le **chemin** `module:fonction` du code tracé ;
+  - la **bibliothèque évitée** (par exemple `torch.nn.Conv2d`, `cv2.resize`,
+    `torchvision.ops.nms`, `sklearn.cluster.KMeans`) ;
+  - le **test** qui vérifie l'implémentation (`python/tests/test_*.py`).
+
+  Les courbes sont calculées **en appelant le code du dépôt** (jamais une réécriture dans
+  le générateur), sur des entrées jouets à graine fixe : la figure prouve ce que fait le code.
 
 ---
 
@@ -149,7 +163,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   planche montre les deux échelles.
 
 ### [ ] T13.6 — Planche d'augmentations
-- **Spec** : §6 · **Dépend de** : T2.5 · **Taille** : S
+- **Spec** : §7.1 · **Dépend de** : T2.6 · **Taille** : S
 - **Livrables** : `figures/modeles/augmentations.png`, une grille image d'origine →
   augmentations avec les boîtes cibles
 - **Acceptation** : graine fixe, et mêmes tirages que `tools/show_augment.py`
@@ -157,7 +171,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   lieu de le réécrire.
 
 ### [ ] T13.7 — Statistiques du jeu VOC
-- **Spec** : §8.3 · **Dépend de** : T2.1 · **Taille** : S
+- **Spec** : §8.3 · **Dépend de** : T2.6 · **Taille** : S
 - **Livrables** : `figures/modeles/voc_stats.png`, en trois panneaux :
   - nombre d'objets par classe, en trainval et en test ;
   - histogramme des aires de boîtes (petits, moyens, grands) ;
@@ -279,7 +293,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 - **Notes** : à rapprocher de T13.2 (couches lourdes et couches sensibles).
 
 ### [ ] T13.17 — Distributions et échelles de calibration
-- **Spec** : §9.1 · **Dépend de** : T4.3 · **Taille** : S
+- **Spec** : §9.2 · **Dépend de** : T4.2 · **Taille** : S
 - **Livrables** :
   - `figures/resultats/calibration.png` : par couche, l'histogramme (log) des activations
     avec le seuil de saturation retenu ;
@@ -432,3 +446,342 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
     image et coloré selon T13.28.
 - **Acceptation** : le total des tests est égal à la collecte pytest + ctest
 - **Notes** : le graphe reste défini une seule fois, dans le README ; la figure le parse.
+
+## F. Réimplémentation de zéro : fonctions mathématiques
+
+Toute la chaîne flottante et entière est écrite à la main en NumPy
+([ADR 0001](../adr/0001-numpy-pur.md)), sans autodiff ni bibliothèque de vision. Chaque
+planche de cette section explique une brique : **la formule**, **le code qui la calcule**,
+et **la preuve** qu'il la calcule juste. Les planches suivent la règle « fiche
+mathématique » (voir [Règles](#règles)). Module : `tools/figures/maths.py`, sorties dans
+`results/figures/maths/`.
+
+### [ ] T13.31 — Carte de la réimplémentation
+- **Spec** : §4 à §9, §11 · **Dépend de** : M1 à M4 · **Taille** : S
+- **Livrables** : `figures/maths/carte.svg`, un schéma en colonnes :
+  - brique (convolution, BN, activations, pool, route/upsample, graphe et rétropropagation,
+    perte, SGD, k-means, NMS, mAP, prétraitement, quantification, entier, LUT, formats) ;
+  - module et fonction (`python/yolo/…`) ;
+  - bibliothèque évitée (`torch.nn`, `torch.autograd`, `torch.optim`, `cv2`, `torchvision.ops`,
+    `sklearn`, devkit VOC MATLAB, `onnx`, Vitis AI) ;
+  - test qui la vérifie, et planche de cette section qui l'explique.
+- **Acceptation** :
+  - une ligne par module de `python/yolo/` (aucun oublié : le générateur parcourt le
+    paquet) ;
+  - chaque test cité existe ;
+  - chaque ligne renvoie à une tâche T13.32 à T13.47.
+- **Notes** : c'est la porte d'entrée de la section F ; la placer en tête de la galerie
+  « maths ».
+
+### [ ] T13.32 — Convolution : boucles et im2col
+- **Spec** : §4.1 · **Dépend de** : T1.2 · **Taille** : M
+- **Livrables** : `figures/maths/convolution.png`, en trois panneaux :
+  - la formule y[f,i,j] = b_f + Σ_c Σ_u Σ_v W[f,c,u,v] · x[c, s·i+u−p, s·j+v−p], avec un
+    patch 3×3 sur une carte 6×6 et le pas s ;
+  - le dépliage im2col : chaque patch devient une colonne (`sliding_window_view`), les
+    poids une matrice (F, C·k²), et la convolution un produit de matrices ; formes
+    annotées pour L00 de Tiny-YOLOv2 ;
+  - le temps de `conv_forward_naive` face à `conv_forward` selon la taille de la carte
+    (échelle log).
+- **Acceptation** :
+  - les deux implémentations donnent la même sortie, écart max affiché (≤ 1e-12 en
+    float64) ;
+  - le temps est mesuré sur la machine, palier R (cartes ≤ 52×52 pour la version naïve).
+- **Notes** :
+  - code : `python/yolo/layers/conv.py` ; test : `test_conv.py` ;
+  - ajouter la passe arrière : dW = dY · colᵀ, dX = col2im(Wᵀ · dY), avec le repli des
+    colonnes (accumulation des recouvrements) dessiné.
+
+### [ ] T13.33 — Rétropropagation écrite à la main
+- **Spec** : §4, §11 · **Dépend de** : T1.1, T1.7 · **Taille** : M
+- **Livrables** :
+  - `figures/maths/retropropagation.svg` : le graphe d'une tranche de réseau (conv → BN →
+    leaky → maxpool, plus une route et un upsample de v3) avec, sur chaque arête, la passe
+    avant et la formule du gradient renvoyé. Les gradients d'une carte lue deux fois
+    (route) s'additionnent, comme dans `Network.backward` ;
+  - `figures/maths/gradcheck.png` : par couche, l'erreur relative
+    ‖g_analytique − g_numérique‖ / max(‖g_a‖, ‖g_n‖) en log, avec la différence centrée
+    (f(x+h) − f(x−h)) / 2h, h = 1e-6, et le seuil 1e-7 en trait.
+- **Acceptation** :
+  - les erreurs viennent de `python/yolo/testing/gradcheck.py` (`check_layer`,
+    `check_grad`) en float64 ;
+  - toutes sont sous 1e-7, sauf la ligne témoin « gradient faux » de
+    `test_gradcheck.py::test_detects_wrong_gradient`, tracée en rouge au-dessus de 1e-5.
+- **Notes** : code : `python/yolo/models/graph.py` et `python/yolo/layers/*.py` ; tests :
+  `test_gradcheck.py`, `test_graph.py`.
+
+### [ ] T13.34 — Activations, sigmoïde stable, BCE et softmax
+- **Spec** : §4.3, §4.5, §6.2 · **Dépend de** : T1.4, T1.6, T2.4 · **Taille** : S
+- **Livrables** : `figures/maths/activations.png`, en quatre panneaux :
+  - leaky ReLU f(x) = max(x, 0,1·x) et sa dérivée (1 ou 0,1) ;
+  - sigmoïde σ(t) = 1/(1 + e^{−t}) calculée en deux branches (e^{−t} pour t ≥ 0,
+    e^{t}/(1 + e^{t}) sinon), face à la forme naïve qui déborde pour t ≪ 0 en float32 ;
+    σ'(t) = σ(t)(1 − σ(t)) superposée ;
+  - softplus et BCE sur logits : BCE(t, y) = softplus(t) − y·t, et son gradient σ(t) − y ;
+  - softmax stable (soustraction du max) pour v2, sur un vecteur de 20 logits.
+- **Acceptation** : courbes calculées par `layers/activations.py` (`leaky_forward`,
+  `sigmoid`) et `train/loss.py` (`softplus`, `bce_logits`) ; aucun `inf` ni `nan` sur
+  t ∈ [−100, 100] pour la version stable.
+- **Notes** : tests : `test_activations.py`, `test_loss.py`.
+
+### [ ] T13.35 — Batch normalization et sa fusion
+- **Spec** : §4.2, §9.1 · **Dépend de** : T1.3, T4.1 · **Taille** : S
+- **Livrables** : `figures/maths/batchnorm.png`, en trois panneaux :
+  - normalisation par canal sur (N, H, W) : histogrammes avant et après
+    x̂ = (x − μ_B)/√(σ²_B + ε), puis y = γ x̂ + β ;
+  - moyennes glissantes μ ← 0,9 μ + 0,1 μ_B sur 100 itérations, face à la vraie moyenne ;
+  - fusion dans la conv : s_f = γ_f / √(σ²_f + ε), W'_f = s_f W_f,
+    b'_f = β_f + s_f (b_f − μ_f) ; nuage sortie (conv + BN) face à sortie (conv fusionnée).
+- **Acceptation** : code `layers/batchnorm.py` (`bn_forward`) et `quant/fuse_bn.py`
+  (`fuse_bn`) ; nuage sur la diagonale, écart max affiché.
+- **Notes** :
+  - tests : `test_batchnorm.py`, `test_fuse_bn.py` ;
+  - la passe arrière de la BN (trois termes du gradient) est l'une des formules les plus
+    longues du dépôt ; l'écrire en entier dans la planche.
+
+### [ ] T13.36 — Maxpool, upsample et route
+- **Spec** : §4.4, §4.5 · **Dépend de** : T1.5, T1.6 · **Taille** : S
+- **Livrables** : `figures/maths/pool_upsample_route.png`, des grilles annotées de valeurs :
+  - maxpool 2×2/2 sur une carte 4×4 : max de chaque fenêtre ; le gradient remonte
+    **uniquement** vers l'argmax ;
+  - maxpool 2×2/1 de la couche 11 : complétion d'une ligne et d'une colonne par réplication
+    du bord, taille conservée (13×13 → 13×13) ;
+  - upsample ×2 au plus proche voisin ; en arrière, somme des 4 gradients de chaque bloc ;
+  - route : concaténation des canaux, et découpage du gradient.
+- **Acceptation** : valeurs affichées calculées par `layers/pool.py`, `upsample.py`,
+  `route.py`
+- **Notes** : tests : `test_pool.py`, `test_upsample_route.py`.
+
+### [ ] T13.37 — Boîtes, IoU et décodage
+- **Spec** : §5.2, §8.1 · **Dépend de** : T2.1, T3.1 · **Taille** : S
+- **Livrables** : `figures/maths/boites_decodage.png`, en trois panneaux :
+  - IoU = aire(A ∩ B) / aire(A ∪ B), dessinée sur deux boîtes, et `iou_wh` (boîtes centrées,
+    utilisée par les ancres) ;
+  - décodage : b_x = (σ(t_x) + j)/S, b_y = (σ(t_y) + i)/S ; le centre reste dans sa cellule ;
+  - b_w = p_w e^{t_w}, b_h = p_h e^{t_h} : taille de la boîte selon t_w pour les 5 ancres.
+- **Acceptation** : code `infer/boxes.py` (`iou`, `iou_wh`, `cxcywh_to_xyxy`) et
+  `infer/decode.py` (`decode_head`)
+- **Notes** : tests : `test_boxes.py`, `test_decode.py`. Lien avec T13.5 (même décodage sur
+  une vraie image).
+
+### [ ] T13.38 — Cibles et perte YOLO
+- **Spec** : §5.1, §6.2 · **Dépend de** : T2.3, T2.4, T2.5 · **Taille** : M
+- **Livrables** : `figures/maths/perte.png`, en quatre panneaux :
+  - encodage d'une vérité : cellule (i, j), ancre responsable (meilleure IoU de forme),
+    cibles x* = g_x·S − j, t_w* = ln(g_w / p_w) (`build_targets`) ;
+  - la perte complète, écrite terme par terme :
+    L = λ_coord Σ_obj ω [(σ(t_x) − x*)² + (σ(t_y) − y*)² + (t_w − t_w*)² + (t_h − t_h*)²]
+    + Σ_obj BCE(σ(t_o), 1) + Σ_noobj BCE(σ(t_o), 0) + Σ_obj L_cls ;
+  - la surface du poids ω = 2 − g_w g_h (les petites boîtes comptent double) ;
+  - le masque *ignore* : ancres non responsables dont la boîte prédite dépasse
+    `ignore_thresh` d'IoU avec une vérité, sur une image.
+- **Acceptation** :
+  - code `data/targets.py` et `train/loss.py` (`yolo_loss`, `ignore_mask`) ;
+  - un cinquième panneau donne la part de chaque terme (coord, obj, noobj, cls) sur un lot,
+    et la somme est égale à `LossResult.total`.
+- **Notes** : tests : `test_targets.py`, `test_loss.py`. Variante v2 : L_cls = −ln
+  softmax(t)_{c*}.
+
+### [ ] T13.39 — Optimiseur et taux d'apprentissage
+- **Spec** : §7.1 · **Dépend de** : T2.7 · **Taille** : S
+- **Livrables** : `figures/maths/optimisation.png`, en trois panneaux :
+  - SGD avec momentum et weight decay, v ← μ v − lr (g + wd·p), p ← p + v (μ = 0,9,
+    wd = 5e-4) : trajectoires sur une quadratique 2D mal conditionnée, avec et sans
+    momentum ;
+  - `lr_at` : montée lr·(it / burn_in)⁴ puis paliers, sur un entraînement complet ;
+  - tailles multi-échelles (320 à 608, pas de 32, tirées toutes les 10 itérations) par
+    `multiscale_size`.
+- **Acceptation** : code `train/optim.py` (`SGD`), `train/schedule.py` (`lr_at`),
+  `train/trainer.py` (`multiscale_size`)
+- **Notes** : test : `test_train.py`. Relier aux courbes réelles de T13.26.
+
+### [ ] T13.40 — k-means des ancres avec la distance 1 − IoU
+- **Spec** : §5.2 · **Dépend de** : T2.2 · **Taille** : S
+- **Livrables** : `figures/maths/kmeans.png`, en deux panneaux :
+  - les mêmes boîtes regroupées avec la distance d = 1 − IoU(boîte, centre) et avec la
+    distance euclidienne en (w, h) : l'euclidienne attire les centres vers les grandes
+    boîtes ;
+  - l'initialisation k-means++ (tirage ∝ d²) puis les itérations de mise à jour des
+    centres, sur 300 itérations au plus.
+- **Acceptation** : code `data/anchors.py` (`kmeans_anchors`, `_init_plusplus`,
+  `mean_best_iou`) ; l'IoU moyenne affichée est égale à celle de `anchors.md` sur les
+  données VOC, ou à celle du test sur les données jouets.
+- **Notes** : test : `test_anchors.py`. Complète T13.4, qui montre le résultat sur VOC.
+
+### [ ] T13.41 — NMS et mAP VOC
+- **Spec** : §8.2, §8.3 · **Dépend de** : T3.2, T3.3 · **Taille** : M
+- **Livrables** : `figures/maths/nms_map.png`, en trois panneaux :
+  - NMS pas à pas sur une image : tri par score, garde de la meilleure, suppression des
+    boîtes d'IoU > 0,45, par classe ;
+  - appariement détections / vérités (IoU ≥ 0,5, une vérité ne compte qu'une fois,
+    `difficult` ignorés), et la courbe précision-rappel qui en sort ;
+  - AP VOC07 sur 11 points, AP = (1/11) Σ_{r ∈ {0, 0,1, …, 1}} max_{r̃ ≥ r} p(r̃), face à
+    l'aire sous l'enveloppe (VOC2010+).
+- **Acceptation** : code `infer/nms.py` (`nms`, `filter_and_nms`) et `infer/metrics.py`
+  (`voc_ap`, `eval_class`) ; l'AP affichée est égale à celle de la réécriture du devkit
+  `python/tests/voc_eval_ref.py`.
+- **Notes** : tests : `test_nms.py`, `test_metrics.py`. Le devkit officiel est en MATLAB :
+  l'égalité avec la référence est le point clé de la planche.
+
+### [ ] T13.42 — Prétraitement et augmentations
+- **Spec** : §1, §7.1 · **Dépend de** : T2.6, T3.4 · **Taille** : S
+- **Livrables** : `figures/maths/pretraitement.png`, en quatre panneaux :
+  - letterbox (facteur min(416/w, 416/h), bandes grises, boîtes recalées) face à stretch ;
+  - redimensionnement bilinéaire de `resize_darknet`, avec les poids d'interpolation d'un
+    pixel ;
+  - aller-retour RGB → HSV → RGB, gains de saturation et d'exposition ;
+  - matrice affine (échelle et translation jusqu'à 20 %, retournement) appliquée à l'image
+    et aux boîtes, avec l'élimination des boîtes trop petites.
+- **Acceptation** :
+  - code `data/letterbox.py`, `infer/pipeline.py` (`resize_darknet`, `preprocess`),
+    `data/augment.py` (`affine`, `transform_boxes`, `rgb_to_hsv`, `hsv_to_rgb`) ;
+  - l'erreur de l'aller-retour HSV est affichée.
+- **Notes** : test : `test_data_pipeline.py`. Pillow ne sert qu'à décoder le JPEG.
+
+### [ ] T13.43 — Quantification symétrique et calibration
+- **Spec** : §9.2 · **Dépend de** : T4.2 · **Taille** : S
+- **Livrables** : `figures/maths/quantification.png`, en trois panneaux :
+  - l'escalier q = clip(round_half_up(x / s), −127, 127), avec round_half_up(v) = ⌊v + ½⌋
+    et l'erreur x − s·q en dents de scie ;
+  - les échelles par canal s_w,f = max|W_f| / 127 d'une couche, face à une échelle unique
+    par couche (erreur de chaque option) ;
+  - le choix du seuil de clip d'une activation : MSE de quantification selon le seuil
+    candidat, minimum marqué, taux de saturation en second axe.
+- **Acceptation** : code `quant/quantize.py` (`round_half_up`, `quantize`,
+  `weight_scales`) et `quant/calibrate.py` (`clip_candidates`, `quant_mse`, `clip_rate`,
+  `choose_scales`)
+- **Notes** : test : `test_quantize.py`. Complète T13.17 (échelles réelles du réseau).
+
+### [ ] T13.44 — Arithmétique entière du matériel
+- **Spec** : §9.3 · **Dépend de** : T4.3 · **Taille** : M
+- **Livrables** : `figures/maths/entier.png`, en quatre panneaux :
+  - la chaîne d'une sortie : acc = Σ q_x q_w + q_b (int32), y = (acc · M0 + 2ⁿ⁻¹) ≫ n,
+    leaky, clip à [−127, 127] ;
+  - le multiplicateur fixe : M0 = round(s_x s_w / s_y · 2ⁿ) < 2³¹, n ≤ 31 le plus grand
+    possible ; erreur relative de M0 / 2ⁿ face à l'échelle flottante, par canal ;
+  - la leaky entière : y si y > 0, sinon (13 y + 64) ≫ 7, soit une pente 13/128 ≈ 0,1016,
+    face à 0,1 ;
+  - l'histogramme des accumulateurs d'une couche face aux bornes int32 (marge en bits).
+- **Acceptation** :
+  - code `quant/int_layers.py` (`conv_acc`, `requantize`, `rshift_round`, `leaky_int`,
+    `clip_q`) et `quant/quantize.py` (`requant_params`) ;
+  - mêmes valeurs que `golden::requantize` et `golden::leaky_int`
+    (`cpp/golden/include/golden/conv.hpp`).
+- **Notes** : tests : `test_int_layers.py`, `test_golden_cpp.py`. C'est ce contrat que le
+  golden C++ et le noyau HLS recopient à l'identique (T13.52).
+
+### [ ] T13.45 — Sigmoïde et exponentielle par tables
+- **Spec** : §9.4 · **Dépend de** : T4.4 · **Taille** : S
+- **Livrables** : `figures/maths/lut.png`, en trois panneaux :
+  - la table σ à 256 entrées (indice q + 128, valeurs Q16), face à σ(q·s) flottante ;
+  - la table exp pour b_w = p_w e^{t_w} et la table de softmax (indice d + 255) ;
+  - l'erreur : ≤ 2⁻¹⁷ aux points de la grille, et s/8 de bout en bout à cause du pas s
+    (1/64 pour s = 1/8).
+- **Acceptation** : code `quant/lut.py` (`sigmoid_lut`, `exp_lut`, `softmax_exp_lut`,
+  `logit_threshold_q`) ; bornes d'erreur égales à celles de la docstring
+- **Notes** :
+  - test : `test_lut.py` ;
+  - ajouter le seuil sans sigmoïde : σ(q s) > θ ⟺ q > logit(θ)/s, une seule comparaison
+    entière.
+
+### [ ] T13.46 — QAT, puissances de 2 et 4 bits
+- **Spec** : §9.2 · **Dépend de** : M9.2, M9.3 · **Taille** : M
+- **Livrables** : `figures/maths/basse_precision.png`, en quatre panneaux :
+  - fake-quant : passe avant en escalier, passe arrière par estimateur straight-through
+    (gradient 1 dans la plage, 0 hors de la plage) ;
+  - niveaux équidistants face aux niveaux « mixed powers-of-two », et la multiplication
+    par décalages et additions (`shift_add_mul`) ;
+  - ADMM : W, Z = Π_S(W + U), U ← U + W − Z ; trajectoire d'un poids et résidus primal et
+    dual ;
+  - découpage 4 bits de l'entrée : x = 16·(x ≫ 4) + (x & 15), deux convolutions 4 bits.
+- **Acceptation** : code `quant/fake_quant.py` (`fq_weight`, `fq_act_forward`,
+  `fq_act_backward`), `quant/pow2.py` (`levels`, `project`, `shift_add_mul`),
+  `train/admm.py` (`ADMM`), `quant/int_layers.py` (`split4`, `conv_acc_split4`)
+- **Notes** : tests : `test_fake_quant.py`, `test_pow2.py`, `test_admm.py`. Les mAP qui
+  en résultent sont en T13.14.
+
+### [ ] T13.47 — Formats de fichiers lus et écrits à la main
+- **Spec** : §7.1, §10.2 · **Dépend de** : T1.7, T1.9, T4.7 · **Taille** : S
+- **Livrables** : `figures/maths/formats.svg`, en trois bandes :
+  - un `.weights` Darknet octet par octet : en-tête (major, minor, revision, seen), puis
+    par conv [β, γ, μ, σ²] ou [biais], puis les poids (F, C, k, k), en float32 ;
+  - le parser `.cfg` : sections `[convolutional]`, `[maxpool]`, `[route]`, `[upsample]`,
+    `[yolo]`/`[region]` → dicts de `models/specs.py` ;
+  - l'arène exportée : décalage et taille de chaque tampon d'activation, poids et LUT,
+    alignés.
+- **Acceptation** : code `io/darknet_weights.py` (`read_header`, `load_darknet_weights`),
+  `models/cfg.py` (`parse_cfg`), `io/export.py` (`layout`, `build_manifest`) ; décalages
+  égaux au `manifest.json` de `model/tiny-yolov2-voc`
+- **Notes** : tests : `test_darknet_weights.py`, `test_cfg.py`, `test_export.py`.
+
+## G. Architecture des réseaux en détail
+
+Complète T13.1 à T13.3 : ici, chaque figure décrit Tiny-YOLOv2 VOC et Tiny-YOLOv3 COCO
+au niveau de la couche et du tenseur. Les données viennent de `python/yolo/models/specs.py`
+(`infer_shapes`, `layer_cost`) appliqué aux `.cfg` de `python/yolo/models/cfg/`. Module :
+`tools/figures/reseaux.py`, sorties dans `results/figures/reseaux/`.
+
+### [ ] T13.48 — Fiche couche par couche
+- **Spec** : §3.1, §3.2 · **Dépend de** : T1.8 · **Taille** : S
+- **Livrables** : `figures/reseaux/fiche_<net>.png`, une figure-tableau, une ligne par
+  couche :
+  - indice et type ; k, stride, pad ; cin → cout ; H×W en entrée et en sortie ;
+  - paramètres, MACs (et part du total en barre dans la cellule) ;
+  - champ réceptif et pas cumulé (stride effectif) ;
+  - activation et présence de BN.
+- **Acceptation** : totaux égaux au §3 et à `tools/count_macs.py` ; formes égales à
+  `infer_shapes`
+- **Notes** : test : `test_tiny_yolo.py`. Même contenu exporté en CSV à côté de l'image.
+
+### [ ] T13.49 — Champ réceptif et résolution
+- **Spec** : §3 · **Dépend de** : T13.48 · **Taille** : S
+- **Livrables** : `figures/reseaux/champ_receptif.png`, en deux panneaux :
+  - croissance du champ réceptif par couche (r_l = r_{l−1} + (k_l − 1)·j_{l−1}, j_l =
+    j_{l−1}·s_l), v2 et v3 ;
+  - sur une image 416×416 : une cellule 13×13 (pas de 32 px), son champ réceptif, et une
+    cellule 26×26 de v3 (pas de 16 px), avec les ancres de chaque tête.
+- **Acceptation** : r et j calculés depuis les specs ; pas finaux = 32 (v2, v3 tête 1) et
+  16 (v3 tête 2)
+- **Notes** : explique pourquoi v3 détecte mieux les petits objets (lien avec T13.7).
+
+### [ ] T13.50 — Flux des tenseurs en 3D
+- **Spec** : §3.1, §3.2 · **Dépend de** : T13.48 · **Taille** : M
+- **Livrables** : `figures/reseaux/flux_<net>.png`, un bloc par tenseur dont la largeur
+  suit C et la hauteur suit H = W (échelle log) :
+  - v2 : 3×416×416 → … → 1024×13×13 → 125×13×13 ;
+  - v3 : branche 13×13, route vers la couche 8, upsample 13 → 26, concaténation, seconde
+    tête 255×26×26.
+- **Acceptation** : chaque bloc porte sa forme, égale à `infer_shapes`
+- **Notes** : variante en ligne v2 et v3 côte à côte pour la comparaison.
+
+### [ ] T13.51 — La tête de sortie
+- **Spec** : §2.2, §5.1, §8.1 · **Dépend de** : T3.1 · **Taille** : S
+- **Livrables** : `figures/reseaux/tete.png`, en deux panneaux :
+  - la sortie (A·(5 + C), S, S) vue en (A, 5 + C, S, S) : canaux t_x, t_y, t_w, t_h, t_o
+    puis les classes ; 5 × (5 + 20) = 125 pour v2 VOC, 3 × (5 + 80) = 255 par tête pour v3
+    COCO ;
+  - le vecteur d'une cellule et d'une ancre, décodé : sigmoïdes sur t_x, t_y, t_o, exp sur
+    t_w, t_h, puis softmax des classes (v2) ou sigmoïdes indépendantes (v3).
+- **Acceptation** : ordre des canaux égal à `docs/conventions.md` et à
+  `infer/decode.py` (`decode_head`, modes `v2` et `v3`)
+- **Notes** : ajouter la version entière à côté (même vecteur en int8, décodé par les LUT
+  de T13.45).
+
+### [ ] T13.52 — Une couche à travers toutes les représentations
+- **Spec** : §9, §10.2 · **Dépend de** : T4.3, T5.3, T6.2 · **Taille** : M
+- **Livrables** : `figures/reseaux/une_couche.svg`. Une même couche (conv 3×3 + BN + leaky
+  + maxpool, par exemple L02 de v2) suivie à travers les stades :
+  - flottant : conv, BN, leaky, maxpool (float32) ;
+  - BN fusionnée : W', b' ;
+  - entier Python : `conv_acc` (int8 × int8 → int32) → `requantize` → `leaky_int` →
+    `clip_q` → `maxpool_int` ;
+  - golden C++ : `golden::conv_layer`, `golden::requantize`, `golden::leaky_int` ;
+  - HLS : `load_input`, `load_weights`, `compute`, puis l'étage de sortie qui appelle
+    `golden::requantize` (`hls/kernels/conv_pe.cpp`, `output_stage.hpp`).
+
+  Chaque flèche porte le type et la largeur en bits du tenseur, et l'écart mesuré entre
+  stades (flottant ↔ entier : SNR en dB ; entier ↔ golden ↔ HLS : 0).
+- **Acceptation** : noms des fonctions vérifiés dans le code par le générateur (grep) ;
+  écarts lus sur les dumps de `model/<net>/dumps/` (T13.18)
+- **Notes** : c'est le pendant détaillé de T13.12 : une seule couche, mais toutes les
+  formules et tous les types.

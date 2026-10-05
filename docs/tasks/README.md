@@ -22,7 +22,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M10](M10-ameliorations.md) | Améliorations (optionnel) | Tiny-YOLOv2 ≤ 45 ms en C-sim, == golden |
 | [M11](M11-jeux-de-donnees.md) | Autres jeux de données (optionnel) | mAP flottante / entière / FPGA hors VOC |
 | [M12](M12-profils-pc.md) | Profils de test sur PC (avant la carte) | chaque évaluation a un profil R/M/N, un critère et une décision |
-| [M13](M13-figures.md) | Figures (optionnel) | `make figures` régénère les figures d'architecture, de résultats et de suivi |
+| [M13](M13-figures.md) | Figures (optionnel) | `make figures` régénère les figures d'architecture, de résultats, de suivi et des maths réimplémentées |
 
 ## Dépendances
 
@@ -86,4 +86,4 @@ reporter ici l'avancement par jalon.
 | M10 | 13 (+ renvoi T10.12) | 0 |
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
-| M13 | 31 | 0 |
+| M13 | 53 | 0 |
