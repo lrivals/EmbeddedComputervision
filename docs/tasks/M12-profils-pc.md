@@ -25,6 +25,7 @@ Repères mesurés (journaux de `build/`) :
 | `make bench-sim`, 22 threads | ≈ 40 min |
 | QAT, batch 8, CPU | ≈ 0,45 s/image (≈ 36 min pour 600 itérations) |
 | ADMM | ≈ 50 min pour 600 itérations |
+| QAT / ADMM sur GPU (`--device gpu`, T12.11) | à mesurer (T12.11-e) |
 
 ### Fiche d'un profil
 
@@ -50,6 +51,9 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   Chiffres de référence : flottant **56,30**, INT8 **55,66** ([map_stades](../../results/map_stades.md)).
 - **Sorties** : `build/m12/<profil>/` (journal, JSON des mAP de `--out`, CSV). On recopie
   dans `results/` uniquement les chiffres validés sur les 4 952 images.
+- **Backend d'entraînement** : `--device cpu` (défaut, référence) ou `--device gpu`
+  seulement sur demande (T12.11). L'option est **à ajouter** à `tools/train.py`. Les
+  évaluations (mAP, entier, golden, C-sim) restent toujours sur le CPU.
 - **Une seule variable à la fois** par rapport à la référence, sauf pour les grilles
   croisées annoncées.
 
@@ -181,11 +185,12 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   - `--batch 8 | 16` ;
   - `--qat-steps` : pas de la PTQ, ou absent.
 - **Commande** :
-  - `python tools/train.py --net tiny-yolov2-voc --qat w4a4 … --out build/m12/qat/<essai>` ;
+  - `python tools/train.py --net tiny-yolov2-voc --qat w4a4 … [--device gpu] --out build/m12/qat/<essai>` ;
   - puis `python tools/quant_lowbit.py --scheme w4a4 --checkpoint build/m12/qat/<essai>/checkpoint.npz --out build/m12/qat/<essai>/model` ;
   - puis `eval_quant.py --model-dir … --variants int --subset 500`.
 - **Coût** : environ 18 min pour 300 itérations et environ 36 min pour 600 (batch 8).
-  2 000 itérations relèvent du palier N.
+  2 000 itérations relèvent du palier N sur CPU, et peuvent passer en palier M sur GPU si
+  T12.11 est validée.
 - **Mesure** : moyenne glissante sur 50 itérations de `loss.csv` (début contre fin), puis
   mAP.
 - **Décision** :
@@ -219,10 +224,11 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
 - **Prérequis** : `growth` et `rho_max` existent dans `python/yolo/train/admm.py`
   (1,3 et 1,0), mais `tools/train.py` ne les expose pas. Les essais A, B, C et E
   fonctionnent avec les options actuelles. D demande une option `--admm-growth`.
-- **Commande** : `python tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --admm build/m9/plan_mixed6.json --admm-rho <ρ₀> --admm-every <k> --lr 1e-4 --burn-in 50 --batch 8 --iters <n> --out build/m12/admm/<essai>`,
+- **Commande** : `python tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --admm build/m9/plan_mixed6.json --admm-rho <ρ₀> --admm-every <k> --lr 1e-4 --burn-in 50 --batch 8 --iters <n> [--device gpu] --out build/m12/admm/<essai>`,
   puis `quant_lowbit.py --weights pow2 --checkpoint …`, puis `eval_quant.py … --subset 500`.
 - **Coût** : environ 25 min pour 300 itérations et environ 50 min pour 600. Les essais C
-  et D tiennent dans le palier M ; on peut les lancer en parallèle des évaluations.
+  et D tiennent dans le palier M ; on peut les lancer en parallèle des évaluations. Sur
+  GPU (T12.11), la grille entière devient envisageable en une soirée.
 - **Mesure** : la dernière ligne de `admm.csv` (colonnes `res_*`), ainsi que la pente du
   résidu entre deux pas Z / U.
 - **Décision** :
@@ -303,6 +309,74 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
     calculé.
 - **Décision** : tout format ou chemin cassé se corrige avant la carte, pas sur la carte.
 
+### [ ] T12.11 — Entraînement sur CPU ou GPU (au choix)
+- **Spec** : §7.1 · **Dépend de** : T2.7, T9.3.3 · **Taille** : M · **Palier** : M
+- **Livrables** (code, à venir) :
+  - un module de backend (`python/yolo/backend.py` ou équivalent) qui fournit `xp`,
+    c'est-à-dire `numpy` ou `cupy`, choisi une fois au démarrage ;
+  - l'option `tools/train.py --device cpu|gpu`, `cpu` par défaut ;
+  - des tests GPU sautés quand CuPy est absent (`pytest.importorskip("cupy")`).
+- **Acceptation** : le profil d'équivalence CPU / GPU ci-dessous passe (a à f), et le gain
+  de vitesse est mesuré
+- **Contexte** : l'entraînement (affinage, QAT T9.3.3, ADMM T9.2.3) tourne en NumPy sur le
+  CPU, à environ 0,45 s par image, soit 36 à 50 min pour 600 itérations. Cette durée
+  limite les grilles de T12.5 et T12.6. Le PC a un GPU NVIDIA RTX 1000 Ada Laptop
+  (6 Go, vu par `lspci`).
+- **Choix** : **CuPy**, qui garde l'API de NumPy et donc le style « couches écrites à la
+  main » (`forward` / `backward`) de la spécification. PyTorch apporterait son propre
+  autograd et un second chemin de calcul.
+- **Comportement attendu** :
+  - Le **CPU reste le défaut et la référence**. Le GPU sert **seulement si l'utilisateur
+    le demande** (`--device gpu`).
+  - **Pas de repli silencieux** : `--device gpu` sans CuPy, sans pilote ou sans GPU
+    s'arrête avec un message clair.
+  - CuPy est importé **seulement** par `--device gpu`. Sans cette option, `python/yolo/`
+    n'a toujours aucune dépendance hors NumPy.
+  - Les données, l'augmentation et les cibles (`python/yolo/data/`) restent calculées sur
+    le CPU. Seul le lot est copié vers le GPU.
+  - Les checkpoints sont sauvés en NumPy (`.get()` avant `np.savez`), donc lisibles par
+    les deux backends. La reprise **exacte** n'est garantie que sur le même backend.
+  - Tout ce qui est entier ou bit-exact (`IntNetwork`, `eval_quant.py`, export, golden,
+    HLS) reste sur le CPU, sans changement.
+- **Code touché** (à vérifier à l'implémentation) :
+  - `python/yolo/layers/` : `conv.py` utilise `sliding_window_view` et `np.tensordot` ;
+    `pool.py` utilise `np.add.at`, qui devient `cupyx.scatter_add` ;
+  - `models/graph.py` ;
+  - `train/loss.py`, `optim.py`, `trainer.py`, `admm.py` ;
+  - `quant/fake_quant.py`, `quant/pow2.py`.
+- **Prérequis machine** :
+  - pilote NVIDIA et CUDA installés (aujourd'hui, `nvidia-smi` est absent) ;
+  - `pip install cupy-cuda12x` (dans l'environnement Python du projet, pas dans
+    `python/yolo/`) ;
+  - contrôle : `python -c "import cupy; print(cupy.cuda.runtime.getDeviceCount())"`
+    doit afficher au moins 1.
+- **Profil d'équivalence CPU / GPU** :
+
+  | Point | Mesure | Critère |
+  |---|---|---|
+  | a) gradcheck | `yolo.testing.gradcheck` en float64 sur GPU | ≤ 1e-7, comme dans `conventions.md` |
+  | b) couches | passes avant et arrière GPU contre CPU, mêmes entrées | float64 ≤ 1e-12 ; float32, erreur relative ≤ 1e-5 |
+  | c) surapprentissage | T2.8 (`make test-slow`) sur GPU | converge, comme sur CPU |
+  | d) entraînement court | 50 itérations à graine égale, QAT w4a4 puis ADMM | perte moyenne GPU à moins de 1 % de la perte CPU |
+  | e) vitesse | s/image et batch maximal qui tient dans 6 Go, en 416×416 | gain chiffré face à 0,45 s/image |
+  | f) non-régression CPU | 10 itérations avec `--device cpu` (et sans l'option) | checkpoint identique à l'octet à celui d'avant |
+
+- **Notes** :
+  - La règle « pas de dépendance hors NumPy » de `docs/conventions.md` est à amender au
+    moment de l'implémentation : « CuPy optionnel, importé seulement par
+    `--device gpu` ».
+  - TF32 désactivé (float32 strict), pour que le point b) ait un sens.
+  - `sliding_window_view` : vérifier sa présence dans la version de CuPy installée, sinon
+    passer par `as_strided`.
+  - Mémoire : la vue im2col de la première conv est la plus grosse. On la mesure avant de
+    monter le batch.
+  - Un chiffre publié dans `results/` à partir d'un poids entraîné indique le backend
+    utilisé.
+- **Décision** :
+  - si le gain est d'au moins 5×, les grilles longues de T12.5 et T12.6 passent sur GPU
+    (palier M au lieu de N), avec `--device gpu` explicite dans chaque commande ;
+  - sinon, le GPU reste une option et on documente le gain mesuré.
+
 ---
 
 ## Ordre conseillé
@@ -313,6 +387,7 @@ graph LR
   T2c --> T2[T12.2 a,b,d,e] & T3[T12.3 sensibilité]
   T3 --> T4[T12.4 PTQ]
   T4 --> T5[T12.5 QAT] & T6[T12.6 ADMM]
+  T1 -.-> T11[T12.11 GPU optionnel] -.-> T5 & T6
   T1 --> T7[T12.7 post] & T8[T12.8 perf]
   T4 & T5 & T6 --> T9[T12.9 chaîne simulée]
   T9 --> T10[T12.10 répétition]
@@ -321,7 +396,9 @@ graph LR
 - **En parallèle**, sur une machine à 22 threads :
   - T12.5 et T12.6 tournent ensemble, chacun avec 8 threads BLAS (comme
     `build/m9/run_train_short.sh`) ;
-  - une évaluation sur 500 images peut s'y ajouter avec `--jobs 4`.
+  - une évaluation sur 500 images peut s'y ajouter avec `--jobs 4` ;
+  - sur GPU (T12.11), T12.5 et T12.6 se lancent l'un après l'autre (un seul GPU de
+    6 Go), pendant que les évaluations occupent le CPU.
 - **La nuit** : T12.9 complet (`make bench-sim`) seul, puis les évaluations des variantes
   retenues sur les 4 952 images.
 - **Rien de M12 ne demande Vitis ni la carte.** La synthèse et la co-simulation restent

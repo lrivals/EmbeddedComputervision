@@ -81,5 +81,5 @@ reporter ici l'avancement par jalon.
 | M9.3 | 5 | 0 |
 | M9.4 | 3 | 3 (estimations ; synthèse en attente) |
 | M10 | 13 (+ renvoi T10.12) | 0 |
-| M12 | 10 | 0 |
+| M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
