@@ -10,6 +10,8 @@ Les gains chiffrés viennent de `tools/perf_model.py` (`make perf-model`) et de
 [rapport.md §3](../../results/rapport.md). Les gains qui n'y figurent pas sont marqués
 « à estimer ». M9 regroupe les extensions de recherche ; M10 les optimisations et
 l'outillage.
+Avant d'engager une piste, la classer par gain / effort avec les profils PC de
+[T12.8](M12-profils-pc.md#-t128--performance-estimée-m6-m8-m94-m10).
 
 ## A. Noyau moteur unique
 

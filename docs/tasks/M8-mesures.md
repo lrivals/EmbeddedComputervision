@@ -36,6 +36,7 @@ explicite.
   ARM + noyau C-sim, 22 processus, ≈ 40 min) : **mAP 55,66, 4 952 / 4 952 images identiques**
   à l'entier.
 - **Reste** : le même `yolo_bench --inputs` sur la KV260 (`board/dets_*.jsonl`).
+- **Profils PC** : chaîne simulée par paliers [T12.9](M12-profils-pc.md#-t129--chaîne-carte-simulée), répétition du protocole [T12.10](M12-profils-pc.md#-t1210--répétition-générale-du-protocole-carte)
 
 ### [ ] T8.3 — Rapport comparatif
 - **Spec** : §10.4 · **Dépend de** : T8.2 · **Taille** : M

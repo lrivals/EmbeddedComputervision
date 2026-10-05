@@ -1,0 +1,328 @@
+# M12 — Profils de test sur PC (avant la carte)
+
+Objectif : épuiser ce qui se mesure sur PC avant de passer sur la KV260. Pour chaque
+évaluation déjà en place (M3 à M9.4), on fixe des **profils** : quels réglages faire
+varier, ce que ça coûte, le critère chiffré et la décision à prendre selon le résultat.
+La carte n'a ensuite plus qu'à **confirmer** des chiffres déjà connus en simulation : 0 écart
+avec la C-sim, et des temps à rapprocher du modèle de cycles.
+
+## Conventions communes
+
+### Paliers de coût
+
+| Palier | Durée | Typiquement |
+|---|---|---|
+| **R** (rapide) | < 5 min | tests unitaires, 3 dumps, `--subset 100`, modèles analytiques |
+| **M** (moyen) | < 1 h | `--subset 500`, entraînement court (300 itérations) |
+| **N** (nuit) | plusieurs heures | VOC2007 test complet (4 952 images), `make bench-sim`, ≥ 600 itérations |
+
+Repères mesurés (journaux de `build/`) :
+
+| Mesure | Durée |
+|---|---|
+| `eval_quant.py` complet `--variants int`, 8 jobs | ≈ 120 ms/image, ≈ 10 min |
+| `eval_quant.py` complet `--variants float,int` | ≈ 150-300 ms/image, 12-25 min |
+| `make bench-sim`, 22 threads | ≈ 40 min |
+| QAT, batch 8, CPU | ≈ 0,45 s/image (≈ 36 min pour 600 itérations) |
+| ADMM | ≈ 50 min pour 600 itérations |
+
+### Fiche d'un profil
+
+Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
+
+1. **Diagnostic / hypothèse** : ce qu'on observe ou ce qu'on cherche, avec un chiffre.
+2. **Réglages fixes** : ce qui ne bouge pas (réseau, `--resize`, seuils, calibration).
+3. **Grille** : les valeurs testées, une ligne par essai.
+4. **Commande** : une commande exacte par point de la grille.
+5. **Coût** : le palier et une durée estimée.
+6. **Mesure** : le fichier produit et la grandeur lue.
+7. **Critère** : le seuil chiffré de réussite.
+8. **Décision** : quoi faire si le critère est atteint, et quoi faire sinon. Documenter un
+   échec comme « non convergé » ou « rejeté » est une décision valable.
+
+### Règles
+
+- **Sous-ensemble** : une mAP sur 500 images (`--subset 500`) sert seulement à **classer**
+  des variantes. Un chiffre rapporté dans `results/` vient toujours des 4 952 images.
+  T12.2-c vérifie que ce classement est fiable.
+- **Réglages de référence** : sauf mention contraire, Tiny-YOLOv2 VOC, `--resize stretch`
+  (PIL), `--conf 0.005`, NMS 0,45, calibration `build/quant/tiny-yolov2-voc/calib.json`.
+  Chiffres de référence : flottant **56,30**, INT8 **55,66** ([map_stades](../../results/map_stades.md)).
+- **Sorties** : `build/m12/<profil>/` (journal, JSON des mAP de `--out`, CSV). On recopie
+  dans `results/` uniquement les chiffres validés sur les 4 952 images.
+- **Une seule variable à la fois** par rapport à la référence, sauf pour les grilles
+  croisées annoncées.
+
+---
+
+### [ ] T12.1 — Non-régression fonctionnelle
+- **Spec** : §10.5 · **Dépend de** : M5, M6, M7 · **Taille** : S · **Palier** : R
+- **Livrables** : ordre d'exécution et temps relevés, dans les notes de cette tâche
+- **Acceptation** : chacun des trois profils passe avec 0 écart à l'octet ; temps de chacun
+  noté
+- **Profils** :
+
+  | Profil | Contenu | Quand |
+  |---|---|---|
+  | *Fumée* | `make test-py` (sans `-m slow`) + `make test-cpp` | après toute modification |
+  | *Bit-exact* | `make golden-check` (v2, v3, 3 dumps) + `make csim-gcc` (tb_conv, tb_net, tb_post, tb_stream, tb_net_pow2) + `make sw-sim` (run_compare, run_compare_hw_post, yolo_app, yolo_bench) | après une modification du contrat entier, du noyau ou du driver |
+  | *Avant carte* | *Bit-exact* + `make test-slow` + `make perf-model` (cycles == C-sim) + `make check-regmap` (si l'en-tête Vitis existe) | avant de produire un bitstream |
+
+- **Décision** : si un écart apparaît, `run_compare --layer N` localise la couche
+  fautive, puis `tools/compare_dumps.py` sur cette couche. On ne lance aucun profil M ou N
+  tant que *Bit-exact* n'est pas vert.
+
+### [ ] T12.2 — mAP flottante et entière (M3, M4)
+- **Spec** : §8.3, §9.2 · **Dépend de** : T4.5, T8.2 · **Taille** : M · **Palier** : M puis N
+- **Livrables** : `build/m12/map/*.json`, et une table de synthèse dans les notes
+- **Acceptation** : les cinq profils ci-dessous ont un chiffre et une décision
+
+**a) Prétraitement**
+- Diagnostic : l'entier perd 2 points en `letterbox` (53,68) par rapport à `stretch`
+  (55,66), alors que la calibration est faite en letterbox.
+- Grille :
+  - `--resize letterbox | stretch` ;
+  - `--interp pil | darknet` (avec `eval_voc.py` seulement).
+- Commande : `python tools/eval_quant.py --variants float,int --resize <r> --subset 500 --out build/m12/map/pre_<r>.json`
+- Critère : mesurer l'écart flottant/entier (environ 0,5 point en référence).
+- Décision : si l'écart entier grandit en letterbox, recalibrer en `stretch` (lien avec
+  T12.2-d).
+
+**b) Seuils**
+- Grille :
+  - `--conf 0.005 | 0.01 | 0.25` ;
+  - `--iou 0.40 | 0.45 | 0.50`.
+- Critère : mAP et nombre de détections par image. À 0,25, la mAP chute ; ce seuil sert à
+  la démonstration, pas à la mAP.
+- Décision : garder 0,005 / 0,45, sauf si un autre couple gagne plus de 0,3 point sur
+  500 images *et* sur 4 952 images.
+
+**c) Fidélité du sous-ensemble** (à faire en premier)
+- Grille :
+  - `--subset 100 | 500 | 1000 | 0` (0 = toutes les images) ;
+  - modèles : INT8 (`--variants int`) et pow2 mixed6 en PTQ
+    (`--model-dir build/m9/models/tiny-yolov2-voc-pow2-ptq`).
+- Critère : sur 500 images, l'écart à la mAP complète reste sous 1 point, et l'ordre
+  INT8 > pow2 est conservé.
+- Décision : si le critère tient, 500 images deviennent le palier M de tout le jalon.
+  Sinon, passer à 1 000 images et ajuster les durées.
+
+**d) Calibration**
+- Grille :
+  - `tools/calibrate.py --choice mse | p99 | p99.9 | p99.99 | max` ;
+  - `--images 100 | 500 | 2000` ;
+  - `--seed 0 | 1 | 2`, avec `--out build/m12/calib/<…>` ;
+  - puis `eval_quant.py --variants int --calib <…>/calib.json --subset 500`.
+- Mesure : mAP et écart-type selon la graine.
+- Critère : la référence (mse, 500 images) reste à moins de 0,3 point de la meilleure
+  variante.
+- Décision : changer la calibration seulement si le gain dépasse l'écart-type mesuré entre
+  graines.
+
+**e) Échelle de la tête**
+- Grille : `tools/calibrate.py --head-scale` autour de la valeur par défaut (×0,5, ×1, ×2).
+- Critère : mAP entière et saturation de la tête.
+
+### [ ] T12.3 — Sensibilité par couche
+- **Spec** : §9.2, §10.5 étape 2 · **Dépend de** : T12.2-c · **Taille** : M · **Palier** : M
+- **Livrables** : `build/m12/sens/` ; classement des couches (table couche × schéma)
+- **Acceptation** : pour chaque conv (0, 2, 4, 6, 8, 10, 12, 13, 14) et chaque schéma, la
+  perte de mAP sur 500 images face à la référence INT8 projetée
+- **Grille** :
+  - une seule couche passe en `mixed6`, `uniform6` ou w4, et les autres restent en
+    `int8` ;
+  - c'est le modèle de `build/m9/run_sensitivity.sh`, étendu à trois schémas.
+  - Complément en fake-quant :
+    `eval_quant.py --variants float,fq:all,fq:each --subset 500`.
+- **Coût** : 9 couches × 3 schémas, soit 27 évaluations sur 500 images (≈ 1 min chacune
+  avec 8 jobs, plus l'export). Prévoir moins d'1 h.
+- **Décision** : les couches qui perdent plus de 1 point restent en INT8 dans les plans
+  mixtes de T12.4. Le classement alimente aussi T10.10.
+
+### [ ] T12.4 — PTQ basse précision (M9.2, M9.3)
+- **Spec** : §9.2, §9.3 · **Dépend de** : T12.3 · **Taille** : M · **Palier** : M puis N
+- **Livrables** : `build/m12/ptq/map_*.json` ; une table mAP × schéma
+- **Acceptation** : chaque variante est placée face au plancher pow2 en PTQ (52,46) et à
+  INT8 (55,66). Le contrôle `w8a8` redonne 55,66 à 0,1 près
+- **Diagnostic** : `w4a4` en PTQ s'effondre (17,06). Il faut savoir si la cause vient des
+  poids ou des activations.
+- **Grille** :
+
+  | Variante | Commande `quant_lowbit.py` | Rôle |
+  |---|---|---|
+  | w8a8 | `--scheme w8a8` | contrôle de l'outil |
+  | w8a4 | `--scheme w8a4` | isole les activations |
+  | w4a8 | `--scheme w4a8` | isole les poids |
+  | w4a4 | `--scheme w4a4` | référence (17,06) |
+  | uniform6 | `--weights pow2 --weights-plan build/m9/plan_uniform6.json` | équidistant 6 bits |
+  | mixed6 | `--weights pow2` | REQ-YOLO (52,46) |
+  | mixed6 sauf les couches sensibles | `--weights pow2 --weights-plan <plan T12.3>` | plan mixte |
+  | w4a4, 1re et dernière couche en INT8 | à décrire par plan (si l'outil le permet) | règle usuelle de la 4 bits |
+
+  Pour chaque variante : `--out build/m12/ptq/<v>`, puis
+  `eval_quant.py --model-dir build/m12/ptq/<v> --variants int --subset 500`.
+- **Décision** :
+  - si w8a4 ≪ w4a8, l'effort de QAT (T12.5) porte d'abord sur les pas d'activation ;
+  - les deux meilleures variantes passent sur les 4 952 images (N).
+
+### [ ] T12.5 — QAT 4 bits
+- **Spec** : §7.1, §9.2 · **Dépend de** : T12.4 · **Taille** : M · **Palier** : M puis N
+- **Livrables** : `build/m12/qat/<essai>/` (loss.csv, checkpoint, mAP)
+- **Acceptation** : la perte décroît ; la mAP sur 500 images après export dépasse nettement
+  la PTQ w4a4
+- **Diagnostic** : l'essai actuel (600 itérations, lr 1e-4, batch 8) finit avec une perte
+  bruitée, entre 6 et 13 sur les dernières itérations. La tendance ne se voit pas sans
+  moyenne glissante, et aucune mAP n'a encore été mesurée après export.
+- **Réglages fixes** : `--init weights/yolov2-tiny-voc.weights`, `--burn-in 50`,
+  `--qat-steps build/m9/models/tiny-yolov2-voc-w4a4-ptq/steps.json`.
+- **Grille**, une variable à la fois :
+  - `--lr 1e-4 | 3e-4 | 1e-3` ;
+  - `--iters 300 | 600 | 2000` ;
+  - `--batch 8 | 16` ;
+  - `--qat-steps` : pas de la PTQ, ou absent.
+- **Commande** :
+  - `python tools/train.py --net tiny-yolov2-voc --qat w4a4 … --out build/m12/qat/<essai>` ;
+  - puis `python tools/quant_lowbit.py --scheme w4a4 --checkpoint build/m12/qat/<essai>/checkpoint.npz --out build/m12/qat/<essai>/model` ;
+  - puis `eval_quant.py --model-dir … --variants int --subset 500`.
+- **Coût** : environ 18 min pour 300 itérations et environ 36 min pour 600 (batch 8).
+  2 000 itérations relèvent du palier N.
+- **Mesure** : moyenne glissante sur 50 itérations de `loss.csv` (début contre fin), puis
+  mAP.
+- **Décision** :
+  - si la perte ne baisse pas à lr 1e-4, essayer 3e-4 ;
+  - si la mAP reste sous 40 sur 500 images après 600 itérations, documenter « QAT court
+    insuffisant » et chiffrer le coût de 2 000 itérations ou plus avant de les lancer.
+
+### [ ] T12.6 — ADMM REQ-YOLO
+- **Spec** : §9.2 · **Dépend de** : T12.4, T9.2.3 · **Taille** : M · **Palier** : M
+- **Livrables** : `build/m12/admm/<essai>/` (admm.csv, checkpoint, mAP)
+- **Acceptation** : résidu ‖W − Z‖/‖W‖ < 0,01 sur toutes les couches à la fin, et mAP
+  après projection finale > 52,46 (PTQ pow2)
+- **Diagnostic** : l'ADMM ne converge pas avec les réglages actuels
+  (`--admm-rho 1e-3 --admm-every 50`, 600 itérations). Le résidu par couche devrait tendre
+  vers 0. Au lieu de ça, il monte de 0,05-0,06 (itération 50) à environ 0,087
+  (`build/train/admm-mixed6/admm.csv`). La pénalité ρ, qui ramène les poids vers les
+  niveaux, reste trop faible : elle n'atteint que 0,023 à l'itération 600
+  (1e-3 × 1,3¹²). Les poids ne sont donc pas vraiment attirés vers les niveaux, et le
+  résultat final sera proche de la projection directe sans réentraînement (52,46).
+- **Grille** :
+
+  | Essai | ρ₀ | `growth` | `rho_max` | `--admm-every` | Itérations | ρ final |
+  |---|---|---|---|---|---|---|
+  | réf | 1e-3 | 1,3 | 1 | 50 | 600 | 0,023 |
+  | A | 1e-2 | 1,3 | 1 | 50 | 600 | 0,23 |
+  | B | 5e-2 | 1,3 | 1 | 50 | 600 | 1 (plafond) |
+  | C | 5e-2 | 1,3 | 1 | 25 | 300 | 1 (plafond) |
+  | D | 1e-1 | 1,5 | 1 | 50 | 300 | 1 (plafond) |
+  | E | 5e-2 | 1,3 | 1 | 100 | 600 | 0,2 |
+
+- **Prérequis** : `growth` et `rho_max` existent dans `python/yolo/train/admm.py`
+  (1,3 et 1,0), mais `tools/train.py` ne les expose pas. Les essais A, B, C et E
+  fonctionnent avec les options actuelles. D demande une option `--admm-growth`.
+- **Commande** : `python tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --admm build/m9/plan_mixed6.json --admm-rho <ρ₀> --admm-every <k> --lr 1e-4 --burn-in 50 --batch 8 --iters <n> --out build/m12/admm/<essai>`,
+  puis `quant_lowbit.py --weights pow2 --checkpoint …`, puis `eval_quant.py … --subset 500`.
+- **Coût** : environ 25 min pour 300 itérations et environ 50 min pour 600. Les essais C
+  et D tiennent dans le palier M ; on peut les lancer en parallèle des évaluations.
+- **Mesure** : la dernière ligne de `admm.csv` (colonnes `res_*`), ainsi que la pente du
+  résidu entre deux pas Z / U.
+- **Décision** :
+  - si le résidu descend sous 0,01, passer la mAP sur les 4 952 images ;
+  - si ρ fort fait diverger la perte (pénalité qui écrase la perte de détection), revenir
+    à l'essai A ;
+  - sinon, documenter le résultat « non convergé » dans T9.2.3 avec la table ci-dessus.
+
+### [ ] T12.7 — Post-traitement matériel (M9.1)
+- **Spec** : §8.2, §10.3 · **Dépend de** : T9.1.3 · **Taille** : S · **Palier** : R puis M
+- **Livrables** : `build/m12/hwpp/` ; table capacité × débordements × mAP
+- **Acceptation** : 0 écart entre Python, golden et C-sim ; perte de mAP de la
+  variante retenue < 0,2 face à `int`
+- **Grille** :
+  - **capacité** : `eval_quant.py --variants int,int-hwpp --hw-cap 64 | 128 | 256 | 1024 --subset 500`.
+    On lit les candidates perdues affichées ; la référence actuelle est 256, avec 50
+    débordements sur 4 952 images et 55,56 de mAP.
+  - **seuil** : `--conf 0.005 | 0.25`. La NMS sans tri s'écarte de la NMS triée surtout
+    à faible seuil.
+  - **robustesse** : `tb_post` (ctest). Le nombre de têtes aléatoires est fixé dans le
+    code (800 pour v2, 200 pour v3). Le passer en option permettrait une nuit à 10⁵ cas.
+  - **pire cas en cycles** : les 845 candidates de v2 passent toutes, avec une capacité
+    de 64, 128 ou 256. Les cycles se comparent aux 342 000 de
+    [`postproc_hw.md`](../../results/postproc_hw.md).
+- **Décision** : retenir la plus petite capacité dont la perte reste sous 0,05 point. Le
+  coût en cycles et en BRAM de la capacité est noté pour T10.7.
+
+### [ ] T12.8 — Performance estimée (M6, M8, M9.4, M10)
+- **Spec** : §10.2, §10.4 · **Dépend de** : T8.1, T9.4.1 · **Taille** : S · **Palier** : R
+- **Livrables** : une table des gains attendus par piste, à confirmer sur la carte
+- **Acceptation** : `make perf-model` vert (cycles égaux à la C-sim, cycle pour cycle) ;
+  chaque piste de M10 a un chiffre de projection
+- **Grille** :
+  - **moteur unique** : `make hls-cycles` puis `make perf-model` (scénarios : ports
+    64 et 128 bits, canaux valides, requantification parallèle). Référence : 206,5 ms,
+    soit 4,8 img/s.
+  - **roofline** : `make roofline` (toutes les cartes de `hw/boards/`). On vérifie que le
+    point Tm = 32, Tn = 24 reste le meilleur sous le budget de la KV260.
+  - **streaming** : `tools/stream_model.py --board kv260 --wbits 8|4 --abits 8|4`, plus
+    `--net tiny-yolov3-voc`. Références : 32,1 img/s en 8 bits et 64,2 img/s en 4 bits.
+  - **sensibilité au réseau** : les mêmes commandes sur `tiny-yolov3-coco`.
+- **Décision** : classer les pistes de M10 par gain divisé par effort. Les écarts
+  carte / projection de T8.1 seront lus face à cette table.
+
+### [ ] T12.9 — Chaîne carte simulée
+- **Spec** : §11 · **Dépend de** : T12.1, T8.2 · **Taille** : M · **Palier** : M puis N
+- **Livrables** : `build/m12/sim/<variante>/` (dets, temps) ; `make map-stades` relancé
+- **Acceptation** : pour chaque variante, images identiques entre l'entier et la C-sim,
+  avec un écart égal à 0
+- **Grille** :
+
+  | Variante | Ce qui change | Palier |
+  |---|---|---|
+  | paliers d'images | `yolo_bench --start 0 --count 100`, puis 500, puis `make bench-sim` | R → M → N |
+  | `ap_int` contre `ACC_NO_APINT` | `BENCH=build/sw/yolo_bench` (ap_int) contre `build/sw-fast` sur 500 images | M |
+  | post-traitement matériel | `yolo_bench --hw-post` contre logiciel ; comparaison à `eval_quant --variants int-hwpp --save-dets` | M |
+  | modèles basse précision | `--model` sur un modèle exporté par T12.4 / T12.5 / T12.6 (si `tb_net_pow2` / lowbit sont verts) | M |
+
+- **Décision** : un seul écart bloque la carte. On le localise avec `run_compare` sur
+  l'image en cause avant toute autre mesure.
+
+### [ ] T12.10 — Répétition générale du protocole carte
+- **Spec** : §10.4 · **Dépend de** : T12.9 · **Taille** : S · **Palier** : M
+- **Livrables** : les fichiers de sortie du protocole produits sur PC (backend sim) et lus
+  par les outils de rapport
+- **Acceptation** : tout [`protocole.md`](../../results/protocole.md) se déroule sur PC,
+  sauf la puissance et les temps absolus. Sur la carte, il ne reste qu'à changer de backend
+  (`sw-board`, `--backend uio`).
+- **Profils** :
+  - **JPEG** : `yolo_bench --images <dir> --count 1000 --warmup 5 --times … --dets …`,
+    avec le décodage stb. Ensuite, comparer avec les détections `--inputs` (prétraitement
+    PIL). On mesure l'écart de mAP entre stb et PIL, qui se verra aussi sur la carte.
+  - **Lecture des sorties** : `tools/bench_report.py` et `tools/map_stades.py` lisent les
+    fichiers produits sans modification (formats, noms de colonnes, chemins
+    `board/dets_*.jsonl` simulés).
+  - **Temps** : les temps par étage sur PC n'ont pas de valeur absolue. On vérifie
+    seulement que `pre`, `load`, `acc` et `post` sont tous renseignés et que p99 est
+    calculé.
+- **Décision** : tout format ou chemin cassé se corrige avant la carte, pas sur la carte.
+
+---
+
+## Ordre conseillé
+
+```mermaid
+graph LR
+  T1[T12.1 non-régression] --> T2c[T12.2-c sous-ensemble]
+  T2c --> T2[T12.2 a,b,d,e] & T3[T12.3 sensibilité]
+  T3 --> T4[T12.4 PTQ]
+  T4 --> T5[T12.5 QAT] & T6[T12.6 ADMM]
+  T1 --> T7[T12.7 post] & T8[T12.8 perf]
+  T4 & T5 & T6 --> T9[T12.9 chaîne simulée]
+  T9 --> T10[T12.10 répétition]
+```
+
+- **En parallèle**, sur une machine à 22 threads :
+  - T12.5 et T12.6 tournent ensemble, chacun avec 8 threads BLAS (comme
+    `build/m9/run_train_short.sh`) ;
+  - une évaluation sur 500 images peut s'y ajouter avec `--jobs 4`.
+- **La nuit** : T12.9 complet (`make bench-sim`) seul, puis les évaluations des variantes
+  retenues sur les 4 952 images.
+- **Rien de M12 ne demande Vitis ni la carte.** La synthèse et la co-simulation restent
+  dans M6 et M9.x.
