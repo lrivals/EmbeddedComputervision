@@ -63,7 +63,11 @@ Validation : `pytest python/tests/test_manifest.py`.
   - Route `layout: "contiguous"` : les sources sont déjà bout à bout dans le même tampon, dans
     l'ordre de `from` ; `out` pointe sur la première, la route ne copie rien (§10.3). Les
     sources doivent partager la **même échelle** (contrainte pour la quantification, T4).
-  - Upsample : copie ×2 vers `out` (ici le début du tampon de la route 20).
+  - Upsample : `out` réserve la place d'une copie ×2 (début du tampon de la route 20). Le
+    golden C++ (M5) ne fait **aucune copie** : la conv suivante lit la source par division
+    d'adresse `(r >> 1, c >> 1)` ; son entrée est une vue à segments (`golden::InView`) et la
+    route 20 se lit en deux segments, L18 vue ×2 puis le prépool de L08 à `R + 128·26·26`.
+    `R:[0, 128·26·26)` n'est jamais écrit.
   - `yolo` : `mask` = indices dans `anchors` ; lit la tête à `in`.
 - `region` (YOLOv2) : `num` ancres, classes par softmax ; les ancres v2 ne sont pas entières
   (34,56 px).

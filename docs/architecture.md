@@ -20,15 +20,16 @@ vérification repose sur ce principe.
 Produit par l'export Python (T4.7), lu par le golden (T5.1), le testbench HLS et le driver ARM.
 
 ```
-model/tiny-yolov3-voc-int8/
-├── manifest.json          # description du réseau (ci-dessous)
-├── weights.bin            # poids int8, concaténés, alignés sur 64 octets
-├── bias.bin               # biais int32
-├── requant.bin            # M0 int32 par canal de sortie
-└── dumps/
-    ├── input.npy          # image prétraitée quantifiée (int8, NCHW)
-    ├── L00.npy … L22.npy  # sortie entière de chaque couche
-    └── heads.json         # boîtes après décodage + NMS (référence de post-traitement)
+model/tiny-yolov3-coco/        # make export : tiny-yolov2-voc, tiny-yolov3-coco
+├── manifest.json              # description du réseau (ci-dessous)
+├── weights.bin                # poids int8, concaténés, alignés sur 64 octets
+├── bias.bin                   # biais int32
+├── requant.bin                # M0 int32 par canal de sortie
+├── luts.bin                   # tables σ, e^t, e^{d·s} des têtes (uint32)
+└── dumps/000001/ … 000003/    # 3 images de VOC2007 test
+    ├── input.npy              # image prétraitée quantifiée (int8, NCHW)
+    ├── L00.npy … L23.npy      # sortie entière de chaque couche (conv fusionnée : avant pool)
+    └── detections.json        # boîtes après décodage + NMS (référence de post-traitement)
 ```
 
 Extrait de `manifest.json` (schéma : [manifest.schema.json](manifest.schema.json), exemple
@@ -74,12 +75,28 @@ Le décodage et la NMS tournent d'abord sur l'ARM (§10.3), avec le code de
 La carte n'est pas choisie ([ADR 0003](adr/0003-choix-carte.md)). Les tailles de tuiles
 sont donc des paramètres (`hls/configs/<carte>.tcl`), fixés par l'outil roofline (T5.6).
 
-## 4. Flux de vérification
+## 4. Golden model C++ (`cpp/golden/`, M5)
+
+Le golden exécute le réseau comme le moteur matériel et sert de testbench au HLS :
+
+| En-tête | Rôle |
+|---|---|
+| `model.hpp`, `json.hpp`, `npy.hpp` | lecture du manifest, des blobs et des dumps (T5.1) |
+| `conv.hpp` | PE conv tuilée `conv_layer<Tiles<Tm, Tn, Tr, Tc>>` : tampons de taille fixe, étage de sortie biais + requantification + leaky + maxpool fusionné ; en-tête seul, sans allocation, partagé avec `hls/` (T5.2) |
+| `engine.hpp` | réseau complet sur une arène « DDR » par tampon du manifest ; chaque couche a une vue de sortie (`InView`, ≤ 2 segments) : upsample = division d'adresse, route = segments bout à bout, aucune copie ; compteurs d'accès DDR (T5.3, T5.4) |
+| `postproc.hpp` | seuil sur le logit, LUT, décodage, NMS ; STL seule, réutilisable dans `sw/postproc` (T5.5) |
+
+`golden_run run <model> <input.npy> <out>` écrit `Lxx.npy` et `detections.json` ;
+`make golden-check` les compare aux dumps Python avec `tools/compare_dumps.py`. Les écarts
+assumés au pseudo-code du §10.2 (ordre des boucles de tuiles, tuiles avant pooling) sont
+décrits dans [T5.2](tasks/M5-golden-cpp.md).
+
+## 5. Flux de vérification
 
 ```
 pytest (gradcheck)          ─► étage 1 correct
 mAP flottant vs entier      ─► perte de quantification mesurée (§9)
-tools/compare_dumps.py      ─► golden == dumps Python, couche par couche
+tools/compare_dumps.py      ─► golden == dumps Python, couche par couche (make golden-check)
 C-sim / co-sim HLS          ─► noyau == golden
 test sur carte              ─► sortie DDR == golden ; mAP aux trois stades (§11)
 ```

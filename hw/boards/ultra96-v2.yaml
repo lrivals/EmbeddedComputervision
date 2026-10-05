@@ -1,0 +1,14 @@
+# Ressources de la carte pour l'explorateur roofline (T5.6, tools/roofline.py).
+# Valeurs de fiches techniques publiques (hors base), à revérifier avant T6.0.
+name: Ultra96-V2
+part: xczu3eg-sbva484-1
+family: zynq-ultrascale+
+dsp: 360            # DSP48E2 (multiplieur 27×18)
+bram18: 432         # 216 BRAM36
+uram: 0
+ddr: LPDDR4 32 bits, 2133 MT/s
+ddr_bw_gbps: 8.5
+ddr_efficiency: 0.7
+freq_mhz: 200
+int8_macs_per_dsp: 1
+cost: ~300 €

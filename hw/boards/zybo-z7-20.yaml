@@ -1,0 +1,14 @@
+# Ressources de la carte pour l'explorateur roofline (T5.6, tools/roofline.py).
+# Valeurs de fiches techniques publiques (hors base), à revérifier avant T6.0.
+name: Zybo Z7-20
+part: xc7z020clg400-1
+family: zynq-7000
+dsp: 220
+bram18: 280
+uram: 0
+ddr: DDR3L 32 bits, 1066 MT/s
+ddr_bw_gbps: 4.26
+ddr_efficiency: 0.7
+freq_mhz: 150
+int8_macs_per_dsp: 1
+cost: ~300 €

@@ -1,0 +1,14 @@
+# Ressources de la carte pour l'explorateur roofline (T5.6, tools/roofline.py).
+# Valeurs de fiches techniques publiques (hors base), à revérifier avant T6.0.
+name: Kria KV260
+part: xck26-sfvc784-2LV-c
+family: zynq-ultrascale+
+dsp: 1248
+bram18: 288         # 144 BRAM36
+uram: 64            # 288 Kb chacune ; non utilisées par le modèle de tampons (BRAM seules)
+ddr: DDR4 64 bits, 2400 MT/s
+ddr_bw_gbps: 19.2
+ddr_efficiency: 0.7
+freq_mhz: 200
+int8_macs_per_dsp: 1
+cost: ~250 €

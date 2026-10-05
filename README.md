@@ -34,10 +34,10 @@ d'acceptation mesurable.
 | `cpp/golden/` | golden model C++17 bit-exact (bibliothèque + tests Catch2) |
 | `hls/` | noyaux Vitis HLS, testbenchs, scripts tcl, configurations par carte |
 | `sw/` | code ARM : driver de l'accélérateur, post-traitement, application |
-| `hw/boards/` | block designs Vivado (tcl), un par carte |
+| `hw/boards/` | ressources des cartes candidates (yaml, roofline) ; block designs Vivado (tcl) |
 | `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
 | `model/` | modèles exportés (non versionnés) |
-| `results/` | `benchmarks.csv` des mesures (format du §10.4) |
+| `results/` | `benchmarks.csv` des mesures (format du §10.4), rapports mAP, roofline |
 | `data/`, `weights/` | jeux de données et poids (non versionnés) |
 
 ## Démarrage rapide
@@ -46,6 +46,8 @@ d'acceptation mesurable.
 pip install -e "python[dev,data]"   # numpy ; dev : pytest, ruff, jsonschema ; data : pillow
 make test-py                        # tests NumPy
 make test-cpp                       # build + tests du golden model (télécharge Catch2)
+make golden-check                   # golden C++ == dumps Python de model/ (après make export)
+make roofline                       # tuiles et ms/image par carte → results/roofline.md
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/

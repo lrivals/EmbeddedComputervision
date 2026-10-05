@@ -1,9 +1,11 @@
-.PHONY: help test test-py test-slow test-cpp lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
 	@echo "test-slow   tests longs : surapprentissage d'une image (T2.8)"
 	@echo "test-cpp    build + tests du golden model C++"
+	@echo "golden-check golden C++ sur les dumps de model/ + rapport par couche (T5.4)"
+	@echo "roofline    tuiles et performance par carte hw/boards → results/roofline.md (T5.6)"
 	@echo "lint        ruff sur python/ et tools/"
 	@echo "count-macs  paramètres et MACs des réseaux Tiny (T0.5)"
 	@echo "bench-conv  temps de la conv 13×13×1024→1024 (T1.2)"
@@ -28,6 +30,19 @@ test-cpp:
 	cmake -S cpp/golden -B build/golden -DGOLDEN_TESTS=ON
 	cmake --build build/golden -j
 	cd build/golden && ctest --output-on-failure
+
+DUMP_IMAGES = 000001 000002 000003
+
+golden-check:
+	cmake -S cpp/golden -B build/golden
+	cmake --build build/golden -j --target golden_run
+	for n in $(QNETS); do for i in $(DUMP_IMAGES); do \
+	  build/golden/golden_run run model/$$n model/$$n/dumps/$$i/input.npy build/golden/out/$$n/$$i && \
+	  python tools/compare_dumps.py model/$$n/dumps/$$i build/golden/out/$$n/$$i || exit 1; \
+	done; done
+
+roofline:
+	python tools/roofline.py
 
 lint:
 	ruff check python tools

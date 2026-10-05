@@ -1,0 +1,14 @@
+# Ressources de la carte pour l'explorateur roofline (T5.6, tools/roofline.py).
+# Valeurs de fiches techniques publiques (hors base), à revérifier avant T6.0.
+name: PYNQ-Z2
+part: xc7z020clg400-1
+family: zynq-7000
+dsp: 220            # DSP48E1 (multiplieur 25×18)
+bram18: 280         # 140 BRAM36 = 280 BRAM18
+uram: 0
+ddr: DDR3 16 bits ×2 (32 bits), 1050 MT/s
+ddr_bw_gbps: 4.2    # crête, Go/s
+ddr_efficiency: 0.7 # part de la crête atteinte par les DMA (hypothèse)
+freq_mhz: 150       # horloge PL visée pour la PE (speed grade -1)
+int8_macs_per_dsp: 1
+cost: ~120 €
