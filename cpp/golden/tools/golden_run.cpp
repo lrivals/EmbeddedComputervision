@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 
+#include "golden/detections_io.hpp"
 #include "golden/engine.hpp"
 #include "golden/model.hpp"
 #include "golden/npy.hpp"
@@ -57,21 +58,6 @@ static int inspect(const std::string& dir) {
     std::printf("\n");
   }
   return 0;
-}
-
-static void write_detections(const std::string& path, const std::vector<postproc::Detection>& d) {
-  FILE* f = std::fopen(path.c_str(), "w");
-  if (!f) throw std::runtime_error("impossible d'écrire " + path);
-  std::fprintf(f, "{\"boxes\": [");
-  for (size_t k = 0; k < d.size(); ++k)
-    std::fprintf(f, "%s[%.17g, %.17g, %.17g, %.17g]", k ? ", " : "", d[k].box[0], d[k].box[1],
-                 d[k].box[2], d[k].box[3]);
-  std::fprintf(f, "], \"scores\": [");
-  for (size_t k = 0; k < d.size(); ++k) std::fprintf(f, "%s%.17g", k ? ", " : "", d[k].score);
-  std::fprintf(f, "], \"labels\": [");
-  for (size_t k = 0; k < d.size(); ++k) std::fprintf(f, "%s%d", k ? ", " : "", d[k].label);
-  std::fprintf(f, "]}\n");
-  std::fclose(f);
 }
 
 static int run(const std::string& dir, const std::string& input, const std::string& out) {

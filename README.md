@@ -34,7 +34,7 @@ d'acceptation mesurable.
 | `cpp/golden/` | golden model C++17 bit-exact (bibliothèque + tests Catch2) |
 | `hls/` | noyaux Vitis HLS, testbenchs, scripts tcl, configurations par carte |
 | `sw/` | code ARM : driver de l'accélérateur, post-traitement, application |
-| `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; block designs Vivado (tcl) |
+| `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
 | `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
 | `model/` | modèles exportés (non versionnés) |
 | `results/` | `benchmarks.csv` des mesures (format du §10.4), rapports mAP, roofline, rapport HLS |
@@ -51,6 +51,8 @@ make roofline                       # tuiles et ms/image par carte → results/r
 make csim-gcc                       # C-sim du noyau HLS avec g++ : noyau == golden == dumps
 make hls-cycles hls-report          # cycles par couche (C-sim) → results/hls_report.md
 make csim hls-synth hls-cosim       # même chose dans Vitis HLS (BOARD=kv260 par défaut)
+make sw-sim                         # driver ARM sur PC (registres émulés) : DDR == dumps, détections
+make vivado-build fpga-firmware     # bitstream + overlay KV260 (Vivado), puis make sw-board sur la carte
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/

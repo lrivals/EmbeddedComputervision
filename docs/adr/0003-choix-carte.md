@@ -58,3 +58,7 @@ Tc = 13** : `hls/configs/kv260.tcl`.
   avec g++ et les en-têtes `ap_int` open source (`hls/CMakeLists.txt`). La synthèse, la
   co-simulation et l'export (T6.5) attendent l'installation de Vitis 2023.2 ou ultérieur
   (version validée sur KV260 par AMD).
+- Pile logicielle de la carte (M7) : Ubuntu Kria 22.04, `xmutil` pour le bitstream et
+  l'overlay, UIO pour les registres et l'interruption, u-dma-buf pour la mémoire contiguë.
+  Préférée à XRT (flux plateforme Vitis plus lourd) et à PYNQ (driver en Python) : le driver
+  reste en C++ pur et le même code tourne sur PC avec un backend simulé.

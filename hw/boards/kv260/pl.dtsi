@@ -1,0 +1,53 @@
+// Overlay de la KV260 (T7.1, T7.2) pour Ubuntu Kria : chargé par `xmutil loadapp yolo` avec
+// yolo.bit.bin (hw/boards/kv260/firmware.sh).
+//
+// - yolo_conv : registres s_axi_control (0xA000_0000, build.tcl) exposés en `generic-uio`
+//   → /dev/uioN, avec l'interruption pl_ps_irq0[0] = GIC SPI 89, niveau haut ;
+// - u-dma-buf (module ikwzm/u-dma-buf) : 32 Mo contigus en CMA pour arène + poids + paramètres
+//   (Tiny-YOLOv2 : 1,2 Mo + 15,9 Mo + 30 Ko) → /dev/udmabuf0 ;
+// - pl_clk0 (zynqmp_clk 71) réglé à 200 MHz comme dans le block design.
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&fpga_full>;
+		__overlay__ {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			firmware-name = "yolo.bit.bin";
+			resets = <&zynqmp_reset 116>;
+		};
+	};
+
+	fragment@1 {
+		target = <&amba>;
+		__overlay__ {
+			#address-cells = <2>;
+			#size-cells = <2>;
+
+			clocking0: clocking0 {
+				compatible = "xlnx,fclk";
+				#clock-cells = <0>;
+				clocks = <&zynqmp_clk 71>;
+				clock-output-names = "fabric_clk";
+				assigned-clocks = <&zynqmp_clk 71>;
+				assigned-clock-rates = <200000000>;
+			};
+
+			yolo_conv: yolo_conv@a0000000 {
+				compatible = "generic-uio";
+				reg = <0x0 0xa0000000 0x0 0x10000>;
+				clocks = <&zynqmp_clk 71>;
+				interrupt-parent = <&gic>;
+				interrupts = <0 89 4>;
+			};
+
+			udmabuf0: udmabuf@0 {
+				compatible = "ikwzm,u-dma-buf";
+				device-name = "udmabuf0";
+				size = <0x2000000>;
+			};
+		};
+	};
+};

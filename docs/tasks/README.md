@@ -59,6 +59,6 @@ reporter ici l'avancement par jalon.
 | M4 | 7 | 7 (T4.6 sans objet) |
 | M5 | 6 | 6 |
 | M6 | 6 | 1 (T6.0-T6.3 en C-sim ; synthèse et co-sim en attente de Vitis) |
-| M7 | 4 | 0 |
+| M7 | 4 | 0 (T7.1-T7.4 écrits et vérifiés sur PC, backend sim ; carte et Vivado en attente) |
 | M8 | 3 | 0 |
 | M9 | 5 | 0 |

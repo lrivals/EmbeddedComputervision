@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -23,6 +23,11 @@ help:
 	@echo "hls-cosim   co-simulation RTL sur une image (T6.5, long)"
 	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
 	@echo "hls-report  results/hls_report.md (T6.5)"
+	@echo "check-regmap offsets de sw/driver/regmap.hpp == xyolo_conv_hw.h généré (T7.2)"
+	@echo "vivado-build block design + bitstream + .xsa → build/vivado/$(BOARD)/ (T7.1)"
+	@echo "fpga-firmware yolo.bit.bin + yolo.dtbo pour xmutil (T7.1)"
+	@echo "sw-sim      driver ARM sur PC (backend sim) : run_compare + yolo_app (T7.2-T7.4)"
+	@echo "sw-board    build natif sur la KV260 (backend uio)"
 
 test: test-py test-cpp
 
@@ -108,6 +113,27 @@ hls-export:
 
 hls-report:
 	python tools/hls_report.py --board $(BOARD)
+
+check-regmap:
+	python tools/check_regmap.py --board $(BOARD)
+
+VIVADO_JOBS ?= 8
+
+vivado-build: check-regmap
+	vivado -mode batch -nojournal -log build/vivado-$(BOARD).log \
+	  -source hw/boards/$(BOARD)/build.tcl -tclargs $(VIVADO_JOBS)
+
+fpga-firmware:
+	hw/boards/$(BOARD)/firmware.sh
+
+sw-sim:
+	cmake -S sw -B build/sw -DSW_BACKEND=sim
+	cmake --build build/sw -j
+	cd build/sw && ctest --output-on-failure
+
+sw-board:
+	cmake -S sw -B build/sw-board -DSW_BACKEND=uio
+	cmake --build build/sw-board -j
 
 clean:
 	rm -rf build

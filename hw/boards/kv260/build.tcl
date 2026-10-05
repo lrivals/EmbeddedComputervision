@@ -1,0 +1,144 @@
+# Block design Vivado de la KV260 (T7.1) : PS Zynq UltraScale+, IP `yolo_conv` (M6),
+# interconnexions AXI, horloge 200 MHz, reset, interruption ; bitstream + .xsa.
+#
+# Reproductible depuis ce seul script (mode batch), après `make hls-export BOARD=kv260` :
+#   vivado -mode batch -source hw/boards/kv260/build.tcl -tclargs [jobs]   (make vivado-build)
+# Sorties : build/vivado/kv260/{yolo.bit, yolo.xsa, timing.rpt, utilization.rpt}.
+# Échoue si le timing n'est pas tenu (WNS < 0 ou TNS < 0, WHS < 0).
+#
+# Carte des adresses (reprise par pl.dtsi et sw/driver/regmap.hpp) :
+#   s_axi_control  0xA000_0000, 64 Ko, via M_AXI_HPM0_FPD
+#   gmem_in, gmem_out → S_AXI_HP0_FPD ; gmem_w, gmem_p → S_AXI_HP1_FPD (DDR entière, 64 bits)
+#   interrupt → pl_ps_irq0[0] (GIC SPI 89)
+
+set jobs 8
+if {[info exists argv] && [llength $argv] > 0} { set jobs [lindex $argv 0] }
+
+set root [file normalize [file join [file dirname [info script]] .. .. ..]]
+source [file join $root hls configs kv260.tcl]   ;# PART, CLOCK_NS (mêmes que la synthèse HLS)
+set out [file join $root build vivado kv260]
+set ip_zip [file join $root build hls ip yolo_conv_kv260.zip]
+set freq_mhz [expr {round(1000.0 / $CLOCK_NS)}]
+
+if {![file exists $ip_zip]} {
+  error "IP absente : $ip_zip (make hls-export BOARD=kv260)"
+}
+
+# --- Projet ------------------------------------------------------------------------------
+file delete -force $out
+file mkdir $out
+create_project yolo_kv260 [file join $out proj] -part $PART
+
+# Fichiers de carte Kria (xhub) : SOM + connecteur de la carrière KV260.
+set som [lindex [lsort -dictionary [get_board_parts -quiet *kv260_som*]] end]
+if {$som eq ""} {
+  error "fichiers de carte KV260 absents : xhub::refresh_catalog \[xhub::get_xstores xilinx_board_store\] ; xhub::install \[xhub::get_xitems *kv260*\]"
+}
+set_property board_part $som [current_project]
+set carrier [lindex [lsort -dictionary [get_board_parts -quiet *kv260_carrier*]] end]
+if {$carrier ne ""} {
+  # xilinx.com:kv260_carrier:part0:1.3 → xilinx.com:kv260_carrier:som240_1_connector:1.3
+  lassign [split $carrier :] vendor name _ version
+  set_property board_connections \
+    "som240_1_connector $vendor:$name:som240_1_connector:$version" [current_project]
+}
+
+# Dépôt IP : l'archive exportée par Vitis HLS (hls/scripts/export.tcl).
+set repo [file join $out ip_repo]
+file mkdir $repo
+exec unzip -o -q $ip_zip -d [file join $repo yolo_conv]
+set_property ip_repo_paths $repo [current_project]
+update_ip_catalog
+
+# --- Block design ------------------------------------------------------------------------
+create_bd_design yolo
+set ps [create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e zynq_ultra_ps_e_0]
+apply_bd_automation -rule xilinx.com:bd_rule:zynq_ultra_ps_e \
+  -config {apply_board_preset "1"} $ps
+
+# Un seul maître PL (HPM0_FPD), deux ports esclaves HP, une horloge, une interruption.
+set_property -dict [list \
+  CONFIG.PSU__USE__M_AXI_GP0 {1} \
+  CONFIG.PSU__USE__M_AXI_GP1 {0} \
+  CONFIG.PSU__USE__M_AXI_GP2 {0} \
+  CONFIG.PSU__USE__S_AXI_GP2 {1} \
+  CONFIG.PSU__USE__S_AXI_GP3 {1} \
+  CONFIG.PSU__SAXIGP2__DATA_WIDTH {128} \
+  CONFIG.PSU__SAXIGP3__DATA_WIDTH {128} \
+  CONFIG.PSU__FPGA_PL0_ENABLE {1} \
+  CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ $freq_mhz \
+  CONFIG.PSU__USE__IRQ0 {1} \
+] $ps
+
+set accel [create_bd_cell -type ip -vlnv yolo-embarque:hls:yolo_conv:1.0 yolo_conv_0]
+set rst [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_pl0]
+
+# Contrôle : HPM0_FPD → s_axi_control.
+set sc_ctrl [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect sc_ctrl]
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {1}] $sc_ctrl
+# Données : deux bundles d'activations sur HP0 (chargement et stockage recouverts, T6.2),
+# poids et paramètres sur HP1.
+set sc_hp0 [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect sc_hp0]
+set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1}] $sc_hp0
+set sc_hp1 [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect sc_hp1]
+set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1}] $sc_hp1
+
+connect_bd_intf_net [get_bd_intf_pins $ps/M_AXI_HPM0_FPD] [get_bd_intf_pins $sc_ctrl/S00_AXI]
+connect_bd_intf_net [get_bd_intf_pins $sc_ctrl/M00_AXI] [get_bd_intf_pins $accel/s_axi_control]
+connect_bd_intf_net [get_bd_intf_pins $accel/m_axi_gmem_in] [get_bd_intf_pins $sc_hp0/S00_AXI]
+connect_bd_intf_net [get_bd_intf_pins $accel/m_axi_gmem_out] [get_bd_intf_pins $sc_hp0/S01_AXI]
+connect_bd_intf_net [get_bd_intf_pins $sc_hp0/M00_AXI] [get_bd_intf_pins $ps/S_AXI_HP0_FPD]
+connect_bd_intf_net [get_bd_intf_pins $accel/m_axi_gmem_w] [get_bd_intf_pins $sc_hp1/S00_AXI]
+connect_bd_intf_net [get_bd_intf_pins $accel/m_axi_gmem_p] [get_bd_intf_pins $sc_hp1/S01_AXI]
+connect_bd_intf_net [get_bd_intf_pins $sc_hp1/M00_AXI] [get_bd_intf_pins $ps/S_AXI_HP1_FPD]
+
+# Horloge unique pl_clk0, reset synchronisé.
+set clk [get_bd_pins $ps/pl_clk0]
+connect_bd_net $clk [get_bd_pins $ps/maxihpm0_fpd_aclk] [get_bd_pins $ps/saxihp0_fpd_aclk] \
+  [get_bd_pins $ps/saxihp1_fpd_aclk] [get_bd_pins $accel/ap_clk] [get_bd_pins $rst/slowest_sync_clk] \
+  [get_bd_pins $sc_ctrl/aclk] [get_bd_pins $sc_hp0/aclk] [get_bd_pins $sc_hp1/aclk]
+connect_bd_net [get_bd_pins $ps/pl_resetn0] [get_bd_pins $rst/ext_reset_in]
+connect_bd_net [get_bd_pins $rst/peripheral_aresetn] [get_bd_pins $accel/ap_rst_n] \
+  [get_bd_pins $sc_ctrl/aresetn] [get_bd_pins $sc_hp0/aresetn] [get_bd_pins $sc_hp1/aresetn]
+connect_bd_net [get_bd_pins $accel/interrupt] [get_bd_pins $ps/pl_ps_irq0]
+
+# Adresses : registres à 0xA000_0000 ; les ports m_axi voient toute la DDR.
+assign_bd_address -offset 0xA0000000 -range 0x10000 \
+  -target_address_space [get_bd_addr_spaces $ps/Data] [get_bd_addr_segs $accel/s_axi_control/Reg]
+assign_bd_address
+
+validate_bd_design
+save_bd_design
+
+# --- Synthèse, implémentation, bitstream -------------------------------------------------
+set bd_file [get_files yolo.bd]
+generate_target all $bd_file
+set wrapper [make_wrapper -files $bd_file -top]
+add_files -norecurse $wrapper
+set_property top yolo_wrapper [current_fileset]
+update_compile_order -fileset sources_1
+
+launch_runs synth_1 -jobs $jobs
+wait_on_run synth_1
+if {[get_property PROGRESS [get_runs synth_1]] ne "100%"} { error "échec de la synthèse" }
+launch_runs impl_1 -to_step write_bitstream -jobs $jobs
+wait_on_run impl_1
+if {[get_property PROGRESS [get_runs impl_1]] ne "100%"} { error "échec de l'implémentation" }
+
+open_run impl_1
+report_timing_summary -file [file join $out timing.rpt]
+report_utilization -file [file join $out utilization.rpt]
+report_utilization -hierarchical -file [file join $out utilization_hier.rpt]
+report_power -file [file join $out power.rpt]   ;# puissance puce estimée (M8)
+
+set impl_dir [get_property DIRECTORY [get_runs impl_1]]
+file copy -force [file join $impl_dir yolo_wrapper.bit] [file join $out yolo.bit]
+write_hw_platform -fixed -include_bit -force [file join $out yolo.xsa]
+
+# Timing tenu : critère d'acceptation de T7.1.
+set wns [get_property STATS.WNS [get_runs impl_1]]
+set tns [get_property STATS.TNS [get_runs impl_1]]
+set whs [get_property STATS.WHS [get_runs impl_1]]
+puts "timing : WNS $wns ns, TNS $tns ns, WHS $whs ns à $freq_mhz MHz"
+if {$wns < 0 || $tns < 0 || $whs < 0} { error "timing non tenu à $freq_mhz MHz" }
+puts "OK : [file join $out yolo.bit], [file join $out yolo.xsa]"

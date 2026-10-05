@@ -120,4 +120,8 @@ Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages
   `ACC_TC` (défauts KV260). Boucles nommées (`mac:`, `load_in:`…) pour lire leur II dans
   les rapports. Le top est à portée globale (`set_top yolo_conv`). Testbenchs et driver :
   C++17 ; code de sortie 0 = aucun écart.
+- Logiciel ARM (`sw/`) : C++17, bibliothèque standard + POSIX ; tout accès matériel passe
+  par `driver::Device` (backends `sim` et `uio`), jamais par des pointeurs bruts ailleurs.
+  Les offsets de registres de `sw/driver/regmap.hpp` doivent égaler ceux de l'en-tête
+  généré `xyolo_conv_hw.h` (`make check-regmap`) : en cas d'écart, l'en-tête fait foi.
 - Chaque formule implémentée cite sa section de la spec en commentaire (`# §6.2`).

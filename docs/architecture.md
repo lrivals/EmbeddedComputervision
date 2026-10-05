@@ -98,6 +98,33 @@ A/B soient réécrits). C-sim avec g++ (`make csim-gcc`, en-têtes `ap_int` open
 Vitis (`make csim`) ; synthèse, co-sim, export : `make hls-synth | hls-cosim | hls-export`,
 rapport `make hls-report` → `results/hls_report.md`.
 
+### Intégration SoC (M7)
+
+Pile sur la KV260 : Ubuntu Kria, overlay chargé par `xmutil loadapp yolo`, registres du
+noyau par `/dev/uioN` (`generic-uio`), mémoire contiguë par `/dev/udmabuf0` (u-dma-buf).
+
+```
+PS (A53) ── HPM0_FPD ─► s_axi_control @0xA000_0000 ─┐
+          ◄─ pl_ps_irq0 ─ interrupt ─────────────────┤ yolo_conv (200 MHz, pl_clk0)
+DDR ◄─ HP0_FPD ◄─ gmem_in, gmem_out ─────────────────┤
+    ◄─ HP1_FPD ◄─ gmem_w, gmem_p ────────────────────┘
+```
+
+| Fichier | Rôle |
+|---|---|
+| `hw/boards/kv260/build.tcl` | block design, bitstream, `.xsa`, rapports ; échoue si le timing n'est pas tenu (`make vivado-build`) |
+| `hw/boards/kv260/pl.dtsi`, `firmware.sh` | overlay (UIO + IRQ, u-dma-buf 32 Mo, horloge) et paquet `xmutil` (`make fpga-firmware`) |
+| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 26 mots ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
+| `sw/driver/device.hpp` | accès matériel : `uio` (carte) ou `sim` (PC : registres émulés → noyau C-sim) |
+| `sw/driver/accel_driver.hpp` | `Accelerator` : un tampon contigu [arène \| poids \| paramètres], bornes de chaque `LayerDesc` vérifiées, une conv par `run_layer` |
+| `sw/postproc/heads.hpp` | têtes lues en place dans l'arène → `postproc.hpp` (décodage + NMS sur l'ARM) |
+| `sw/app/run_compare.cpp` | chaque couche en DDR == dump, puis détections == `detections.json` ; `--layer N` : une conv isolée |
+| `sw/app/yolo_app.cpp` | démo image → boîtes, temps prétraitement / accélérateur / post-traitement |
+
+Le backend `sim` passe par le même chemin que la carte (encodage des registres, adresses
+physiques, ap_start / ap_done) : `make sw-sim` valide tout sauf le matériel lui-même.
+Procédure carte : [hw/boards/kv260/README.md](../hw/boards/kv260/README.md).
+
 ## 4. Golden model C++ (`cpp/golden/`, M5)
 
 Le golden exécute le réseau comme le moteur matériel et sert de testbench au HLS :
@@ -121,5 +148,6 @@ pytest (gradcheck)          ─► étage 1 correct
 mAP flottant vs entier      ─► perte de quantification mesurée (§9)
 tools/compare_dumps.py      ─► golden == dumps Python, couche par couche (make golden-check)
 C-sim / co-sim HLS          ─► noyau == golden == dumps (make csim-gcc, make hls-cosim)
-test sur carte              ─► sortie DDR == golden ; mAP aux trois stades (§11)
+run_compare (sim puis uio)  ─► sortie DDR == golden == dumps (make sw-sim, puis sur carte)
+mesures sur carte           ─► mAP aux trois stades (§11), benchmarks.csv (M8)
 ```
