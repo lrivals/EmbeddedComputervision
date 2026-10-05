@@ -10,6 +10,7 @@ namespace sw {
 
 // Consomme argv[i] (et sa valeur) si c'est une option de backend ; rend false sinon.
 //   --backend sim|uio  --uio /dev/uioN  --udmabuf udmabufN  --poll (sans interruption)
+//   --uio-post /dev/uioN (registres de yolo_post, T9.1)
 inline bool parse_device_option(int argc, char** argv, int& i, driver::DeviceOptions& o) {
   const std::string k = argv[i];
   if (k == "--poll") {
@@ -19,6 +20,7 @@ inline bool parse_device_option(int argc, char** argv, int& i, driver::DeviceOpt
   std::string* dst = k == "--backend" ? &o.backend
                      : k == "--uio"   ? &o.uio
                      : k == "--udmabuf" ? &o.udmabuf
+                     : k == "--uio-post" ? &o.uio_post
                                         : nullptr;
   if (!dst || i + 1 >= argc) return false;
   *dst = argv[++i];

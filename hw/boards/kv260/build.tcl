@@ -10,6 +10,9 @@
 #   s_axi_control  0xA000_0000, 64 Ko, via M_AXI_HPM0_FPD
 #   gmem_in, gmem_out → S_AXI_HP0_FPD ; gmem_w, gmem_p → S_AXI_HP1_FPD (DDR entière, 64 bits)
 #   interrupt → pl_ps_irq0[0] (GIC SPI 89)
+#   yolo_post (T9.1, si build/hls/ip/yolo_post_kv260.zip existe : make hls-export-post) :
+#   s_axi_control 0xA001_0000, gmem_in/gmem_out → HP0, gmem_p → HP1, interrupt →
+#   pl_ps_irq0[1] (GIC SPI 90)
 
 set jobs 8
 if {[info exists argv] && [llength $argv] > 0} { set jobs [lindex $argv 0] }
@@ -19,6 +22,8 @@ source [file join $root hls configs kv260.tcl]   ;# PART, CLOCK_NS (mêmes que l
 set out [file join $root build vivado kv260]
 set ip_zip [file join $root build hls ip yolo_conv_kv260.zip]
 set freq_mhz [expr {round(1000.0 / $CLOCK_NS)}]
+set post_zip [file join $root build hls ip yolo_post_kv260.zip]
+set with_post [file exists $post_zip]
 
 if {![file exists $ip_zip]} {
   error "IP absente : $ip_zip (make hls-export BOARD=kv260)"
@@ -47,6 +52,7 @@ if {$carrier ne ""} {
 set repo [file join $out ip_repo]
 file mkdir $repo
 exec unzip -o -q $ip_zip -d [file join $repo yolo_conv]
+if {$with_post} { exec unzip -o -q $post_zip -d [file join $repo yolo_post] }
 set_property ip_repo_paths $repo [current_project]
 update_ip_catalog
 
@@ -79,9 +85,10 @@ set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {1}] $sc_ctrl
 # Données : deux bundles d'activations sur HP0 (chargement et stockage recouverts, T6.2),
 # poids et paramètres sur HP1.
 set sc_hp0 [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect sc_hp0]
-set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1}] $sc_hp0
+set_property -dict [list CONFIG.NUM_SI [expr {$with_post ? 4 : 2}] CONFIG.NUM_MI {1}] $sc_hp0
 set sc_hp1 [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect sc_hp1]
-set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1}] $sc_hp1
+set_property -dict [list CONFIG.NUM_SI [expr {$with_post ? 3 : 2}] CONFIG.NUM_MI {1}] $sc_hp1
+if {$with_post} { set_property CONFIG.NUM_MI {2} $sc_ctrl }
 
 connect_bd_intf_net [get_bd_intf_pins $ps/M_AXI_HPM0_FPD] [get_bd_intf_pins $sc_ctrl/S00_AXI]
 connect_bd_intf_net [get_bd_intf_pins $sc_ctrl/M00_AXI] [get_bd_intf_pins $accel/s_axi_control]
@@ -100,11 +107,31 @@ connect_bd_net $clk [get_bd_pins $ps/maxihpm0_fpd_aclk] [get_bd_pins $ps/saxihp0
 connect_bd_net [get_bd_pins $ps/pl_resetn0] [get_bd_pins $rst/ext_reset_in]
 connect_bd_net [get_bd_pins $rst/peripheral_aresetn] [get_bd_pins $accel/ap_rst_n] \
   [get_bd_pins $sc_ctrl/aresetn] [get_bd_pins $sc_hp0/aresetn] [get_bd_pins $sc_hp1/aresetn]
-connect_bd_net [get_bd_pins $accel/interrupt] [get_bd_pins $ps/pl_ps_irq0]
+if {$with_post} {
+  # Post-traitement matériel (T9.1) : même horloge et reset, deux interruptions concaténées.
+  set post [create_bd_cell -type ip -vlnv yolo-embarque:hls:yolo_post:1.0 yolo_post_0]
+  connect_bd_intf_net [get_bd_intf_pins $sc_ctrl/M01_AXI] [get_bd_intf_pins $post/s_axi_control]
+  connect_bd_intf_net [get_bd_intf_pins $post/m_axi_gmem_in] [get_bd_intf_pins $sc_hp0/S02_AXI]
+  connect_bd_intf_net [get_bd_intf_pins $post/m_axi_gmem_out] [get_bd_intf_pins $sc_hp0/S03_AXI]
+  connect_bd_intf_net [get_bd_intf_pins $post/m_axi_gmem_p] [get_bd_intf_pins $sc_hp1/S02_AXI]
+  connect_bd_net $clk [get_bd_pins $post/ap_clk]
+  connect_bd_net [get_bd_pins $rst/peripheral_aresetn] [get_bd_pins $post/ap_rst_n]
+  set irq [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat irq_concat]
+  set_property CONFIG.NUM_PORTS {2} $irq
+  connect_bd_net [get_bd_pins $accel/interrupt] [get_bd_pins $irq/In0]
+  connect_bd_net [get_bd_pins $post/interrupt] [get_bd_pins $irq/In1]
+  connect_bd_net [get_bd_pins $irq/dout] [get_bd_pins $ps/pl_ps_irq0]
+} else {
+  connect_bd_net [get_bd_pins $accel/interrupt] [get_bd_pins $ps/pl_ps_irq0]
+}
 
 # Adresses : registres à 0xA000_0000 ; les ports m_axi voient toute la DDR.
 assign_bd_address -offset 0xA0000000 -range 0x10000 \
   -target_address_space [get_bd_addr_spaces $ps/Data] [get_bd_addr_segs $accel/s_axi_control/Reg]
+if {$with_post} {
+  assign_bd_address -offset 0xA0010000 -range 0x10000 \
+    -target_address_space [get_bd_addr_spaces $ps/Data] [get_bd_addr_segs $post/s_axi_control/Reg]
+}
 assign_bd_address
 
 validate_bd_design

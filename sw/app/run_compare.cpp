@@ -2,10 +2,13 @@
 // golden, puis détections du post-traitement ARM == detections.json (T7.3).
 //
 //   run_compare [--model DIR] [--net NAME]… [--image ID]… [--layer N] [--csv temps.csv]
-//               [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
+//               [--hw-post] [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
+//               [--uio-post /dev/uioN]
 //
 // --layer N (T7.2, couche isolée) : l'arène est d'abord remplie avec les dumps des couches
 // < N, aux places où les convs précédentes les auraient écrites, puis seule la conv N tourne.
+// --hw-post (T9.1) : en plus, boîtes du noyau `yolo_post` == `hwpp::run` (golden) sur les
+// têtes en DDR, aux seuils 0,25 et 0,005.
 // Code de sortie 0 = aucun écart.
 #include <chrono>
 #include <cstdio>
@@ -15,6 +18,7 @@
 
 #include "accel_driver.hpp"
 #include "golden/detections_io.hpp"
+#include "golden/hw_heads.hpp"
 #include "golden/model.hpp"
 #include "heads.hpp"
 #include "options.hpp"
@@ -27,6 +31,7 @@ namespace {
 struct Args {
   tb::Args tb;
   driver::DeviceOptions dev;
+  bool hw_post = false;
 };
 
 Args parse(int argc, char** argv) {
@@ -35,6 +40,10 @@ Args parse(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     if (sw::parse_device_option(argc, argv, i, a.dev)) continue;
     const std::string k = argv[i];
+    if (k == "--hw-post") {
+      a.hw_post = true;
+      continue;
+    }
     if (i + 1 >= argc) {
       std::fprintf(stderr, "argument inconnu ou sans valeur : %s\n", k.c_str());
       std::exit(2);
@@ -159,6 +168,23 @@ int main(int argc, char** argv) {
           std::printf("  détections DIFFÉRENTES de %s\n", ref.c_str());
           ++nd_img;
         }
+        if (a.hw_post)
+          for (double conf : {0.25, 0.005}) {
+            std::vector<hwpp::HeadData> heads;
+            for (int id : m.heads())
+              heads.push_back(make_hw_head(m, m.layers[size_t(id)],
+                                           acc.arena() + prog.views[size_t(id)].seg[0].off, conf));
+            int ov_ref = 0, ov = 0;
+            const auto want = hwpp::run(heads, make_hw_params(conf, 0.45), &ov_ref);
+            double s = 0.0;
+            const auto got = acc.run_post(conf, 0.45, &ov, &s);
+            bool ok = got.size() == want.size() && ov == ov_ref;
+            for (size_t b = 0; ok && b < got.size(); ++b)
+              ok = std::memcmp(&got[b], &want[b], sizeof(hwpp::Box)) == 0;
+            std::printf("  yolo_post conf %.3f : %zu boîtes, %s, %.3f ms\n", conf, got.size(),
+                        ok ? "== golden" : "DIFFÉRENT du golden", 1e3 * s);
+            nd_img += !ok;
+          }
         total_diff += nd_img;
         std::printf("%s %s : %s, %zu détections, accélérateur %.1f ms, post-traitement %.3f ms\n",
                     net.c_str(), image.c_str(), nd_img ? "ÉCHEC" : "OK", dets.size(),

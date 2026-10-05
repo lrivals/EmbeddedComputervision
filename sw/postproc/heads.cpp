@@ -1,5 +1,6 @@
 #include "heads.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace sw {
@@ -33,6 +34,20 @@ std::vector<postproc::Head> make_heads(const golden::Model& m, const driver::Pro
     heads.push_back(std::move(h));
   }
   return heads;
+}
+
+std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes) {
+  const double unit = double(hwpp::ANCHOR_REF << hwpp::BOX_FRAC);
+  std::vector<postproc::Detection> dets;
+  for (const hwpp::Box& b : boxes)
+    dets.push_back(postproc::Detection{{(double(b.x1) + b.x2) / 2 / unit,
+                                        (double(b.y1) + b.y2) / 2 / unit,
+                                        double(b.x2 - b.x1) / unit, double(b.y2 - b.y1) / unit},
+                                       b.score / double(1 << hwpp::LUT_FRAC), b.cls});
+  std::stable_sort(dets.begin(), dets.end(), [](const auto& x, const auto& y) {
+    return x.score > y.score;
+  });
+  return dets;
 }
 
 }  // namespace sw

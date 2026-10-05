@@ -114,7 +114,7 @@ DDR ◄─ HP0_FPD ◄─ gmem_in, gmem_out ────────────
 |---|---|
 | `hw/boards/kv260/build.tcl` | block design, bitstream, `.xsa`, rapports ; échoue si le timing n'est pas tenu (`make vivado-build`) |
 | `hw/boards/kv260/pl.dtsi`, `firmware.sh` | overlay (UIO + IRQ, u-dma-buf 32 Mo, horloge) et paquet `xmutil` (`make fpga-firmware`) |
-| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 26 mots ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
+| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 27 mots (`qmax` ajouté en T9.3) ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
 | `sw/driver/device.hpp` | accès matériel : `uio` (carte) ou `sim` (PC : registres émulés → noyau C-sim) |
 | `sw/driver/accel_driver.hpp` | `Accelerator` : un tampon contigu [arène \| poids \| paramètres], bornes de chaque `LayerDesc` vérifiées, une conv par `run_layer` |
 | `sw/postproc/heads.hpp` | têtes lues en place dans l'arène → `postproc.hpp` (décodage + NMS sur l'ARM) |

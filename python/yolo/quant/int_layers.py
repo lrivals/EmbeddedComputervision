@@ -9,7 +9,8 @@ Contrat (repris par le golden C++ et le HLS, conventions.md « Arithmétique ent
   appliqué après elle. Le §9.3 écrit (y · 13) >> 7 (plancher) : ce plancher biaise chaque
   sortie négative de −½ pas en moyenne, biais qui se cumule de couche en couche (mesuré :
   écart moyen aux têtes ×1,7) ; l'arrondi ne coûte qu'une addition ;
-- saturation finale dans [−127, 127] ;
+- saturation finale dans [−qmax, qmax], qmax = 127 par défaut, plus petit par couche pour
+  les activations à b bits (qmax = 2^{b−1} − 1, T9.3 : le conteneur reste int8) ;
 - maxpool (stride 1 : réplication du bord), upsample et route : identiques au flottant, car
   le max et la copie sont exacts sur des entiers.
 
@@ -43,8 +44,12 @@ def leaky_int(y):
     return np.where(y > 0, y, rshift_round(y * LEAKY_MUL, LEAKY_SHIFT))
 
 
+def clip_q(y, qmax=QMAX):
+    return np.clip(y, -qmax, qmax)
+
+
 def clip8(y):
-    return np.clip(y, QMIN, QMAX)
+    return clip_q(y)
 
 
 def conv_acc(qx, qW, qb, engine="int64"):
@@ -62,18 +67,34 @@ def conv_acc(qx, qW, qb, engine="int64"):
     return acc
 
 
+def split4(qx):
+    """x = 16·x_hi + x_lo, x_hi = x ≫ 4 ∈ [−8, 7] (signé 4 bits), x_lo = x & 15 ∈ [0, 15]
+    (non signé 4 bits) ; exact en complément à 2 (T9.3.4)."""
+    qx = np.asarray(qx, dtype=np.int64)
+    return qx >> 4, qx & 15
+
+
+def conv_acc_split4(qx, qW, qb, engine="int64"):
+    """Première couche d'un réseau 4 bits [2024-yan#007.3] : l'entrée 8 bits passe par deux
+    convolutions à entrées 4 bits, acc = 16·conv(x_hi) + conv(x_lo) + q_b ; égal à
+    `conv_acc` à l'entier près (linéarité)."""
+    hi, lo = split4(qx)
+    zero = np.zeros(len(qW), dtype=np.int64)
+    return 16 * conv_acc(hi, qW, zero, engine) + conv_acc(lo, qW, qb, engine)
+
+
 def requantize(acc, M0, n):
     """§9.3 : (acc · M0_f + 2ⁿ⁻¹) >> n ; |acc·M0| < 2³¹·2³¹ = 2⁶² tient sur int64."""
     return rshift_round(acc * np.asarray(M0, np.int64)[None, :, None, None], n)
 
 
-def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64"):
-    """Couche conv entière complète (§9.3) ; renvoie (y int64 dans [−127, 127], acc)."""
+def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64", qmax=QMAX):
+    """Couche conv entière complète (§9.3) ; renvoie (y int64 dans [−qmax, qmax], acc)."""
     acc = conv_acc(qx, qW, qb, engine)
     y = requantize(acc, M0, n)
     if act == "leaky":
         y = leaky_int(y)
-    return clip8(y), acc
+    return clip_q(y, qmax), acc
 
 
 def maxpool_int(qx, k=2, s=2):

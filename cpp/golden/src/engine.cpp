@@ -14,6 +14,7 @@ ConvParams conv_params(const Layer& l, int in_h, int in_w) {
   p.h = in_h;
   p.w = in_w;
   p.shift = l.shift;
+  p.qmax = l.qmax;
   p.leaky = l.leaky;
   if (l.pool_layer >= 0) {
     p.pool_k = l.pool_k;

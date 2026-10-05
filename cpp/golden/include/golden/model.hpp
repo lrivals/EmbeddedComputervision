@@ -32,6 +32,7 @@ struct Layer {
   BufRef prepool_out;
   int64_t w_offset = 0, b_offset = 0, m0_offset = 0;
   int shift = 0;
+  int qmax = 127;  // saturation de la sortie (activations à b bits : 2^{b−1} − 1, T9.3)
   double in_scale = 0.0, out_scale = 0.0;
 
   // maxpool

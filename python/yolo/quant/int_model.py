@@ -33,6 +33,8 @@ class QConv:
     sy: float
     act: str
     s: int = 1
+    qmax: int = 127   # saturation de la sortie (2^{b−1} − 1 pour b bits, T9.3)
+    wqmax: int = 127  # poids dans [−wqmax, wqmax]
 
 
 @dataclass
@@ -56,8 +58,14 @@ class QuantModel:
         return self.input_scale if o < 0 else self.convs[o].sy
 
     @classmethod
-    def from_fused(cls, fused, input_scale, act_scales):
-        """`fused` : `Network` à BN fusionnée ; `act_scales` : {id conv: s_y}."""
+    def from_fused(cls, fused, input_scale, act_scales, w_qmax=None, a_qmax=None,
+                   weights=None):
+        """`fused` : `Network` à BN fusionnée ; `act_scales` : {id conv: s_y}.
+
+        `w_qmax`, `a_qmax` : {id conv: qmax} des poids et des sorties (127 par défaut) ;
+        `weights` : {id conv: (qW, s_w)} déjà quantifiés (puissances de 2, T9.2).
+        """
+        w_qmax, a_qmax, weights = w_qmax or {}, a_qmax or {}, weights or {}
         layers = fused.layers
         owner = scale_owners(layers)
         qm = cls(net=fused.net, input_scale=float(input_scale))
@@ -69,11 +77,12 @@ class QuantModel:
             sx = input_scale if o < 0 else act_scales[o]
             sy = act_scales[i]
             p = fused.params[i]
-            qW, sw = quantize_weights_per_channel(p["W"])
+            wq = w_qmax.get(i, 127)
+            qW, sw = weights[i] if i in weights else quantize_weights_per_channel(p["W"], wq)
             qb = quantize_bias(p["b"], sx, sw)
             M0, n = requant_params(sx, sw, sy)
             qm.convs[i] = QConv(qW, qb, M0, n, float(sx), sw, float(sy), layer["act"],
-                                layer["s"])
+                                layer["s"], a_qmax.get(i, 127), wq)
         return qm
 
     def acc_bound(self, i):
@@ -109,7 +118,8 @@ class IntNetwork:
             src = [x if j < 0 else outs[j] for j in _sources(layers, i)]
             if t == "conv":
                 c = self.qm.convs[i]
-                y, acc = il.conv_int(src[0], c.qW, c.qb, c.M0, c.n, c.act, self.engine)
+                y, acc = il.conv_int(src[0], c.qW, c.qb, c.M0, c.n, c.act, self.engine,
+                                     c.qmax)
                 self.max_acc[i] = max(self.max_acc.get(i, 0), int(np.abs(acc).max()))
             elif t == "maxpool":
                 y = il.maxpool_int(src[0], k=layer["k"], s=layer["s"])
@@ -155,7 +165,7 @@ def fake_quant_forward(fused, qm, x, layers=None, all_outputs=False):
                 slope = il.LEAKY_MUL / 2**il.LEAKY_SHIFT if i in quant else 0.1
                 y, _ = leaky_forward(y, slope)
             if i in quant:
-                y = fake_quant(y, qm.convs[i].sy)
+                y = fake_quant(y, qm.convs[i].sy, qm.convs[i].qmax)
         elif t == "maxpool":
             y = il.maxpool_forward(src[0], k=layer["k"], s=layer["s"])[0]
         elif t == "upsample":

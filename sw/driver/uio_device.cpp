@@ -7,6 +7,7 @@
 //   O_SYNC (non caché), ce qui rend `sync_for_*` inutiles au prix d'accès CPU plus lents.
 // - Interruption UIO : écrire 1 dans le fd la démasque, `read` bloque jusqu'à la suivante ;
 //   l'ISR du noyau HLS est acquittée par écriture de 1.
+// - `yolo_post` (T9.1, option `uio_post`) : second nœud UIO, même protocole.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -18,6 +19,7 @@
 #include <string>
 
 #include "device.hpp"
+#include "post_regmap.hpp"
 #include "regmap.hpp"
 
 namespace driver {
@@ -35,25 +37,67 @@ T read_sysfs(const std::string& path) {
   return v;
 }
 
+// Fenêtre de registres d'un noyau HLS exposée par un nœud generic-uio.
+struct UioRegs {
+  int fd = -1;
+  volatile uint32_t* regs = nullptr;
+  bool irq = true;
+
+  void open(const std::string& path, const char* kernel, bool use_irq) {
+    irq = use_irq;
+    fd = ::open(path.c_str(), O_RDWR | O_SYNC);
+    if (fd < 0) throw sys_error("ouverture de " + path);
+    void* p = ::mmap(nullptr, regmap::SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) throw sys_error("mmap des registres");
+    regs = static_cast<volatile uint32_t*>(p);
+    if (!(regs[regmap::CTRL / 4] & regmap::AP_IDLE))
+      throw std::runtime_error(std::string(kernel) + " n'est pas au repos (bitstream chargé ?)");
+    regs[regmap::GIE / 4] = irq ? 1 : 0;
+    regs[regmap::IER / 4] = irq ? 1 : 0;
+  }
+
+  void close() {
+    if (regs) ::munmap(const_cast<uint32_t*>(regs), regmap::SPAN);
+    if (fd >= 0) ::close(fd);
+    regs = nullptr;
+    fd = -1;
+  }
+
+  void wait_done() {
+    if (!irq) {
+      while (!(regs[regmap::CTRL / 4] & regmap::AP_DONE)) {
+      }
+      return;
+    }
+    uint32_t count = 0;
+    if (::read(fd, &count, sizeof count) != ssize_t(sizeof count))
+      throw sys_error("attente de l'interruption UIO");
+    regs[regmap::ISR / 4] = 1;    // acquitte ap_done
+    (void)regs[regmap::CTRL / 4];  // efface ap_done (COR)
+    unmask();
+  }
+
+  // Démasque l'interruption : avant le premier ap_start, puis après chaque fin.
+  void unmask() {
+    if (!irq) return;
+    const uint32_t one = 1;
+    if (::write(fd, &one, sizeof one) != ssize_t(sizeof one))
+      throw sys_error("démasquage de l'interruption UIO");
+  }
+};
+
 class UioDevice : public Device {
  public:
   explicit UioDevice(const DeviceOptions& o) : irq_(o.irq), udmabuf_(o.udmabuf) {
-    uio_fd_ = ::open(o.uio.c_str(), O_RDWR | O_SYNC);
-    if (uio_fd_ < 0) throw sys_error("ouverture de " + o.uio);
-    void* p = ::mmap(nullptr, regmap::SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, uio_fd_, 0);
-    if (p == MAP_FAILED) throw sys_error("mmap des registres");
-    regs_ = static_cast<volatile uint32_t*>(p);
-    if (!(read32(regmap::CTRL) & regmap::AP_IDLE))
-      throw std::runtime_error("yolo_conv n'est pas au repos (bitstream chargé ?)");
-    write32(regmap::GIE, irq_ ? 1 : 0);
-    write32(regmap::IER, irq_ ? 1 : 0);
+    conv_.open(o.uio, "yolo_conv", irq_);
+    if (!o.uio_post.empty()) post_.open(o.uio_post, "yolo_post", irq_);
   }
 
   ~UioDevice() override {
     if (buf_.virt) ::munmap(buf_.virt, buf_.size);
     if (dma_fd_ >= 0) ::close(dma_fd_);
-    if (regs_) ::munmap(const_cast<uint32_t*>(regs_), regmap::SPAN);
-    if (uio_fd_ >= 0) ::close(uio_fd_);
+    post_.close();
+    conv_.close();
   }
 
   const char* name() const override { return "uio"; }
@@ -78,36 +122,34 @@ class UioDevice : public Device {
     return buf_;
   }
 
-  void write32(uint32_t off, uint32_t v) override { regs_[off / 4] = v; }
-  uint32_t read32(uint32_t off) override { return regs_[off / 4]; }
+  void write32(uint32_t off, uint32_t v) override { conv_.regs[off / 4] = v; }
+  uint32_t read32(uint32_t off) override { return conv_.regs[off / 4]; }
+  void wait_done() override { conv_.wait_done(); }
 
-  void wait_done() override {
-    if (!irq_) {
-      while (!(read32(regmap::CTRL) & regmap::AP_DONE)) {
-      }
-      return;
-    }
-    uint32_t count = 0;
-    if (::read(uio_fd_, &count, sizeof count) != ssize_t(sizeof count))
-      throw sys_error("attente de l'interruption UIO");
-    write32(regmap::ISR, 1);  // acquitte ap_done
-    (void)read32(regmap::CTRL);  // efface ap_done (COR)
-    unmask();
+  bool has_post() const override { return post_.regs != nullptr; }
+  void post_write32(uint32_t off, uint32_t v) override {
+    if (!has_post()) Device::post_write32(off, v);
+    post_.regs[off / 4] = v;
+  }
+  uint32_t post_read32(uint32_t off) override {
+    if (!has_post()) return Device::post_read32(off);
+    return post_.regs[off / 4];
+  }
+  void post_wait_done() override {
+    if (!has_post()) Device::post_wait_done();
+    post_.wait_done();
   }
 
-  // Démasque l'interruption : avant le premier ap_start, puis après chaque fin.
   void unmask() {
-    if (!irq_) return;
-    const uint32_t one = 1;
-    if (::write(uio_fd_, &one, sizeof one) != ssize_t(sizeof one))
-      throw sys_error("démasquage de l'interruption UIO");
+    conv_.unmask();
+    if (has_post()) post_.unmask();
   }
 
  private:
   bool irq_;
   std::string udmabuf_;
-  int uio_fd_ = -1, dma_fd_ = -1;
-  volatile uint32_t* regs_ = nullptr;
+  int dma_fd_ = -1;
+  UioRegs conv_, post_;
   Buffer buf_;
 };
 

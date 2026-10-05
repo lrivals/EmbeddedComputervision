@@ -3,7 +3,8 @@
 # Appelé par les scripts d'étape, depuis hls/ :
 #   vitis_hls -f scripts/<étape>.tcl -tclargs [carte] [arguments du testbench…]
 # La carte (défaut kv260) choisit hls/configs/<carte>.tcl : part, horloge, tuiles.
-# Avant `source`, le script d'étape fixe `step` (nom du projet) et `tb` (testbench).
+# Avant `source`, le script d'étape fixe `step` (nom du projet) et `tb` (testbench), et
+# éventuellement `top` (défaut yolo_conv ; yolo_post pour le post-traitement, T9.1).
 
 set board kv260
 set tb_args {}
@@ -22,9 +23,11 @@ set tbflags "-std=c++17 $inc $defs"
 if {[llength $tb_args] == 0} { set tb_args $default_tb_args }
 set argv_tb "--model $root/model $tb_args"
 
+if {![info exists top]} { set top yolo_conv }
+set ksrc [dict get {yolo_conv conv_pe.cpp yolo_post postproc.cpp} $top]
 open_project -reset proj_${board}_$step
-set_top yolo_conv
-add_files [file join $root hls kernels conv_pe.cpp] -cflags $kflags
+set_top $top
+add_files [file join $root hls kernels $ksrc] -cflags $kflags
 foreach f {
   cpp/golden/src/golden.cpp cpp/golden/src/json.cpp cpp/golden/src/npy.cpp
   cpp/golden/src/model.cpp cpp/golden/src/engine.cpp sw/driver/program.cpp

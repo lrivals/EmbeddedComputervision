@@ -1,13 +1,15 @@
 // Démo de détection sur l'ARM (T7.3, T7.4) : image ou entrée int8 → accélérateur → boîtes.
 //
 //   yolo_app --model DIR (--input input.npy | --image photo.jpg) [--out detections.json]
-//            [--draw boites.jpg] [--conf 0.25] [--repeat N]
+//            [--draw boites.jpg] [--conf 0.25] [--repeat N] [--hw-post]
 //            [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
+//            [--uio-post /dev/uioN]
 //
 // --input : entrée déjà quantifiée (dumps/<id>/input.npy), sortie comparable bit à bit au
 // dump. --image : JPEG/PNG/PPM, redimensionnement `stretch` Darknet (preprocess.hpp), boîtes
 // normalisées dans l'image d'origine. Temps séparés : prétraitement, accélérateur,
-// post-traitement (moyenne sur --repeat passes).
+// post-traitement (moyenne sur --repeat passes). --hw-post (T9.1) : décodage et NMS par le
+// noyau `yolo_post` au lieu de l'ARM.
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -35,7 +37,7 @@ const char* const VOC[] = {"aeroplane", "bicycle", "bird", "boat", "bottle", "bu
 int usage() {
   std::fprintf(stderr,
                "usage : yolo_app --model DIR (--input x.npy | --image img.jpg) [--out det.json]\n"
-               "                 [--draw out.jpg] [--conf 0.25] [--repeat N]\n"
+               "                 [--draw out.jpg] [--conf 0.25] [--repeat N] [--hw-post]\n"
                "                 [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] "
                "[--poll]\n");
   return 2;
@@ -69,9 +71,14 @@ int main(int argc, char** argv) {
   std::string model_dir, input, image, out, draw_path;
   double conf = 0.25;
   int repeat = 1;
+  bool hw_post = false;
   for (int i = 1; i < argc; ++i) {
     if (sw::parse_device_option(argc, argv, i, dopt)) continue;
     const std::string k = argv[i];
+    if (k == "--hw-post") {
+      hw_post = true;
+      continue;
+    }
     if (i + 1 >= argc) return usage();
     const std::string v = argv[++i];
     if (k == "--model") model_dir = v;
@@ -116,7 +123,8 @@ int main(int argc, char** argv) {
       acc.run(x.data());
       t_acc += sw::seconds_since(t0);
       t0 = std::chrono::steady_clock::now();
-      dets = sw::detect(m, acc.program(), acc.arena(), conf);
+      dets = hw_post ? sw::hw_detections(acc.run_post(conf, 0.45))
+                     : sw::detect(m, acc.program(), acc.arena(), conf);
       t_post += sw::seconds_since(t0);
     }
 

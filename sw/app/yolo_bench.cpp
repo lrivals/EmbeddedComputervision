@@ -3,7 +3,7 @@
 //
 //   yolo_bench --model DIR (--inputs inputs.bin --ids ids.txt | --images liste.txt)
 //              [--start 0] [--count N] [--warmup 5] [--conf 0.005] [--iou 0.45]
-//              [--times temps.csv] [--dets det.jsonl]
+//              [--times temps.csv] [--dets det.jsonl] [--hw-post]
 //              [--power /sys/class/hwmon/hwmonN/power1_input] [--idle-s 5]
 //              [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll]
 //
@@ -15,7 +15,8 @@
 //
 // Étages (ms, par image) : pre = lecture de l'entrée (et décodage + redimensionnement +
 // quantification en --images) ; load = mise à zéro de l'arène et copie de l'entrée en DDR ;
-// acc = somme des convs (registres + calcul + attente) ; post = décodage + NMS.
+// acc = somme des convs (registres + calcul + attente) ; post = décodage + NMS (sur l'ARM, ou
+// par le noyau `yolo_post` avec --hw-post, T9.1).
 // --power : µW lus dans hwmon (INA260 du SOM KV260) toutes les 10 ms, au repos pendant
 // --idle-s secondes puis pendant la boucle mesurée.
 #include <algorithm>
@@ -46,7 +47,7 @@ int usage() {
   std::fprintf(stderr,
                "usage : yolo_bench --model DIR (--inputs x.bin --ids ids.txt | --images l.txt)\n"
                "                   [--start 0] [--count N] [--warmup 5] [--conf 0.005]\n"
-               "                   [--iou 0.45] [--times t.csv] [--dets d.jsonl]\n"
+               "                   [--iou 0.45] [--times t.csv] [--dets d.jsonl] [--hw-post]\n"
                "                   [--power .../power1_input] [--idle-s 5]\n"
                "                   [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] "
                "[--poll]\n");
@@ -125,9 +126,14 @@ int main(int argc, char** argv) {
   double conf = 0.005, iou = 0.45, idle_s = 5.0;
   long start = 0, count = -1;
   int warmup = 5;
+  bool hw_post = false;
   for (int i = 1; i < argc; ++i) {
     if (sw::parse_device_option(argc, argv, i, dopt)) continue;
     const std::string k = argv[i];
+    if (k == "--hw-post") {
+      hw_post = true;
+      continue;
+    }
     if (i + 1 >= argc) return usage();
     const std::string v = argv[++i];
     if (k == "--model") model_dir = v;
@@ -245,7 +251,8 @@ int main(int argc, char** argv) {
       double a = 0.0;
       for (const driver::ConvCall& c : acc.program().calls) a += acc.run_layer(c);
       t0 = std::chrono::steady_clock::now();
-      const auto d = sw::detect(m, acc.program(), acc.arena(), conf, iou);
+      const auto d = hw_post ? sw::hw_detections(acc.run_post(conf, iou))
+                             : sw::detect(m, acc.program(), acc.arena(), conf, iou);
       const double post = sw::seconds_since(t0);
 
       t_pre.push_back(1e3 * pre);

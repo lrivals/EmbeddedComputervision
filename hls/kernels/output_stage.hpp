@@ -2,7 +2,7 @@
 // leaky 13/128 + saturation, puis maxpool 2×2 en stride 2 ou 1 (réplication du bord bas et
 // droit), et carte avant pooling en DDR si demandée (prépool de L08 pour la route 20).
 //
-// L'arithmétique est celle du golden (`golden::requantize`, `leaky_int`, `clip8`), réutilisée
+// L'arithmétique est celle du golden (`golden::requantize`, `leaky_int`, `clip_q`), réutilisée
 // telle quelle : produit acc·M0 sur 64 bits → 4 DSP48 (32 × 31 bits) pour l'unique
 // multiplieur de requantification, partagé par les Tm canaux (une valeur par cycle).
 #pragma once
@@ -42,7 +42,7 @@ store_ch:
       const int trr = n / TC, tcc = n % TC;
       int32_t y = golden::requantize(int32_t(out_buf[too][trr][tcc]) + bias, m0, d.shift);
       if (d.leaky) y = golden::leaky_int(y);
-      q[trr][tcc] = golden::clip8(y);
+      q[trr][tcc] = golden::clip_q(y, d.qmax);
     }
 
     if (write_prepool) {

@@ -1,4 +1,5 @@
-// Backend `sim` (PC) : banc de registres AXI-Lite émulé devant le noyau C-sim `yolo_conv`.
+// Backend `sim` (PC) : bancs de registres AXI-Lite émulés devant les noyaux C-sim `yolo_conv`
+// et `yolo_post` (T9.1).
 //
 // Les tampons reçoivent des adresses physiques fictives (au-delà de 4 Go, pour exercer les
 // mots de poids fort des pointeurs 64 bits). ap_start → relecture des registres, traduction
@@ -9,6 +10,8 @@
 
 #include "accel.hpp"
 #include "device.hpp"
+#include "post_regmap.hpp"
+#include "postproc.hpp"
 #include "regmap.hpp"
 
 namespace driver {
@@ -16,7 +19,10 @@ namespace {
 
 class SimDevice : public Device {
  public:
-  SimDevice() { regs_[regmap::CTRL / 4] = regmap::AP_IDLE; }
+  SimDevice() {
+    regs_[regmap::CTRL / 4] = regmap::AP_IDLE;
+    post_[post_regmap::CTRL / 4] = post_regmap::AP_IDLE;
+  }
 
   const char* name() const override { return "sim"; }
 
@@ -53,6 +59,33 @@ class SimDevice : public Device {
       throw std::runtime_error("sim : ap_done absent après ap_start");
   }
 
+  bool has_post() const override { return true; }
+
+  void post_write32(uint32_t off, uint32_t v) override {
+    check(off);
+    if (off == post_regmap::CTRL) {
+      if (v & post_regmap::AP_START) start_post();
+      return;
+    }
+    if (off == post_regmap::ISR) {
+      post_[off / 4] &= ~v;
+      return;
+    }
+    post_[off / 4] = v;
+  }
+
+  uint32_t post_read32(uint32_t off) override {
+    check(off);
+    const uint32_t v = post_[off / 4];
+    if (off == post_regmap::CTRL) post_[off / 4] &= ~post_regmap::AP_DONE;
+    return v;
+  }
+
+  void post_wait_done() override {
+    if (!(post_read32(post_regmap::CTRL) & post_regmap::AP_DONE))
+      throw std::runtime_error("sim : ap_done de yolo_post absent après ap_start");
+  }
+
  private:
   static constexpr uint64_t PAGE = 4096;
 
@@ -60,9 +93,10 @@ class SimDevice : public Device {
     if (off % 4 || off >= regmap::SPAN) throw std::out_of_range("sim : registre hors fenêtre");
   }
 
-  uint64_t reg64(uint32_t off) const {
-    return uint64_t(regs_[off / 4]) | uint64_t(regs_[off / 4 + 1]) << 32;
+  static uint64_t reg64(const uint32_t* bank, uint32_t off) {
+    return uint64_t(bank[off / 4]) | uint64_t(bank[off / 4 + 1]) << 32;
   }
+  uint64_t reg64(uint32_t off) const { return reg64(regs_, off); }
 
   // Adresse physique → pointeur dans le tampon qui la contient.
   uint8_t* virt(uint64_t phys) const {
@@ -85,7 +119,19 @@ class SimDevice : public Device {
     if ((regs_[regmap::IER / 4] & 1)) regs_[regmap::ISR / 4] |= 1;
   }
 
+  void start_post() {
+    post_[post_regmap::CTRL / 4] &= ~(post_regmap::AP_IDLE | post_regmap::AP_DONE);
+    const accel::PostDesc d = post_regmap::words_to_desc(&post_[post_regmap::D / 4]);
+    yolo_post(reinterpret_cast<const int8_t*>(virt(reg64(post_, post_regmap::ACT))),
+              reinterpret_cast<const int32_t*>(virt(reg64(post_, post_regmap::TAB))),
+              reinterpret_cast<int32_t*>(virt(reg64(post_, post_regmap::RES))), d);
+    post_[post_regmap::CTRL / 4] |=
+        post_regmap::AP_DONE | post_regmap::AP_IDLE | post_regmap::AP_READY;
+    if ((post_[post_regmap::IER / 4] & 1)) post_[post_regmap::ISR / 4] |= 1;
+  }
+
   uint32_t regs_[regmap::SPAN / 4] = {};
+  uint32_t post_[post_regmap::SPAN / 4] = {};
   std::vector<std::vector<uint8_t>> mem_;
   std::map<uint64_t, Buffer> bufs_;  // par adresse physique de début
   uint64_t next_phys_ = 0x8'0000'0000ull;

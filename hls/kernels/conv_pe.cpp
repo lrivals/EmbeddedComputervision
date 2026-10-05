@@ -71,7 +71,7 @@ mac:
       acc_t sum = 0;
       for (int tii = 0; tii < TN; ++tii) {
 #pragma HLS UNROLL
-        sum += w_buf[too][tii][i][j] * in_buf[tii][trr + i][tcc + j];
+        sum += mul_w(int(w_buf[too][tii][i][j]), int(in_buf[tii][trr + i][tcc + j]));
       }
       out_buf[too][trr][tcc] = (init ? acc_t(0) : out_buf[too][trr][tcc]) + sum;
     }

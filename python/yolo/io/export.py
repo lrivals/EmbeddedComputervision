@@ -134,12 +134,14 @@ def layout(net):
     return entries, dict(sorted(sizes.items()))
 
 
-def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_frac=None):
+def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_frac=None,
+                   qmax_of=None):
     """Manifest de `net` (format `specs`).
 
     `scale_of(i)` : échelle de la sortie de la couche i (−1 : entrée) ; `shift_of(i)` : n de
     la conv i ; `lut_offsets` : {id de tête: offset dans luts.bin} et `exp_frac` : {id de
-    tête: bits fractionnaires de la table exponentielle} (optionnels).
+    tête: bits fractionnaires de la table exponentielle} (optionnels). `qmax_of(i)` :
+    saturation de la sortie de la conv i, écrite seulement si ≠ 127 (T9.3).
     """
     layers = net["layers"]
     shapes = infer_shapes(net)
@@ -163,6 +165,8 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
                      in_scale=scale_of(src), out_scale=scale_of(i), **{"in": p["in"]},
                      out=p["out"],
                      out_shape=list(shapes[pool["layer"]][1] if pool else outs))
+            if qmax_of is not None and qmax_of(i) != 127:
+                e["qmax"] = int(qmax_of(i))
             w_off = align(w_off + k * k * ins[0] * cout)
             b_off = align(b_off + 4 * cout)
         elif t == "maxpool":
@@ -221,7 +225,8 @@ def export_model(qm, out_dir):
         lut_offsets[hid] = off
         off = align(off + 4 * 256 * len(LUT_NAMES))
     m = build_manifest(qm.net, qm.input_scale, qm.scale_of, lambda i: qm.convs[i].n,
-                       lut_offsets, {i: h.exp_frac for i, h in luts.items()})
+                       lut_offsets, {i: h.exp_frac for i, h in luts.items()},
+                       lambda i: qm.convs[i].qmax)
     m["blobs"]["luts.bin"] = off
 
     w = np.zeros(m["blobs"]["weights.bin"], np.int8)
@@ -271,7 +276,7 @@ def load_model(model_dir):
             M0 = m0[e["m0_offset"] // 4:e["m0_offset"] // 4 + cout]
             convs[e["id"]] = QConv(qW.copy(), qb.astype(np.int32), M0.astype(np.int32),
                                    e["shift"], e["in_scale"], None, e["out_scale"], e["act"],
-                                   e["s"])
+                                   e["s"], e.get("qmax", 127))
         elif t == "maxpool":
             layers.append({"type": "maxpool", "k": e["k"], "s": e["s"]})
         elif t == "upsample":

@@ -93,7 +93,9 @@ Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages
   (−2,5 → −2, −0,5 → 0).
 - Leaky : `y > 0 ? y : (13·y + 64) >> 7` (pente 13/128, **arrondie** de la même façon ;
   le plancher `(13·y) >> 7` du §9.3 biaise les négatifs de −½ pas par couche).
-- Saturation : `clip(y, −127, 127)` après la leaky ; −128 n'est jamais produit.
+- Saturation : `clip(y, −qmax, qmax)` après la leaky, `qmax = 127` sauf champ `qmax` de la
+  conv dans le manifest (activations à b bits : 2^{b−1} − 1, T9.3) ; −128 n'est jamais
+  produit.
 - Maxpool, upsample, route : exacts (max et copies) ; maxpool stride 1 par réplication.
 - Têtes : `M0`/`shift` comme les autres convs, sans leaky.
 

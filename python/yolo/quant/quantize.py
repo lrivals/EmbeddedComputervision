@@ -37,16 +37,16 @@ def quantize_input(x):
     return quantize(x, INPUT_SCALE).astype(np.int8)
 
 
-def weight_scales(W):
-    """s_w,f = max|W_f| / 127 ; un filtre nul reçoit l'échelle 1/127 (poids tous nuls)."""
+def weight_scales(W, qmax=QMAX):
+    """s_w,f = max|W_f| / qmax ; un filtre nul reçoit l'échelle 1/qmax (poids tous nuls)."""
     m = np.abs(np.asarray(W, dtype=np.float64)).reshape(len(W), -1).max(axis=1)
-    return np.where(m > 0, m, 1.0) / QMAX
+    return np.where(m > 0, m, 1.0) / qmax
 
 
-def quantize_weights_per_channel(W):
-    """§9.2 : (qW int8 (F, C, k, k), s_w (F,))."""
-    sw = weight_scales(W)
-    return quantize(W, sw[:, None, None, None]).astype(np.int8), sw
+def quantize_weights_per_channel(W, qmax=QMAX):
+    """§9.2 : (qW int8 (F, C, k, k), s_w (F,)) ; `qmax` = 2^{b−1} − 1 pour b bits."""
+    sw = weight_scales(W, qmax)
+    return quantize(W, sw[:, None, None, None], qmax).astype(np.int8), sw
 
 
 def quantize_bias(b, sx, sw):

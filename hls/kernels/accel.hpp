@@ -78,6 +78,28 @@ struct SimCycles {
 extern SimCycles sim_cycles;  // remis à zéro à chaque appel de yolo_conv
 #endif
 
+// Produit poids × activation de la PE. Mode `ACC_WMODE_POW2` (T9.2.4, REQ-YOLO) : poids sur
+// les niveaux « mixed powers-of-two » ±(2^a + 2^{a−k}) (python/yolo/quant/pow2.py), le
+// produit est fait par deux décalages et une addition, sans DSP. Le poids arrive en int8 et
+// est décodé en (signe, a, k) au chargement dans w_buf (en matériel : stockage des codes 6
+// bits) ; résultat égal au produit tant que le poids est sur un niveau (le testbench le
+// vérifie sur le modèle tools/quant_lowbit.py --weights pow2).
+#ifdef ACC_WMODE_POW2
+inline int32_t mul_w(int w, int x) {
+  const int m = w < 0 ? -w : w;
+  if (m == 0) return 0;
+  int a = 0;
+  while ((2 << a) <= m) ++a;  // bit de poids fort
+  const int rest = m - (1 << a);
+  int b = 0;
+  while (rest && (2 << b) <= rest) ++b;
+  const int32_t p = (int32_t(x) << a) + (rest ? (int32_t(x) << b) : 0);
+  return w < 0 ? -p : p;
+}
+#else
+inline int32_t mul_w(int w, int x) { return w * x; }
+#endif
+
 }  // namespace accel
 
 // Top (portée globale pour `set_top`) : `act_in` et `act_out` désignent la même arène DDR

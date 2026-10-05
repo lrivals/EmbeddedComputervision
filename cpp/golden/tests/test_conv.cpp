@@ -155,3 +155,10 @@ TEST_CASE("chaque conv == dump Python, plusieurs jeux de tuiles") {
     SECTION(std::string(net) + " 32,8,26,4") { check_layers<Tiles<32, 8, 26, 4>>(net); }
   }
 }
+
+TEST_CASE("T9.3.4 : produit 8 bits par deux multiplieurs 4 bits") {
+  int bad = 0;
+  for (int w = -128; w < 128; ++w)
+    for (int x = -128; x < 128; ++x) bad += golden::mul_split4(int8_t(w), int8_t(x)) != w * x;
+  REQUIRE(bad == 0);
+}

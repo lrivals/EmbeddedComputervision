@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -23,6 +23,7 @@ help:
 	@echo "hls-cosim   co-simulation RTL sur une image (T6.5, long)"
 	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
 	@echo "hls-report  results/hls_report.md (T6.5)"
+	@echo "hls-synth-post / hls-export-post  noyau yolo_post (T9.1, Vitis)"
 	@echo "check-regmap offsets de sw/driver/regmap.hpp == xyolo_conv_hw.h généré (T7.2)"
 	@echo "vivado-build block design + bitstream + .xsa → build/vivado/$(BOARD)/ (T7.1)"
 	@echo "fpga-firmware yolo.bit.bin + yolo.dtbo pour xmutil (T7.1)"
@@ -116,6 +117,12 @@ hls-cosim:
 
 hls-export:
 	cd hls && vitis_hls -f scripts/export.tcl -tclargs $(BOARD)
+
+hls-synth-post:
+	cd hls && vitis_hls -f scripts/synth_post.tcl -tclargs $(BOARD)
+
+hls-export-post:
+	cd hls && vitis_hls -f scripts/export_post.tcl -tclargs $(BOARD)
 
 hls-report:
 	python tools/hls_report.py --board $(BOARD)

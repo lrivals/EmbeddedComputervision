@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "golden/hw_postproc.hpp"
 #include "golden/model.hpp"
 #include "golden/postproc.hpp"
 #include "program.hpp"
@@ -22,5 +23,9 @@ inline std::vector<postproc::Detection> detect(const golden::Model& m, const dri
                                                double iou = 0.45) {
   return postproc::postprocess(make_heads(m, p, arena), conf, iou);
 }
+
+// Boîtes entières de `yolo_post` (T9.1) → détections (cx, cy, w, h) normalisées, triées par
+// score décroissant (stable) ; mêmes doubles que `to_detections` (hw_postproc.py).
+std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes);
 
 }  // namespace sw

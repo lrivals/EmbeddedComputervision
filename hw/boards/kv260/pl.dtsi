@@ -3,6 +3,8 @@
 //
 // - yolo_conv : registres s_axi_control (0xA000_0000, build.tcl) exposés en `generic-uio`
 //   → /dev/uioN, avec l'interruption pl_ps_irq0[0] = GIC SPI 89, niveau haut ;
+// - yolo_post (T9.1, si l'IP est dans le bitstream) : 0xA001_0000, pl_ps_irq0[1] = SPI 90
+//   → second /dev/uioN (option --uio-post du driver) ;
 // - u-dma-buf (module ikwzm/u-dma-buf) : 32 Mo contigus en CMA pour arène + poids + paramètres
 //   (Tiny-YOLOv2 : 1,2 Mo + 15,9 Mo + 30 Ko) → /dev/udmabuf0 ;
 // - pl_clk0 (zynqmp_clk 71) réglé à 200 MHz comme dans le block design.
@@ -41,6 +43,14 @@
 				clocks = <&zynqmp_clk 71>;
 				interrupt-parent = <&gic>;
 				interrupts = <0 89 4>;
+			};
+
+			yolo_post: yolo_post@a0010000 {
+				compatible = "generic-uio";
+				reg = <0x0 0xa0010000 0x0 0x10000>;
+				clocks = <&zynqmp_clk 71>;
+				interrupt-parent = <&gic>;
+				interrupts = <0 90 4>;
 			};
 
 			udmabuf0: udmabuf@0 {

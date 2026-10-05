@@ -129,6 +129,8 @@ Model Model::load(const std::string& dir) {
                     l.m0_offset % BLOB_ALIGN == 0,
                 "offsets de blobs non alignés sur 64 octets");
         require(l.shift >= 1 && l.shift <= 31, "shift hors de [1, 31]");
+        if (e.has("qmax")) l.qmax = static_cast<int>(e["qmax"].integer());
+        require(l.qmax >= 1 && l.qmax <= 127, "qmax hors de [1, 127]");
         break;
       }
       case LayerType::Maxpool:

@@ -30,6 +30,7 @@ struct LayerDesc {
   int32_t prepool_off;     // carte avant pooling en DDR ; −1 : non écrite
   int32_t w_off;           // octets dans weights.bin
   int32_t b_off, m0_off;   // indices int32 dans le tableau de paramètres
+  int32_t qmax;            // saturation de la sortie (127 ; 2^{b−1} − 1 à b bits, T9.3)
 
   bool pooled() const { return pool_k > 0; }
   int pk() const { return pooled() ? pool_k : 1; }

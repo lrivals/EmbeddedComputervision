@@ -25,7 +25,7 @@ FIELDS = {
     "PRM": "PRM_DATA",
     "D": "D_DATA",
 }
-D_BITS = 26 * 32
+D_BITS = 27 * 32
 
 
 def regmap_offsets(path=REGMAP):

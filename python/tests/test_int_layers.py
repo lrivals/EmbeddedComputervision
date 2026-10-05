@@ -115,3 +115,22 @@ def test_upsample_and_route_int():
     assert np.array_equal(il.upsample_int(q), upsample_forward(q.astype(float))[0])
     r = il.route_int([q, q[:, :1]])
     assert r.shape == (1, 3, 3, 3) and np.array_equal(r[:, 2], q[:, 0])
+
+
+def test_split4_first_layer_exact():
+    """T9.3.4 : la première conv calculée par deux convolutions à entrées 4 bits == la conv
+    8 bits, sur toute la plage int8 et sur une vraie entrée (dump du modèle exporté)."""
+    from pathlib import Path
+
+    from yolo.quant.int_layers import conv_acc, conv_acc_split4, split4
+
+    q = np.arange(-128, 128)
+    hi, lo = split4(q)
+    assert hi.min() == -8 and hi.max() == 7 and lo.min() == 0 and lo.max() == 15
+    assert np.array_equal(16 * hi + lo, q)
+    rng = np.random.default_rng(0)
+    qW = rng.integers(-7, 8, (16, 3, 3, 3))
+    qb = rng.integers(-1000, 1000, 16)
+    d = Path(__file__).resolve().parents[2] / "model" / "tiny-yolov2-voc" / "dumps" / "000001"
+    qx = np.load(d / "input.npy") if d.exists() else rng.integers(-127, 128, (1, 3, 32, 32))
+    assert np.array_equal(conv_acc_split4(qx, qW, qb), conv_acc(qx, qW, qb))

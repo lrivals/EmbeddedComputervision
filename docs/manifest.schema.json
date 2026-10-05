@@ -137,6 +137,10 @@
         "b_offset": {"$ref": "#/$defs/offset64"},
         "m0_offset": {"$ref": "#/$defs/offset64"},
         "shift": {"type": "integer", "minimum": 1, "maximum": 62},
+        "qmax": {
+          "description": "Saturation de la sortie dans [−qmax, qmax] (défaut 127 ; 2^{b−1} − 1 pour des activations à b bits, T9.3).",
+          "type": "integer", "minimum": 1, "maximum": 127
+        },
         "in_scale": {"$ref": "#/$defs/scale"},
         "out_scale": {"$ref": "#/$defs/scale"},
         "in": {"$ref": "#/$defs/bufref"},

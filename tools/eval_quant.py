@@ -9,7 +9,11 @@
 
 Variantes : `float` (réseau fusionné, float32), `int` (modèle entier, `IntNetwork`, moteur
 f64 bit-exact), `fq:all` (simulation flottante de toutes les couches quantifiées),
-`fq:<id>` (seule la conv <id> quantifiée), `fq:each` (toutes les `fq:<id>`).
+`fq:<id>` (seule la conv <id> quantifiée), `fq:each` (toutes les `fq:<id>`), `int-hwpp`
+(modèle entier + post-traitement matériel tout entier et NMS sans tri, T9.1 ; `--hw-cap`
+emplacements de sélection, débordements comptés). `--model-dir` : évalue un modèle entier
+exporté (manifest + blobs, ex. 4 bits ou puissances de 2, M9.2-M9.3) au lieu de celui de
+`--calib` ; seules les variantes `int` et `int-hwpp` s'appliquent alors.
 Même prétraitement (`--resize` letterbox | stretch, PIL) et même seuil (0,005) que
 `tools/eval_voc.py`. La calibration (T4.2) est faite en letterbox dans les deux cas.
 """
@@ -20,6 +24,7 @@ import multiprocessing as mp
 import os
 import sys
 import time
+from functools import partial
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,16 +51,34 @@ def _init(*args):
         _W["error"] = exc
 
 
-def _setup(name, weights, calib, conf, iou):
+def _setup(name, weights, calib, conf, iou, hw_cap=256, model_dir=None):
     from calibrate import load_fused
 
+    from yolo.io.export import load_model
     from yolo.quant.calibrate import load_scales
     from yolo.quant.int_model import IntNetwork, QuantModel, head_luts
 
-    fused64 = load_fused(name, weights, dtype=np.float64)
-    qm = QuantModel.from_fused(fused64, *load_scales(calib))
-    _W.update(fused=load_fused(name, weights, dtype=np.float32), qm=qm,
-              inet=IntNetwork(qm, "f64"), luts=head_luts(qm), conf=conf, iou=iou)
+    if model_dir:
+        qm, fused = load_model(model_dir)[0], None
+    else:
+        fused64 = load_fused(name, weights, dtype=np.float64)
+        qm = QuantModel.from_fused(fused64, *load_scales(calib))
+        fused = load_fused(name, weights, dtype=np.float32)
+    _W.update(fused=fused, qm=qm,
+              inet=IntNetwork(qm, "f64"), luts=head_luts(qm), conf=conf, iou=iou,
+              hw_cap=hw_cap)
+
+
+class _Memo:
+    """`IntNetwork` dont la passe avant est gardée pour l'image courante."""
+
+    def __init__(self, inet):
+        self.qm, self._inet, self._key, self._out = inet.qm, inet, None, None
+
+    def forward(self, x):
+        if self._key is None or not np.array_equal(self._key, x):
+            self._key, self._out = x, self._inet.forward(x)
+        return self._out
 
 
 def _run(task):
@@ -71,12 +94,20 @@ def _run(task):
         x, wh = preprocess(img, size, mode)
     x = x[None]
     fused, qm, conf, iou = _W["fused"], _W["qm"], _W["conf"], _W["iou"]
+    inet = _Memo(_W["inet"])  # une seule passe entière pour int et int-hwpp
     out = {}
     for v in variants:
         if v == "float":
             dets = detect(fused, x, [wh], mode, conf, iou)
         elif v == "int":
-            dets = detect_int(_W["inet"], _W["luts"], x, [wh], mode, conf, iou)
+            dets = detect_int(inet, _W["luts"], x, [wh], mode, conf, iou)
+        elif v == "int-hwpp":
+            from yolo.infer.hw_postproc import postprocess_hw_counted
+
+            ov = []
+            post = partial(postprocess_hw_counted, cap=_W["hw_cap"], overflow=ov)
+            dets = detect_int(inet, _W["luts"], x, [wh], mode, conf, iou, post=post)
+            out["hwpp:overflow"] = sum(ov)
         else:
             layers = None if v == "fq:all" else [int(v[3:])]
 
@@ -118,14 +149,17 @@ def run(args, samples, variants):
              for s in samples]
     t0 = time.time()
     raw = open(args.save_dets, "w") if args.save_dets else None  # noqa: SIM115
+    overflow = 0
     with ctx.Pool(args.jobs, initializer=_init,
-                  initargs=(args.net, args.weights, args.calib, args.conf, args.iou)) as pool:
+                  initargs=(args.net, args.weights, args.calib, args.conf, args.iou,
+                            args.hw_cap, args.model_dir)) as pool:
         for k, (s, res) in enumerate(zip(samples, pool.imap(_run, tasks, chunksize=2)), 1):
             if raw is not None:
                 boxes, scores, labels = res["int:raw"]
                 raw.write(json.dumps({"image": s["id"], "boxes": boxes, "scores": scores,
                                       "labels": labels}) + "\n")
             res.pop("int:raw", None)
+            overflow += res.pop("hwpp:overflow", 0)
             for v, (labels, scores, px) in res.items():
                 for c, sc, b in zip(labels, scores, px):
                     per[v][c][0].append(s["id"])
@@ -137,6 +171,8 @@ def run(args, samples, variants):
                       flush=True)
     if raw is not None:
         raw.close()
+    if "int-hwpp" in variants:
+        print(f"int-hwpp : {overflow} candidates perdues (sélection pleine, {args.hw_cap})")
     return {v: {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4))
                 for c, d in pc.items()} for v, pc in per.items()}
 
@@ -157,12 +193,18 @@ def main():
     ap.add_argument("--iou", type=float, default=IOU_THR)
     ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--blas-threads", type=int, default=2)
+    ap.add_argument("--model-dir", type=Path, default=None,
+                    help="modèle entier exporté à évaluer (variantes int, int-hwpp)")
+    ap.add_argument("--hw-cap", type=int, default=256,
+                    help="emplacements de sélection de la NMS sans tri (int-hwpp)")
     ap.add_argument("--out", type=Path, default=None, help="table JSON des mAP")
     ap.add_argument("--save-dets", type=Path, default=None,
                     help="détections du modèle entier, une ligne JSON par image (T8.2)")
     args = ap.parse_args()
     if args.save_dets and "int" not in args.variants.split(","):
         ap.error("--save-dets demande la variante int")
+    if args.model_dir and set(args.variants.split(",")) - {"int", "int-hwpp"}:
+        ap.error("--model-dir : variantes int et int-hwpp seulement")
     args.weights = args.weights or ROOT / "weights" / PRETRAINED[args.net]
     args.calib = args.calib or ROOT / "build" / "quant" / args.net / "calib.json"
 

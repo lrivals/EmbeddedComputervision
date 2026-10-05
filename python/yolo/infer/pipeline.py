@@ -72,14 +72,16 @@ def detect(net, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_
     return out
 
 
-def detect_int(inet, luts, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_THR):
+def detect_int(inet, luts, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_THR,
+               post=None):
     """Comme `detect`, avec le modèle entier : `x` float est quantifié en int8 (fait par
     l'hôte), passe avant entière, décodage par tables (§9.4). `luts` : {id de tête: HeadLuts}.
+    `post` remplace `postprocess_int` (même signature), par ex. le post-traitement matériel.
     """
     from yolo.quant.quantize import quantize_input
 
     size = x.shape[-1]
-    dets = postprocess_int(inet.forward(quantize_input(x)), inet.qm.net, luts, conf_thr,
-                           iou_thr)
+    dets = (post or postprocess_int)(inet.forward(quantize_input(x)), inet.qm.net, luts,
+                                     conf_thr, iou_thr)
     return [(to_original(b, w, h, size) if mode == "letterbox" else b, s, lab)
             for (b, s, lab), (w, h) in zip(dets, orig_sizes)]

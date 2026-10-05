@@ -36,11 +36,12 @@ class Trainer:
     """Entraîne `net` (`yolo.models.graph.Network`).
 
     `size` : taille d'entrée fixe, ou `None` pour le multi-échelle (`multiscale_size`).
+    `grad_hook(trainer, grads)` : appelé avant le pas SGD (terme de pénalité de l'ADMM, T9.2).
     Les autres options sont passées à `yolo_loss` (`ignore_thresh`, `lambda_coord`).
     """
 
     def __init__(self, net, optimizer, schedule, size=416, seed=0, log_path=None,
-                 **loss_kwargs):
+                 grad_hook=None, **loss_kwargs):
         self.net = net
         self.optimizer = optimizer
         self.schedule = schedule
@@ -51,6 +52,7 @@ class Trainer:
         region = any(net.layers[h]["type"] == "region" for h, _ in self.head_list)
         self.loss_kwargs = {"class_mode": "softmax" if region else "sigmoid", **loss_kwargs}
         self.log_path = Path(log_path) if log_path else None
+        self.grad_hook = grad_hook
 
     def size_for(self, it):
         return self.size if self.size else multiscale_size(it, self.seed)
@@ -64,6 +66,8 @@ class Trainer:
                         self.net.net["classes"], **self.loss_kwargs)
         _, grads = self.net.backward({h: d / n for h, d in res.douts.items()})
         lr = self.schedule(self.it)
+        if self.grad_hook:
+            self.grad_hook(self, grads)
         self.optimizer.step(grads, lr)
         self._log(lr, images.shape[-1], n, res, time.perf_counter() - t0)
         self.it += 1

@@ -28,7 +28,7 @@ target_include_directories(driver PUBLIC ../sw/driver kernels)
 target_link_libraries(driver PUBLIC golden)
 target_compile_options(driver PRIVATE -Wall -Wextra)
 
-add_library(accel kernels/conv_pe.cpp)
+add_library(accel kernels/conv_pe.cpp kernels/postproc.cpp)
 target_include_directories(accel PUBLIC kernels)
 target_include_directories(accel SYSTEM PUBLIC ${hls_ap_types_SOURCE_DIR}/include)
 target_link_libraries(accel PUBLIC golden)
@@ -43,10 +43,37 @@ target_compile_options(accel PUBLIC -Wno-unknown-pragmas -Wno-maybe-uninitialize
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   get_filename_component(ACC_MODEL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../model" ABSOLUTE)
   include(CTest)
-  foreach(tb tb_conv tb_net)
+  foreach(tb tb_conv tb_net tb_post)
     add_executable(${tb} tb/${tb}.cpp)
     target_link_libraries(${tb} PRIVATE accel driver)
     target_compile_definitions(${tb} PRIVATE ACC_MODEL_DIR="${ACC_MODEL_DIR}")
     add_test(NAME ${tb} COMMAND ${tb})
   endforeach()
+
+  # T9.4.2 : architecture streaming (Tiny-YOLOv2).
+  add_executable(tb_stream tb/tb_stream.cpp stream/yolo_stream.cpp)
+  target_include_directories(tb_stream PRIVATE stream)
+  target_link_libraries(tb_stream PRIVATE golden)
+  target_compile_definitions(tb_stream PRIVATE ACC_MODEL_DIR="${ACC_MODEL_DIR}")
+  target_compile_options(tb_stream PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
+  add_test(NAME tb_stream COMMAND tb_stream --image 000001)
+
+  # T9.2.4 : PE à décalages (REQ-YOLO) sur le modèle à poids puissances de 2
+  # (tools/quant_lowbit.py --weights pow2 → build/m9/models/), testé s'il existe.
+  add_library(accel_pow2 kernels/conv_pe.cpp kernels/postproc.cpp)
+  target_include_directories(accel_pow2 PUBLIC kernels)
+  target_include_directories(accel_pow2 SYSTEM PUBLIC ${hls_ap_types_SOURCE_DIR}/include)
+  target_link_libraries(accel_pow2 PUBLIC golden)
+  target_compile_definitions(accel_pow2 PUBLIC ACC_TM=${ACC_TM} ACC_TN=${ACC_TN}
+                             ACC_TR=${ACC_TR} ACC_TC=${ACC_TC} ACC_WMODE_POW2)
+  target_compile_options(accel_pow2 PUBLIC -Wno-unknown-pragmas -Wno-maybe-uninitialized
+                                           -Wno-uninitialized)
+  add_executable(tb_net_pow2 tb/tb_net.cpp)
+  target_link_libraries(tb_net_pow2 PRIVATE accel_pow2 driver)
+  get_filename_component(ACC_M9_MODELS "${CMAKE_CURRENT_SOURCE_DIR}/../build/m9/models"
+                         ABSOLUTE)
+  if(EXISTS "${ACC_M9_MODELS}/tiny-yolov2-voc-pow2-ptq/manifest.json")
+    add_test(NAME tb_net_pow2 COMMAND tb_net_pow2 --model ${ACC_M9_MODELS}
+             --net tiny-yolov2-voc-pow2-ptq --image 000001)
+  endif()
 endif()

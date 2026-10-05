@@ -74,6 +74,8 @@ if(SW_BACKEND STREQUAL "sim")
   add_test(NAME run_compare_layer13 COMMAND run_compare --net tiny-yolov2-voc --layer 13)
   add_test(NAME run_compare_layer21 COMMAND run_compare --net tiny-yolov3-coco --layer 21)
   add_test(NAME run_compare COMMAND run_compare)
+  # T9.1 : post-traitement par le noyau yolo_post == golden hwpp.
+  add_test(NAME run_compare_hw_post COMMAND run_compare --image 000002 --hw-post)
   add_test(NAME yolo_app_input COMMAND yolo_app --model ${SW_MODEL_DIR}/tiny-yolov2-voc
            --input ${SW_MODEL_DIR}/tiny-yolov2-voc/dumps/000001/input.npy
            --out ${CMAKE_BINARY_DIR}/det_000001.json)

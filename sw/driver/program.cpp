@@ -60,6 +60,7 @@ accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int6
   d.h = p.h;
   d.w = p.w;
   d.shift = p.shift;
+  d.qmax = p.qmax;
   d.leaky = p.leaky;
   d.pool_k = p.pool_k;
   d.pool_s = p.pool_s;

@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "post_regmap.hpp"
+#include "post_table.hpp"
 #include "regmap.hpp"
 
 namespace driver {
@@ -35,7 +37,19 @@ Accelerator::Accelerator(Device& dev, const golden::Model& m)
   const int64_t w_at = align64(prog_.arena_size);
   const int64_t p_at = align64(w_at + int64_t(m.weights.size()));
   const int64_t params_bytes = int64_t(prog_.params.size() * sizeof(int32_t));
-  mem_ = dev_.alloc(size_t(p_at + params_bytes));
+  int64_t end = p_at + params_bytes;
+  if (dev_.has_post()) {
+    for (int id : m.heads()) {
+      const View& v = prog_.views[size_t(id)];
+      if (v.nseg != 1 || v.seg[0].up != 0) throw std::runtime_error("tête non contiguë");
+      head_off_.push_back(v.seg[0].off);
+    }
+    const size_t tab_words = post_table(m, head_off_, 0.25, 0.45).words.size();
+    tab_at_ = align64(end);
+    res_at_ = align64(tab_at_ + int64_t(tab_words * 4));
+    end = res_at_ + 4 * (2 + accel::POST_BOX_WORDS * accel::POST_CAP);
+  }
+  mem_ = dev_.alloc(size_t(end));
   if (mem_.phys % ARENA_ALIGN) throw std::runtime_error("tampon contigu non aligné à 64");
   for (const ConvCall& c : prog_.calls)
     check_bounds(c, prog_.arena_size, int64_t(m.weights.size()), int64_t(prog_.params.size()));
@@ -72,6 +86,40 @@ double Accelerator::run_layer(const ConvCall& c) {
   dev_.wait_done();
   dev_.sync_for_cpu(mem_);
   return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+}
+
+std::vector<hwpp::Box> Accelerator::run_post(double conf, double iou, int* overflow,
+                                             double* seconds) {
+  const auto t0 = std::chrono::steady_clock::now();
+  if (!dev_.has_post()) throw std::runtime_error("yolo_post absent du périphérique");
+  if (conf != post_conf_ || iou != post_iou_) {  // table écrite une fois par réglage
+    const PostTable t = post_table(m_, head_off_, conf, iou);
+    std::memcpy(mem_.virt + tab_at_, t.words.data(), t.words.size() * 4);
+    dev_.sync_for_device(mem_);
+    post_desc_ = t.desc;
+    post_conf_ = conf;
+    post_iou_ = iou;
+  }
+  if (!(dev_.post_read32(post_regmap::CTRL) & post_regmap::AP_IDLE))
+    throw std::runtime_error("yolo_post occupé");
+  auto ptr = [&](uint32_t off, uint64_t phys) {
+    dev_.post_write32(off, uint32_t(phys));
+    dev_.post_write32(off + 4, uint32_t(phys >> 32));
+  };
+  ptr(post_regmap::ACT, mem_.phys);
+  ptr(post_regmap::TAB, mem_.phys + uint64_t(tab_at_));
+  ptr(post_regmap::RES, mem_.phys + uint64_t(res_at_));
+  uint32_t w[post_regmap::D_WORDS];
+  post_regmap::desc_to_words(post_desc_, w);
+  for (int i = 0; i < post_regmap::D_WORDS; ++i)
+    dev_.post_write32(post_regmap::D + 4 * uint32_t(i), w[i]);
+  dev_.post_write32(post_regmap::CTRL, post_regmap::AP_START);
+  dev_.post_wait_done();
+  dev_.sync_for_cpu(mem_);
+  const auto out = post_boxes(reinterpret_cast<const int32_t*>(mem_.virt + res_at_), overflow);
+  if (seconds)
+    *seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+  return out;
 }
 
 void Accelerator::run(const int8_t* input,

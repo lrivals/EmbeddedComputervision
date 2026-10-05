@@ -2,7 +2,10 @@
 //
 //   golden_run run <model_dir> <input.npy> <out_dir>   → Lxx.npy + detections.json
 //   golden_run inspect <model_dir>                     → résumé du modèle relu (T5.1)
+//   golden_run hwpp <model_dir> <conf> <iou> <tête.npy>… → boîtes du post-traitement
+//                                                         matériel (T9.1), une par ligne
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -10,6 +13,7 @@
 
 #include "golden/detections_io.hpp"
 #include "golden/engine.hpp"
+#include "golden/hw_heads.hpp"
 #include "golden/model.hpp"
 #include "golden/npy.hpp"
 
@@ -17,7 +21,8 @@ using namespace golden;
 
 static int usage() {
   std::cerr << "usage : golden_run run <model_dir> <input.npy> <out_dir>\n"
-               "        golden_run inspect <model_dir>\n";
+               "        golden_run inspect <model_dir>\n"
+               "        golden_run hwpp <model_dir> <conf> <iou> <tête.npy>...\n";
   return 2;
 }
 
@@ -81,10 +86,33 @@ static int run(const std::string& dir, const std::string& input, const std::stri
   return 0;
 }
 
+// Têtes (dans l'ordre de `Model::heads`) → boîtes entières du post-traitement matériel.
+static int hwpp_run(const std::string& dir, double conf, double iou, char** files, int n) {
+  const Model m = Model::load(dir);
+  const std::vector<int> ids = m.heads();
+  if (n != int(ids.size())) throw std::runtime_error("une tête .npy par tête du modèle");
+  std::vector<NpyInt8> data;
+  std::vector<hwpp::HeadData> heads;
+  for (int k = 0; k < n; ++k) data.push_back(npy_load_int8(files[k]));
+  for (int k = 0; k < n; ++k) {
+    const Layer& l = m.layers[size_t(ids[size_t(k)])];
+    if (data[size_t(k)].numel() != size_t(l.out_c) * l.out_h * l.out_w)
+      throw std::runtime_error("tête de taille inattendue");
+    heads.push_back(make_hw_head(m, l, data[size_t(k)].data.data(), conf));
+  }
+  int overflow = 0;
+  for (const hwpp::Box& b : hwpp::run(heads, make_hw_params(conf, iou), &overflow))
+    std::printf("box %d %d %d %d %d %d\n", b.x1, b.y1, b.x2, b.y2, b.score, b.cls);
+  std::printf("overflow %d\n", overflow);
+  return 0;
+}
+
 int main(int argc, char** argv) {
   try {
     if (argc == 5 && std::strcmp(argv[1], "run") == 0) return run(argv[2], argv[3], argv[4]);
     if (argc == 3 && std::strcmp(argv[1], "inspect") == 0) return inspect(argv[2]);
+    if (argc >= 6 && std::strcmp(argv[1], "hwpp") == 0)
+      return hwpp_run(argv[2], std::atof(argv[3]), std::atof(argv[4]), argv + 5, argc - 5);
     return usage();
   } catch (const std::exception& ex) {
     std::cerr << "erreur : " << ex.what() << "\n";

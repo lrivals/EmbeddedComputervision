@@ -4,7 +4,8 @@
 // Mémoire : un seul tampon contigu, découpé en [arène | weights.bin | paramètres], chaque
 // partie alignée à 64 octets. L'arène est celle de `driver::build` (tampons du manifest bout
 // à bout), donc le placement contigu de la route est conservé ; les offsets des `LayerDesc`
-// sont des indices relatifs aux trois pointeurs m_axi.
+// sont des indices relatifs aux trois pointeurs m_axi. Si le périphérique a le noyau
+// `yolo_post` (T9.1), deux zones suivent : sa table (tables + descripteurs) et son résultat.
 #pragma once
 
 #include <cstdint>
@@ -12,7 +13,9 @@
 #include <memory>
 
 #include "device.hpp"
+#include "golden/hw_postproc.hpp"
 #include "golden/model.hpp"
+#include "postproc.hpp"
 #include "program.hpp"
 
 namespace driver {
@@ -33,6 +36,10 @@ class Accelerator {
   // Passe avant complète ; `after(call, secondes)` après chaque conv.
   void run(const int8_t* input,
            const std::function<void(const ConvCall&, double)>& after = nullptr);
+  // Post-traitement matériel sur les têtes de l'arène (T9.1) : boîtes de `yolo_post`
+  // (coins Q4, scores Q16). `seconds` : registres + calcul + lecture du résultat.
+  std::vector<hwpp::Box> run_post(double conf, double iou, int* overflow = nullptr,
+                                  double* seconds = nullptr);
 
  private:
   Device& dev_;
@@ -40,6 +47,10 @@ class Accelerator {
   Program prog_;
   Buffer mem_;
   uint64_t w_phys_ = 0, p_phys_ = 0;
+  int64_t tab_at_ = 0, res_at_ = 0;  // octets dans mem_ (yolo_post)
+  double post_conf_ = -1.0, post_iou_ = -1.0;
+  std::vector<int64_t> head_off_;
+  accel::PostDesc post_desc_{};
 };
 
 }  // namespace driver

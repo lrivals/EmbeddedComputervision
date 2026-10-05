@@ -73,6 +73,7 @@ struct ConvParams {
   int cin = 0, cout = 0;
   int h = 0, w = 0;      // entrée
   int shift = 31;        // n de la requantification
+  int qmax = 127;        // saturation de la sortie (T9.3)
   bool leaky = true;
   int pool_k = 0, pool_s = 0;  // maxpool fusionné ; 0 : aucun
 
@@ -99,7 +100,16 @@ inline int32_t requantize(int32_t acc, int32_t m0, int n) {
   return int32_t((int64_t(acc) * m0 + (int64_t(1) << (n - 1))) >> n);
 }
 inline int32_t leaky_int(int32_t y) { return y > 0 ? y : (13 * y + 64) >> 7; }
-inline int8_t clip8(int32_t y) { return int8_t(y < -127 ? -127 : (y > 127 ? 127 : y)); }
+inline int8_t clip_q(int32_t y, int qmax) {
+  return int8_t(y < -qmax ? -qmax : (y > qmax ? qmax : y));
+}
+inline int8_t clip8(int32_t y) { return clip_q(y, 127); }
+
+// T9.3.4 [2024-yan#007.3] : produit d'une entrée 8 bits par deux multiplieurs à entrée 4 bits,
+// x = 16·(x ≫ 4) + (x & 15) ; égal à w·x pour tout (w, x) int8.
+inline int32_t mul_split4(int8_t w, int8_t x) {
+  return 16 * (int32_t(w) * (int32_t(x) >> 4)) + int32_t(w) * (int32_t(x) & 15);
+}
 
 // Tampons sur puce d'une configuration de tuiles (taille == formules du §10.2).
 template <int TM, int TN, int TR, int TC>
@@ -203,7 +213,7 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
             for (int tcc = 0; tcc < tc_n; ++tcc) {
               int32_t y = requantize(b.out_buf[too][trr][tcc] + bias[o], m0[o], p.shift);
               if (p.leaky) y = leaky_int(y);
-              b.out_buf[too][trr][tcc] = clip8(y);
+              b.out_buf[too][trr][tcc] = clip_q(y, p.qmax);
             }
           // Carte avant pooling : lignes et colonnes propres à la tuile (hors recouvrement).
           const int own_r = imin(tr_n, Pr * ps), own_c = imin(tc_n, Pc * ps);

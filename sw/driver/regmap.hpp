@@ -2,7 +2,7 @@
 //
 // Disposition produite par Vitis HLS pour le top de conv_pe.cpp : bloc de contrôle
 // ap_ctrl_hs, puis les 4 pointeurs m_axi (64 bits, `config_interface -m_axi_addr64`, un mot
-// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 26 champs int32, le
+// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 27 champs int32, le
 // champ i au mot i (premier champ = bits de poids faible). À vérifier contre l'en-tête généré
 // `xyolo_conv_hw.h` après `make hls-export` : `make check-regmap` (tools/check_regmap.py).
 #pragma once
@@ -34,7 +34,7 @@ constexpr int D_WORDS = int(sizeof(accel::LayerDesc) / 4);
 constexpr uint32_t END = D + 4 * D_WORDS;  // premier octet après `d`
 constexpr uint32_t SPAN = 0x1000;          // fenêtre AXI-Lite (assign_bd_address, 4 Ko)
 
-static_assert(D_WORDS == 26 && sizeof(accel::LayerDesc) == 4 * 26, "LayerDesc : 26 × int32");
+static_assert(D_WORDS == 27 && sizeof(accel::LayerDesc) == 4 * 27, "LayerDesc : 27 × int32");
 static_assert(std::is_trivially_copyable<accel::LayerDesc>::value, "LayerDesc copiable");
 static_assert(END <= SPAN, "registres hors de la fenêtre");
 

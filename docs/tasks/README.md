@@ -77,8 +77,8 @@ reporter ici l'avancement par jalon.
 | M8 | 3 | 0 (T8.1-T8.3 outillés ; projection C-sim et mAP FPGA en C-sim = entier (55,66, 4 952 images identiques) ; mesures carte en attente) |
 | M9 | 1 (T9.5) | 0 |
 | M9.1 | 3 | 2 (T9.1.3 vérifié en sim ; carte en attente) |
-| M9.2 | 4 | 0 |
-| M9.3 | 5 | 0 |
+| M9.2 | 4 | 3 (T9.2.3 : ADMM non convergé, à reprendre) |
+| M9.3 | 5 | 5 (QAT court : 36,4 de mAP ; synthèse en attente) |
 | M9.4 | 3 | 3 (estimations ; synthèse en attente) |
 | M10 | 13 (+ renvoi T10.12) | 0 |
 | M12 | 11 | 0 |

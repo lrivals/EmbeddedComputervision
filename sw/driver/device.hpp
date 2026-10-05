@@ -35,6 +35,15 @@ class Device {
   // Cohérence : tampons non cachés en `uio` (O_SYNC), rien à faire en `sim`.
   virtual void sync_for_device(const Buffer&) {}
   virtual void sync_for_cpu(const Buffer&) {}
+
+  // Second noyau `yolo_post` (T9.1), dans sa propre fenêtre de registres ; absent par défaut.
+  virtual bool has_post() const { return false; }
+  virtual void post_write32(uint32_t, uint32_t) { no_post(); }
+  virtual uint32_t post_read32(uint32_t) { no_post(); }
+  virtual void post_wait_done() { no_post(); }
+
+ private:
+  [[noreturn]] static void no_post();
 };
 
 struct DeviceOptions {
@@ -46,12 +55,13 @@ struct DeviceOptions {
   std::string uio = "/dev/uio0";       // registres de yolo_conv (nœud generic-uio du dtbo)
   std::string udmabuf = "udmabuf0";    // /dev/<nom>, /sys/class/u-dma-buf/<nom>/phys_addr
   bool irq = true;                     // uio : interruption ; false : sondage d'ap_done
+  std::string uio_post;                // registres de yolo_post (T9.1) ; vide : absent en uio
 };
 
 std::unique_ptr<Device> make_device(const DeviceOptions& o);
 
 #ifdef SW_HAVE_SIM
-std::unique_ptr<Device> make_sim_device();
+std::unique_ptr<Device> make_sim_device();  // yolo_conv et yolo_post
 #endif
 std::unique_ptr<Device> make_uio_device(const DeviceOptions& o);
 
