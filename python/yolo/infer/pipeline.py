@@ -11,7 +11,7 @@ import numpy as np
 
 from yolo.data.letterbox import GRAY, letterbox_image, letterbox_params
 from yolo.infer.decode import to_original
-from yolo.infer.nms import CONF_THR, IOU_THR, postprocess
+from yolo.infer.nms import CONF_THR, IOU_THR, postprocess, postprocess_int
 
 MODES = ("letterbox", "stretch")
 INTERPS = ("pil", "darknet")
@@ -71,3 +71,15 @@ def detect(net, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_
         out.append((to_original(b, w, h, size) if mode == "letterbox" else b, s, lab))
     return out
 
+
+def detect_int(inet, luts, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_THR):
+    """Comme `detect`, avec le modèle entier : `x` float est quantifié en int8 (fait par
+    l'hôte), passe avant entière, décodage par tables (§9.4). `luts` : {id de tête: HeadLuts}.
+    """
+    from yolo.quant.quantize import quantize_input
+
+    size = x.shape[-1]
+    dets = postprocess_int(inet.forward(quantize_input(x)), inet.qm.net, luts, conf_thr,
+                           iou_thr)
+    return [(to_original(b, w, h, size) if mode == "letterbox" else b, s, lab)
+            for (b, s, lab), (w, h) in zip(dets, orig_sizes)]

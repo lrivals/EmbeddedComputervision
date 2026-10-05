@@ -56,7 +56,7 @@ reporter ici l'avancement par jalon.
 | M1 | 9 | 8 |
 | M2 | 9 | 8 |
 | M3 | 4 | 4 |
-| M4 | 7 | 0 |
+| M4 | 7 | 7 (T4.6 sans objet) |
 | M5 | 6 | 0 |
 | M6 | 6 | 0 |
 | M7 | 4 | 0 |

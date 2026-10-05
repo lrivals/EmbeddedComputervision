@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp lint count-macs bench-conv get-weights anchors detect eval-float csim clean
+.PHONY: help test test-py test-slow test-cpp lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -11,6 +11,9 @@ help:
 	@echo "anchors     ancres k-means sur VOC → results/anchors.md (T2.2)"
 	@echo "detect      démo Tiny-YOLOv2 VOC sur une image → build/detect/ (T3.4)"
 	@echo "eval-float  mAP VOC2007 test de Tiny-YOLOv2 VOC, poids Darknet (T3.4)"
+	@echo "calibrate   échelles INT8 sur 500 images VOC trainval → build/quant/ (T4.2)"
+	@echo "eval-int    mAP VOC2007 test du modèle entier et du flottant (T4.5)"
+	@echo "export      modèle entier + dumps → model/<net>/ (T4.7)"
 	@echo "csim        C-simulation HLS (T6.1, nécessite Vitis HLS)"
 
 test: test-py test-cpp
@@ -46,6 +49,17 @@ detect:
 
 eval-float:
 	python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights --resize stretch
+
+QNETS = tiny-yolov2-voc tiny-yolov3-coco
+
+calibrate:
+	for n in $(QNETS); do python tools/calibrate.py --net $$n || exit 1; done
+
+eval-int:
+	python tools/eval_quant.py --net tiny-yolov2-voc --variants float,int --resize stretch
+
+export:
+	for n in $(QNETS); do python tools/export_model.py --net $$n || exit 1; done
 
 csim:
 	cd hls && vitis_hls -f scripts/csim.tcl

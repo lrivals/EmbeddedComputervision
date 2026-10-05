@@ -79,8 +79,10 @@ class Network:
             caches.append(c_act)
         return y, caches
 
-    def forward(self, x, train=True):
-        """Renvoie {id: sortie} des couches `yolo`/`region` (ou de la dernière couche)."""
+    def forward(self, x, train=True, all_outputs=False):
+        """Renvoie {id: sortie} des couches `yolo`/`region` (ou de la dernière couche) ;
+        avec `all_outputs`, la liste des sorties de toutes les couches.
+        """
         outs, caches = [], []
         for i, layer in enumerate(self.layers):
             t = layer["type"]
@@ -100,6 +102,8 @@ class Network:
             outs.append(y)
             caches.append(cache)
         self._caches = caches
+        if all_outputs:
+            return outs
         return {i: outs[i] for i in self.outputs}
 
     # ---------------------------------------------------------------- passe arrière

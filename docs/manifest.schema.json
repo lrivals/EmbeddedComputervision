@@ -26,25 +26,26 @@
       }
     },
     "anchors": {
-      "description": "Ancres en pixels pour une entrée de 416, triées par aire croissante.",
+      "description": "Ancres en pixels pour une entrée de 416, triées par aire croissante ; non entières pour YOLOv2 (1,08 cellule × 32 = 34,56 px).",
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "array",
-        "prefixItems": [{"type": "integer", "minimum": 1}, {"type": "integer", "minimum": 1}],
+        "prefixItems": [{"type": "number", "exclusiveMinimum": 0}, {"type": "number", "exclusiveMinimum": 0}],
         "items": false,
         "minItems": 2
       }
     },
     "blobs": {
-      "description": "Taille en octets de chaque fichier binaire.",
+      "description": "Taille en octets de chaque fichier binaire ; luts.bin (tables du décodage, §9.4) est écrit par l'export réel.",
       "type": "object",
       "required": ["weights.bin", "bias.bin", "requant.bin"],
       "additionalProperties": false,
       "properties": {
         "weights.bin": {"$ref": "#/$defs/size"},
         "bias.bin": {"$ref": "#/$defs/size"},
-        "requant.bin": {"$ref": "#/$defs/size"}
+        "requant.bin": {"$ref": "#/$defs/size"},
+        "luts.bin": {"$ref": "#/$defs/size"}
       }
     },
     "buffers": {
@@ -63,13 +64,22 @@
           {"$ref": "#/$defs/maxpool"},
           {"$ref": "#/$defs/upsample"},
           {"$ref": "#/$defs/route"},
-          {"$ref": "#/$defs/yolo"}
+          {"$ref": "#/$defs/yolo"},
+          {"$ref": "#/$defs/region"}
         ]
       }
     }
   },
   "$defs": {
     "dim": {"type": "integer", "minimum": 1},
+    "exp_frac": {
+      "description": "Bits fractionnaires de la table exponentielle (les deux autres sont en Q16).",
+      "type": "integer", "minimum": 0, "maximum": 16
+    },
+    "lut_offset": {
+      "description": "Offset (octets) dans luts.bin des 3 tables uint32 de 256 entrées de la tête : sigmoïde, exponentielle, exponentielle du softmax (§9.4).",
+      "$ref": "#/$defs/offset64"
+    },
     "size": {"type": "integer", "minimum": 0},
     "id": {"type": "integer", "minimum": 0},
     "scale": {"type": "number", "exclusiveMinimum": 0},
@@ -186,7 +196,25 @@
         "mask": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
         "scale": {"$ref": "#/$defs/scale"},
         "in": {"$ref": "#/$defs/bufref"},
-        "out_shape": {"$ref": "#/$defs/shape"}
+        "out_shape": {"$ref": "#/$defs/shape"},
+        "lut_offset": {"$ref": "#/$defs/lut_offset"},
+        "exp_frac": {"$ref": "#/$defs/exp_frac"}
+      }
+    },
+    "region": {
+      "description": "Sortie YOLOv2 : toutes les ancres (num), classes par softmax (§8.1).",
+      "type": "object",
+      "required": ["id", "type", "num", "scale", "in", "out_shape"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "type": {"const": "region"},
+        "num": {"type": "integer", "minimum": 1},
+        "scale": {"$ref": "#/$defs/scale"},
+        "in": {"$ref": "#/$defs/bufref"},
+        "out_shape": {"$ref": "#/$defs/shape"},
+        "lut_offset": {"$ref": "#/$defs/lut_offset"},
+        "exp_frac": {"$ref": "#/$defs/exp_frac"}
       }
     }
   }

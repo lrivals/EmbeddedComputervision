@@ -39,3 +39,10 @@ def tiny_yolov2_voc(dtype=np.float32, rng=None, **kwargs):
 
 def tiny_yolov3_voc(dtype=np.float32, rng=None, **kwargs):
     return build("tiny-yolov3-voc", dtype=dtype, rng=rng, **kwargs)
+
+
+# Poids Darknet pré-entraînés (`make get-weights`), relatifs à `weights/`.
+PRETRAINED = {
+    "tiny-yolov2-voc": "yolov2-tiny-voc.weights",
+    "tiny-yolov3-coco": "yolov3-tiny.weights",
+}

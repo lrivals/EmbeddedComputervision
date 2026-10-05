@@ -58,3 +58,58 @@ def decode(outputs, net):
 def to_original(boxes, width, height, size):
     """Boîtes de l'image letterbox `size` → normalisées dans l'image d'origine (w × h)."""
     return boxes_from_letterbox(boxes, width, height, size)
+
+
+# ------------------------------------------------------------------ décodage entier (§9.4)
+def decode_head_int(q, anchors, num_classes, mode, luts, obj_thr):
+    """Une image, une tête int8 `q` (A·(5+C), S, S) d'échelle `luts.scale`.
+
+    §9.4 : on garde d'abord les cellules dont l'entier t_o dépasse le logit du seuil (le
+    score σ(t_o)·p_c ≤ σ(t_o) : aucune boîte au-dessus du seuil n'est perdue), puis les
+    tables (Q16) ne servent qu'aux survivantes. Rend `boxes` (K, 4), `obj` (K,),
+    `scores` (K, C) dans l'ordre (ancre, ligne, colonne), comme `decode_head`.
+    """
+    from yolo.quant.lut import ONE, SOFTMAX_OFFSET, logit_threshold_q, lookup
+
+    anchors = np.asarray(anchors, dtype=np.float64).reshape(-1, 2)
+    a = len(anchors)
+    _, s, _ = q.shape
+    p = np.asarray(q, dtype=np.int64).reshape(a, 5 + num_classes, s, s)
+    keep = p[:, 4] >= logit_threshold_q(obj_thr, luts.scale)
+    k, i, j = np.nonzero(keep)
+    t = p[k, :, i, j]  # (K, 5 + C) entiers
+    bx = (lookup(luts.sigmoid, t[:, 0]) / ONE + j) / s
+    by = (lookup(luts.sigmoid, t[:, 1]) / ONE + i) / s
+    bw = anchors[k, 0] * (lookup(luts.exp, t[:, 2]) / 2.0**luts.exp_frac)
+    bh = anchors[k, 1] * (lookup(luts.exp, t[:, 3]) / 2.0**luts.exp_frac)
+    obj = lookup(luts.sigmoid, t[:, 4]) / ONE
+    tc = t[:, 5:]
+    if mode == "v3":
+        cls = lookup(luts.sigmoid, tc) / ONE
+    elif mode == "v2":
+        # Softmax en trois étages : max entier, e^{(q − q_max)s} par table, division.
+        e = lookup(luts.softmax_exp, tc - tc.max(axis=1, keepdims=True), SOFTMAX_OFFSET)
+        cls = e / e.sum(axis=1, keepdims=True, dtype=np.int64)
+    else:
+        raise ValueError(f"mode inconnu : {mode!r}")
+    boxes = np.stack([bx, by, bw, bh], axis=-1).reshape(-1, 4)
+    return boxes, obj, obj[:, None] * cls
+
+
+def decode_int(outputs, net, luts, obj_thr):
+    """Têtes int8 de `net` → par image `(boxes, scores)` des cellules retenues.
+
+    `luts` : {id de tête: HeadLuts}.
+    """
+    anchors = anchors_frac(net["anchors"])
+    n = len(next(iter(outputs.values())))
+    out = []
+    for b in range(n):
+        parts = []
+        for hid, mask in heads(net):
+            mode = "v2" if net["layers"][hid]["type"] == "region" else "v3"
+            boxes, _, scores = decode_head_int(outputs[hid][b], anchors[mask], net["classes"],
+                                               mode, luts[hid], obj_thr)
+            parts.append((boxes, scores))
+        out.append(tuple(np.concatenate(x, axis=0) for x in zip(*parts)))
+    return out

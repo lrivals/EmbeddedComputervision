@@ -65,9 +65,33 @@ Validation : `pytest python/tests/test_manifest.py`.
     sources doivent partager la **même échelle** (contrainte pour la quantification, T4).
   - Upsample : copie ×2 vers `out` (ici le début du tampon de la route 20).
   - `yolo` : `mask` = indices dans `anchors` ; lit la tête à `in`.
-- **Allocation de l'exemple** : ping-pong A/B ; `S` garde la couche 13 (lue par 14 et par
-  la route 17) ; `R` reçoit 19 puis 8 ; `H13`/`H26` reçoivent les têtes. Aucune écriture ne
+- `region` (YOLOv2) : `num` ancres, classes par softmax ; les ancres v2 ne sont pas entières
+  (34,56 px).
+- `luts.bin` (export réel) : pour chaque tête, à `lut_offset`, trois tables uint32 de 256
+  entrées : σ(q·s) en Q16 et e^{q·s} en Q`exp_frac` (≤ 16, pour tenir sur 32 bits)
+  indexées par `q + 128`, puis e^{d·s} en Q16 indexée par `d + 255`,
+  d = q_c − q_max ∈ [−255, 0] (softmax v2), avec s = `scale` de la tête.
+- Export réel : `model/<net>/` (`tools/export_model.py`), dumps `dumps/<id>/input.npy`,
+  `Lxx.npy` (sortie int8 de chaque couche) et `detections.json` pour 3 images de VOC2007 test.
+- **Allocation** (`yolo.io.export.layout`, commune à l'exemple et à l'export) : ping-pong
+  A/B ; `S` garde la couche 13 (lue par 14 et par la route 17) ; `R` reçoit 19 puis 8 ;
+  `H13`/`H26` reçoivent les têtes. Aucune écriture ne
   recouvre un tenseur encore à lire (vérifié par le test).
+
+## Arithmétique entière (contrat Python ↔ C++ ↔ HLS)
+
+Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages **arithmétiques**.
+
+- Entrée : `q = ⌊x·127 + ½⌋` (x ∈ [0, 1], échelle 1/127), fait par l'hôte.
+- Accumulateur : `acc = Σ q_w·q_x + q_b` sur 32 bits signés (int8 × int8, biais int32).
+- Requantification : `y = (acc·M0 + 2ⁿ⁻¹) >> n`, produit sur **64 bits**, `M0 < 2³¹` par
+  canal, `n ≤ 31` par couche (`shift`). Arrondi au plus proche, demis vers +∞
+  (−2,5 → −2, −0,5 → 0).
+- Leaky : `y > 0 ? y : (13·y + 64) >> 7` (pente 13/128, **arrondie** de la même façon ;
+  le plancher `(13·y) >> 7` du §9.3 biaise les négatifs de −½ pas par couche).
+- Saturation : `clip(y, −127, 127)` après la leaky ; −128 n'est jamais produit.
+- Maxpool, upsample, route : exacts (max et copies) ; maxpool stride 1 par réplication.
+- Têtes : `M0`/`shift` comme les autres convs, sans leaky.
 
 ## Tolérances de test
 

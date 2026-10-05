@@ -8,7 +8,7 @@ score et on élimine celles dont l'IoU avec elle dépasse `iou_thr` ; on recomme
 import numpy as np
 
 from yolo.infer.boxes import iou
-from yolo.infer.decode import decode
+from yolo.infer.decode import decode, decode_int
 
 CONF_THR = 0.25
 IOU_THR = 0.45
@@ -59,3 +59,10 @@ def postprocess(outputs, net, conf_thr=CONF_THR, iou_thr=IOU_THR):
     boxes, _, scores = decode(outputs, net)
     return [filter_and_nms(b, s, conf_thr, iou_thr) for b, s in zip(boxes, scores)]
 
+
+def postprocess_int(outputs, net, luts, conf_thr=CONF_THR, iou_thr=IOU_THR):
+    """Têtes int8 → par image `(boxes, scores, labels)` (§9.4 puis §8.2) ; `luts` :
+    {id de tête: HeadLuts}. Le seuil sur t_o reprend `conf_thr` (score ≤ objectness).
+    """
+    return [filter_and_nms(b, s, conf_thr, iou_thr)
+            for b, s in decode_int(outputs, net, luts, conf_thr)]
