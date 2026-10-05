@@ -6,6 +6,8 @@
 // que WORD octets consécutifs tombent dans WORD bancs `too` différents de w_buf. Canaux de
 // sortie complétés par des zéros jusqu'à Tm ; sans TRIM, voies complétées jusqu'à Tn.
 // Voie = canal d'entrée, ou (canal, ligne du noyau) pour une conv pliée (fold).
+// Poids 4 bits (d.wbits = 4, T10.10) : même ordre, deux poids par octet (quartet bas = too
+// pair) ; Tm pair, donc un bloc fait exactement la moitié des octets.
 //
 // C++ simple : partagé par le noyau, le driver ARM et les testbenchs.
 #pragma once
@@ -26,8 +28,12 @@ inline int ti_lanes(const LayerDesc& d, int k) {
   const int rest = lanes(d) - k * TN;
   return TRIM ? (rest < TN ? rest : TN) : TN;
 }
-inline int64_t w_block_bytes(const LayerDesc& d, int n) {
+// Poids d'un bloc de n voies, et ses octets en DDR.
+inline int64_t w_block_elems(const LayerDesc& d, int n) {
   return int64_t(TM) * n * kern_h(d) * d.k;
+}
+inline int64_t w_block_bytes(const LayerDesc& d, int n) {
+  return d.wbits == 4 ? w_block_elems(d, n) / 2 : w_block_elems(d, n);
 }
 // Octets d'un groupe de Tm canaux de sortie (tous ses blocs ti).
 inline int64_t w_per_to(const LayerDesc& d) {
@@ -55,7 +61,13 @@ inline void reorder_weights(const LayerDesc& d, const int8_t* w, std::vector<int
               const int o = im * TM + too, lane = k * TN + tii;
               if (o >= d.cout || lane >= L) continue;
               const int c = d.fold ? lane / K : lane, r = d.fold ? lane % K : i;
-              blk[((i * K + j) * n + tii) * TM + too] = w[((o * d.cin + c) * K + r) * K + j];
+              const int8_t v = w[((o * d.cin + c) * K + r) * K + j];
+              const int64_t e = ((i * K + j) * n + tii) * TM + too;
+              if (d.wbits == 4)  // too pair : quartet bas ; impair : quartet haut
+                blk[e / 2] = int8_t((uint8_t(blk[e / 2]) & (e % 2 ? 0x0F : 0xF0)) |
+                                    ((uint8_t(v) & 0x0F) << (e % 2 ? 4 : 0)));
+              else
+                blk[e] = v;
             }
     }
 }

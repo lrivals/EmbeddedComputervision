@@ -2,7 +2,7 @@
 //
 // Disposition produite par Vitis HLS pour le top de conv_pe.cpp : bloc de contrôle
 // ap_ctrl_hs, puis les 4 pointeurs m_axi (64 bits, `config_interface -m_axi_addr64`, un mot
-// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 30 champs int32, le
+// réservé après chacun), puis `d` agrégé (`#pragma HLS AGGREGATE`) : 31 champs int32, le
 // champ i au mot i (premier champ = bits de poids faible), puis le séquenceur (T10.7) :
 // pointeur `descs` et `n_calls`. À vérifier contre l'en-tête généré `xyolo_conv_hw.h` après
 // `make hls-export` : `make check-regmap` (tools/check_regmap.py) ; les offsets de DESCS et
@@ -26,8 +26,8 @@ constexpr uint32_t ACT_OUT = 0x1c;
 constexpr uint32_t WTS = 0x28;
 constexpr uint32_t PRM = 0x34;
 constexpr uint32_t D = 0x40;
-constexpr uint32_t DESCS = 0xbc;    // table des descripteurs (T10.7)
-constexpr uint32_t N_CALLS = 0xc8;  // 0 : une couche décrite par D
+constexpr uint32_t DESCS = 0xc0;    // table des descripteurs (T10.7)
+constexpr uint32_t N_CALLS = 0xcc;  // 0 : une couche décrite par D
 
 constexpr uint32_t AP_START = 1u << 0;
 constexpr uint32_t AP_DONE = 1u << 1;

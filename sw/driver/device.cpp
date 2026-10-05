@@ -8,6 +8,10 @@ void Device::no_post() {
   throw std::runtime_error("yolo_post absent (--uio-post /dev/uioN en uio)");
 }
 
+void Device::no_stream() {
+  throw std::runtime_error("yolo_stream absent (--uio-stream et --uio-dma en uio)");
+}
+
 std::unique_ptr<Device> make_device(const DeviceOptions& o) {
   if (o.backend == "uio") return make_uio_device(o);
 #ifdef SW_HAVE_SIM

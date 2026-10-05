@@ -141,6 +141,10 @@
           "description": "Saturation de la sortie dans [−qmax, qmax] (défaut 127 ; 2^{b−1} − 1 pour des activations à b bits, T9.3).",
           "type": "integer", "minimum": 1, "maximum": 127
         },
+        "wbits": {
+          "description": "Bits de stockage des poids dans weights.bin (défaut 8). 4 : deux poids par octet, quartet bas = poids d'indice pair dans l'ordre (cout, cin, k, k), valeurs dans [−8, 7] (T10.10).",
+          "enum": [4, 8]
+        },
         "in_scale": {"$ref": "#/$defs/scale"},
         "out_scale": {"$ref": "#/$defs/scale"},
         "in": {"$ref": "#/$defs/bufref"},

@@ -56,8 +56,15 @@ inline std::string net_dir(const Args& a, const std::string& net) {
   return a.model_dir + "/" + net;
 }
 
+// Export absent : le testbench saute le réseau, sauf avec YOLO_REQUIRE_MODEL=1 (CI, T10.13)
+// où il échoue, pour qu'une CI sans export ne soit pas verte à vide.
 inline bool have_model(const Args& a, const std::string& net) {
-  return std::filesystem::exists(net_dir(a, net) + "/manifest.json");
+  if (std::filesystem::exists(net_dir(a, net) + "/manifest.json")) return true;
+  if (std::getenv("YOLO_REQUIRE_MODEL")) {
+    std::fprintf(stderr, "export absent : %s (YOLO_REQUIRE_MODEL)\n", net_dir(a, net).c_str());
+    std::exit(1);
+  }
+  return false;
 }
 
 // Dump Python : layer < 0 → input.npy, sinon Lxx.npy.

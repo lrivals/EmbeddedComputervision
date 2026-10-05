@@ -99,6 +99,8 @@ def test_dumps_close_to_float_postproc(net):
     import json
 
     model_dir, spec, luts, ids = _heads(net)
+    if (model_dir / "SYNTHETIC").exists():
+        pytest.skip("export synthétique (CI) : têtes aléatoires, scores quasi égaux")
     for image in IMAGES:
         outs = {h: np.load(model_dir / "dumps" / image / f"L{h:02d}.npy")[None] for h in ids}
         ref = json.loads((model_dir / "dumps" / image / "detections.json").read_text())

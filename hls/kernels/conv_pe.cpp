@@ -68,23 +68,27 @@ load_in:
   }
 }
 
-// load(w_buf) : bloc contigu de Tm × n × kh × k octets, ordre (i, j, tii, too).
+// load(w_buf) : bloc contigu de Tm × n × kh × k poids, ordre (i, j, tii, too) ; un mot porte
+// WORD poids, ou 2·WORD en 4 bits (T10.10 : quartet bas = poids pair, extension de signe).
 static void load_weights(const word_t* wts, const LayerDesc& d, const TileInfo& t, int kti,
                          int n, w_t w_buf[TM][TN][K_MAX][K_MAX]) {
   const int K = d.k;
-  const int64_t bytes = w_block_bytes(d, n);
+  const bool w4 = d.wbits == 4;
+  const int64_t elems = w_block_elems(d, n), bytes = w_block_bytes(d, n);
   const int64_t w0 = (d.w_off + w_block_off(d, t.to / TM, kti)) / WORD;
 load_w:
   for (int k = 0; k < cdiv(int(bytes), WORD); ++k) {
 #pragma HLS PIPELINE II=1
-#pragma HLS LOOP_TRIPCOUNT min=TM*TN/WORD max=TM*TN*K_MAX*K_MAX/WORD
+#pragma HLS LOOP_TRIPCOUNT min=TM*TN/WORD/2 max=TM*TN*K_MAX*K_MAX/WORD
     const word_t v = wts[w0 + k];
-    for (int b = 0; b < WORD; ++b) {
+    for (int b = 0; b < 2 * WORD; ++b) {
 #pragma HLS UNROLL
-      const int e = k * WORD + b;
-      if (e < bytes) {
+      const int8_t byte = word_byte(v, w4 ? b / 2 : b % WORD);
+      const int nib = (b % 2 ? uint8_t(byte) >> 4 : uint8_t(byte) & 0xF);
+      const int e = w4 ? k * 2 * WORD + b : k * WORD + b;
+      if ((w4 || b < WORD) && e < elems) {
         const int too = e % TM, tii = (e / TM) % n, ij = e / (TM * n);
-        w_buf[too][tii][ij / K][ij % K] = word_byte(v, b);
+        w_buf[too][tii][ij / K][ij % K] = w4 ? w_t(nib >= 8 ? nib - 16 : nib) : w_t(byte);
       }
     }
   }

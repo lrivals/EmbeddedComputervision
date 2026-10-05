@@ -142,6 +142,11 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
   avec 8 jobs, plus l'export). Prévoir moins d'1 h.
 - **Décision** : les couches qui perdent plus de 1 point restent en INT8 dans les plans
   mixtes de T12.4. Le classement alimente aussi T10.10.
+- **Fait (par T10.10)** : grille couche × {uniform4, uniform6, mixed6} mesurée par
+  `tools/mixed_precision.py sens`. Sorties dans `build/m10/mixed/sensitivity.csv` (et non
+  `build/m12/sens/`), tableau dans [precision_mixte](../../results/precision_mixte.md).
+  Plus de 1 point de perte : L00 (les trois schémas), L02 et L04 en 4 bits. Le complément
+  en fake-quant reste à faire.
 
 ### [ ] T12.4 — PTQ basse précision (M9.2, M9.3)
 - **Spec** : §9.2, §9.3 · **Dépend de** : T12.3 · **Taille** : M · **Palier** : M puis N

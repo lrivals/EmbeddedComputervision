@@ -13,6 +13,7 @@ namespace sw {
 //   --backend sim|uio  --uio /dev/uioN  --udmabuf udmabufN  --poll (sans interruption)
 //   --uio-post /dev/uioN (registres de yolo_post, T9.1)
 //   --cached (u-dma-buf caché, synchronisations explicites, T10.6)
+//   --uio-stream /dev/uioN --uio-dma /dev/uioM (yolo_stream et son AXI DMA, T10.9)
 inline bool parse_device_option(int argc, char** argv, int& i, driver::DeviceOptions& o) {
   const std::string k = argv[i];
   if (k == "--poll") {
@@ -27,6 +28,8 @@ inline bool parse_device_option(int argc, char** argv, int& i, driver::DeviceOpt
                      : k == "--uio"   ? &o.uio
                      : k == "--udmabuf" ? &o.udmabuf
                      : k == "--uio-post" ? &o.uio_post
+                     : k == "--uio-stream" ? &o.uio_stream
+                     : k == "--uio-dma" ? &o.uio_dma
                                         : nullptr;
   if (!dst || i + 1 >= argc) return false;
   *dst = argv[++i];

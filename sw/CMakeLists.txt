@@ -32,16 +32,16 @@ FetchContent_Declare(stb GIT_REPOSITORY https://github.com/nothings/stb.git
 FetchContent_MakeAvailable(stb)
 
 set(SW_DRIVER_SOURCES driver/device.cpp driver/uio_device.cpp driver/accel_driver.cpp
-                      postproc/heads.cpp)
+                      driver/stream_driver.cpp postproc/heads.cpp)
 if(SW_BACKEND STREQUAL "sim")
   list(APPEND SW_DRIVER_SOURCES driver/sim_device.cpp)
 endif()
 add_library(sw_driver ${SW_DRIVER_SOURCES})
-target_include_directories(sw_driver PUBLIC driver postproc app)
+target_include_directories(sw_driver PUBLIC driver postproc app ../hls/stream)
 target_link_libraries(sw_driver PUBLIC driver)
 target_compile_options(sw_driver PRIVATE -Wall -Wextra)
 if(SW_BACKEND STREQUAL "sim")
-  target_link_libraries(sw_driver PRIVATE accel)
+  target_link_libraries(sw_driver PRIVATE accel accel_stream)
   target_compile_definitions(sw_driver PUBLIC SW_HAVE_SIM)
 endif()
 
@@ -86,6 +86,13 @@ if(SW_BACKEND STREQUAL "sim")
            -DBENCH=$<TARGET_FILE:yolo_bench> -DMODEL=${SW_MODEL_DIR}/tiny-yolov2-voc
            -DIMAGE=000001 -DWORK=${CMAKE_BINARY_DIR}/bench_test
            -P ${CMAKE_CURRENT_SOURCE_DIR}/app/test_yolo_bench.cmake)
+  # T10.9 : architecture streaming (yolo_stream + AXI DMA émulé) → détections des dumps.
+  foreach(image 000001 000002 000003)
+    add_test(NAME yolo_bench_stream_${image} COMMAND ${CMAKE_COMMAND}
+             -DBENCH=$<TARGET_FILE:yolo_bench> -DMODEL=${SW_MODEL_DIR}/tiny-yolov2-voc
+             -DIMAGE=${image} -DENGINE=stream -DWORK=${CMAKE_BINARY_DIR}/bench_stream_${image}
+             -P ${CMAKE_CURRENT_SOURCE_DIR}/app/test_yolo_bench.cmake)
+  endforeach()
   # T10.5 : --pipeline (deux arènes, deux threads) → mêmes détections qu'en séquentiel.
   find_package(Python3 COMPONENTS Interpreter)
   if(Python3_FOUND)

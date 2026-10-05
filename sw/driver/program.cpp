@@ -93,6 +93,7 @@ accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int6
   d.tr = big ? accel::TILE_POOL : accel::TR;
   d.tc = big ? accel::TILE_POOL : accel::TC;
   d.fold = accel::FOLD && p.k > 1 && p.cin * p.k <= accel::TN;
+  d.wbits = l.wbits;  // T10.10 : poids paquetés par reorder_weights
   return d;
 }
 

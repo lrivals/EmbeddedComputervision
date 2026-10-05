@@ -35,7 +35,15 @@ def _load(task):
         return preprocess(img, size)[0]
 
 
+def net_tag(name):
+    """Nom des dossiers de sortie : le réseau, ou le nom de fichier d'un .cfg (T10.11)."""
+    return name if name in PRETRAINED else Path(name).stem
+
+
 def load_fused(name, weights=None, dtype=np.float32):
+    """`name` : réseau de `PRETRAINED`, ou chemin d'un .cfg avec ses `weights` Darknet."""
+    if weights is None and name not in PRETRAINED:
+        raise ValueError(f"{name} : --weights requis hors des réseaux pré-entraînés")
     net = build(name)
     load_darknet_weights(net, weights or ROOT / "weights" / PRETRAINED[name])
     return fuse_network(net, dtype=dtype)
@@ -102,7 +110,7 @@ def markdown(calib):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--net", default="tiny-yolov2-voc", choices=sorted(PRETRAINED))
+    ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau pré-entraîné, ou chemin d'un .cfg (élagué, T10.11 ; --weights requis)")
     ap.add_argument("--weights", type=Path, default=None)
     ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
     ap.add_argument("--images", type=int, default=500)
@@ -121,12 +129,12 @@ def main():
     stats = collect(fused, paths, workers=args.workers)
     scales, rows, groups = choose_scales(fused, stats, args.choice, head)
     calib = calib_dict(fused, scales, rows, groups, stats.images, args.choice, head)
-    out = args.out or ROOT / "build" / "quant" / args.net / "calib.json"
+    out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / "calib.json"
     save_calib(out, calib)
     text = markdown(calib)
     print(text)
     print(f"échelles : {out}")
-    md = args.markdown or ROOT / "results" / f"calibration_{args.net}.md"
+    md = args.markdown or ROOT / "results" / f"calibration_{net_tag(args.net)}.md"
     md.write_text(f"# Calibration INT8 — {args.net} (T4.2)\n\n" + text)
     print(f"rapport : {md}")
 

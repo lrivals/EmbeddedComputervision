@@ -1,5 +1,7 @@
 # YOLO embarqué de zéro
 
+[![ci](https://github.com/lrivals/EmbeddedComputervision/actions/workflows/ci.yml/badge.svg)](https://github.com/lrivals/EmbeddedComputervision/actions/workflows/ci.yml)
+
 Réécriture à la main de **Tiny-YOLOv2** et **Tiny-YOLOv3** sans bibliothèque d'apprentissage
 (NumPy), puis quantification entière bit-exacte et accélérateur **FPGA en Vitis HLS**.
 
@@ -29,7 +31,8 @@ d'acceptation mesurable.
 - **M9.1 à M9.4** : extensions de recherche (post-traitement matériel, REQ-YOLO, 4 bits,
   streaming).
 - **[M10](docs/tasks/M10-ameliorations.md)** : améliorations d'ingénierie chiffrées par
-  `tools/perf_model.py` (ports m_axi larges, requantification parallèle, pipeline ARM, CI).
+  `tools/perf_model.py` (ports m_axi larges, requantification parallèle, pipeline ARM),
+  streaming synthétisable, précision mixte, élagage, CI (`.github/workflows/ci.yml`).
 - **[M11](docs/tasks/M11-jeux-de-donnees.md)** : jeux de données au-delà de VOC (COCO,
   ExDark, KITTI, VisDrone, CrowdHuman, FLIR), chacun choisi pour éprouver une partie de la
   chaîne.
@@ -69,6 +72,7 @@ make vivado-build fpga-firmware     # bitstream + overlay KV260 (Vivado), puis m
 make perf-model                     # modèle de cycles == C-sim, pistes d'optimisation (M8)
 make m8-inputs m8-int bench-sim map-stades   # mAP flottant / entier / FPGA (C-sim) → results/map_stades.md
 make bench-report                   # results/benchmarks.csv, results/mesures.md (protocole : results/protocole.md)
+make ci-model ci                    # CI (T10.13) : export synthétique, sans VOC ni poids Darknet
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/

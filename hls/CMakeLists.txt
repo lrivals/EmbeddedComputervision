@@ -46,6 +46,12 @@ target_compile_options(accel PRIVATE -Wall -Wextra -Wno-unused-label)
 target_compile_options(accel PUBLIC -Wno-unknown-pragmas -Wno-maybe-uninitialized
                                     -Wno-uninitialized)
 
+# Architecture streaming (T9.4.2) : testbench, et backend sim du driver (T10.9).
+add_library(accel_stream stream/yolo_stream.cpp)
+target_include_directories(accel_stream PUBLIC stream)
+target_link_libraries(accel_stream PUBLIC golden)
+target_compile_options(accel_stream PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
+
 # Testbenchs : seulement en projet principal (sw/ réutilise golden, driver et accel).
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   get_filename_component(ACC_MODEL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../model" ABSOLUTE)
@@ -58,12 +64,35 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   endforeach()
 
   # T9.4.2 : architecture streaming (Tiny-YOLOv2).
-  add_executable(tb_stream tb/tb_stream.cpp stream/yolo_stream.cpp)
-  target_include_directories(tb_stream PRIVATE stream)
-  target_link_libraries(tb_stream PRIVATE golden)
+  add_executable(tb_stream tb/tb_stream.cpp)
+  target_link_libraries(tb_stream PRIVATE accel_stream)
   target_compile_definitions(tb_stream PRIVATE ACC_MODEL_DIR="${ACC_MODEL_DIR}")
   target_compile_options(tb_stream PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
   add_test(NAME tb_stream COMMAND tb_stream --image 000001)
+
+  # T10.8 : mêmes étages, poids sur la puce en ROM générée depuis l'export (gen_stream_rom.py).
+  find_package(Python3 COMPONENTS Interpreter)
+  set(STREAM_ROM_MODEL "${ACC_MODEL_DIR}/tiny-yolov2-voc")
+  if(Python3_FOUND AND EXISTS "${STREAM_ROM_MODEL}/manifest.json")
+    set(STREAM_ROM_DIR "${CMAKE_CURRENT_BINARY_DIR}/stream_rom")
+    add_custom_command(
+      OUTPUT ${STREAM_ROM_DIR}/stream_rom.hpp ${STREAM_ROM_DIR}/stream_rom.cpp
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../tools/gen_stream_rom.py
+              --model ${STREAM_ROM_MODEL} --out ${STREAM_ROM_DIR}
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../tools/gen_stream_rom.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/../tools/stream_model.py
+              ${CMAKE_CURRENT_SOURCE_DIR}/stream/yolo_stream.hpp
+              ${STREAM_ROM_MODEL}/manifest.json ${STREAM_ROM_MODEL}/weights.bin
+      COMMENT "ROM des poids de yolo_stream")
+    add_executable(tb_stream_rom tb/tb_stream.cpp stream/yolo_stream.cpp
+                   ${STREAM_ROM_DIR}/stream_rom.cpp)
+    target_include_directories(tb_stream_rom PRIVATE stream ${STREAM_ROM_DIR})
+    target_link_libraries(tb_stream_rom PRIVATE golden)
+    target_compile_definitions(tb_stream_rom PRIVATE STREAM_ROM
+                               ACC_MODEL_DIR="${ACC_MODEL_DIR}")
+    target_compile_options(tb_stream_rom PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
+    add_test(NAME tb_stream_rom COMMAND tb_stream_rom)
+  endif()
 
   # T9.2.4 : PE à décalages (REQ-YOLO) sur le modèle à poids puissances de 2
   # (tools/quant_lowbit.py --weights pow2 → build/m9/models/), testé s'il existe.
@@ -78,6 +107,13 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   target_link_libraries(tb_net_pow2 PRIVATE accel_pow2 driver)
   get_filename_component(ACC_M9_MODELS "${CMAKE_CURRENT_SOURCE_DIR}/../build/m9/models"
                          ABSOLUTE)
+  # T10.10 : précision mixte retenue (poids 4 bits paquetés), tools/mixed_precision.py full.
+  get_filename_component(ACC_M10_MODELS "${CMAKE_CURRENT_SOURCE_DIR}/../build/m10/models"
+                         ABSOLUTE)
+  if(EXISTS "${ACC_M10_MODELS}/tiny-yolov2-voc-mixed/manifest.json")
+    add_test(NAME tb_net_mixed COMMAND tb_net --model ${ACC_M10_MODELS}
+             --net tiny-yolov2-voc-mixed)
+  endif()
   if(EXISTS "${ACC_M9_MODELS}/tiny-yolov2-voc-pow2-ptq/manifest.json")
     add_test(NAME tb_net_pow2 COMMAND tb_net_pow2 --model ${ACC_M9_MODELS}
              --net tiny-yolov2-voc-pow2-ptq --image 000001)

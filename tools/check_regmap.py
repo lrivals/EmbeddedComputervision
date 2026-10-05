@@ -27,7 +27,7 @@ FIELDS = {
     "DESCS": "DESCS_DATA",
     "N_CALLS": "N_CALLS_DATA",
 }
-D_BITS = 30 * 32
+D_BITS = 31 * 32
 
 
 def regmap_offsets(path=REGMAP):
@@ -73,7 +73,7 @@ def main():
             bad += 1
     bits = gen.get("BITS_D_DATA")
     if bits is not None and bits != D_BITS:
-        print(f"d : {bits} bits au lieu de {D_BITS} (LayerDesc agrégé, 30 × int32)")
+        print(f"d : {bits} bits au lieu de {D_BITS} (LayerDesc agrégé, 31 × int32)")
         bad += 1
     print(f"{hdr} : {'OK' if bad == 0 else f'{bad} écart(s)'}")
     return 1 if bad else 0

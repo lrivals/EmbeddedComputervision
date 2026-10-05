@@ -16,7 +16,7 @@ def test_mixed6_levels():
     assert levels("uniform6").max() == 31
 
 
-@pytest.mark.parametrize("kind", ["mixed6", "pot5", "uniform6"])
+@pytest.mark.parametrize("kind", ["mixed6", "pot5", "uniform6", "uniform4"])
 def test_projection_is_nearest_level(kind):
     m = levels(kind)
     v = np.random.default_rng(0).uniform(-110, 110, 5000)

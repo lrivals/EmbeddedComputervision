@@ -6,7 +6,8 @@ QAT / ADMM, puis export (manifest, blobs, LUT, dumps) lisible par le golden et l
     # après QAT (tools/train.py --qat w4a4) : paramètres du checkpoint
     python tools/quant_lowbit.py --scheme w4a4 --checkpoint build/train/qat-w4a4/checkpoint.npz \\
         --out build/m9/models/tiny-yolov2-voc-w4a4-qat
-    # poids 6 bits « mixed powers-of-two » de REQ-YOLO (T9.2) ; activations INT8 calibrées
+    # poids 6 bits « mixed powers-of-two » de REQ-YOLO (T9.2) ; activations INT8 calibrées ;
+    # plan par couche int8 / uniform6 / mixed6 / uniform4 (paqueté 4 bits, T10.10)
     # (build/quant/<net>/calib.json, comme le modèle INT8 de référence) ; --checkpoint : ADMM
     python tools/quant_lowbit.py --weights pow2 [--weights-plan plan.json] [--checkpoint …]
 
@@ -60,7 +61,7 @@ def pow2_model(net, calib, checkpoint=None, plan_file=None):
     """QuantModel à poids REQ-YOLO (T9.2) et activations INT8 de `calib`."""
     from yolo.quant.calibrate import load_scales
     from yolo.quant.int_model import QuantModel
-    from yolo.quant.pow2 import load_plan, quantize_network_pow2
+    from yolo.quant.pow2 import WBITS, load_plan, quantize_network_pow2
 
     fused = load_fused(net, dtype=np.float64)
     if checkpoint:
@@ -68,6 +69,8 @@ def pow2_model(net, calib, checkpoint=None, plan_file=None):
     plan = load_plan(plan_file, fused.net)
     qm = QuantModel.from_fused(fused, *load_scales(calib),
                                weights=quantize_network_pow2(fused, plan=plan))
+    for i, kind in plan.items():  # uniform4 : paqueté deux par octet (T10.10)
+        qm.convs[i].wbits = WBITS.get(kind, 8)
     return plan, qm
 
 

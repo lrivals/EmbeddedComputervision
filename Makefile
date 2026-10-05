@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -24,6 +24,7 @@ help:
 	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
 	@echo "hls-report  results/hls_report.md (T6.5)"
 	@echo "hls-synth-post / hls-export-post  noyau yolo_post (T9.1, Vitis)"
+	@echo "hls-synth-stream / hls-cosim-stream / hls-export-stream  yolo_stream, poids en ROM (T10.8-T10.9, Vitis)"
 	@echo "check-regmap offsets de sw/driver/regmap.hpp == xyolo_conv_hw.h généré (T7.2)"
 	@echo "vivado-build block design + bitstream + .xsa → build/vivado/$(BOARD)/ (T7.1)"
 	@echo "fpga-firmware yolo.bit.bin + yolo.dtbo pour xmutil (T7.1)"
@@ -35,8 +36,26 @@ help:
 	@echo "bench-sim   stade FPGA en C-sim sur PC, paquets parallèles (T8.2, ~40 min sur 22 threads)"
 	@echo "map-stades  results/map_stades.md : mAP aux trois stades, égalité entier == FPGA"
 	@echo "bench-report results/benchmarks.csv (ce travail) : mesures carte ou projection"
+	@echo "ci-model    export synthétique → model/ (sans poids Darknet ni VOC, T10.13)"
+	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
 
 test: test-py test-cpp
+
+# CI (T10.13, T10.14) : make ci-model ci. Les tests Python passent en dernier, une fois
+# golden_run, tb_stream et cycles_conv.csv construits ; YOLO_REQUIRE_MODEL change en échec
+# tout saut faute d'export.
+ci-model:
+	python tools/make_ci_model.py
+
+ci: export YOLO_REQUIRE_MODEL = 1
+ci:
+	$(MAKE) lint
+	$(MAKE) test-cpp
+	$(MAKE) golden-check
+	$(MAKE) csim-gcc
+	$(MAKE) perf-model
+	$(MAKE) sw-sim
+	$(MAKE) test-py
 
 test-py:
 	cd python && python -m pytest -q
@@ -124,6 +143,18 @@ hls-synth-post:
 hls-export-post:
 	cd hls && vitis_hls -f scripts/export_post.tcl -tclargs $(BOARD)
 
+stream-rom:
+	python tools/gen_stream_rom.py --board $(BOARD) --out build/hls/stream_rom
+
+hls-synth-stream: stream-rom
+	cd hls && vitis_hls -f scripts/synth_stream.tcl -tclargs $(BOARD)
+
+hls-cosim-stream: stream-rom
+	cd hls && vitis_hls -f scripts/cosim_stream.tcl -tclargs $(BOARD)
+
+hls-export-stream: stream-rom
+	cd hls && vitis_hls -f scripts/export_stream.tcl -tclargs $(BOARD)
+
 hls-report:
 	python tools/hls_report.py --board $(BOARD)
 
@@ -132,12 +163,14 @@ check-regmap:
 
 VIVADO_JOBS ?= 8
 
+ENGINE ?= conv
+
 vivado-build: check-regmap
 	vivado -mode batch -nojournal -log build/vivado-$(BOARD).log \
-	  -source hw/boards/$(BOARD)/build.tcl -tclargs $(VIVADO_JOBS)
+	  -source hw/boards/$(BOARD)/build.tcl -tclargs $(VIVADO_JOBS) $(ENGINE)
 
 fpga-firmware:
-	hw/boards/$(BOARD)/firmware.sh
+	ENGINE=$(ENGINE) hw/boards/$(BOARD)/firmware.sh
 
 sw-sim:
 	cmake -S sw -B build/sw -DSW_BACKEND=sim

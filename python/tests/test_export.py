@@ -93,3 +93,32 @@ def test_real_export_dumps_replay(d):
         for i, o in enumerate(outs):
             ref = np.load(dd / f"L{i:02d}.npy")
             assert ref.dtype == np.int8 and np.array_equal(o, ref), i
+
+
+def test_pack4_roundtrip():
+    from yolo.io.export import pack4, unpack4, weight_bytes
+
+    q = np.random.default_rng(0).integers(-8, 8, 37)
+    b = pack4(q)
+    assert b.dtype == np.int8 and len(b) == weight_bytes(37, 4) == 19
+    assert np.array_equal(unpack4(b, 37), q)
+    # quartet bas = poids d'indice pair
+    assert pack4(np.array([1, -1])).view(np.uint8)[0] == 0xF1
+    with pytest.raises(ValueError):
+        pack4(np.array([8]))
+
+
+def test_export_wbits4_roundtrip(tmp_path):
+    qm, qx = _qm("tiny-yolov2-voc", np.random.default_rng(0))
+    i = sorted(qm.convs)[1]
+    c = qm.convs[i]
+    c.qW = np.clip(c.qW, -7, 7).astype(np.int8)
+    c.wbits = 4
+    m = export_model(qm, tmp_path)
+    e = next(e for e in m["layers"] if e["id"] == i)
+    assert e["wbits"] == 4
+    jsonschema.Draft202012Validator(SCHEMA).validate(m)
+    back, _ = load_model(tmp_path)
+    assert back.convs[i].wbits == 4 and np.array_equal(back.convs[i].qW, c.qW)
+    a, b = IntNetwork(qm).forward(qx), IntNetwork(back).forward(qx)
+    assert all(np.array_equal(a[k], b[k]) for k in a)

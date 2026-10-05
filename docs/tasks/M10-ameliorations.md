@@ -188,12 +188,67 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
 - **Acceptation** : synthèse : DSP, LUT, BRAM/URAM et fréquence atteinte, comparés au plan
   de T9.4.1 (968 DSP, 32,1 img/s) ; co-sim du DATAFLOW sans interblocage
 - **Notes** : les boucles PE × SIMD déroulées de 256 sont un risque de timing.
+- **Fait** :
+  - **ROM** : `tools/gen_stream_rom.py` écrit `stream_rom.{hpp,cpp}` depuis l'export, pour
+    les 7 étages que le plan garde sur la puce (1,62 Mo). Rangement
+    `[og][ig][i][j][pe·SIMD + s]` : un mot de PE·SIMD octets par cycle, avec
+    `ARRAY_RESHAPE cyclic` (`STREAM_ROM_PRAGMAS`). Le script refuse un plan différent des
+    tables de `yolo_stream.hpp`.
+  - **PE extérieur** pour L12 et L13 (étages FRAME) :
+    - les poids d'un groupe (PE × C_in × K² octets) sont lus une fois en DDR dans un tampon
+      local, puis toute la carte est balayée ;
+    - L12 passe à L13 canal par canal (CHW), sans carte de sortie ;
+    - L13 garde sa carte de sortie et l'émet en HWC pour L14.
+  - **Modèle** (`stream_model`) :
+    - il compte désormais la carte de sortie et les FIFO ;
+    - l'allocation part de « tout sur la puce » et bascule en DDR les plus gros poids ;
+    - même plan (32,1 img/s, L12 et L13 en DDR), mémoire sur puce 1,94 → 2,15 Mo sur 2,31.
+  - **FIFO** : une ligne de sortie du producteur (`stream_model.fifo_depths`), dans la table
+    `FIFO_DEPTH` et les `#pragma HLS STREAM`. Chaîne linéaire : la profondeur règle le débit,
+    pas l'interblocage. Le shim mesure son occupation maximale (informative en C-sim
+    séquentielle).
+  - Les arguments de template viennent des tables `STAGE_PE`, `STAGE_SIMD`, `STAGE_FRAME` et
+    `STAGE_OUT_CHW`.
+  - Scripts Vitis `synth_stream.tcl`, `cosim_stream.tcl` et `export_stream.tcl`, avec
+    `make hls-synth-stream | hls-cosim-stream | hls-export-stream`.
+  - **Vérification** :
+    - `tb_stream` (pointeurs) et `tb_stream_rom` (ROM) : chaque étage == dumps à l'octet sur
+      3 images, cycles inchangés == modèle ;
+    - `test_stream_model.py` : FIFO, pragmas et tables == modèle.
+- **Reste** :
+  - synthèse (DSP, LUT, BRAM/URAM, fréquence) et co-sim du DATAFLOW (Vitis absent) ;
+  - vérifier que Vitis accepte la ROM de 1,2 Mo de L10 en `ARRAY_RESHAPE` (sinon, découpage
+    par groupe og).
 
 ### [ ] T10.9 — Intégration du streaming
 - **Spec** : §10.5 étape 5 · **Dépend de** : T10.8, T7.1 · **Taille** : L
 - **Livrables** : AXI-Stream ↔ DMA dans le block design, backend du driver, `yolo_bench`
 - **Acceptation** : sortie == golden sur la carte ; débit et latence mesurés face à
   [streaming.md](../../results/streaming.md)
+- **Fait** :
+  - ports `in` et `out` en AXI-Stream d'un octet avec TLAST sur la dernière valeur de la tête
+    (`hls::axis` en synthèse, structure équivalente en C-sim). `tb_stream` vérifie un seul
+    TLAST.
+  - `StreamDesc` dans `hls/stream/stream_desc.hpp`, partagé avec le driver. Bibliothèque
+    `accel_stream`.
+  - Driver :
+    - `stream_regmap.hpp` (offsets de `yolo_stream` et AXI DMA PG021 en mode direct) ;
+    - `Device` (`stream_*`, `dma_*`, `dma_wait_done`) ;
+    - `StreamAccelerator` (entrée HWC, ap_start, S2MM puis MM2S, attente de la fin du S2MM,
+      tête HWC → CHW).
+  - Backend sim : DMA émulé par ses registres (RS, LENGTH, IOC, TLAST, longueur reçue).
+  - Backend uio : fenêtres `--uio-stream` et `--uio-dma`, `--uio none` sans `yolo_conv`.
+    Compile (`make sw-board`).
+  - `yolo_bench --engine stream` (pipeline compris). `sw::detect` sur une tête en mémoire.
+  - Ctests `yolo_bench_stream_00000{1,2,3}` : détections == dumps. En `--pipeline`, mêmes
+    détections qu'en séquentiel.
+  - Block design : `build.tcl -tclargs <jobs> stream` (`make vivado-build ENGINE=stream`),
+    `yolo_stream` + AXI DMA 8 bits ; overlay `pl_stream.dtsi` (`ENGINE=stream make
+    fpga-firmware`). Écrits, Tcl syntaxiquement complet, **non exécutés** (Vivado absent).
+- **Reste** :
+  - export de l'IP, block design et bitstream ;
+  - offsets réels des registres et noms des ports AXIS (`in_r`, `out_r`) ;
+  - sortie == golden, débit et latence sur la carte.
 
 ## D. Modèle et quantification
 
@@ -204,6 +259,33 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   2 × 4 bits en mémoire (exclu de T9.3.1)
 - **Acceptation** : front de Pareto mAP / (DSP, octets de poids) face à INT8 et au tout
   4 bits ; golden et C-sim à l'octet pour la configuration retenue
+- **Fait** :
+  - type `uniform4` (±7) dans `pow2.KINDS`, poids paquetés deux par octet (quartet bas =
+    indice pair) :
+    - champ `wbits` du manifest et du schéma ;
+    - `export.pack4` / `unpack4` ;
+    - golden C++ : dépaquetage au chargement ;
+    - driver : `reorder_weights` paquette les blocs de tuiles ;
+    - noyau : mot `wbits` de `LayerDesc` (31 mots, regmap décalé), chargeur de `w_buf` à
+      2·WORD poids par mot ;
+    - `perf_model` : poids 4 bits à demi-octet.
+  - `stream_model.plan` accepte des bits par couche.
+  - `tools/mixed_precision.py` : sensibilité (27 évaluations sur 500 images), front glouton
+    (perte / bits gagnés) et mAP complète de la configuration retenue.
+  - **Résultats** ([precision_mixte](../../results/precision_mixte.md)) :
+    - les trois premières convs sont sensibles ; la queue (98 % des poids) perd moins de
+      0,3 point en 4 bits ;
+    - retenue : L10, L12 et L13 en 4 bits, L02 et L08 en 6 bits ;
+    - **54,68** de mAP contre 55,69 en INT8 projeté (−1,01) ; poids 15,86 → 8,19 Mo ;
+    - streaming : **64,2 img/s** (L13 en 4 bits lève le goulot), contre 43,19 pour le tout
+      4 bits en PTQ.
+  - Golden == C-sim == dumps à l'octet sur 3 images : ctest conditionnel `tb_net_mixed`
+    (`build/m10/models/tiny-yolov2-voc-mixed`).
+  - Les cycles du moteur unique sont inchangés (calcul limitant).
+- **Reste** :
+  - QAT par couche (`qat_from_steps` global) pour repasser sous 1 point ;
+  - 2 MAC 4 bits par DSP dans le noyau ;
+  - synthèse du chargeur paqueté.
 
 ### [ ] T10.11 — Élagage de canaux
 - **Spec** : §10.4 · **Dépend de** : T9.3.3 · **Taille** : L
@@ -214,11 +296,37 @@ Avant d'engager une piste, la classer par gain / effort avec les profils PC de
   ne soit plus faussée par l'élagage
 - **Notes** : quand cout n'est pas multiple de Tm, la perte de tuilage peut annuler le gain.
   Il faut élaguer par multiples de Tm (32) et Tn (24).
+- **Fait** :
+  - `python/yolo/prune.py` (testé) :
+    - norme L1 du filtre après fusion de la BN ;
+    - filtres gardés au multiple de Tm = 32 (Tn = 24 n'est pas tenu : ppcm 96 trop
+      grossier) ;
+    - convs élagables : chaîne conv → (maxpool) → conv ; `--layers` pour n'en élaguer
+      qu'une partie.
+  - `tools/prune.py` écrit un `.cfg` et un `.weights` réduits.
+  - `calibrate.py`, `export_model.py` et `eval_quant.py` acceptent un `.cfg` (`--net`
+    chemin, `--weights`).
+  - `perf_model.py --manifest` donne les cycles du noyau actuel pour un export quelconque.
+  - `tools/prune_study.sh` (palier M) : élagage, mAP sans affinage, affinage de 300
+    itérations, calibration, mAP sur 500 images, export, cycles.
+  - **Résultats** ([elagage](../../results/elagage.md)) :
+    - 30 / 50 / 70 % : 44,6 / 60,5 / 82,5 img/s projetés (contre 26,9) ;
+    - mais mAP 11,9 / 8,0 / 1,6 après affinage, contre 57,8 sur ces 500 images ;
+    - 300 itérations ne suffisent pas à récupérer l'élagage ;
+    - l'efficacité MAC chute (61 → 36 %) : tuiles moins remplies.
+  - Export r30 : golden == C-sim == dumps à l'octet, cycles C-sim == modèle.
+- **Reste** :
+  - affinage long (palier N) et mAP complète ;
+  - élagage guidé par la sensibilité ou progressif ;
+  - comparaison avec 2026-fata à mAP égale.
 
 ### T10.12 — Poids propres (renvoi)
 Ce n'est pas une nouvelle tâche : voir [T2.9](M2-cibles-perte-entrainement.md) (affinage
 sur VOC). Elle devient nécessaire si T10.11 ou un autre jeu de données exige de
 s'affranchir des poids Darknet.
+
+T10.11 la rend nécessaire : l'élagage ne se récupère pas avec un affinage court (voir
+[elagage](../../results/elagage.md)), et l'affinage long passe par la boucle d'entraînement de T2.9.
 
 ## E. Vérification et outillage
 
@@ -230,6 +338,29 @@ s'affranchir des poids Darknet.
   échouer
 - **Notes** : rien qui demande Vitis, la carte ou VOC complet. Les poids et dumps
   nécessaires sont mis en cache, ou réduits à un sous-ensemble versionné.
+- **Fait** :
+  - `.github/workflows/ci.yml` (ubuntu, Python 3.11) : `make ci-model ci`.
+  - **Export synthétique** au lieu de poids versionnés : `tools/make_ci_model.py`.
+    - Poids He et BN aléatoires à graine fixe, calibration sur 8 images synthétiques,
+      export et dumps de 3 entrées nommées 000001 à 000003 (≈ 20 s, ni VOC ni `.weights`).
+    - Mêmes formes que les vrais réseaux : golden == C-sim à l'octet et cycles == modèle
+      gardent tout leur sens.
+    - Le script échoue si une couche ne sort que des zéros.
+  - `make ci` enchaîne `lint`, `test-cpp`, `golden-check`, `csim-gcc`, `perf-model`,
+    `sw-sim` et `test-py`. Pytest passe en dernier, une fois les binaires construits.
+  - **Garde anti-saut** `YOLO_REQUIRE_MODEL=1` : un export absent fait échouer les
+    testbenchs HLS et sw (`tb_common.hpp`), Catch2 (`REQUIRE_MODEL`) et pytest
+    (`conftest.py`), au lieu de les sauter. Les sauts liés aux poids Darknet ou à VOC restent
+    permis.
+  - Ajout de `pyyaml` à l'extra `dev`, pour `tools/roofline.py`.
+  - Vérifié dans une copie propre (sans `model/`, `data/` ni `weights/`) :
+    - tout est vert (pytest : 298 passés ; 7 sautés pour poids Darknet, VOC, ou export
+      synthétique) ;
+    - un octet modifié dans un dump fait échouer `golden-check`.
+  - Seul test sauté sur l'export synthétique (témoin `SYNTHETIC`) : l'écart post-traitement
+    matériel / flottant de `test_hw_postproc`. Il compare l'ordre des détections, et des
+    têtes aléatoires ont trop de scores quasi égaux.
+- **Reste** : première exécution sur GitHub (pousser `main`).
 
 ### [ ] T10.14 — Non-régression des cycles
 - **Spec** : §10.4 · **Dépend de** : T10.13 · **Taille** : S
@@ -237,6 +368,9 @@ s'affranchir des poids Darknet.
   `build/hls/cycles_conv.csv`) ajouté à la CI
 - **Acceptation** : la CI échoue si le modèle de cycles et les compteurs C-sim divergent.
   Cette vérification garde fiables les gains annoncés par T10.1-T10.4.
+- **Fait** : `perf-model` (`hls-cycles`, puis `perf_model.py --check`) dans `make ci`.
+  Vérifié : un cycle modifié dans `cycles_conv.csv` (L06 de v2) donne « 1 écarts » et le
+  code 1. Le modèle lit aussi le champ `wbits` du manifest (poids 4 bits, T10.10).
 
 ## F. Pistes de recherche (renvois)
 

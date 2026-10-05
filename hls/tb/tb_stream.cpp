@@ -1,5 +1,6 @@
-// Testbench de l'architecture streaming (T9.4.2) : sortie de chaque étage et tête de
-// `yolo_stream` == dumps Python (== golden) ; cycles par étage (itérations PE × SIMD).
+// Testbench de l'architecture streaming (T9.4.2, T10.8) : sortie de chaque étage et tête de
+// `yolo_stream` == dumps Python (== golden) ; cycles par étage (itérations PE × SIMD) ; tête
+// AXI-Stream avec un seul TLAST. Compilé avec et sans STREAM_ROM (tb_stream_rom).
 //
 //   tb_stream [--model DIR] [--image ID]…   (Tiny-YOLOv2 VOC seulement)
 #include <cstdio>
@@ -33,11 +34,22 @@ int main(int argc, char** argv) {
   for (const std::string& image : a.images) {
     const NpyInt8 x = tb::dump(a, net, image, -1);
     const int C = m.in_c, H = m.in_h, W = m.in_w;
-    hls::stream<int8_t> in, out;
+    hls::stream<axis_byte> in, out;
     for (int r = 0; r < H; ++r)  // CHW → HWC
       for (int c = 0; c < W; ++c)
-        for (int ch = 0; ch < C; ++ch) in.write(x.data[(size_t(ch) * H + r) * W + c]);
+        for (int ch = 0; ch < C; ++ch) in.write({x.data[(size_t(ch) * H + r) * W + c], false});
     yolo_stream(in, out, m.weights.data(), m.bias.data(), m.m0.data(), d);
+    // Tête en AXI-Stream : TLAST sur la dernière valeur seulement, == tap de l'étage 8.
+    std::vector<int8_t> head;
+    size_t n_last = 0;
+    while (!out.empty()) {
+      const axis_byte v = out.read();
+      head.push_back(v.data);
+      n_last += v.last;
+    }
+    const bool axis_ok = head == stream::stream_taps[stream::N_STAGES - 1] && n_last == 1 &&
+                         head.size() == size_t(stream::OUT_VALUES);
+    if (!axis_ok) std::printf("  ÉCART sortie AXI-Stream (valeurs ou TLAST)\n");
     size_t nd_img = 0;
     uint64_t ii = 0;
     for (int k = 0; k < stream::N_STAGES; ++k) {
@@ -47,8 +59,8 @@ int main(int argc, char** argv) {
       const NpyInt8 want = tb::dump(a, net, image, id);
       const std::vector<int8_t>& got = stream::stream_taps[k];
       const int oc = l.out_c, oh = l.out_h, ow = l.out_w;
-      std::vector<int8_t> chw(got.size());
-      if (got.size() == size_t(oc) * oh * ow)
+      std::vector<int8_t> chw(got);  // STAGE_OUT_CHW : déjà en CHW
+      if (!stream::STAGE_OUT_CHW[k] && got.size() == size_t(oc) * oh * ow)
         for (int r = 0; r < oh; ++r)
           for (int c = 0; c < ow; ++c)
             for (int ch = 0; ch < oc; ++ch)
@@ -69,6 +81,7 @@ int main(int argc, char** argv) {
                   stream::STAGE_SIMD[k], (unsigned long long)cyc, nd ? "ÉCHEC" : "OK");
       stream::stream_cycles[k] = stream::StageCycles{};
     }
+    nd_img += axis_ok ? 0 : 1;
     std::printf("%s : %s, II = %llu cycles (étage le plus lent)\n", image.c_str(),
                 nd_img ? "ÉCHEC" : "OK", (unsigned long long)ii);
     total += nd_img;

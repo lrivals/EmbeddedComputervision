@@ -60,3 +60,30 @@ def test_csim_cycles_equal_model():
            re.findall(r"PE (\d+) × SIMD (\d+), (\d+) cycles, OK", out)]
     p = plan(conv_layers(man), BOARD)
     assert got == [(s["pe"], s["simd"], s["cycles"]) for s in p["stages"]]
+
+
+def test_fifo_depths_and_rom_tables_match_model():
+    """T10.8 : profondeurs des FIFO (table et `#pragma HLS STREAM`) et étages FRAME de
+    hls/stream/yolo_stream.* == stream_model ; ROM rangée [og][ig][i][j][pe·SIMD + s]."""
+    import re
+
+    import numpy as np
+
+    from gen_stream_rom import check_plan, hpp_table, rom_layout
+    from perf_model import conv_layers
+    from stream_model import fifo_depths
+
+    man = ROOT / "model" / "tiny-yolov2-voc" / "manifest.json"
+    if not man.exists():
+        pytest.skip("export absent")
+    layers = conv_layers(man)
+    depths = fifo_depths(layers)
+    assert hpp_table("FIFO_DEPTH") == depths
+    cpp = (ROOT / "hls" / "stream" / "yolo_stream.cpp").read_text()
+    pragmas = dict(re.findall(r"STREAM variable=(s\d) depth=(\d+)", cpp))
+    assert [int(pragmas[f"s{k}"]) for k in range(len(depths))] == depths
+    p = plan(layers, BOARD)
+    assert check_plan(p) == [0, 1, 2, 3, 4, 5, 8]
+    W = np.arange(4 * 6 * 3 * 3).reshape(4, 6, 3, 3)
+    r = rom_layout(W, 2, 3).reshape(2, 2, 3, 3, 2, 3)  # [og][ig][i][j][pe][s]
+    assert r[1, 1, 2, 0, 1, 2] == W[1 * 2 + 1, 1 * 3 + 2, 2, 0]

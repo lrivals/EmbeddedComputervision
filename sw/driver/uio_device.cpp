@@ -11,6 +11,9 @@
 // - Interruption UIO : écrire 1 dans le fd la démasque, `read` bloque jusqu'à la suivante ;
 //   l'ISR du noyau HLS est acquittée par écriture de 1.
 // - `yolo_post` (T9.1, option `uio_post`) : second nœud UIO, même protocole.
+// - Streaming (T10.9, options `uio_stream` et `uio_dma`) : `yolo_stream` (même protocole) et
+//   son AXI DMA, dont l'interruption S2MM (fin de la tête) est acquittée dans S2MM_DMASR.
+//   Bitstream sans `yolo_conv` : `--uio none`. Non vérifié sur la carte.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -25,6 +28,7 @@
 #include "device.hpp"
 #include "post_regmap.hpp"
 #include "regmap.hpp"
+#include "stream_regmap.hpp"
 
 namespace driver {
 namespace {
@@ -90,17 +94,77 @@ struct UioRegs {
   }
 };
 
+// Fenêtre de l'AXI DMA (PG021) : interruption de fin du S2MM.
+struct UioDma {
+  int fd = -1;
+  volatile uint32_t* regs = nullptr;
+  bool irq = true;
+
+  void open(const std::string& path, bool use_irq) {
+    using namespace dma_regmap;
+    irq = use_irq;
+    fd = ::open(path.c_str(), O_RDWR | O_SYNC);
+    if (fd < 0) throw sys_error("ouverture de " + path);
+    void* p = ::mmap(nullptr, SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (p == MAP_FAILED) throw sys_error("mmap des registres du DMA");
+    regs = static_cast<volatile uint32_t*>(p);
+    regs[MM2S_DMACR / 4] = CR_RESET;  // remet les deux canaux à zéro
+    while (regs[MM2S_DMACR / 4] & CR_RESET) {
+    }
+  }
+
+  void close() {
+    if (regs) ::munmap(const_cast<uint32_t*>(regs), dma_regmap::SPAN);
+    if (fd >= 0) ::close(fd);
+    regs = nullptr;
+    fd = -1;
+  }
+
+  void wait_done() {
+    using namespace dma_regmap;
+    if (irq) {
+      uint32_t count = 0;
+      if (::read(fd, &count, sizeof count) != ssize_t(sizeof count))
+        throw sys_error("attente de l'interruption du DMA");
+    } else {
+      while (!(regs[S2MM_DMASR / 4] & (SR_IOC_IRQ | SR_ERR))) {
+      }
+    }
+    const uint32_t sr = regs[S2MM_DMASR / 4];
+    regs[S2MM_DMASR / 4] = SR_IOC_IRQ | SR_ERR_IRQ;
+    regs[MM2S_DMASR / 4] = SR_IOC_IRQ | SR_ERR_IRQ;
+    unmask();
+    if (sr & SR_ERR) throw std::runtime_error("DMA : erreur S2MM (DMASR)");
+  }
+
+  void unmask() {
+    if (!irq || fd < 0) return;
+    const uint32_t one = 1;
+    if (::write(fd, &one, sizeof one) != ssize_t(sizeof one))
+      throw sys_error("démasquage de l'interruption du DMA");
+  }
+};
+
 class UioDevice : public Device {
  public:
   explicit UioDevice(const DeviceOptions& o)
       : irq_(o.irq), cached_(o.cached), udmabuf_(o.udmabuf) {
-    conv_.open(o.uio, "yolo_conv", irq_);
+    if (o.uio != "none") conv_.open(o.uio, "yolo_conv", irq_);
     if (!o.uio_post.empty()) post_.open(o.uio_post, "yolo_post", irq_);
+    if (o.uio_stream.empty() != o.uio_dma.empty())
+      throw std::runtime_error("streaming : --uio-stream et --uio-dma vont ensemble");
+    if (!o.uio_stream.empty()) {
+      // Pas d'interruption sur yolo_stream : la fin de la tête est celle du S2MM.
+      stream_.open(o.uio_stream, "yolo_stream", false);
+      dma_.open(o.uio_dma, irq_);
+    }
   }
 
   ~UioDevice() override {
     if (buf_.virt) ::munmap(buf_.virt, buf_.size);
     if (dma_fd_ >= 0) ::close(dma_fd_);
+    dma_.close();
+    stream_.close();
     post_.close();
     conv_.close();
   }
@@ -134,9 +198,9 @@ class UioDevice : public Device {
     sync(b, off, len, 2, "sync_for_cpu");
   }
 
-  void write32(uint32_t off, uint32_t v) override { conv_.regs[off / 4] = v; }
-  uint32_t read32(uint32_t off) override { return conv_.regs[off / 4]; }
-  void wait_done() override { conv_.wait_done(); }
+  void write32(uint32_t off, uint32_t v) override { conv().regs[off / 4] = v; }
+  uint32_t read32(uint32_t off) override { return conv().regs[off / 4]; }
+  void wait_done() override { conv().wait_done(); }
 
   bool has_post() const override { return post_.regs != nullptr; }
   void post_write32(uint32_t off, uint32_t v) override {
@@ -152,12 +216,40 @@ class UioDevice : public Device {
     post_.wait_done();
   }
 
+  bool has_stream() const override { return stream_.regs != nullptr; }
+  void stream_write32(uint32_t off, uint32_t v) override {
+    if (!has_stream()) Device::stream_write32(off, v);
+    stream_.regs[off / 4] = v;
+  }
+  uint32_t stream_read32(uint32_t off) override {
+    if (!has_stream()) return Device::stream_read32(off);
+    return stream_.regs[off / 4];
+  }
+  void dma_write32(uint32_t off, uint32_t v) override {
+    if (!has_stream()) Device::dma_write32(off, v);
+    dma_.regs[off / 4] = v;
+  }
+  uint32_t dma_read32(uint32_t off) override {
+    if (!has_stream()) return Device::dma_read32(off);
+    return dma_.regs[off / 4];
+  }
+  void dma_wait_done() override {
+    if (!has_stream()) Device::dma_wait_done();
+    dma_.wait_done();
+  }
+
   void unmask() {
-    conv_.unmask();
+    if (conv_.regs) conv_.unmask();
     if (has_post()) post_.unmask();
+    if (has_stream()) dma_.unmask();
   }
 
  private:
+  UioRegs& conv() {
+    if (!conv_.regs) throw std::runtime_error("yolo_conv absent (--uio none)");
+    return conv_;
+  }
+
   // direction : 1 vers le noyau (vidage), 2 vers l'ARM (invalidation).
   void sync(const Buffer& b, size_t off, size_t len, int direction, const char* what) {
     if (!cached_ || len == 0) return;
@@ -181,7 +273,8 @@ class UioDevice : public Device {
   std::mutex sync_mutex_;
   std::string udmabuf_;
   int dma_fd_ = -1;
-  UioRegs conv_, post_;
+  UioRegs conv_, post_, stream_;
+  UioDma dma_;
   Buffer buf_;
 };
 

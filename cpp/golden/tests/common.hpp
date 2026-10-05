@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -42,5 +43,9 @@ inline golden::NpyInt8 dump(const std::string& net, const std::string& image, in
 
 }  // namespace testing
 
-#define REQUIRE_MODEL(net) \
-  if (!testing::have_model(net)) SKIP("export absent : make export (T4.7)")
+// YOLO_REQUIRE_MODEL=1 (CI, T10.13) : un export absent est un échec, pas un saut.
+#define REQUIRE_MODEL(net)                                          \
+  if (!testing::have_model(net)) {                                  \
+    if (std::getenv("YOLO_REQUIRE_MODEL")) FAIL("export absent");   \
+    SKIP("export absent : make export (T4.7)");                     \
+  }

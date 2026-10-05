@@ -33,6 +33,7 @@ struct LayerDesc {
   int32_t qmax;            // saturation de la sortie (127 ; 2^{b−1} − 1 à b bits, T9.3)
   int32_t tr, tc;          // tuile de sortie (avant pooling) de cette couche (T10.4)
   int32_t fold;            // 0 / 1 : voies = (canal, ligne du noyau), conv 1 × k (T10.4)
+  int32_t wbits;           // 8, ou 4 : poids paquetés deux par octet (T10.10)
 
   bool pooled() const { return pool_k > 0; }
   int pk() const { return pooled() ? pool_k : 1; }
@@ -44,8 +45,8 @@ struct LayerDesc {
   int pool_w() const { return ps() == 1 ? out_w() : (out_w() - pk()) / ps() + 1; }
 };
 
-constexpr int D_WORDS = 30;
-static_assert(sizeof(LayerDesc) == 4 * D_WORDS, "LayerDesc : 30 × int32");
+constexpr int D_WORDS = 31;
+static_assert(sizeof(LayerDesc) == 4 * D_WORDS, "LayerDesc : 31 × int32");
 
 // Descripteur lu en DDR par le séquenceur (T10.7) : champ i au mot i, comme les registres.
 inline LayerDesc desc_from_words(const int32_t w[D_WORDS]) {
@@ -80,6 +81,7 @@ inline LayerDesc desc_from_words(const int32_t w[D_WORDS]) {
   d.tr = w[27];
   d.tc = w[28];
   d.fold = w[29];
+  d.wbits = w[30];
   return d;
 }
 

@@ -87,7 +87,7 @@ seul appel enchaîne toutes les convs à partir d'une table de descripteurs en D
 | Fichier | Rôle |
 |---|---|
 | `hls/kernels/accel_config.hpp` | configuration de compilation : tuiles, octets par mot des ports, trim, requant ×RQ, pliage, tuile des convs poolées — lue aussi par le driver et `tools/perf_model.py` |
-| `hls/kernels/layer_desc.hpp` | registres s_axilite (`LayerDesc`, 30 mots) : forme, 2 segments d'entrée `{offset, c, h, w, up}`, offsets de sortie et de paramètres, tuile et pliage de la couche — C++ simple, partagé avec le driver |
+| `hls/kernels/layer_desc.hpp` | registres s_axilite (`LayerDesc`, 31 mots) : forme, 2 segments d'entrée `{offset, c, h, w, up}`, offsets de sortie et de paramètres, tuile et pliage de la couche — C++ simple, partagé avec le driver |
 | `hls/kernels/weight_layout.hpp` | poids dans l'ordre des tuiles : un bloc contigu par (to, ti), réordonné une fois par le driver (T10.1) |
 | `hls/kernels/conv_pe.cpp` | top, séquenceur, chargeurs en mots de 64 bits ligne par ligne, PE Tm × Tn (`PIPELINE II=1`), ping-pong `in_buf`/`w_buf` sur ti et `out_buf` sur les tuiles |
 | `hls/kernels/output_stage.hpp` | biais + requantification (8 canaux par cycle) + leaky + saturation, maxpool 2×2 s2/s1, carte avant pooling, écritures en mots |
@@ -105,6 +105,29 @@ A/B soient réécrits). C-sim avec g++ (`make csim-gcc`, en-têtes `ap_int` open
 Vitis (`make csim`) ; synthèse, co-sim, export : `make hls-synth | hls-cosim | hls-export`,
 rapport `make hls-report` → `results/hls_report.md`.
 
+### Architecture streaming (M9.4, T10.8, T10.9)
+
+Seconde famille du §10.1, à côté du moteur unique : `yolo_stream` (hls/stream/) enchaîne un
+étage matériel par conv de Tiny-YOLOv2 sous DATAFLOW, repliements PE × SIMD du plan de
+`tools/stream_model.py` (KV260). Les poids des étages sur la puce sont une ROM générée
+depuis l'export (`tools/gen_stream_rom.py`, `-DSTREAM_ROM`) ; L12 et L13 gardent leur carte
+d'entrée et lisent leurs poids en DDR une fois par image (ordre PE extérieur, L12 → L13 en
+CHW). Entrée et tête en AXI-Stream d'un octet (TLAST), apportées par un AXI DMA en mode
+direct.
+
+| Fichier | Rôle |
+|---|---|
+| `hls/stream/conv_stage.hpp` | étage conv : line buffer ou carte entière (FRAME, PE extérieur), poids en ROM `[og][ig][i][j][pe·SIMD + s]` ou par pointeur, maxpool fusionné en flux |
+| `hls/stream/yolo_stream.hpp` | tables des étages (PE, SIMD, FRAME, CHW, profondeurs des FIFO == `stream_model.fifo_depths`) |
+| `hls/stream/stream_desc.hpp` | registres `StreamDesc` (45 mots), partagés avec le driver |
+| `sw/driver/stream_driver.hpp` | `StreamAccelerator` : entrée HWC, ap_start, S2MM puis MM2S, attente de la fin du S2MM, tête HWC → CHW |
+| `sw/driver/stream_regmap.hpp` | offsets de `yolo_stream` (à vérifier contre l'en-tête Vitis) et de l'AXI DMA (PG021) |
+
+Vérification : `tb_stream` et `tb_stream_rom` (chaque étage == dumps, cycles == modèle, un
+seul TLAST), `yolo_bench --engine stream` en backend sim (DMA émulé, détections == dumps).
+Synthèse : `make hls-synth-stream | hls-cosim-stream | hls-export-stream`, block design
+`make vivado-build ENGINE=stream` (overlay `pl_stream.dtsi`), non exécutés (Vitis absent).
+
 ### Intégration SoC (M7)
 
 Pile sur la KV260 : Ubuntu Kria, overlay chargé par `xmutil loadapp yolo`, registres du
@@ -121,13 +144,13 @@ DDR ◄─ HP0_FPD ◄─ gmem_in, gmem_out ────────────
 |---|---|
 | `hw/boards/kv260/build.tcl` | block design, bitstream, `.xsa`, rapports ; échoue si le timing n'est pas tenu (`make vivado-build`) |
 | `hw/boards/kv260/pl.dtsi`, `firmware.sh` | overlay (UIO + IRQ, u-dma-buf 32 Mo, horloge) et paquet `xmutil` (`make fpga-firmware`) |
-| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 30 mots (`qmax` en T9.3, `tr`, `tc`, `fold` en T10.4), puis `DESCS` et `N_CALLS` (séquenceur, T10.7) ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
+| `sw/driver/regmap.hpp` | offsets s_axilite ; `LayerDesc` agrégé = 31 mots (`qmax` en T9.3, `tr`, `tc`, `fold` en T10.4, `wbits` en T10.10), puis `DESCS` et `N_CALLS` (séquenceur, T10.7) ; contrôlés contre l'en-tête Vitis (`make check-regmap`) |
 | `sw/driver/device.hpp` | accès matériel : `uio` (carte ; `--cached` : u-dma-buf caché et synchronisations par plage, T10.6) ou `sim` (PC : registres émulés → noyau C-sim) |
 | `sw/driver/accel_driver.hpp` | `Accelerator` : un tampon contigu [arène(s) \| poids \| paramètres \| descripteurs], bornes de chaque `LayerDesc` vérifiées ; une conv par `run_layer`, ou toute la passe par `run_all` (une IRQ) ; deux arènes pour le pipeline inter-images (T10.5) |
 | `sw/postproc/heads.hpp` | têtes lues en place dans l'arène → `postproc.hpp` (décodage + NMS sur l'ARM) |
 | `sw/app/run_compare.cpp` | chaque couche en DDR == dump, puis détections == `detections.json` ; `--layer N` : une conv isolée |
 | `sw/app/yolo_app.cpp` | démo image → boîtes, temps prétraitement / accélérateur / post-traitement ; `--pipeline` |
-| `sw/app/yolo_bench.cpp` | mesures par étage (pre, load, acc, post, temps ARM) sur une suite d'images ; `--pipeline` : deux threads, deux arènes |
+| `sw/app/yolo_bench.cpp` | mesures par étage (pre, load, acc, post, temps ARM) sur une suite d'images ; `--pipeline` : deux threads, deux arènes ; `--engine stream` : architecture streaming (T10.9) |
 
 Le backend `sim` passe par le même chemin que la carte (encodage des registres, adresses
 physiques, ap_start / ap_done) : `make sw-sim` valide tout sauf le matériel lui-même.
@@ -138,7 +161,10 @@ Procédure carte : [hw/boards/kv260/README.md](../hw/boards/kv260/README.md).
 | Fichier | Rôle |
 |---|---|
 | `sw/app/yolo_bench.cpp` | suite d'images (`--images` JPEG ou `--inputs` int8) : temps par étage et par image (pre, load, acc, post), moyenne et p99, détections JSONL au seuil de la mAP, puissance INA260 du SOM (`--power`) |
-| `tools/perf_model.py` | modèle de cycles du noyau, égal aux compteurs C-sim (`make perf-model`) ; scénarios d'optimisation chiffrés |
+| `tools/perf_model.py` | modèle de cycles du noyau, égal aux compteurs C-sim (`make perf-model`) ; scénarios d'optimisation chiffrés ; `--manifest` : cycles d'un export quelconque (élagué, précision mixte) |
+| `tools/mixed_precision.py` | précision mixte par couche (T10.10) : sensibilité, front glouton, mAP complète de la configuration retenue → `results/precision_mixte.md` |
+| `tools/prune.py`, `tools/prune_study.sh` | élagage structuré par norme de filtre (T10.11), puis affinage, calibration, mAP et cycles par taux → `results/elagage.md` |
+| `tools/make_ci_model.py` | export synthétique de `model/` pour la CI (T10.13), sans VOC ni poids Darknet |
 | `tools/make_inputs.py` | entrées int8 de VOC2007 test (prétraitement du modèle entier), lues par la carte à la place des JPEG |
 | `tools/bench_sim.sh` | stade FPGA en C-sim sur PC : paquets distribués aux cœurs, reprise (`make bench-sim`) |
 | `tools/map_stades.py` | mAP flottant / entier / FPGA, égalité image par image → `results/map_stades.md` |

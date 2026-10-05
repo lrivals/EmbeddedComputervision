@@ -4,6 +4,7 @@
 //   yolo_bench --model DIR (--inputs inputs.bin --ids ids.txt | --images liste.txt)
 //              [--start 0] [--count N] [--warmup 5] [--conf 0.005] [--iou 0.45]
 //              [--times temps.csv] [--dets det.jsonl] [--hw-post] [--pipeline]
+//              [--engine conv|stream]
 //              [--power /sys/class/hwmon/hwmonN/power1_input] [--idle-s 5]
 //              [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll] [--cached]
 //
@@ -21,6 +22,8 @@
 // --pipeline (T10.5) : deux arènes, deux threads ; pre + load de l'image i + 1 recouvrent
 // acc + post de l'image i. Le débit tend vers l'inverse du plus lent des deux étages au lieu
 // de leur somme ; détections identiques au mode séquentiel.
+// --engine stream (T10.9) : architecture streaming `yolo_stream` + AXI DMA (Tiny-YOLOv2) au
+// lieu du moteur unique ; acc = transfert MM2S → noyau → S2MM de la tête ; post sur l'ARM.
 // --power : µW lus dans hwmon (INA260 du SOM KV260) toutes les 10 ms, au repos pendant
 // --idle-s secondes puis pendant la boucle mesurée.
 #include <algorithm>
@@ -30,6 +33,7 @@
 #include <condition_variable>
 #include <deque>
 #include <exception>
+#include <memory>
 #include <mutex>
 #include <cstdio>
 #include <cstdlib>
@@ -39,6 +43,7 @@
 #include <vector>
 
 #include "accel_driver.hpp"
+#include "stream_driver.hpp"
 #include "golden/detections_io.hpp"
 #include "golden/model.hpp"
 #include "golden/npy.hpp"
@@ -56,7 +61,7 @@ int usage() {
                "usage : yolo_bench --model DIR (--inputs x.bin --ids ids.txt | --images l.txt)\n"
                "                   [--start 0] [--count N] [--warmup 5] [--conf 0.005]\n"
                "                   [--iou 0.45] [--times t.csv] [--dets d.jsonl] [--hw-post]\n"
-               "                   [--pipeline]\n"
+               "                   [--pipeline] [--engine conv|stream]\n"
                "                   [--power .../power1_input] [--idle-s 5]\n"
                "                   [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] "
                "[--poll] [--cached]\n");
@@ -132,6 +137,7 @@ double quantile(std::vector<double> v, double q) {
 int main(int argc, char** argv) {
   driver::DeviceOptions dopt;
   std::string model_dir, inputs, ids_path, images, times_path, dets_path, power_path;
+  std::string engine = "conv";
   double conf = 0.005, iou = 0.45, idle_s = 5.0;
   long start = 0, count = -1;
   int warmup = 5;
@@ -158,15 +164,25 @@ int main(int argc, char** argv) {
     else if (k == "--dets") dets_path = v;
     else if (k == "--power") power_path = v;
     else if (k == "--idle-s") idle_s = std::atof(v.c_str());
+    else if (k == "--engine") engine = v;
     else return usage();
   }
   if (model_dir.empty() || inputs.empty() == images.empty()) return usage();
   if (!inputs.empty() && ids_path.empty()) return usage();
+  if (engine != "conv" && engine != "stream") return usage();
+  if (engine == "stream" && hw_post) {
+    std::fprintf(stderr, "--hw-post : moteur conv seulement\n");
+    return 2;
+  }
 
   try {
     const golden::Model m = golden::Model::load(model_dir);
     const auto dev = driver::make_device(dopt);
-    driver::Accelerator acc(*dev, m, pipeline ? 2 : 1);
+    const int n_slots = pipeline ? 2 : 1;
+    std::unique_ptr<driver::Accelerator> acc_p;
+    std::unique_ptr<driver::StreamAccelerator> sacc;
+    if (engine == "stream") sacc = std::make_unique<driver::StreamAccelerator>(*dev, m, n_slots);
+    else acc_p = std::make_unique<driver::Accelerator>(*dev, m, n_slots);
     const size_t in_bytes = size_t(m.in_c) * m.in_h * m.in_w;
     if (!images.empty() && (m.in_h != m.in_w || m.in_c != 3))
       throw std::runtime_error("entrée carrée RGB attendue");
@@ -214,13 +230,20 @@ int main(int argc, char** argv) {
       stbi_image_free(rgb);
       return stem(list[size_t(k)]);
     };
+    // Moteur : unique (séquenceur, T10.7) ou streaming (T10.9).
+    auto load = [&](int slot) {
+      if (sacc) sacc->load_input(x.data(), slot);
+      else acc_p->load_input(x.data(), slot);
+    };
+    auto run_acc = [&](int slot) { return sacc ? sacc->run(slot) : acc_p->run_all(slot); };
     auto forward = [&]() {
-      acc.load_input(x.data());
-      return acc.run_all();
+      load(0);
+      return run_acc(0);
     };
     auto detect = [&](int slot) {
-      return hw_post ? sw::hw_detections(acc.run_post(conf, iou, nullptr, nullptr, slot))
-                     : sw::detect(m, acc.program(), acc.arena(slot), conf, iou);
+      if (sacc) return sw::detect(m, {sacc->head().data()}, conf, iou);
+      return hw_post ? sw::hw_detections(acc_p->run_post(conf, iou, nullptr, nullptr, slot))
+                     : sw::detect(m, acc_p->program(), acc_p->arena(slot), conf, iou);
     };
 
     std::FILE* times = nullptr;
@@ -235,8 +258,8 @@ int main(int argc, char** argv) {
       if (!dets) throw std::runtime_error("impossible d'écrire " + dets_path);
     }
 
-    std::printf("%s (%s%s) : images [%ld, %ld) de %s\n", m.network.c_str(), dev->name(),
-                pipeline ? ", pipeline" : "", start, end,
+    std::printf("%s (%s, %s%s) : images [%ld, %ld) de %s\n", m.network.c_str(), dev->name(),
+                engine.c_str(), pipeline ? ", pipeline" : "", start, end,
                 inputs.empty() ? images.c_str() : inputs.c_str());
     for (int w = 0; w < warmup && start < end; ++w) {  // caches, pages du u-dma-buf, IRQ
       fetch(start);
@@ -256,7 +279,7 @@ int main(int argc, char** argv) {
     // Étage 2 (thread principal) : accélérateur + post-traitement sur l'arène `slot`.
     auto finish = [&](long k, const std::string& id, int slot, double pre, double load) {
       const double cpu0 = sw::thread_cpu_seconds();
-      const double a = acc.run_all(slot);
+      const double a = run_acc(slot);
       auto t0 = std::chrono::steady_clock::now();
       const auto d = detect(slot);
       const double post = sw::seconds_since(t0);
@@ -292,7 +315,7 @@ int main(int argc, char** argv) {
       auto t0 = std::chrono::steady_clock::now();
       Ready r{k, fetch(k), slot, sw::seconds_since(t0), 0.0};
       t0 = std::chrono::steady_clock::now();
-      acc.load_input(x.data(), slot);
+      load(slot);
       r.load = sw::seconds_since(t0);
       return r;
     };

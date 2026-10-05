@@ -56,7 +56,8 @@ constexpr int IR = TRB + K_MAX - 1;  // S = 1 : S·Tr + K − S
 constexpr int IC = TCB + K_MAX - 1;
 
 static_assert(WORD == 1 || WORD == 2 || WORD == 4 || WORD == 8, "mot de 1, 2, 4 ou 8 octets");
-static_assert(TM % WORD == 0, "blocs de poids alignés sur un mot : Tm multiple de WORD");
+static_assert(TM % (2 * WORD) == 0,
+              "blocs de poids alignés sur un mot, y compris paquetés en 4 bits : Tm multiple de 2·WORD");
 static_assert(RQ >= 1 && TM % RQ == 0, "Tm multiple de RQ");
 static_assert(TILE_POOL == 0 || TILE_POOL % 2 == 0, "tuile poolée paire (maxpool stride 2)");
 

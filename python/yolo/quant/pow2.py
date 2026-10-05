@@ -12,6 +12,8 @@
   tient dans l'int8 du moteur : le golden et le noyau HLS restent bit-exacts sans
   modification.
 - `pot5` : puissances de 2 seules, α·{0, ±2^0, …, ±2^6} (4 bits utiles + signe).
+- `uniform4` : entiers ±7, poids de 4 bits paquetés par deux dans `weights.bin` (précision
+  mixte par couche, T10.10).
 
 α = s_w,f par **canal de sortie** : pris sur les poids fusionnés (BN comprise), la structure
 survit à la fusion (α'_f = s_f·α_f, §9.1). Pour chaque canal, α est cherché sur une grille
@@ -24,12 +26,16 @@ import json
 
 import numpy as np
 
-KINDS = ("uniform6", "mixed6", "pot5", "int8")
+KINDS = ("uniform4", "uniform6", "mixed6", "pot5", "int8")
+# Bits de stockage des poids dans weights.bin (8 par défaut) : uniform4 est paqueté.
+WBITS = {"uniform4": 4}
 SCALE_STEPS = 32
 
 
 def levels(kind):
     """Magnitudes entières autorisées (croissantes, 0 compris)."""
+    if kind == "uniform4":
+        return np.arange(0, 8, dtype=np.int64)
     if kind == "uniform6":
         return np.arange(0, 32, dtype=np.int64)
     if kind == "int8":

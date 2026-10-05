@@ -46,8 +46,18 @@ class Device {
   virtual uint32_t post_read32(uint32_t) { no_post(); }
   virtual void post_wait_done() { no_post(); }
 
+  // Streaming (T10.9) : noyau `yolo_stream` et AXI DMA, chacun dans sa fenêtre de registres
+  // (stream_regmap.hpp) ; absents par défaut. `dma_wait_done` : fin du S2MM (tête reçue).
+  virtual bool has_stream() const { return false; }
+  virtual void stream_write32(uint32_t, uint32_t) { no_stream(); }
+  virtual uint32_t stream_read32(uint32_t) { no_stream(); }
+  virtual void dma_write32(uint32_t, uint32_t) { no_stream(); }
+  virtual uint32_t dma_read32(uint32_t) { no_stream(); }
+  virtual void dma_wait_done() { no_stream(); }
+
  private:
   [[noreturn]] static void no_post();
+  [[noreturn]] static void no_stream();
 };
 
 struct DeviceOptions {
@@ -61,12 +71,14 @@ struct DeviceOptions {
   bool irq = true;                     // uio : interruption ; false : sondage d'ap_done
   bool cached = false;                 // uio : u-dma-buf caché + sync explicites (T10.6)
   std::string uio_post;                // registres de yolo_post (T9.1) ; vide : absent en uio
+  std::string uio_stream;              // registres de yolo_stream (T10.9) ; vide : absent
+  std::string uio_dma;                 // registres de l'AXI DMA du streaming (T10.9)
 };
 
 std::unique_ptr<Device> make_device(const DeviceOptions& o);
 
 #ifdef SW_HAVE_SIM
-std::unique_ptr<Device> make_sim_device();  // yolo_conv et yolo_post
+std::unique_ptr<Device> make_sim_device();  // yolo_conv, yolo_post, yolo_stream + AXI DMA
 #endif
 std::unique_ptr<Device> make_uio_device(const DeviceOptions& o);
 

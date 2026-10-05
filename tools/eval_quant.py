@@ -179,7 +179,7 @@ def run(args, samples, variants):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--net", default="tiny-yolov2-voc", choices=sorted(PRETRAINED))
+    ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau pré-entraîné, ou chemin d'un .cfg (élagué, T10.11 ; --weights requis)")
     ap.add_argument("--weights", type=Path, default=None)
     ap.add_argument("--calib", type=Path, default=None,
                     help="échelles (défaut build/quant/<net>/calib.json)")
@@ -205,8 +205,11 @@ def main():
         ap.error("--save-dets demande la variante int")
     if args.model_dir and set(args.variants.split(",")) - {"int", "int-hwpp"}:
         ap.error("--model-dir : variantes int et int-hwpp seulement")
-    args.weights = args.weights or ROOT / "weights" / PRETRAINED[args.net]
-    args.calib = args.calib or ROOT / "build" / "quant" / args.net / "calib.json"
+    from calibrate import net_tag
+
+    if args.weights is None and args.net in PRETRAINED:
+        args.weights = ROOT / "weights" / PRETRAINED[args.net]
+    args.calib = args.calib or ROOT / "build" / "quant" / net_tag(args.net) / "calib.json"
 
     year, split = args.split.split(":")
     samples = load_split(args.devkit, int(year), split)
@@ -220,7 +223,7 @@ def main():
         aps, m = evaluate(dets[v], samples, len(VOC_CLASSES), use_07=True)
         res[v] = {"map": m, "aps": list(aps)}
         print(f"{v:8s} mAP {m * 100:.2f}")
-    out = args.out or ROOT / "build" / "quant" / args.net / (
+    out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / (
         f"eval_{split}_{len(samples)}_{args.resize}_"
         f"{'-'.join(v.replace(':', '') for v in variants)}.json")
     out.parent.mkdir(parents=True, exist_ok=True)

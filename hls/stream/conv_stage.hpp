@@ -5,9 +5,14 @@
 //   circulaires de W·C_in mots (les K − 1 lignes du §10.2 et la ligne en cours d'arrivée) ;
 //   la ligne de sortie r est calculée dès que la ligne d'entrée r + pad est arrivée.
 // - Mode `FRAME` (poids en DDR, hybride de tools/stream_model.py) : toute la carte d'entrée
-//   est gardée sur la puce. En matériel, la boucle des groupes PE passe à l'extérieur pour
-//   ne lire chaque poids qu'une fois par image ; la C-sim garde l'ordre du line buffer (le
-//   résultat et le nombre d'itérations ne dépendent pas de l'ordre).
+//   est gardée sur la puce et la boucle des groupes PE est à l'extérieur (T10.8) : les poids
+//   d'un groupe (PE × C_in × K² octets) sont lus une fois en DDR dans un tampon local, puis
+//   toute la carte est balayée ; chaque poids est donc lu une fois par image. Sortie : canal
+//   par canal (CHW, `OUT_CHW`, PE = 1) vers un étage FRAME suivant, qui la range telle quelle
+//   (`IN_CHW`), ou carte de sortie émise en HWC après le dernier groupe.
+// - Poids des étages sur la puce : ROM générée par tools/gen_stream_rom.py (T10.8), rangée
+//   [og][ig][i][j][pe·SIMD + s] pour qu'un mot de PE·SIMD octets soit lu par cycle ; sans ROM
+//   (C-sim de référence), lecture directe de weights.bin (C_out, C_in, K, K).
 // - Repliement PE × SIMD : PE canaux de sortie et SIMD canaux d'entrée par cycle ; une
 //   « itération » = (pixel, groupe PE, groupe SIMD, position du noyau). Les cycles C-sim
 //   comptent ces itérations (II = 1) : égaux à `stage_cycles` du modèle.
@@ -24,7 +29,7 @@
 namespace stream {
 
 struct StageParams {
-  const int8_t* w = nullptr;      // (C_out, C_in, K, K)
+  const int8_t* w = nullptr;      // (C_out, C_in, K, K) dans weights.bin (DDR)
   const int32_t* bias = nullptr;  // C_out
   const int32_t* m0 = nullptr;    // C_out
   int shift = 31;
@@ -78,76 +83,135 @@ struct PoolUnit {
   }
 };
 
-// Une sortie conv (pixel, C_out canaux) à partir d'une fenêtre lue par `px(ci, i, j)`.
-template <int K, int CIN, int COUT, int PE, int SIMD, class Px>
-inline void conv_pixel(const StageParams& p, Px px, int8_t out[COUT]
+// Accumulation d'un groupe de PE canaux de sortie (og) pour un pixel : poids `wt(o, c, i, j)`,
+// fenêtre `px(c, i, j)`. Une itération (ig, i, j) = un cycle (II = 1).
+template <int K, int CIN, int PE, int SIMD, class Wt, class Px>
+inline void conv_group(Wt wt, Px px, int og, int32_t acc[PE]
 #ifndef __SYNTHESIS__
                        , StageCycles& cyc
 #endif
 ) {
-  static_assert(COUT % PE == 0 && CIN % SIMD == 0, "repliement : PE | C_out, SIMD | C_in");
-  for (int og = 0; og < COUT; og += PE) {
-    int32_t acc[PE] = {};
-    for (int ig = 0; ig < CIN; ig += SIMD)
-      for (int i = 0; i < K; ++i)
-        for (int j = 0; j < K; ++j) {
+  static_assert(CIN % SIMD == 0, "repliement : SIMD | C_in");
+  for (int pe = 0; pe < PE; ++pe) acc[pe] = 0;
+  for (int ig = 0; ig < CIN; ig += SIMD)
+    for (int i = 0; i < K; ++i)
+      for (int j = 0; j < K; ++j) {
 #pragma HLS PIPELINE II=1
 #ifndef __SYNTHESIS__
-          ++cyc.mac;
+        ++cyc.mac;
 #endif
-          for (int pe = 0; pe < PE; ++pe)
-            for (int s = 0; s < SIMD; ++s) {
-              const int o = og + pe, c = ig + s;
-              acc[pe] += int32_t(p.w[((o * CIN + c) * K + i) * K + j]) * px(c, i, j);
-            }
-        }
-    for (int pe = 0; pe < PE; ++pe) {
-      const int o = og + pe;
-      int32_t y = golden::requantize(acc[pe] + p.bias[o], p.m0[o], p.shift);
-      if (p.leaky) y = golden::leaky_int(y);
-      out[o] = golden::clip_q(y, p.qmax);
-    }
-  }
+        for (int pe = 0; pe < PE; ++pe)
+          for (int s = 0; s < SIMD; ++s)
+            acc[pe] += int32_t(wt(og + pe, ig + s, i, j)) * px(ig + s, i, j);
+      }
+}
+
+// Étage de sortie d'un canal : arithmétique du golden.
+inline int8_t requant_out(const StageParams& p, int o, int32_t acc) {
+  int32_t y = golden::requantize(acc + p.bias[o], p.m0[o], p.shift);
+  if (p.leaky) y = golden::leaky_int(y);
+  return golden::clip_q(y, p.qmax);
+}
+
+// Poids d'une ROM [og][ig][i][j][pe·SIMD + s] (gen_stream_rom.py).
+template <int K, int CIN, int PE, int SIMD>
+inline int8_t rom_at(const int8_t* rom, int o, int c, int i, int j) {
+  return rom[((((o / PE) * (CIN / SIMD) + c / SIMD) * K + i) * K + j) * (PE * SIMD) +
+             (o % PE) * SIMD + c % SIMD];
 }
 
 template <int K, int CIN, int COUT, int H, int W, int PE, int SIMD, int PK, int PS,
-          bool FRAME>
+          bool FRAME, const int8_t* ROM = nullptr, bool IN_CHW = false, bool OUT_CHW = false>
 void conv_stage(hls::stream<int8_t>& in, hls::stream<int8_t>& out, const StageParams& p
 #ifndef __SYNTHESIS__
                 , StageCycles& cyc
 #endif
 ) {
+  static_assert(COUT % PE == 0, "repliement : PE | C_out");
+  static_assert(FRAME || (!IN_CHW && !OUT_CHW), "CHW : étages FRAME seulement");
+  static_assert(!OUT_CHW || (PE == 1 && PK == 0), "sortie CHW : PE = 1, sans maxpool");
+  static_assert(!(FRAME && ROM), "étage FRAME : poids en DDR");
   constexpr int PAD = K / 2;
   constexpr int ROWS = FRAME ? H : K;  // carte entière ou line buffer circulaire
   static int8_t buf[ROWS][W][CIN];
   static int8_t row[W][COUT];
   static PoolUnit<H, W, COUT, PK, PS> pool;
   pool.rows = 0;
-  int read = 0;
-  auto read_row = [&]() {
-    for (int c = 0; c < W; ++c)
-      for (int ch = 0; ch < CIN; ++ch) buf[read % ROWS][c][ch] = in.read();
-    ++read;
-  };
-  if (FRAME)
-    while (read < H) read_row();
-  for (int r = 0; r < H; ++r) {
-    while (read <= (r + PAD < H ? r + PAD : H - 1)) read_row();
-    for (int c = 0; c < W; ++c) {
-      auto px = [&](int ch, int i, int j) -> int32_t {
-        const int ir = r - PAD + i, ic = c - PAD + j;
-        if (ir < 0 || ir >= H || ic < 0 || ic >= W) return 0;  // complétion par des zéros
-        return buf[ir % ROWS][ic][ch];
-      };
-      int8_t o[COUT];
-      conv_pixel<K, CIN, COUT, PE, SIMD>(p, px, o
-#ifndef __SYNTHESIS__
-                                         , cyc
-#endif
-      );
-      for (int ch = 0; ch < COUT; ++ch) row[c][ch] = o[ch];
+
+  if constexpr (FRAME) {
+    // Carte d'entrée entière (HWC, ou CHW depuis un étage FRAME).
+    if constexpr (IN_CHW) {
+      for (int ch = 0; ch < CIN; ++ch)
+        for (int r = 0; r < H; ++r)
+          for (int c = 0; c < W; ++c) buf[r][c][ch] = in.read();
+    } else {
+      for (int r = 0; r < H; ++r)
+        for (int c = 0; c < W; ++c)
+          for (int ch = 0; ch < CIN; ++ch) buf[r][c][ch] = in.read();
     }
-    pool.push(row, out);
+    static int8_t ofm[OUT_CHW ? 1 : H][OUT_CHW ? 1 : W][COUT];
+    static int8_t wloc[PE][CIN][K][K];  // poids du groupe, lus une fois en DDR
+    for (int og = 0; og < COUT; og += PE) {
+      for (int pe = 0; pe < PE; ++pe)
+        for (int c = 0; c < CIN; ++c)
+          for (int i = 0; i < K; ++i)
+            for (int j = 0; j < K; ++j)
+              wloc[pe][c][i][j] = p.w[(((og + pe) * CIN + c) * K + i) * K + j];
+      auto wt = [&](int o, int c, int i, int j) -> int8_t { return wloc[o - og][c][i][j]; };
+      for (int r = 0; r < H; ++r)
+        for (int c = 0; c < W; ++c) {
+          auto px = [&](int ch, int i, int j) -> int32_t {
+            const int ir = r - PAD + i, ic = c - PAD + j;
+            if (ir < 0 || ir >= H || ic < 0 || ic >= W) return 0;
+            return buf[ir][ic][ch];
+          };
+          int32_t acc[PE];
+          conv_group<K, CIN, PE, SIMD>(wt, px, og, acc
+#ifndef __SYNTHESIS__
+                                       , cyc
+#endif
+          );
+          for (int pe = 0; pe < PE; ++pe) {
+            const int8_t y = requant_out(p, og + pe, acc[pe]);
+            if constexpr (OUT_CHW) out.write(y);
+            else ofm[r][c][og + pe] = y;
+          }
+        }
+    }
+    if constexpr (!OUT_CHW)
+      for (int r = 0; r < H; ++r) pool.push(ofm[r], out);
+  } else {
+    // Line buffer : la ligne de sortie r est calculée dès que la ligne r + pad est arrivée.
+    auto wt = [&](int o, int c, int i, int j) -> int8_t {
+      if constexpr (ROM != nullptr) return rom_at<K, CIN, PE, SIMD>(ROM, o, c, i, j);
+      else return p.w[((o * CIN + c) * K + i) * K + j];
+    };
+    int read = 0;
+    auto read_row = [&]() {
+      for (int c = 0; c < W; ++c)
+        for (int ch = 0; ch < CIN; ++ch) buf[read % ROWS][c][ch] = in.read();
+      ++read;
+    };
+    for (int r = 0; r < H; ++r) {
+      while (read <= (r + PAD < H ? r + PAD : H - 1)) read_row();
+      for (int c = 0; c < W; ++c) {
+        auto px = [&](int ch, int i, int j) -> int32_t {
+          const int ir = r - PAD + i, ic = c - PAD + j;
+          if (ir < 0 || ir >= H || ic < 0 || ic >= W) return 0;  // complétion par des zéros
+          return buf[ir % ROWS][ic][ch];
+        };
+        for (int og = 0; og < COUT; og += PE) {
+          int32_t acc[PE];
+          conv_group<K, CIN, PE, SIMD>(wt, px, og, acc
+  #ifndef __SYNTHESIS__
+                                       , cyc
+  #endif
+          );
+          for (int pe = 0; pe < PE; ++pe) row[c][og + pe] = requant_out(p, og + pe, acc[pe]);
+        }
+      }
+      pool.push(row, out);
+    }
   }
 }
 

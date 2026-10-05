@@ -13,9 +13,18 @@ Un étage matériel par conv (maxpool fusionné), chaînés en pipeline [2018-ve
 - **Poids** : sur la puce (K²·C_in·C_out·b/8 octets) tant que la mémoire le permet — SATAY
   garde tous ses paramètres sur la puce [2023-montgomerie-corcoran#006.0]. Sinon (hybride,
   hors base) l'étage garde **toute sa carte d'entrée** (H·W·C_in) et lit ses poids une fois
-  par image en DDR, canal de sortie par canal de sortie ; son temps est alors au moins
-  octets de poids / octets DDR par cycle, et sa latence de remplissage est une image entière.
-- **Allocation** : poids sur la puce par taille croissante sous le budget mémoire, puis
+  par image en DDR, groupe PE par groupe PE (ordre « PE extérieur », T10.8). Il émet donc
+  ses sorties canal par canal (CHW) : un étage suivant lui aussi en DDR les range telles
+  quelles dans sa carte d'entrée ; sinon l'étage garde **sa carte de sortie** (H·W·C_out) et
+  l'émet en HWC après le dernier groupe (un maxpool fusionné impose aussi la carte). Son temps
+  est au moins octets de poids / octets DDR par cycle, et sa latence de remplissage est une
+  image entière.
+- **FIFO** entre étages (T10.8) : une ligne de sortie de l'étage producteur (W'·C_out, après
+  pooling), émise d'un bloc à la fin de chaque ligne : le producteur ne bloque pas tant que
+  le consommateur lit plus vite qu'une ligne par ligne. Chaîne linéaire : pas d'interblocage
+  quelle que soit la profondeur, elle ne règle que le débit.
+- **Allocation** : tous les poids sur la puce, puis les plus gros en DDR jusqu'à tenir dans
+  le budget mémoire (cartes des étages en DDR comprises), puis
   parallélisme doublé (au diviseur suivant) sur l'étage le plus lent tant que les DSP le
   permettent (80 % des DSP, 80 % de BRAM + URAM).
 - **Débit** : II = max_l cycles_l ; **latence** ≈ II + Σ_l remplissage_l, avec
@@ -69,8 +78,21 @@ def line_buffer_bytes(d, abits):
     return lb * abits / 8
 
 
-def frame_bytes(d, abits):
-    return d["h"] * d["w"] * d["cin"] * abits / 8
+def frame_bytes(d, abits, out_frame=True):
+    """Carte d'entrée d'un étage à poids en DDR (PE extérieur), et sa carte de sortie si
+    `out_frame` (étage suivant à line buffer, ou maxpool fusionné)."""
+    return d["h"] * d["w"] * (d["cin"] + (d["cout"] if out_frame else 0)) * abits / 8
+
+
+def out_row(d):
+    """Valeurs d'une ligne de sortie (après maxpool fusionné de stride 2)."""
+    w = d["w"] // 2 if d["pool_k"] and d["pool_s"] == 2 else d["w"]
+    return w * d["cout"]
+
+
+def fifo_depths(layers):
+    """Profondeur (mots de 8 bits) du flux qui suit chaque étage, sauf le dernier (la tête)."""
+    return [out_row(d) for d in layers[:-1]]
 
 
 def stage_cycles(d, pe, simd, ddr_weights=False, wbits=8, ddr_bpc=math.inf):
@@ -85,31 +107,47 @@ def stage_dsp(pe, simd, macs_per_dsp=1):
 
 
 def plan(layers, board, wbits=8, abits=8):
-    """Allocation (placement des poids puis parallélisme) ; rend un dict."""
+    """Allocation (placement des poids puis parallélisme) ; rend un dict.
+
+    `wbits` : bits des poids, commun ou {id conv: bits} (précision mixte, T10.10) ; un étage
+    à poids ≤ 4 bits fait deux MAC par DSP.
+    """
     mem = onchip_bytes(board)
     dsp_budget = int(board["dsp"] * BUDGET)
-    mpd = board.get("int8_macs_per_dsp", 1) * (2 if wbits <= 4 else 1)
+    wb_of = (lambda d: wbits.get(d["layer"], 8)) if isinstance(wbits, dict) else (lambda d: wbits)
+
+    def mpd_of(d):
+        return board.get("int8_macs_per_dsp", 1) * (2 if wb_of(d) <= 4 else 1)
     freq = board["freq_mhz"] * 1e6
     ddr_bpc = board["ddr_bw_gbps"] * 1e9 * board.get("ddr_efficiency", 1.0) / freq
 
     st = [{"layer": d["layer"], "d": d, "pe": 1, "simd": 1, "ddr": True} for d in layers]
-    used = sum(line_buffer_bytes(d, abits) for d in layers)
-    for s in sorted(st, key=lambda s: weight_bytes(s["d"], wbits)):
-        need = weight_bytes(s["d"], wbits)
-        if used + need <= mem:
-            s["ddr"] = False
-            used += need
+    fifo = sum(fifo_depths(layers)) * abits / 8
+    used = sum(line_buffer_bytes(d, abits) for d in layers) + fifo
+    # Tous les poids sur la puce, puis les plus gros passent en DDR (l'étage garde alors ses
+    # cartes d'entrée et de sortie) jusqu'à tenir dans le budget.
+    def out_frame(k):
+        nxt = st[k + 1] if k + 1 < len(st) else None
+        return st[k]["d"]["pool_k"] > 0 or nxt is None or not nxt["ddr"]
+
+    def total():
+        return used + sum(frame_bytes(s["d"], abits, out_frame(k)) if s["ddr"]
+                          else weight_bytes(s["d"], wb_of(s["d"])) for k, s in enumerate(st))
+
     for s in st:
-        if s["ddr"]:
-            used += frame_bytes(s["d"], abits)
-    if used > mem:
+        s["ddr"] = False
+    for s in sorted(st, key=lambda s: -weight_bytes(s["d"], wb_of(s["d"]))):
+        if total() <= mem:
+            break
+        s["ddr"] = True
+    if total() > mem:
         raise ValueError("mémoire sur puce insuffisante même avec poids en DDR")
 
     def cyc(s):
-        return stage_cycles(s["d"], s["pe"], s["simd"], s["ddr"], wbits, ddr_bpc)
+        return stage_cycles(s["d"], s["pe"], s["simd"], s["ddr"], wb_of(s["d"]), ddr_bpc)
 
     def dsp_total():
-        return sum(stage_dsp(s["pe"], s["simd"], mpd) for s in st)
+        return sum(stage_dsp(s["pe"], s["simd"], mpd_of(s["d"])) for s in st)
 
     blocked = set()
     while True:
@@ -124,6 +162,7 @@ def plan(layers, board, wbits=8, abits=8):
             if nv is None:
                 continue
             trial = dict(s, **{key: nv})
+            mpd = mpd_of(d)
             extra = stage_dsp(trial["pe"], trial["simd"], mpd) - stage_dsp(s["pe"], s["simd"], mpd)
             if cyc(trial) < cyc(s) and (best is None or extra < best[0]):
                 best = (extra, key, nv)
@@ -133,30 +172,33 @@ def plan(layers, board, wbits=8, abits=8):
         s[best[1]] = best[2]
 
     rows = []
-    for s in st:
+    for k, s in enumerate(st):
         d = s["d"]
         c = cyc(s)
         delay = c if s["ddr"] else c * (d["pad"] + 1 + (1 if d["pool_k"] else 0)) / d["h"]
         rows.append({
             "layer": s["layer"], "k": d["k"], "cin": d["cin"], "cout": d["cout"],
             "h": d["h"], "w": d["w"], "pe": s["pe"], "simd": s["simd"],
-            "dsp": stage_dsp(s["pe"], s["simd"], mpd), "cycles": c,
-            "weights": "ddr" if s["ddr"] else "puce",
-            "weight_bytes": weight_bytes(d, wbits),
-            "buffer_bytes": frame_bytes(d, abits) if s["ddr"] else line_buffer_bytes(d, abits),
-            "ddr_bytes": weight_bytes(d, wbits) if s["ddr"] else 0, "delay": delay,
+            "dsp": stage_dsp(s["pe"], s["simd"], mpd_of(d)), "cycles": c,
+            "weights": "ddr" if s["ddr"] else "puce", "wbits": wb_of(d),
+            "weight_bytes": weight_bytes(d, wb_of(d)),
+            "buffer_bytes": (frame_bytes(d, abits, out_frame(k)) if s["ddr"]
+                             else line_buffer_bytes(d, abits)),
+            "out_frame": bool(s["ddr"] and out_frame(k)),
+            "ddr_bytes": weight_bytes(d, wb_of(d)) if s["ddr"] else 0, "delay": delay,
         })
     ii = max(r["cycles"] for r in rows)
     lat = ii + sum(r["delay"] for r in rows)
     macs = sum(d["h"] * d["w"] * d["k"] ** 2 * d["cin"] * d["cout"] for d in layers)
-    onchip = sum(r["buffer_bytes"] + (r["weight_bytes"] if r["weights"] == "puce" else 0)
-                 for r in rows)
+    onchip = fifo + sum(r["buffer_bytes"] + (r["weight_bytes"] if r["weights"] == "puce" else 0)
+                        for r in rows)
     return {
         "board": board["name"], "freq_hz": freq, "wbits": wbits, "abits": abits,
         "stages": rows, "ii_cycles": ii, "latency_cycles": lat,
         "fps": freq / ii, "latency_ms": 1e3 * lat / freq,
         "dsp": sum(r["dsp"] for r in rows), "dsp_budget": dsp_budget,
-        "onchip_bytes": onchip, "onchip_budget": mem,
+        "onchip_bytes": onchip, "onchip_budget": mem, "fifo_depths": fifo_depths(layers),
+        "fifo_bytes": fifo,
         "ddr_bytes_per_frame": sum(r["ddr_bytes"] for r in rows),
         "macs": macs, "gops": 2 * macs * freq / ii / 1e9,
         "mac_efficiency": macs / (ii * sum(r["pe"] * r["simd"] for r in rows)),

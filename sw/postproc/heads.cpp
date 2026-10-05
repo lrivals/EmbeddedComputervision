@@ -10,13 +10,24 @@ using golden::LayerType;
 
 std::vector<postproc::Head> make_heads(const golden::Model& m, const driver::Program& p,
                                        const int8_t* arena) {
-  std::vector<postproc::Head> heads;
+  std::vector<const int8_t*> data;
   for (int id : m.heads()) {
-    const Layer& l = m.layers[size_t(id)];
     const driver::View& v = p.views[size_t(id)];
     if (v.nseg != 1 || v.seg[0].up != 0) throw std::runtime_error("tête non contiguë");
+    data.push_back(arena + v.seg[0].off);
+  }
+  return make_heads(m, data);
+}
+
+std::vector<postproc::Head> make_heads(const golden::Model& m,
+                                       const std::vector<const int8_t*>& data) {
+  std::vector<postproc::Head> heads;
+  const std::vector<int> ids = m.heads();
+  if (data.size() != ids.size()) throw std::runtime_error("nombre de têtes");
+  for (size_t k = 0; k < ids.size(); ++k) {
+    const Layer& l = m.layers[size_t(ids[k])];
     postproc::Head h;
-    h.data = arena + v.seg[0].off;
+    h.data = data[k];
     h.grid = l.out_h;
     h.classes = m.classes;
     h.softmax = l.type == LayerType::Region;

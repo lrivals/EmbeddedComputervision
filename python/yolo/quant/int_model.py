@@ -35,6 +35,7 @@ class QConv:
     s: int = 1
     qmax: int = 127   # saturation de la sortie (2^{b−1} − 1 pour b bits, T9.3)
     wqmax: int = 127  # poids dans [−wqmax, wqmax]
+    wbits: int = 8    # stockage dans weights.bin : 8, ou 4 (deux poids par octet, T10.10)
 
 
 @dataclass

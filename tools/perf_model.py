@@ -16,7 +16,8 @@ lu dans hls/kernels/accel_config.hpp) :
 - `width` : octets par mot sur les ports m_axi (1 = 8 bits ; 8 = 64 bits, T10.1). Lecture
   ligne par ligne : chaque (voie, ligne) de `in_buf` coûte `cdiv(IC + width − 1, width)` mots
   (assez pour tout alignement de la ligne en DDR) ; une tuile de poids, réordonnée par le
-  driver en bloc contigu, `cdiv(Tm·n·K², width)` mots ; une ligne de sortie de n octets,
+  driver en bloc contigu, `cdiv(Tm·n·K², width)` mots (moitié moins d'octets pour une conv à
+  poids 4 bits, champ `wbits` du manifest, T10.10) ; une ligne de sortie de n octets,
   `cdiv(n + width − 1, width)` mots ;
 - `trim` : ne charger que les canaux d'entrée valides de la dernière tuile ti (T10.3) ;
 - `requant` : canaux requantifiés par cycle dans l'étage de sortie (T10.2) ;
@@ -70,7 +71,8 @@ def conv_layers(manifest):
             d = {"layer": layer["id"], "k": layer["k"], "pad": layer["pad"], "cin": layer["cin"],
                  "cout": layer["cout"], "h": src[0], "w": src[1],
                  "pool_k": pool["k"] if pool else 0, "pool_s": pool["s"] if pool else 0,
-                 "prepool": layer.get("prepool_out") is not None}
+                 "prepool": layer.get("prepool_out") is not None,
+                 "wbits": layer.get("wbits", 8)}
             out.append(d)
         if "out_shape" in layer:  # entrée de la couche suivante (route comprise)
             prev = tuple(layer["out_shape"][1:])
@@ -110,7 +112,9 @@ def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc
 
     # Chargements par ti : voies × lignes × mots par ligne, et un bloc de poids contigu.
     tns = [min(tn, lanes - t * tn) if trim else tn for t in range(nti)]
-    lds = [(n * ir * words(ic), _cdiv(tm * n * kh * k, width)) for n in tns]
+    # Poids 4 bits (T10.10) : deux par octet, Tm pair.
+    wdiv = 2 if d.get("wbits", 8) == 4 else 1
+    lds = [(n * ir * words(ic), _cdiv(tm * n * kh * k // wdiv, width)) for n in tns]
     comp = kh * k * tr * tc
     s = dict(load_in=0, load_w=0, compute=0, store=0, sequential=0, overlapped=0)
     prev_store = 0
@@ -242,12 +246,28 @@ def markdown(nets=NETS):
     return "\n".join(out)
 
 
+def manifest_summary(path, freq_hz=FREQ_HZ):
+    """Noyau actuel sur un export quelconque (élagué, précision mixte : T10.10, T10.11)."""
+    layers = conv_layers(path)
+    total = sum(macs(d) for d in layers)
+    cyc = sum(kernel_cycles(d)["overlapped"] for d in layers)
+    t = cyc / freq_hz
+    return {"manifest": str(path), "macs": total, "cycles": cyc, "ms": 1e3 * t, "fps": 1 / t,
+            "gops": 2 * total / t / 1e9,
+            "mac_efficiency": total / (TILES["tm"] * TILES["tn"]) / cyc}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--check", type=Path, default=None, help="cycles_conv.csv de make hls-cycles")
+    ap.add_argument("--manifest", type=Path, action="append", default=[],
+                    help="cycles du noyau actuel pour cet export (répétable, JSON en sortie)")
     args = ap.parse_args()
     if args.check:
         sys.exit(1 if check(args.check) else 0)
+    if args.manifest:
+        print(json.dumps([manifest_summary(m) for m in args.manifest], indent=1))
+        return
     print(markdown())
 
 

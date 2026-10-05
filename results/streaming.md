@@ -37,11 +37,11 @@ Budgets : 80 % des 1 248 DSP, 80 % de BRAM + URAM (2,3 Mo). Une MAC int8 par DSP
 | L08 | 3 | 128 → 256 | 26×26 | 1 × 64 | 68 | 3 115 008 | puce (288 Ko) | 13.0 |
 | L10 | 3 | 256 → 512 | 13×13 | 1 × 64 | 68 | 3 115 008 | puce (1 152 Ko) | 13.0 |
 | L12 | 3 | 512 → 1024 | 13×13 | 1 × 256 | 260 | 3 115 008 | ddr (4 608 Ko) | 84.5 |
-| L13 | 3 | 1024 → 1024 | 13×13 | 1 × 256 | 260 | 6 230 016 | ddr (9 216 Ko) | 169.0 |
+| L13 | 3 | 1024 → 1024 | 13×13 | 1 × 256 | 260 | 6 230 016 | ddr (9 216 Ko) | 338.0 |
 | L14 | 1 | 1024 → 125 | 13×13 | 1 × 32 | 36 | 676 000 | puce (125 Ko) | 0.0 |
 
 - II = 6 230 016 cycles → **32.1 img/s** à 200 MHz ; latence ≈ 85.2 ms
-- DSP 968 / 998 (80 %) ; mémoire sur puce 1.94 / 2.31 Mo ; DDR 13.50 Mo de poids par image
+- DSP 968 / 998 (80 %) ; mémoire sur puce 2.15 / 2.31 Mo ; DDR 13.50 Mo de poids par image
 - 223.8 GOPS, efficacité MAC 63.0 %
 - moteur unique (perf model, ports 8 bits) : 41 299 241 cycles → 4.8 img/s ; streaming × 6.6 en débit
 
@@ -64,18 +64,18 @@ Hypothèse : 2 MAC 4 bits par DSP.
 
 | conv | K | C_in → C_out | H×W | PE × SIMD | DSP | cycles | poids | tampon (Ko) |
 |---|---|---|---|---|---|---|---|---|
-| L00 | 3 | 3 → 16 | 416×416 | 16 × 3 | 88 | 1 557 504 | puce (0 Ko) | 4.5 |
-| L02 | 3 | 16 → 32 | 208×208 | 16 × 16 | 192 | 778 752 | puce (2 Ko) | 6.5 |
-| L04 | 3 | 32 → 64 | 104×104 | 4 × 32 | 80 | 1 557 504 | puce (9 Ko) | 6.5 |
-| L06 | 3 | 64 → 128 | 52×52 | 2 × 64 | 72 | 1 557 504 | puce (36 Ko) | 6.5 |
-| L08 | 3 | 128 → 256 | 26×26 | 1 × 128 | 68 | 1 557 504 | puce (144 Ko) | 6.5 |
-| L10 | 3 | 256 → 512 | 13×13 | 1 × 128 | 68 | 1 557 504 | puce (576 Ko) | 6.5 |
-| L12 | 3 | 512 → 1024 | 13×13 | 1 × 256 | 132 | 3 115 008 | ddr (2 304 Ko) | 42.2 |
-| L13 | 3 | 1024 → 1024 | 13×13 | 1 × 512 | 260 | 3 115 008 | ddr (4 608 Ko) | 84.5 |
+| L00 | 3 | 3 → 16 | 416×416 | 16 × 3 | 88 | 1 557 504 | puce (0 Ko) | 8.9 |
+| L02 | 3 | 16 → 32 | 208×208 | 16 × 16 | 192 | 778 752 | puce (2 Ko) | 13.0 |
+| L04 | 3 | 32 → 64 | 104×104 | 4 × 32 | 80 | 1 557 504 | puce (9 Ko) | 13.0 |
+| L06 | 3 | 64 → 128 | 52×52 | 2 × 64 | 72 | 1 557 504 | puce (36 Ko) | 13.0 |
+| L08 | 3 | 128 → 256 | 26×26 | 1 × 128 | 68 | 1 557 504 | puce (144 Ko) | 13.0 |
+| L10 | 3 | 256 → 512 | 13×13 | 1 × 128 | 68 | 1 557 504 | puce (576 Ko) | 13.0 |
+| L12 | 3 | 512 → 1024 | 13×13 | 1 × 256 | 132 | 3 115 008 | ddr (2 304 Ko) | 84.5 |
+| L13 | 3 | 1024 → 1024 | 13×13 | 1 × 512 | 260 | 3 115 008 | ddr (4 608 Ko) | 338.0 |
 | L14 | 1 | 1024 → 125 | 13×13 | 1 × 64 | 36 | 338 000 | puce (62 Ko) | 0.0 |
 
 - II = 3 115 008 cycles → **64.2 img/s** à 200 MHz ; latence ≈ 50.3 ms
-- DSP 996 / 998 (80 %) ; mémoire sur puce 0.97 / 2.31 Mo ; DDR 6.75 Mo de poids par image
+- DSP 996 / 998 (80 %) ; mémoire sur puce 1.34 / 2.31 Mo ; DDR 6.75 Mo de poids par image
 - 447.6 GOPS, efficacité MAC 67.9 %
 - moteur unique (perf model, ports 8 bits) : 41 299 241 cycles → 4.8 img/s ; streaming × 13.3 en débit
 
@@ -88,7 +88,7 @@ Hypothèse : 2 MAC 4 bits par DSP.
 | débit | 4,8 img/s ; 26,9 img/s | **32,1 img/s** | **64,2 img/s** |
 | latence | 206 ms ; 43 ms | ≈ 85 ms | ≈ 50 ms |
 | DSP | 896 (Tm·Tn = 768 + 4·Tm requantification) | 968 | 996 |
-| mémoire sur puce | tampons ping-pong (roofline : 112 BRAM18 ≈ 0,25 Mo) | 1,9 Mo (L12-L13 : cartes entières) | 1,0 Mo |
+| mémoire sur puce | tampons ping-pong (roofline : 112 BRAM18 ≈ 0,25 Mo) | 2,15 Mo (L12-L13 : cartes entières, FIFO) | 1,3 Mo |
 | poids lus en DDR par image | 15,9 Mo, plus les activations à chaque couche | 13,5 Mo (L12, L13) | 6,75 Mo |
 | efficacité MAC | 11 % ; 53 % | 63 % | 68 % |
 | flexibilité | un bitstream pour v2 et v3 | un bitstream par réseau (dimensions en paramètres de gabarit) | idem |
@@ -107,11 +107,18 @@ Lecture :
 - **4 bits.** Ils divisent la mémoire des poids par 2 et doublent les MAC par DSP, ce qui
   double le débit, sous réserve de la mAP du QAT 4 bits (`results/quant_4bits.md`).
 
+Mémoire (T10.8) : le plan compte l'ordre « PE extérieur » de L12-L13 (L12 passe à L13 en
+CHW, L13 garde une carte de sortie de 169 Ko pour L14) et les FIFO entre étages (une ligne de
+sortie, 52 Ko en 8 bits). Le plan ne change pas ; la mémoire sur puce passe de 1,94 à
+2,15 Mo en 8 bits.
+
 ## Reste
 
 - Synthèse de `yolo_stream` : DSP, LUT, BRAM/URAM réels et fréquence atteinte (les
   boucles PE × SIMD déroulées de 256 sont un risque de timing).
-- Poids sur la puce initialisés comme ROM (aujourd'hui des pointeurs m_axi en C-sim) ;
-  ordre « PE extérieur » des étages L12-L13 en matériel.
-- Co-simulation RTL du DATAFLOW (profondeurs des FIFO).
-- Intégration (AXI-Stream ↔ DMA) et mesure sur carte.
+- Co-simulation RTL du DATAFLOW (`make hls-cosim-stream`).
+- Mesure sur carte (block design `ENGINE=stream`, T10.9).
+
+Fait en C-sim (T10.8, T10.9) : poids en ROM (`tb_stream_rom`), ordre PE extérieur de
+L12-L13, profondeurs des FIFO, AXI-Stream avec TLAST et AXI DMA émulé (`yolo_bench --engine
+stream`).

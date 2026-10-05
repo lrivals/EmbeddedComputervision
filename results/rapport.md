@@ -144,6 +144,16 @@ atteint **26,9 img/s et 187 GOPS**, au-delà de 2026-fata (DPU, même carte, ré
 et sans élagage. La piste 5 est outillée (`yolo_bench --pipeline`, `--cached`) et attend la
 carte.
 
+Au-delà du moteur unique (M10, sections C et D) :
+
+- **Streaming** ([streaming.md](streaming.md)) : 32,1 img/s en 8 bits. Poids en ROM, ordre
+  PE extérieur et AXI DMA sont vérifiés en C-sim.
+- **Précision mixte** ([precision_mixte.md](precision_mixte.md)) : L10, L12 et L13 en 4 bits,
+  L02 et L08 en 6 bits. mAP 54,68 (−1,01) pour des poids de 8,19 Mo, et 64,2 img/s en
+  streaming.
+- **Élagage** ([elagage.md](elagage.md)) : jusqu'à 82,5 img/s projetés à 70 %, mais la mAP
+  ne se récupère pas en 300 itérations d'affinage.
+
 Note : `results/hls_report.md` donne 210,5 ms au lieu de 206,5 ms. Son `tb_conv` écrit la
 carte avant pooling de toutes les convs poolées pour tester ce chemin. Le programme du
 driver ne l'écrit que pour L08 de Tiny-YOLOv3 : c'est ce cas que suit la projection.

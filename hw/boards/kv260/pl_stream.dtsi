@@ -1,0 +1,62 @@
+// Overlay de la KV260, moteur streaming (T10.9) : bitstream de `build.tcl -tclargs <jobs>
+// stream`, paquet de `ENGINE=stream hw/boards/kv260/firmware.sh`. Non vérifié sur la carte.
+//
+// - yolo_stream : registres s_axi_control (0xA000_0000) en `generic-uio`, sans interruption
+//   utilisée (--uio-stream) ;
+// - AXI DMA : S_AXI_LITE (0xA001_0000) en `generic-uio` avec s2mm_introut = pl_ps_irq0[1] =
+//   GIC SPI 90 (--uio-dma) ; le driver programme le mode direct lui-même (pas de pilote
+//   xilinx_dma) ;
+// - u-dma-buf : 32 Mo contigus pour entrées, tête, poids (15,9 Mo copiés, seuls ceux de L12-L13
+//   sont lus) et paramètres → /dev/udmabuf0 ;
+// - pl_clk0 (zynqmp_clk 71) réglé à 200 MHz comme dans le block design.
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target = <&fpga_full>;
+		__overlay__ {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			firmware-name = "yolo.bit.bin";
+			resets = <&zynqmp_reset 116>;
+		};
+	};
+
+	fragment@1 {
+		target = <&amba>;
+		__overlay__ {
+			#address-cells = <2>;
+			#size-cells = <2>;
+
+			clocking0: clocking0 {
+				compatible = "xlnx,fclk";
+				#clock-cells = <0>;
+				clocks = <&zynqmp_clk 71>;
+				clock-output-names = "fabric_clk";
+				assigned-clocks = <&zynqmp_clk 71>;
+				assigned-clock-rates = <200000000>;
+			};
+
+			yolo_stream: yolo_stream@a0000000 {
+				compatible = "generic-uio";
+				reg = <0x0 0xa0000000 0x0 0x10000>;
+				clocks = <&zynqmp_clk 71>;
+			};
+
+			yolo_dma: dma@a0010000 {
+				compatible = "generic-uio";
+				reg = <0x0 0xa0010000 0x0 0x10000>;
+				clocks = <&zynqmp_clk 71>;
+				interrupt-parent = <&gic>;
+				interrupts = <0 90 4>;
+			};
+
+			udmabuf0: udmabuf@0 {
+				compatible = "ikwzm,u-dma-buf";
+				device-name = "udmabuf0";
+				size = <0x2000000>;
+			};
+		};
+	};
+};

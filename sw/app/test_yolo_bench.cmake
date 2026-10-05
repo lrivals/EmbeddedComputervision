@@ -1,9 +1,13 @@
 # ctest yolo_bench_input : yolo_bench sur dumps/<IMAGE>/input.npy au seuil des dumps (0,25)
-# → la ligne JSONL contient les détections de dumps/<IMAGE>/detections.json.
+# → la ligne JSONL contient les détections de dumps/<IMAGE>/detections.json. ENGINE (option) :
+# moteur de yolo_bench (stream : yolo_stream + AXI DMA, ctest yolo_bench_stream, T10.9).
+if(NOT ENGINE)
+  set(ENGINE conv)
+endif()
 file(MAKE_DIRECTORY ${WORK})
 file(WRITE ${WORK}/ids.txt "${IMAGE}\n")
 execute_process(COMMAND ${BENCH} --model ${MODEL} --inputs ${MODEL}/dumps/${IMAGE}/input.npy
-                        --ids ${WORK}/ids.txt --warmup 0 --conf 0.25
+                        --ids ${WORK}/ids.txt --warmup 0 --conf 0.25 --engine ${ENGINE}
                         --times ${WORK}/times.csv --dets ${WORK}/dets.jsonl
                 RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)

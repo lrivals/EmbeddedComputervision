@@ -135,13 +135,14 @@ def layout(net):
 
 
 def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_frac=None,
-                   qmax_of=None):
+                   qmax_of=None, wbits_of=None):
     """Manifest de `net` (format `specs`).
 
     `scale_of(i)` : échelle de la sortie de la couche i (−1 : entrée) ; `shift_of(i)` : n de
     la conv i ; `lut_offsets` : {id de tête: offset dans luts.bin} et `exp_frac` : {id de
     tête: bits fractionnaires de la table exponentielle} (optionnels). `qmax_of(i)` :
-    saturation de la sortie de la conv i, écrite seulement si ≠ 127 (T9.3).
+    saturation de la sortie de la conv i, écrite seulement si ≠ 127 (T9.3). `wbits_of(i)` :
+    bits de stockage des poids de la conv i, écrit seulement si ≠ 8 (4 : paquetés, T10.10).
     """
     layers = net["layers"]
     shapes = infer_shapes(net)
@@ -167,7 +168,10 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
                      out_shape=list(shapes[pool["layer"]][1] if pool else outs))
             if qmax_of is not None and qmax_of(i) != 127:
                 e["qmax"] = int(qmax_of(i))
-            w_off = align(w_off + k * k * ins[0] * cout)
+            wbits = 8 if wbits_of is None else wbits_of(i)
+            if wbits != 8:
+                e["wbits"] = int(wbits)
+            w_off = align(w_off + weight_bytes(k * k * ins[0] * cout, wbits))
             b_off = align(b_off + 4 * cout)
         elif t == "maxpool":
             e.update(k=layer["k"], s=layer["s"], fused_into=p["fused_into"],
@@ -204,6 +208,33 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
     return m
 
 
+def weight_bytes(n, wbits=8):
+    """Octets de `n` poids stockés sur `wbits` bits (8, ou 4 : deux par octet)."""
+    if wbits not in (4, 8):
+        raise ValueError(f"wbits = {wbits} : 4 ou 8 attendu")
+    return n if wbits == 8 else (n + 1) // 2
+
+
+def pack4(q):
+    """Poids int dans [−8, 7] → octets, deux par octet : quartet bas = poids d'indice pair."""
+    q = np.asarray(q, dtype=np.int64).ravel()
+    if q.size and (q.min() < -8 or q.max() > 7):
+        raise ValueError("poids hors de [−8, 7] : non paquetable sur 4 bits")
+    n = q.size + (q.size & 1)
+    nib = np.zeros(n, np.uint8)
+    nib[:q.size] = q & 0xF
+    return (nib[0::2] | (nib[1::2] << 4)).astype(np.uint8).view(np.int8)
+
+
+def unpack4(b, n):
+    """Inverse de `pack4` : `n` poids int8 (extension de signe des quartets)."""
+    u = np.asarray(b).view(np.uint8)
+    nib = np.empty(2 * len(u), np.int16)
+    nib[0::2] = u & 0xF
+    nib[1::2] = u >> 4
+    return np.where(nib >= 8, nib - 16, nib)[:n].astype(np.int8)
+
+
 def _num(v):
     """Ancre : entier si elle l'est (Tiny-YOLOv3), sinon flottant (34,56 px en v2)."""
     return int(v) if float(v).is_integer() else float(v)
@@ -226,7 +257,7 @@ def export_model(qm, out_dir):
         off = align(off + 4 * 256 * len(LUT_NAMES))
     m = build_manifest(qm.net, qm.input_scale, qm.scale_of, lambda i: qm.convs[i].n,
                        lut_offsets, {i: h.exp_frac for i, h in luts.items()},
-                       lambda i: qm.convs[i].qmax)
+                       lambda i: qm.convs[i].qmax, lambda i: qm.convs[i].wbits)
     m["blobs"]["luts.bin"] = off
 
     w = np.zeros(m["blobs"]["weights.bin"], np.int8)
@@ -236,7 +267,8 @@ def export_model(qm, out_dir):
         if e["type"] != "conv":
             continue
         c = qm.convs[e["id"]]
-        w[e["w_offset"]:e["w_offset"] + c.qW.size] = c.qW.ravel()
+        packed = pack4(c.qW) if c.wbits == 4 else c.qW.ravel()
+        w[e["w_offset"]:e["w_offset"] + packed.size] = packed
         b[e["b_offset"] // 4:e["b_offset"] // 4 + len(c.qb)] = c.qb
         m0[e["m0_offset"] // 4:e["m0_offset"] // 4 + len(c.M0)] = c.M0
     lut = np.zeros(off // 4, "<u4")
@@ -271,12 +303,14 @@ def load_model(model_dir):
             k, cin, cout = e["k"], e["cin"], e["cout"]
             layers.append({"type": "conv", "k": k, "s": e["s"], "cout": cout,
                            "act": e["act"], "bn": False})
-            qW = w[e["w_offset"]:e["w_offset"] + cout * cin * k * k].reshape(cout, cin, k, k)
+            n, wbits = cout * cin * k * k, e.get("wbits", 8)
+            raw = w[e["w_offset"]:e["w_offset"] + weight_bytes(n, wbits)]
+            qW = (unpack4(raw, n) if wbits == 4 else raw).reshape(cout, cin, k, k)
             qb = b[e["b_offset"] // 4:e["b_offset"] // 4 + cout]
             M0 = m0[e["m0_offset"] // 4:e["m0_offset"] // 4 + cout]
             convs[e["id"]] = QConv(qW.copy(), qb.astype(np.int32), M0.astype(np.int32),
                                    e["shift"], e["in_scale"], None, e["out_scale"], e["act"],
-                                   e["s"], e.get("qmax", 127))
+                                   e["s"], e.get("qmax", 127), 7 if wbits == 4 else 127, wbits)
         elif t == "maxpool":
             layers.append({"type": "maxpool", "k": e["k"], "s": e["s"]})
         elif t == "upsample":

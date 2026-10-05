@@ -33,6 +33,9 @@ struct Layer {
   int64_t w_offset = 0, b_offset = 0, m0_offset = 0;
   int shift = 0;
   int qmax = 127;  // saturation de la sortie (activations à b bits : 2^{b−1} − 1, T9.3)
+  // Poids paquetés dans weights.bin (4 : deux par octet, T10.10). Au chargement, ils sont
+  // dépaquetés en int8 à la fin de `Model::weights` et w_offset désigne cette copie.
+  int wbits = 8;
   double in_scale = 0.0, out_scale = 0.0;
 
   // maxpool

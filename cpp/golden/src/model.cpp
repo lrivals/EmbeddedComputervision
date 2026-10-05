@@ -131,6 +131,8 @@ Model Model::load(const std::string& dir) {
         require(l.shift >= 1 && l.shift <= 31, "shift hors de [1, 31]");
         if (e.has("qmax")) l.qmax = static_cast<int>(e["qmax"].integer());
         require(l.qmax >= 1 && l.qmax <= 127, "qmax hors de [1, 127]");
+        if (e.has("wbits")) l.wbits = static_cast<int>(e["wbits"].integer());
+        require(l.wbits == 4 || l.wbits == 8, "wbits : 4 ou 8");
         break;
       }
       case LayerType::Maxpool:
@@ -164,6 +166,23 @@ Model Model::load(const std::string& dir) {
   m.bias = read_blob<int32_t>(dir + "/bias.bin", blobs["bias.bin"].integer());
   m.m0 = read_blob<int32_t>(dir + "/requant.bin", blobs["requant.bin"].integer());
   m.luts = read_blob<uint32_t>(dir + "/luts.bin", blobs["luts.bin"].integer());
+
+  // Poids 4 bits (T10.10) : quartet bas = poids d'indice pair, extension de signe ; copie
+  // int8 ajoutée en fin de `weights` (alignée sur 64), sur laquelle pointe w_offset.
+  const int64_t packed_size = int64_t(m.weights.size());
+  for (auto& l : m.layers) {
+    if (l.type != LayerType::Conv || l.wbits == 8) continue;
+    const int64_t n = int64_t(l.cout) * l.cin * l.k * l.k;
+    require(l.w_offset + (n + 1) / 2 <= packed_size, "poids hors de weights.bin");
+    const int64_t dst = (int64_t(m.weights.size()) + BLOB_ALIGN - 1) / BLOB_ALIGN * BLOB_ALIGN;
+    m.weights.resize(size_t(dst + n), 0);
+    for (int64_t i = 0; i < n; ++i) {
+      const uint8_t byte = uint8_t(m.weights[size_t(l.w_offset + i / 2)]);
+      const int nib = (i % 2 == 0) ? (byte & 0xF) : (byte >> 4);
+      m.weights[size_t(dst + i)] = int8_t(nib >= 8 ? nib - 16 : nib);
+    }
+    l.w_offset = dst;
+  }
 
   // Contrôles de cohérence : blobs couverts, tampons assez grands.
   auto fits = [&](const BufRef& r, int64_t bytes) {

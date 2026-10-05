@@ -39,6 +39,26 @@ def test_inspect_matches_python(net):
     model_dir = ROOT / "model" / net
     if not GOLDEN.exists() or not (model_dir / "manifest.json").exists():
         pytest.skip("golden_run ou export absent (make test-cpp, make export)")
+    check_inspect(model_dir)
+
+
+def test_inspect_wbits4(tmp_path):
+    """T10.10 : poids 4 bits paquetés dans weights.bin, dépaquetés par le golden C++."""
+    from tests.test_export import _qm
+
+    from yolo.io.export import export_model
+
+    if not GOLDEN.exists():
+        pytest.skip("golden_run absent (make test-cpp)")
+    qm, _ = _qm("tiny-yolov2-voc", np.random.default_rng(0))
+    for i in sorted(qm.convs)[1:3]:
+        qm.convs[i].qW = np.clip(qm.convs[i].qW, -8, 7).astype(np.int8)
+        qm.convs[i].wbits = 4
+    export_model(qm, tmp_path)
+    check_inspect(tmp_path)
+
+
+def check_inspect(model_dir):
     head, anchors, buffers, layers = inspect(model_dir)
     qm, m = load_model(model_dir)
     luts = load_luts(model_dir, m)

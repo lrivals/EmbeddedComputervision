@@ -22,12 +22,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import numpy as np  # noqa: E402
 
-from calibrate import load_fused  # noqa: E402
+from calibrate import load_fused, net_tag  # noqa: E402
 from yolo.data.voc import load_split  # noqa: E402
 from yolo.infer.nms import CONF_THR, IOU_THR, postprocess_int  # noqa: E402
 from yolo.infer.pipeline import preprocess  # noqa: E402
 from yolo.io.export import export_model, load_model  # noqa: E402
-from yolo.models.tiny_yolo import PRETRAINED  # noqa: E402
 from yolo.quant.calibrate import load_scales  # noqa: E402
 from yolo.quant.int_model import IntNetwork, QuantModel, head_luts  # noqa: E402
 from yolo.quant.quantize import quantize_input  # noqa: E402
@@ -35,15 +34,22 @@ from yolo.quant.quantize import quantize_input  # noqa: E402
 DUMP_IMAGES = 3
 
 
-def write_dumps(qm, samples, out_dir, size):
+def _preprocessed(s, size):
+    """(image float (3, size, size), (w, h)) : `s["x"]` déjà prétraitée, sinon `s["image"]`."""
+    if "x" in s:
+        return s["x"], (size, size)
     from PIL import Image
 
+    with Image.open(s["image"]) as img:
+        return preprocess(img, size)
+
+
+def write_dumps(qm, samples, out_dir, size):
     inet, luts = IntNetwork(qm, "int64"), head_luts(qm)
     for s in samples:
         d = out_dir / "dumps" / s["id"]
         d.mkdir(parents=True, exist_ok=True)
-        with Image.open(s["image"]) as img:
-            x, (w, h) = preprocess(img, size)
+        x, (w, h) = _preprocessed(s, size)
         qx = quantize_input(x[None])
         np.save(d / "input.npy", qx)
         outs = inet.forward(qx, all_outputs=True)
@@ -60,15 +66,15 @@ def write_dumps(qm, samples, out_dir, size):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--net", default="tiny-yolov2-voc", choices=sorted(PRETRAINED))
+    ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau pré-entraîné, ou chemin d'un .cfg (élagué, T10.11 ; --weights requis)")
     ap.add_argument("--weights", type=Path, default=None)
     ap.add_argument("--calib", type=Path, default=None)
     ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--size", type=int, default=416)
     args = ap.parse_args()
-    calib = args.calib or ROOT / "build" / "quant" / args.net / "calib.json"
-    out = (args.out or ROOT / "model" / args.net).resolve()
+    calib = args.calib or ROOT / "build" / "quant" / net_tag(args.net) / "calib.json"
+    out = (args.out or ROOT / "model" / net_tag(args.net)).resolve()
 
     qm = QuantModel.from_fused(load_fused(args.net, args.weights, np.float64),
                                *load_scales(calib))

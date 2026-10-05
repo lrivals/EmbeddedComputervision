@@ -17,6 +17,17 @@ namespace sw {
 std::vector<postproc::Head> make_heads(const golden::Model& m, const driver::Program& p,
                                        const int8_t* arena);
 
+// Têtes lues à des adresses données (une par tête de `m.heads()`, (C, H, W) int8), par exemple
+// la tête rendue par le streaming (T10.9).
+std::vector<postproc::Head> make_heads(const golden::Model& m,
+                                       const std::vector<const int8_t*>& data);
+
+inline std::vector<postproc::Detection> detect(const golden::Model& m,
+                                               const std::vector<const int8_t*>& data,
+                                               double conf = 0.25, double iou = 0.45) {
+  return postproc::postprocess(make_heads(m, data), conf, iou);
+}
+
 // Décodage + NMS aux seuils de la démo et des dumps (conf 0,25, IoU 0,45).
 inline std::vector<postproc::Detection> detect(const golden::Model& m, const driver::Program& p,
                                                const int8_t* arena, double conf = 0.25,
