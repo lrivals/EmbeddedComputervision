@@ -9,7 +9,8 @@ disque local de la session) en essayant, dans l'ordre :
 3. la même archive par rclone (`get_datasets.sh pull <jeu>`, remote `remote`) : le PC
    sans le jeu, si rclone est installé ;
 4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
-   pour CrowdHuman, VisDrone et FLIR (jeton dans les secrets Colab KAGGLE_USERNAME, KAGGLE_KEY).
+   pour CrowdHuman, VisDrone et FLIR (jeton : `<drive_dir>/kaggle.json`, ou les secrets Colab
+   KAGGLE_USERNAME, KAGGLE_KEY, illisibles depuis un noyau Colab sous VS Code).
 
 Mise en place de rclone et export des jeux : docs/tasks/donnees-drive.md.
 
@@ -19,6 +20,7 @@ petits fichiers) : seul le tar y est lu, d'une traite.
 Pas de dépendance hors bibliothèque standard : ce module est importé par les notebooks.
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -52,16 +54,27 @@ def mount_drive():
     drive.mount(DRIVE_MOUNT)
 
 
-def kaggle_credentials():
-    """Secrets Colab KAGGLE_USERNAME et KAGGLE_KEY → variables d'environnement de la CLI."""
-    if os.environ.get("KAGGLE_KEY"):
+def kaggle_credentials(drive_dir=DRIVE_DIR):
+    """Jeton de la CLI Kaggle : variables d'environnement, ~/.kaggle/kaggle.json,
+    `<drive_dir>/kaggle.json` (Drive monté), puis secrets Colab KAGGLE_USERNAME et KAGGLE_KEY.
+
+    Sous VS Code, les secrets Colab ne répondent pas (TimeoutException : pas de page pour
+    autoriser l'accès) ; le fichier sur le Drive est la voie qui marche partout."""
+    if os.environ.get("KAGGLE_KEY") or Path("~/.kaggle/kaggle.json").expanduser().is_file():
+        return True
+    on_drive = Path(drive_dir) / "kaggle.json" if drive_dir else None
+    if on_drive and on_drive.is_file():
+        token = json.loads(on_drive.read_text())
+        os.environ["KAGGLE_USERNAME"], os.environ["KAGGLE_KEY"] = token["username"], token["key"]
+        print(f"jeton Kaggle : {on_drive}")
         return True
     try:
         from google.colab import userdata
         for k in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
             os.environ[k] = userdata.get(k)
     except Exception as e:  # pas sur Colab, ou secret absent / non partagé avec le notebook
-        print(f"jeton Kaggle indisponible ({e.__class__.__name__})")
+        print(f"jeton Kaggle indisponible ({e.__class__.__name__}) : copier kaggle.json "
+              f"(kaggle.com, Settings, Create New Token) dans {on_drive or '~/.kaggle/'}")
         return False
     return True
 
@@ -98,7 +111,7 @@ def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True,
             return "rclone"
     if download and dataset in DOWNLOAD:
         if "kaggle-download" in DOWNLOAD[dataset]:
-            kaggle_credentials()
+            kaggle_credentials(drive_dir)
             if not shutil.which("kaggle"):
                 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "kaggle"])
         if _sh(DOWNLOAD[dataset], data_dir) == 0 and _check(dataset, data_dir):

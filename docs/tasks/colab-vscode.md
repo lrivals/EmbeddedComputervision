@@ -33,8 +33,11 @@ qui clique sur « Run All ».
    runtime CPU, la cellule « Environnement » s'arrête avec « runtime Colab sans GPU » (avant
    ce contrôle, CuPy disait `cudaErrorInsufficientDriver`). La roue CuPy suit la version
    CUDA du pilote (`cupy-cuda13x` à partir de 13, sinon `cupy-cuda12x`).
-3. Secrets Colab `KAGGLE_USERNAME` et `KAGGLE_KEY` si le jeu se télécharge depuis Kaggle
-   (crowdhuman, visdrone sans archive sur Drive).
+3. Jeton Kaggle si le jeu se télécharge depuis Kaggle (crowdhuman, visdrone, flir sans
+   archive sur Drive) : `kaggle.json` (kaggle.com, Settings, « Create New Token ») copié dans
+   `MyDrive/EmbeddedCV/kaggle.json`, par exemple `rclone copy kaggle.json gdrive:EmbeddedCV`.
+   Les secrets Colab ne marchent pas ici : sous VS Code, `userdata.get` n'a pas de page
+   pour demander l'accès et finit en `TimeoutException`.
 
 La cellule « Environnement » détecte Colab (`"google.colab" in sys.modules`). Le kernel
 tourne dans `/content`, hors du dépôt : elle clone donc
@@ -51,7 +54,7 @@ est sur Drive aujourd'hui :
 | voc | `MyDrive/EmbeddedCV/data/voc.tar` |
 | visdrone | `MyDrive/EmbeddedCV/data/visdrone.tar` |
 | kitti | téléchargement direct (`get_datasets.sh kitti`) |
-| flir | API Kaggle (`get_datasets.sh kaggle-download flir`, miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2` ; jeton dans les secrets Colab), puis `push flir` pour les sessions suivantes |
+| flir | API Kaggle (`get_datasets.sh kaggle-download flir`, miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2` ; jeton dans `MyDrive/EmbeddedCV/kaggle.json`), puis `push flir` pour les sessions suivantes |
 
 À vérifier au premier essai : `drive.mount()` (`colab.mount_drive`) demande une
 autorisation dans le notebook. Si elle ne s'affiche pas sous VS Code, monter Drive par la

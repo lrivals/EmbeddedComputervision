@@ -149,8 +149,9 @@ de la session) en essayant, dans l'ordre :
 2. l'archive `<DRIVE_DIR>/data/<jeu>.tar` sur Google Drive ;
 3. la même archive par rclone (`tools/get_datasets.sh pull <jeu>`), sur un PC sans le jeu ;
 4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
-   (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, avec un jeton dans les secrets
-   Colab `KAGGLE_USERNAME` et `KAGGLE_KEY`).
+   (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, avec un jeton dans
+   `<DRIVE_DIR>/kaggle.json` ou les secrets Colab `KAGGLE_USERNAME` et `KAGGLE_KEY`, qu'un
+   noyau Colab sous VS Code ne peut pas lire).
 
 Drive ne sert qu'à ce qui ne se télécharge pas : ExDark (les annotations ne sont pas sur
 Kaggle), ou un jeu qu'on ne veut pas retélécharger. Le Drive gratuit
