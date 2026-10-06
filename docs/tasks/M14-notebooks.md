@@ -150,7 +150,7 @@ de la session) en essayant, dans l'ordre :
 3. la même archive par rclone (`tools/get_datasets.sh pull <jeu>`), sur un PC sans le jeu ;
 4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
    (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, avec un jeton dans
-   `<DRIVE_DIR>/kaggle.json` ou les secrets Colab `KAGGLE_USERNAME` et `KAGGLE_KEY`, qu'un
+   `<DRIVE_DIR>/access_token` (jeton `KGAT_…`) ou les secrets Colab (`KAGGLE_API_TOKEN`), qu'un
    noyau Colab sous VS Code ne peut pas lire).
 
 Drive ne sert qu'à ce qui ne se télécharge pas : ExDark (les annotations ne sont pas sur

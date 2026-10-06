@@ -159,7 +159,7 @@ kaggle_download() {
   [[ -n "${KAGGLE_ID[$ds]:-}" ]] || { echo "$ds : pas de version Kaggle" >&2; return 1; }
   check "$ds" > /dev/null && { echo "$ds : déjà prêt"; return 0; }
   command -v kaggle > /dev/null \
-    || { echo "CLI kaggle absente : pip install kaggle (jeton : ~/.kaggle/kaggle.json)" >&2; return 1; }
+    || { echo "CLI kaggle absente : pip install kaggle (jeton : KAGGLE_API_TOKEN ou ~/.kaggle/access_token)" >&2; return 1; }
   kaggle datasets download "${KAGGLE_ID[$ds]}" -p "$DATA_DIR/${KAGGLE_DIR[$ds]}" --unzip
 }
 
