@@ -56,9 +56,13 @@ entraînement (« Reste » de chaque tâche).
   [results/figures.md](../../results/figures.md). Une ligne par notebook : jeu, modèle,
   rôle, palier de coût, poids requis, badge « Open in Colab ».
 - **Visionneuse** : `notebooks/figures_live.ipynb`, hors registre modèle × jeu, générée
-  avec l'index (`gabarits.viewer`). Affichage seul et **sans exécution** : une cellule
-  Markdown par dossier de PNG versionnés (`docs/tasks/figures/`, `results/figures/`), en
-  liens `![](../…)`, visibles dès l'ouverture dans VS Code comme sur GitHub. La liste est
+  avec l'index (`gabarits.viewer`). Affichage seul et **sans exécution** : les PNG
+  versionnés (`docs/tasks/figures/`, `results/figures/`) en cellules Markdown, liens
+  `![](../…)`, visibles dès l'ouverture dans VS Code comme sur GitHub. Ils sont rangés par
+  famille du registre `tools/figures/` (section ouverte par un paragraphe de contexte,
+  `FAMILY_INTROS`, et la liste des figures), puis par figure : tâche T13.x, légende,
+  source, commande (`EXTRA_PREFIXES` rattache les PNG au nom d'une autre figure). Un PNG
+  qu'aucune figure ne réclame tombe dans « Autres figures ». La liste est
   lue sur le disque à la génération : après `make figures`, lancer `make notebooks`
   (sinon `--check` signale la visionneuse). Les PNG de `build/` (non versionnés)
   s'affichent par la dernière cellule, avec un noyau local.

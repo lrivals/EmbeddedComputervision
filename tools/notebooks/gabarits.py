@@ -742,19 +742,78 @@ VIEWER_STATIC = ["docs/tasks/figures", "results/figures"]
 VIEWER_DIRS = ["build/figures", "build/notebooks"]
 
 
+# Contexte d'une famille du registre tools/figures (titres : FAMILY_TITLES), en tête de section.
+FAMILY_INTROS = {
+    "resultats": "Ce que donne le projet, mesuré : la précision (mAP) aux stades flottant, "
+                 "entier et C-sim, l'effet du format des poids et de la quantification, le "
+                 "coût en cycles et en ressources de l'accélérateur, et sa place face aux "
+                 "travaux publiés. Les chiffres viennent des sorties de `build/` et de "
+                 "`results/*.md` ; aucun n'est recopié à la main.",
+    "modeles": "Les deux réseaux du projet, Tiny-YOLOv2 VOC et Tiny-YOLOv3 COCO, vus d'en "
+               "haut : graphe des couches, coût par couche (MACs, paramètres, activations), "
+               "empreinte mémoire face au budget de la carte, ancres, lecture d'une sortie "
+               "YOLO, et les données VOC qui servent à l'entraînement et à l'évaluation.",
+    "materiel": "L'accélérateur sur le SoC Zynq : la répartition ARM / logique programmable, "
+                "le moteur unique de MACs et son tuilage, l'alternative streaming, et la "
+                "chaîne qui vérifie bit à bit chaque passage, du NumPy flottant à la carte.",
+    "maths": "Toute la chaîne est réécrite à la main en NumPy pur, sans PyTorch, OpenCV, "
+             "scikit-learn ni devkit (ADR 0001). Chaque figure reprend une brique, de la "
+             "convolution à la quantification, par ses fonctions mathématiques.",
+    "reseaux": "Le niveau en dessous de « Modèles » : chaque couche et chaque tenseur de "
+               "Tiny-YOLOv2 VOC et Tiny-YOLOv3 COCO, tirés de `python/yolo/models/specs.py`, "
+               "jusqu'au suivi d'une couche du flottant au noyau HLS.",
+    "projet": "Comment le projet s'est construit : jalons et chronologie (depuis les "
+              "commits), avancement des tâches, volume de code, tests et dépendances "
+              "entre jalons.",
+}
+
+
+# PNG dont le nom ne commence pas par celui de la figure qui les trace (préfixe → figure).
+EXTRA_PREFIXES = {"echelles_poids": "calibration"}
+
+
 def _figure_cells():
-    """Une cellule Markdown par dossier de PNG versionnés : `![nom](../chemin)`."""
+    """Cellules Markdown des PNG versionnés, rangés par famille puis par figure du registre
+    tools/figures (titre, légende, source, commande), liens `![nom](../chemin)` ; les PNG
+    que le registre ne réclame pas finissent dans « Autres figures »."""
+    from tools.figures import FIGURES
+    from tools.figures.__main__ import FAMILY_TITLES, images_of
+
+    pngs = sorted(p for top in VIEWER_STATIC for p in (ROOT / top).rglob("*.png"))
+    # Un PNG revient à la figure au nom le plus long qui le réclame (ancres / ancres_k).
+    owner = {}
+    for fig in FIGURES.values():
+        for p in images_of(fig):
+            if p in pngs and len(fig.name) > len(owner.get(p, "")):
+                owner[p] = fig.name
+    for p in pngs:
+        for prefix, name in EXTRA_PREFIXES.items():
+            if p not in owner and p.stem.startswith(prefix):
+                owner[p] = name
+    link = lambda p: f"![{p.stem}](../{p.relative_to(ROOT).as_posix()})"
+
     cells = []
-    for top in VIEWER_STATIC:
-        folders = {}
-        for p in sorted((ROOT / top).rglob("*.png")):
-            folders.setdefault(p.parent, []).append(p)
-        for folder, pngs in folders.items():
-            rel = folder.relative_to(ROOT).as_posix()
-            lines = [f"## `{rel}` ({len(pngs)})", ""]
-            for p in pngs:
-                lines += [f"**{p.stem}**", "", f"![{p.stem}](../{rel}/{p.name})", ""]
+    for fam, title in FAMILY_TITLES.items():
+        figs = [(f, [p for p in pngs if owner.get(p) == f.name])
+                for f in FIGURES.values() if f.family == fam]
+        figs = [(f, imgs) for f, imgs in figs if imgs]
+        if not figs:
+            continue
+        toc = [f"- {f.task} — `{f.name}`" for f, _ in figs]
+        cells.append(md("\n".join([f"## {title}", "", FAMILY_INTROS.get(fam, ""), "", *toc])))
+        for f, imgs in figs:
+            lines = [f"### {f.task} — `{f.name}`", "", f.caption, "",
+                     f"- Source : `{f.source}`", f"- Régénérer : `{f.command}`", ""]
+            for p in imgs:
+                lines += ([f"**{p.stem}**", ""] if len(imgs) > 1 else []) + [link(p), ""]
             cells.append(md("\n".join(lines)))
+    orphans = [p for p in pngs if p not in owner]
+    if orphans:
+        lines = ["## Autres figures", "",
+                 "PNG versionnés qu'aucune figure du registre `tools/figures/` ne produit.", ""]
+        for p in orphans:
+            lines += [f"**{p.relative_to(ROOT).as_posix()}**", "", link(p), ""]
+        cells.append(md("\n".join(lines)))
     return cells
 
 
@@ -766,15 +825,40 @@ def viewer():
         md("""\
         # Figures
 
-        Affichage seul, sans exécution : chaque dossier de PNG versionnés
-        (`docs/tasks/figures/`, `results/figures/`) a sa cellule. Une nouvelle figure
-        apparaît ici après `make notebooks` (liste régénérée depuis le disque). Les figures
-        de `build/` (non versionnées) s'affichent par la dernière cellule, avec un noyau local.
-        Notebook généré par `python -m tools.notebooks` : modifier
+        Le projet expliqué en images (jalon M13) : l'architecture des réseaux et de
+        l'accélérateur, les résultats mesurés, la réimplémentation NumPy et l'histoire du
+        projet. Chaque figure est tracée par `tools/figures/` à partir de données du dépôt ;
+        aucun chiffre n'est saisi à la main.
+
+        **Lecture.** Une section par famille, ouverte par un paragraphe de contexte et la
+        liste de ses figures. Chaque figure donne sa tâche (`T13.x`, détaillée dans
+        [M13-figures.md](../docs/tasks/M13-figures.md)), ce qu'elle montre, la donnée
+        qu'elle lit et la commande qui la retrace. La même galerie existe en Markdown :
+        [results/figures.md](../results/figures.md).
+
+        **Affichage seul.** Les PNG versionnés (`results/figures/`, `docs/tasks/figures/`)
+        sont dans des cellules Markdown : rien à exécuter, dans VS Code comme sur GitHub.
+        Seule la dernière section, pour `build/`, demande un noyau local.
+
+        **Mise à jour.** `make figures` retrace les PNG, puis `make notebooks` régénère ce
+        notebook depuis le disque. Il est généré par `python -m tools.notebooks` : modifier
         `tools/notebooks/gabarits.py:viewer`, pas ce fichier.
         """),
         *_figure_cells(),
-        md("## Figures de `build/` (noyau local)"),
+        md("""\
+        ## Figures non versionnées (`build/`, noyau local)
+
+        Certaines figures ne sont pas publiées : celles calculées sur un sous-ensemble
+        d'images (règle M12, par exemple la sensibilité par couche) et les sorties des
+        notebooks d'entraînement et d'inférence. Elles restent dans `build/`, sur le PC qui
+        les a produites ; la cellule ci-dessous les affiche, avec un noyau local (pas Colab).
+
+        - `DIRS` : dossiers parcourus, relatifs à la racine du dépôt ;
+        - `FILTER` : sous-chaîne du chemin pour ne garder que certaines images ;
+        - `WIDTH` : largeur d'affichage en pixels.
+
+        Les images s'affichent de la plus récente à la plus ancienne.
+        """),
         code(f"""\
         DIRS   = {VIEWER_DIRS!r}  # relatifs à la racine du dépôt
         FILTER = ''  # sous-chaîne du chemin (ex. 'balayage') ; '' : tout

@@ -113,8 +113,16 @@ def test_visionneuse_generee_et_affichage_seul(tmp_path):
     shown = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
     # figures versionnées affichées sans exécution, liens relatifs à notebooks/
     assert "![balayage_map](../docs/tasks/figures/resultats/balayage_map.png)" in shown
-    for link in re.findall(r"\]\(\.\./([^)]+\.png)\)", shown):
+    links = re.findall(r"\]\(\.\./([^)]+\.png)\)", shown)
+    for link in links:
         assert (ROOT / link).exists(), link
+    # chaque PNG versionné une seule fois, rangé par famille et par figure du registre
+    from tools.figures import FIGURES
+    from tools.notebooks.gabarits import VIEWER_STATIC
+    pngs = {p.relative_to(ROOT).as_posix() for top in VIEWER_STATIC for p in (ROOT / top).rglob("*.png")}
+    assert sorted(links) == sorted(pngs)
+    assert "## Résultats (D)" in shown and "### T13.53 — `balayage`" in shown
+    assert FIGURES["map_stades"].caption in shown
     src = "\n".join(_code(nb))
     assert "Image(data=" in src and "SystemExit" in src
     assert "tools.notebooks.commandes" not in src and "C.run" not in src  # aucun calcul

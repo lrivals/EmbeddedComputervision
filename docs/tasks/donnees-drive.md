@@ -53,9 +53,9 @@ ls -l data_archives/                 # doivent être identiques
 | crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | ✓ (6 oct. 2026) | aussi par l'API Kaggle ; le plus long à envoyer |
 | coco | ≈ 1,3 Go | `coco/annotations/instances_val2017.json` | — | absent du PC ; se retélécharge (`get_datasets.sh coco`) |
 | kitti | ≈ 12 Go | `kitti/training/image_2/000000.png` | — | absent du PC ; se retélécharge (`get_datasets.sh kitti`) |
-| flir | — | `flir/images_thermal_val/coco.json` | — | inscription, ou l'API Kaggle (miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2`) |
+| flir | 12 Go | `flir/images_thermal_val/coco.json` | ✓ (7 oct. 2026) | aussi par l'API Kaggle (miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2`) ; RGB et vidéos compris (images thermiques seules : 4,9 Go) |
 
-Les tailles sont celles de `du -shL` sur le PC. Ensemble, les quatre premiers jeux font environ 17 Go.
+Les tailles sont celles de `du -shL` sur le PC. Ensemble, les cinq jeux envoyés font environ 30 Go.
 C'est plus que le Drive gratuit (15 Go), mais le compte du projet a 100 Go. Vérifier la place
 avec `rclone about gdrive:` avant un gros envoi. Après un nouvel envoi, mettre à jour la
 colonne « Sur le Drive ».
@@ -129,5 +129,19 @@ Un run entraîné sur GPU l'indique dans `run.json` (`device`).
 - ExDark : le lien `data/exdark/ExDark` pointe vers tout `data/ExDark Dataset/`. L'archive
   contient donc aussi les annotations sous `exdark/ExDark/ExDark_Annno/`. Elles font
   quelques Mo et ne sont pas lues.
+- FLIR sur le PC : le téléchargement manuel arrive dans `data/Teledyne FLIR ADAS Thermal
+  Dataset v2/FLIR_ADAS_v2/`. Le relier à la main, comme `kaggle` le fait pour le miroir :
+  `ln -s "Teledyne FLIR ADAS Thermal Dataset v2/FLIR_ADAS_v2" data/flir`.
+- Gros envoi (> 10 Go) : le fichier part en entier, puis Drive met plusieurs minutes à le
+  finaliser. rclone peut alors abandonner et tout renvoyer sans message d'erreur : le total
+  de `--progress` grossit d'une taille d'archive à chaque essai (23,8 puis 35,7 Gio pour
+  les 11,9 Gio de FLIR), et il arrive que l'envoi se fige (`0/s`). Ne pas relancer `push`,
+  qui refait l'archive : renvoyer celle de `data_archives/` (`--timeout 30m` pour laisser
+  Drive finir, option non testée), puis comparer les tailles.
+
+  ```bash
+  rclone copy data_archives/flir.tar gdrive:EmbeddedCV/data --progress --timeout 30m
+  ```
+
 - Un jeu modifié en local (nouvelles annotations, sous-ensemble) doit être renvoyé
   avec `push`. `pull` ne remplace jamais un jeu déjà présent.
