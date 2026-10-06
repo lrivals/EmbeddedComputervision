@@ -54,8 +54,7 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
         if any(w.startswith("weights/") and not (ROOT / w).exists() for w in weights):
             _sh("bash", "tools/get_weights.sh")
         if not data_root and not data_ok(dataset):
-            if dataset not in colab.DOWNLOAD:  # ExDark, FLIR : seulement par Drive
-                mount_drive(drive_dir)
+            mount_drive(drive_dir)  # archive sur Drive avant le téléchargement direct
             colab.prepare_data(dataset, drive_dir)
     elif not data_root and not data_ok(dataset):
         try:  # local : archive sur Drive par rclone, jamais de téléchargement implicite
