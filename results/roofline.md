@@ -12,3 +12,5 @@ Ordre de grandeur du §10.2 : Tm = Tn = 16, 200 MHz, efficacité 100 % → 3.49 
 | Zybo Z7-20 | 220 | 280 | 2.98 | 150 | 8, 16, 13, 13 | 160 | 48 | 68.9 | 35.1 | 35.1 | 198.4 | 159.4 |
 
 Graphiques : `roofline_kv260.png`, `roofline_pynq-z2.png`, `roofline_ultra96-v2.png`, `roofline_zybo-z7-20.png`
+
+Roofline par couche, avant et après M10 : `results/figures/resultats/roofline_couches_kv260.png` (`python -m tools.figures roofline_couches`, T13.22).

@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -38,6 +38,7 @@ help:
 	@echo "bench-report results/benchmarks.csv (ce travail) : mesures carte ou projection"
 	@echo "ci-model    export synthétique → model/ (sans poids Darknet ni VOC, T10.13)"
 	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
+	@echo "figures     figures M13 dont les données sont présentes → results/figures/, results/figures.md"
 
 test: test-py test-cpp
 
@@ -80,6 +81,11 @@ golden-check:
 
 roofline:
 	python tools/roofline.py
+
+# M13 : régénère toutes les figures dont la source est présente (palier R ; les autres sont
+# sautées avec un message) et la galerie results/figures.md.
+figures:
+	python -m tools.figures all
 
 lint:
 	ruff check python tools

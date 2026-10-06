@@ -77,7 +77,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ## A. Infrastructure
 
-### [ ] T13.0 — Paquet `tools/figures/` et galerie
+### [x] T13.0 — Paquet `tools/figures/` et galerie
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** :
   - `tools/figures/__init__.py` et `__main__.py`, qui tiennent le registre nom → générateur ;
@@ -92,10 +92,28 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - le test est marqué `skip` si matplotlib est absent.
 - **Notes** : un générateur a la forme `fn(out_dir) -> list[Path]`. La galerie
   `results/figures.md` est réécrite à partir du registre, ce qui évite les liens morts.
+- **Fait** :
+  - 22 générateurs B, D et E (`python -m tools.figures --list`) ;
+  - `make figures` en 1 min environ ;
+  - `python/tests/test_figures.py`.
+- **Mode automatique** (`tools/figures/auto.py`) : actif par défaut, coupé par `--no-figures`
+  ou `YOLO_FIGURES=0`. Il écrit à côté des sorties du run, jamais dans `results/`, et un
+  échec de tracé n'affecte pas le run. Points d'appel :
+
+  | Outil | Figures produites |
+  |---|---|
+  | `tools/train.py` | courbes dans `<out>/figures/`, à chaque `--save-every` et en fin de run |
+  | `tools/eval_quant.py` | AP par classe et sensibilité `fq:<i>` à côté du JSON |
+  | `tools/eval_voc.py` | courbes PR dans `build/figures/eval/<run>/` |
+  | `tools/map_stades.py` | `--json` puis la figure T13.13 |
+  | `tools/perf_model.py` | cascade, cycles et roofline par couche dans `build/perf/figures/` |
+  | `tools/m12.sh` | résumé des mAP et courbes du profil dans `build/m12/<profil>/figures/` |
+
+  À la main : `python -m tools.figures --run scan --dir <dossier>`.
 
 ## B. Architecture des modèles
 
-### [ ] T13.1 — Schéma couche par couche de Tiny-YOLOv2 et Tiny-YOLOv3
+### [x] T13.1 — Schéma couche par couche de Tiny-YOLOv2 et Tiny-YOLOv3
 - **Spec** : §3 · **Dépend de** : T1.7 · **Taille** : M
 - **Livrables** : `figures/modeles/graphe_<net>.{svg,png}`, généré en Graphviz depuis
   `python/yolo/models/cfg.py` et `graph.py`
@@ -110,7 +128,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - épaisseur des nœuds proportionnelle aux MACs (T13.2) ;
   - variante « compacte » : un bloc par étage de résolution.
 
-### [ ] T13.2 — Profil par couche : MACs, paramètres, activations
+### [x] T13.2 — Profil par couche : MACs, paramètres, activations
 - **Spec** : §3 · **Dépend de** : T0.5 · **Taille** : S
 - **Livrables** : `figures/modeles/profil_couches.png`, en trois panneaux à axe x commun
   (indice de couche) :
@@ -126,7 +144,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   13×13 portent l'essentiel des poids, et les premières couches l'essentiel des
   activations.
 
-### [ ] T13.3 — Empreinte mémoire face au budget de la carte
+### [x] T13.3 — Empreinte mémoire face au budget de la carte
 - **Spec** : §10.2 · **Dépend de** : T13.2, T5.6 · **Taille** : S
 - **Livrables** : `figures/modeles/memoire.png`, en barres empilées par couche (poids int8,
   biais int32, activations entrée et sortie) avec deux lignes de référence :
@@ -137,7 +155,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 - **Notes** : la figure justifie le moteur couche par couche, puisque rien ne tient en BRAM
   d'un seul coup. Elle sert aussi de point de départ à T13.11 (streaming).
 
-### [ ] T13.4 — Ancres : boîtes VOC et k-means
+### [~] T13.4 — Ancres : boîtes VOC et k-means
 - **Spec** : §5.2 · **Dépend de** : T2.2 · **Taille** : S
 - **Livrables** :
   - `figures/modeles/ancres.png` : nuage (w, h) des 40 058 boîtes VOC07+12 (hexbin), avec
@@ -149,6 +167,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - réutiliser les fonctions de `tools/kmeans_anchors.py` (ne pas dupliquer le k-means) ;
   - la courbe en k est un palier M, car elle relance un k-means par valeur ;
   - nécessite `data/VOCdevkit`.
+- **Partiel** : `ancres.png` est fait ; `ancres_k.png` (palier M) reste à faire.
 
 ### [ ] T13.5 — Sortie YOLO expliquée sur une image
 - **Spec** : §5.1, §8.1 · **Dépend de** : T3.1 · **Taille** : M
@@ -170,7 +189,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 - **Notes** : reprendre `tools/show_augment.py` (sorties dans `build/augment_samples`) au
   lieu de le réécrire.
 
-### [ ] T13.7 — Statistiques du jeu VOC
+### [x] T13.7 — Statistiques du jeu VOC
 - **Spec** : §8.3 · **Dépend de** : T2.6 · **Taille** : S
 - **Livrables** : `figures/modeles/voc_stats.png`, en trois panneaux :
   - nombre d'objets par classe, en trainval et en test ;
@@ -247,7 +266,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ## D. Résultats
 
-### [ ] T13.13 — mAP aux trois stades et AP par classe
+### [x] T13.13 — mAP aux trois stades et AP par classe
 - **Spec** : §8.3 · **Dépend de** : T8.2 · **Taille** : S
 - **Livrables** : `figures/resultats/map_stades.png`, des barres groupées par classe
   (flottant, entier, C-sim, puis carte quand elle sera mesurée) avec la mAP globale en
@@ -257,7 +276,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - ajouter `--json` à `tools/map_stades.py`, pour ne pas reparser le Markdown ;
   - variante en écart (entier − flottant) par classe, triée.
 
-### [ ] T13.14 — Précision selon le format numérique
+### [x] T13.14 — Précision selon le format numérique
 - **Spec** : §9 · **Dépend de** : T4.5, M9.2, M9.3 · **Taille** : S
 - **Livrables** : `figures/resultats/map_formats.png`, une mAP par variante :
   - flottant ;
@@ -272,7 +291,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - marquer « non convergé » sur l'ADMM tant que T9.2.3 est ouverte ;
   - une version en nuage (DSP en x, mAP en y) donne la frontière de Pareto.
 
-### [ ] T13.15 — Courbes précision-rappel
+### [x] T13.15 — Courbes précision-rappel
 - **Spec** : §8.3 · **Dépend de** : T3.3 · **Taille** : S
 - **Livrables** : `figures/resultats/pr_<variante>.png`, une petite courbe par classe
   (grille 4 × 5) avec les 11 points VOC07
@@ -283,7 +302,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - comparer stretch et letterbox, et notre prétraitement face à celui de Darknet (les
     quatre variantes de `build/eval/`).
 
-### [ ] T13.16 — Sensibilité par couche à la quantification
+### [x] T13.16 — Sensibilité par couche à la quantification
 - **Spec** : §9.2 · **Dépend de** : T4.5, T12.3 · **Taille** : S
 - **Livrables** : `figures/resultats/sensibilite.png`, une barre par couche. La barre donne
   la perte de mAP quand cette couche seule est quantifiée, ou quand elle seule reste en
@@ -292,7 +311,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   T12.3
 - **Notes** : à rapprocher de T13.2 (couches lourdes et couches sensibles).
 
-### [ ] T13.17 — Distributions et échelles de calibration
+### [x] T13.17 — Distributions et échelles de calibration
 - **Spec** : §9.2 · **Dépend de** : T4.2 · **Taille** : S
 - **Livrables** :
   - `figures/resultats/calibration.png` : par couche, l'histogramme (log) des activations
@@ -302,7 +321,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   `results/calibration_*.md`
 - **Notes** : montrer la part des valeurs saturées par couche.
 
-### [ ] T13.18 — Erreur flottant → entier par couche
+### [x] T13.18 — Erreur flottant → entier par couche
 - **Spec** : §9 · **Dépend de** : T4.7, T5.3 · **Taille** : S
 - **Livrables** : `figures/resultats/erreur_couches.png`, qui trace par couche :
   - le SNR (dB) de la sortie entière déquantifiée face au flottant ;
@@ -322,7 +341,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 - **Notes** : choisir une image où flottant et entier diffèrent, pour montrer l'effet de la
   quantification.
 
-### [ ] T13.20 — Cycles par couche
+### [x] T13.20 — Cycles par couche
 - **Spec** : §10.2 · **Dépend de** : T6.3, T8.1 · **Taille** : S
 - **Livrables** : `figures/resultats/cycles_couches.png`, des barres empilées par couche
   (load_in, load_w, compute, store), le temps recouvert étant marqué d'un point. Deux
@@ -331,7 +350,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   hls-cycles`) et à `tools/perf_model.py --check`
 - **Notes** : on y voit quel goulot domine chaque couche (mémoire au début, calcul à 13×13).
 
-### [ ] T13.21 — Cascade des optimisations
+### [x] T13.21 — Cascade des optimisations
 - **Spec** : §10.3 · **Dépend de** : M10 · **Taille** : S
 - **Livrables** : `figures/resultats/cascade_m10.png`, un waterfall en ms sur Tiny-YOLOv2.
   - Il part de 206,5 ms (noyau M6), puis passe par les ports 64 bits, le trim, la
@@ -344,7 +363,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - deux teintes : piste faite (code dans `hls/kernels/`) et piste projetée ;
   - mettre à jour à chaque tâche M10 fermée.
 
-### [ ] T13.22 — Roofline par couche
+### [x] T13.22 — Roofline par couche
 - **Spec** : §10.2 · **Dépend de** : T5.6, T13.20 · **Taille** : S
 - **Livrables** : `figures/resultats/roofline_couches_<carte>.png`. C'est le roofline de
   `tools/roofline.py`, avec :
@@ -355,7 +374,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   points à T13.20
 - **Notes** : étendre `tools/roofline.py` plutôt que le dupliquer.
 
-### [ ] T13.23 — Comparaison à l'état de l'art
+### [x] T13.23 — Comparaison à l'état de l'art
 - **Spec** : §10.4 · **Dépend de** : T8.3 · **Taille** : S
 - **Livrables** : `figures/resultats/etat_art.png`, en trois panneaux :
   - GOPS face à la puissance, avec des iso-GOPS/W ;
@@ -368,7 +387,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 - **Notes** : l'annotation donne l'auteur et l'année (colonne `travail`). Les colonnes vides
   (puissance de ce travail) restent « à mesurer ».
 
-### [ ] T13.24 — Ressources face au budget KV260
+### [~] T13.24 — Ressources face au budget KV260
 - **Spec** : §10.1 · **Dépend de** : M9.2, M9.3, M9.4 · **Taille** : S
 - **Livrables** : `figures/resultats/ressources.png`, des barres DSP / BRAM / LUT
   rapportées au budget XCK26 (1 248 DSP, etc.) pour quatre variantes :
@@ -382,8 +401,12 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - les barres sont hachurées tant que ce sont des estimations ;
   - elles deviennent pleines avec `hls_report.md` après synthèse.
 - **Notes** : à recouper avec T13.14 pour l'arbitrage précision / surface.
+- **Partiel** :
+  - faits : DSP et mémoire sur puce du moteur unique INT8 et 4 bits et du streaming W8A8 /
+    W4A4 ;
+  - à faire : la variante pow2 et les LUT (aucune estimation chiffrée dans `req_yolo.md`).
 
-### [ ] T13.25 — Post-traitement matériel
+### [x] T13.25 — Post-traitement matériel
 - **Spec** : §10.3 · **Dépend de** : M9.1 · **Taille** : S
 - **Livrables** : `figures/resultats/hw_postproc.png`, en deux panneaux :
   - la mAP avec et sans plafond de boîtes ;
@@ -392,7 +415,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   `hwpp_map_nocap.json`
 - **Notes** : justifie la taille du plafond retenue dans [postproc_hw.md](../../results/postproc_hw.md).
 
-### [ ] T13.26 — Courbes d'entraînement
+### [x] T13.26 — Courbes d'entraînement
 - **Spec** : §7 · **Dépend de** : T2.7, M9.2, M9.3 · **Taille** : S
 - **Livrables** : `figures/resultats/entrainement_<run>.png`, avec :
   - la perte totale et ses composantes (coordonnées, objectness, classes), lissées ;
@@ -406,7 +429,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ## E. Développement du projet
 
-### [ ] T13.27 — Chronologie des jalons
+### [x] T13.27 — Chronologie des jalons
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** : `figures/projet/chronologie.png`, un Gantt des jalons M0 → M9, reconstruit
   à partir des commits « Mx : » de `git log --date=iso`, avec les jalons de documentation en
@@ -416,7 +439,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - granularité à l'heure : beaucoup de jalons tombent le même jour ;
   - les jalons non commencés (M10 à M13) sont en gris.
 
-### [ ] T13.28 — Avancement par jalon
+### [x] T13.28 — Avancement par jalon
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** : `figures/projet/avancement.png`, des barres horizontales par jalon (tâches
   faites, vérifiées sur PC, en attente de la carte, ouvertes)
@@ -428,7 +451,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   des notes du suivi (C-sim, sim). Si la règle est trop fragile, ajouter une colonne au
   tableau de suivi.
 
-### [ ] T13.29 — Volume de code au fil des commits
+### [x] T13.29 — Volume de code au fil des commits
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** : `figures/projet/code.png`, des aires empilées (lignes par dossier :
   `python/`, `tools/`, `hls/`, `sw/`, `docs/`, `results/`) commit par commit
@@ -436,7 +459,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   au décompte actuel.
 - **Notes** : variante par langage (Python, C++, CMake, Markdown).
 
-### [ ] T13.30 — Tests et dépendances
+### [~] T13.30 — Tests et dépendances
 - **Spec** : — · **Dépend de** : T0.3 · **Taille** : S
 - **Livrables** :
   - `figures/projet/tests.png` : nombre de tests par module Python
@@ -446,6 +469,9 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
     image et coloré selon T13.28.
 - **Acceptation** : le total des tests est égal à la collecte pytest + ctest
 - **Notes** : le graphe reste défini une seule fois, dans le README ; la figure le parse.
+- **Partiel** :
+  - fait : `tests.png` (collecte pytest et `ctest -N`) ;
+  - à faire : les durées `--durations` et `dependances.svg`.
 
 ## F. Réimplémentation de zéro : fonctions mathématiques
 

@@ -111,6 +111,8 @@ def main():
     ap.add_argument("--area", action="store_true", help="AP par aire (VOC2010+) au lieu de 11 pts")
     ap.add_argument("--out", type=Path, default=None, help="dossier des détections écrites")
     ap.add_argument("--markdown", type=Path, default=None, help="ajoute la table à ce fichier")
+    ap.add_argument("--no-figures", action="store_true",
+                    help="pas de courbes PR à côté des détections (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
 
     split = datasets.split_of(args)
@@ -154,6 +156,13 @@ def main():
     if args.markdown:
         with args.markdown.open("a") as f:
             f.write(text + "\n")
+    if metric == "voc" and not args.no_figures:
+        sys.path.insert(0, str(ROOT))
+        from tools.figures.auto import after_run
+
+        det_dir = args.dets or out
+        after_run("eval-voc", det_dir, out=ROOT / "build" / "figures" / "eval" / det_dir.name,
+                  dets=dets, samples=samples, names=view.names, title=title)
 
 
 if __name__ == "__main__":

@@ -45,3 +45,5 @@ make bench-sim          # stade FPGA en C-sim, lots parallèles
 # carte : yolo_bench --inputs ... --dets build/m8/<net>/board/dets_0.jsonl (results/protocole.md)
 make map-stades
 ```
+
+Figure : `results/figures/resultats/map_stades.png` (`python -m tools.figures map_stades`, T13.13).

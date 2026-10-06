@@ -217,6 +217,8 @@ def main():
     ap.add_argument("--out", type=Path, default=None, help="table JSON des mAP")
     ap.add_argument("--save-dets", type=Path, default=None,
                     help="détections du modèle entier, une ligne JSON par image (T8.2)")
+    ap.add_argument("--no-figures", action="store_true",
+                    help="pas de figure à côté du JSON (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
     if args.save_dets and not {"int", "int-hwpp"} & set(args.variants.split(",")):
         ap.error("--save-dets demande la variante int ou int-hwpp")
@@ -270,6 +272,11 @@ def main():
                                "hw_cap": args.hw_cap if "int-hwpp" in variants else None,
                                "results": res}, indent=1) + "\n")
     print(f"résultats : {out}")
+    if not args.no_figures:
+        sys.path.insert(0, str(ROOT))
+        from tools.figures.auto import after_run
+
+        after_run("eval-quant", out)
 
 
 if __name__ == "__main__":

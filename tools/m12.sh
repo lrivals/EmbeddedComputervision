@@ -17,7 +17,8 @@
 #   repetition                            T12.10  répétition du protocole carte (M)
 #
 # Sorties dans build/m12/<profil>/ (journal log.txt, JSON des mAP, CSV) ; rien n'est écrit
-# dans results/. Variables : JOBS (évaluations, défaut 16), DEVICE (cpu | gpu, entraînements,
+# dans results/ ; figures du profil dans build/m12/<profil>/figures/ (YOLO_FIGURES=0 : non).
+# Variables : JOBS (évaluations, défaut 16), DEVICE (cpu | gpu, entraînements,
 # défaut cpu), SUBSET (défaut 500), NET (défaut tiny-yolov2-voc).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -43,6 +44,7 @@ step() {
 setup() {
   mkdir -p "$M12/$1"
   LOG=$M12/$1/log.txt
+  FIG_DIR=$M12/$1
   echo "=== $1 — $(date -Is)" >> "$LOG"
 }
 
@@ -316,3 +318,9 @@ repetition)
   exit 2
   ;;
 esac
+
+# Figures du profil (M13) dans build/m12/<profil>/figures/ : courbes d'entraînement et mAP
+# relues dans les sorties ; YOLO_FIGURES=0 pour couper. N'échoue jamais.
+if [ -n "${FIG_DIR:-}" ] && [ "${YOLO_FIGURES:-1}" != 0 ]; then
+  python -m tools.figures --run m12 --dir "$FIG_DIR" 2>&1 | tee -a "$LOG" || true
+fi

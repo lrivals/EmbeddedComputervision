@@ -98,6 +98,24 @@ def evaluate(layers, tm, tn, tr, tc, freq_hz, bw_bytes):
     }
 
 
+def layer_points(convs, board, before, after, tiles=(32, 24, 13, 13)):
+    """Roofline par couche (T13.22) : [(id, CTC, GOPS avant, GOPS après)].
+
+    `convs` : dicts de `perf_model.conv_layers` ; CTC du modèle §10.2 aux tuiles `tiles` ;
+    `before`, `after` : d → cycles de la couche (par exemple noyau M6 et noyau actuel).
+    """
+    out = []
+    for d in convs:
+        r = d["h"] + 2 * d["pad"] - d["k"] + 1
+        c = d["w"] + 2 * d["pad"] - d["k"] + 1
+        arr = np.array([(d["cout"], d["cin"], r, c, d["k"])], dtype=np.int64)
+        e = evaluate(arr, *tiles, board["freq_hz"], board["bw_bytes"])
+        ops = 2 * total_macs(arr)
+        out.append((d["layer"], e["ctc"], ops * board["freq_hz"] / before(d) / 1e9,
+                    ops * board["freq_hz"] / after(d) / 1e9))
+    return out
+
+
 def ideal_time_s(layers, tm, tn, freq_hz):
     """Ordre de grandeur du §10.2 : MACs / (Tm Tn) cycles, efficacité 100 %."""
     return total_macs(layers) / (tm * tn) / freq_hz
@@ -194,7 +212,10 @@ def report(boards, nets, out_dir):
             + " | ".join(f"{t:.1f}" for t in times) + " |")
         png = out_dir / f"roofline_{board['file']}.png"
         plot(points, board, nets[0], png)
-    lines += ["", "Graphiques : " + ", ".join(f"`roofline_{b['file']}.png`" for b in boards), ""]
+    lines += ["", "Graphiques : " + ", ".join(f"`roofline_{b['file']}.png`" for b in boards),
+              "", "Roofline par couche, avant et après M10 : "
+              "`results/figures/resultats/roofline_couches_kv260.png` "
+              "(`python -m tools.figures roofline_couches`, T13.22).", ""]
     return "\n".join(lines)
 
 

@@ -64,3 +64,5 @@ manifest. Le golden C++ et la C-sim HLS (`tb_net`) le reproduisent **à l'octet*
 - Le paquetage 4 bits dans le moteur : conteneur int8 aujourd'hui, donc pas de gain de
   bande passante.
 - Le packing de 2 MAC par DSP dans le HLS, puis la synthèse.
+
+Figures : `results/figures/resultats/map_formats.png` (T13.14) et `entrainement_qat-w4a4.png` (T13.26), `python -m tools.figures map_formats entrainement`.

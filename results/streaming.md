@@ -122,3 +122,5 @@ sortie, 52 Ko en 8 bits). Le plan ne change pas ; la mémoire sur puce passe de 
 Fait en C-sim (T10.8, T10.9) : poids en ROM (`tb_stream_rom`), ordre PE extérieur de
 L12-L13, profondeurs des FIFO, AXI-Stream avec TLAST et AXI DMA émulé (`yolo_bench --engine
 stream`).
+
+Figure : `results/figures/resultats/ressources.png` (T13.24, estimations face au budget KV260), `python -m tools.figures ressources`.

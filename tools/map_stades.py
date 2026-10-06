@@ -71,6 +71,9 @@ def main():
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "map_stades.md")
+    ap.add_argument("--json", type=Path, default=None,
+                    help="stades en JSON pour les figures (défaut <dir>/map_stades.json, T13.13)")
+    ap.add_argument("--no-figures", action="store_true", help="pas de figure en fin de run")
     args = ap.parse_args()
     d = args.dir or (ROOT / "build" / "m8" / args.net if args.dataset == "voc"
                      else ROOT / "build" / "m11" / args.dataset / args.net)
@@ -154,10 +157,26 @@ def main():
               "# carte : yolo_bench --inputs ... --dets build/m8/<net>/board/dets_0.jsonl "
               "(results/protocole.md)",
               "make map-stades", "```", ""]
+    if args.dataset == "voc":
+        lines[-1:-1] = ["", "Figure : `results/figures/resultats/map_stades.png` "
+                        "(`python -m tools.figures map_stades`, T13.13)."]
     args.out.write_text("\n".join(lines))
+    keys = ("flottant", "entier", "csim", "carte")
+    js = args.json or d / "map_stades.json"
+    js.write_text(json.dumps({
+        "net": args.net, "dataset": args.dataset, "split": split, "metric": metric,
+        "images": len(samples), "classes": list(names),
+        "stages": [{"key": k, "name": n.split(" (")[0], "label": n, "map": m,
+                    "aps": None if aps is None else [float(a) for a in aps], "eq": eq}
+                   for k, (n, m, aps, eq) in zip(keys, stages)]}, indent=1) + "\n")
     for name, m, _, eq in stages:
         print(f"{name:45s} {'—' if m is None else f'{m * 100:.2f}':>6s}  {eq}")
-    print(f"→ {args.out}")
+    print(f"→ {args.out}, {js}")
+    if not args.no_figures:
+        sys.path.insert(0, str(ROOT))
+        from tools.figures.auto import after_run
+
+        after_run("map-stades", js)
 
 
 if __name__ == "__main__":

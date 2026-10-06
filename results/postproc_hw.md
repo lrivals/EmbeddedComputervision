@@ -91,3 +91,5 @@ Sur le PC, le post-traitement ARM de M7 prend entre 0,011 et 0,037 ms par image 
 - Vérification des offsets de `sw/driver/post_regmap.hpp` contre l'en-tête Vitis.
 - Ajout de l'IP au block design (`hw/boards/kv260/build.tcl`, second nœud UIO).
 - Mesure sur carte de `yolo_bench --hw-post` face au post-traitement ARM.
+
+Figure : `results/figures/resultats/hw_postproc.png` (`python -m tools.figures hw_postproc`, T13.25).

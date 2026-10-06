@@ -8,6 +8,7 @@ dependencies = ["numpy>=1.24"]
 [project.optional-dependencies]
 dev = ["pytest>=7", "ruff>=0.4", "jsonschema>=4", "pyyaml>=6"]
 data = ["pillow>=10"]
+plots = ["matplotlib>=3.7"]  # figures M13 (tools/figures/), jamais importé par yolo/
 coco = ["pycocotools>=2"]  # vérification de yolo.infer.coco_eval seulement (T11.1)
 
 [build-system]

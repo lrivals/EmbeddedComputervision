@@ -105,6 +105,8 @@ def main():
                     help="facteur de ρ à chaque pas Z / U (plafond 1)")
     ap.add_argument("--device", choices=("cpu", "gpu"), default="cpu",
                     help="backend de l'entraînement : NumPy (défaut) ou CuPy (T12.11)")
+    ap.add_argument("--no-figures", action="store_true",
+                    help="pas de courbes dans <out>/figures/ (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
     if args.device == "gpu":
         try:
@@ -168,8 +170,18 @@ def main():
         print(f"it {tr.it:6d}  lr {lr:.2e}  perte {res.total / n:8.3f}  "
               f"coord {p['coord']:.3f} obj {p['obj']:.3f} noobj {p['noobj']:.3f} "
               f"cls {p['cls']:.3f}", flush=True)
-        if args.admm and args.save_every and tr.it % args.save_every == 0:
-            admm.save(args.out / "admm.npz")
+        if args.save_every and tr.it % args.save_every == 0:
+            if args.admm:
+                admm.save(args.out / "admm.npz")
+            figures()
+
+    def figures():
+        """Courbes de perte (et résidus ADMM) dans <out>/figures/ (M13, T13.26)."""
+        if not args.no_figures:
+            sys.path.insert(0, str(ROOT))
+            from tools.figures.auto import after_run
+
+            after_run("train", args.out)
 
     args.out.mkdir(parents=True, exist_ok=True)
     try:
@@ -177,6 +189,7 @@ def main():
                     callback=report)
     finally:
         loader.close()
+        figures()
     if args.admm:
         admm.save(args.out / "admm.npz")
     if args.qat or args.admm:

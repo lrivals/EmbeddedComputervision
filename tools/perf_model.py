@@ -262,6 +262,8 @@ def main():
     ap.add_argument("--check", type=Path, default=None, help="cycles_conv.csv de make hls-cycles")
     ap.add_argument("--manifest", type=Path, action="append", default=[],
                     help="cycles du noyau actuel pour cet export (répétable, JSON en sortie)")
+    ap.add_argument("--no-figures", action="store_true",
+                    help="pas de figure dans build/perf/figures/ (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
     if args.check:
         sys.exit(1 if check(args.check) else 0)
@@ -269,6 +271,11 @@ def main():
         print(json.dumps([manifest_summary(m) for m in args.manifest], indent=1))
         return
     print(markdown())
+    if not args.no_figures:
+        sys.path.insert(0, str(ROOT))
+        from tools.figures.auto import after_run
+
+        after_run("perf-model", ROOT / "build" / "perf")
 
 
 if __name__ == "__main__":

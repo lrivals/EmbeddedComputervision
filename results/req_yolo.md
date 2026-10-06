@@ -87,3 +87,5 @@ petite puce. 2019-ding (Virtex-7, FFT + puissances de 2) annonce 314 images/s
   réseau flottant.
 - Synthèse des deux variantes de PE : DSP, LUT et timing mesurés.
 - Codes 6 bits stockés en mémoire au lieu de l'int8 (gain de 25 % sur les poids).
+
+Figures : `results/figures/resultats/map_formats.png` (T13.14) et `entrainement_admm-mixed6.png` (T13.26, résidus ADMM), `python -m tools.figures map_formats entrainement`.
