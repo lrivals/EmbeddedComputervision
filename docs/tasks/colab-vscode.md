@@ -51,7 +51,7 @@ est sur Drive aujourd'hui :
 | voc | `MyDrive/EmbeddedCV/data/voc.tar` |
 | visdrone | `MyDrive/EmbeddedCV/data/visdrone.tar` |
 | kitti | téléchargement direct (`get_datasets.sh kitti`) |
-| flir | **manquant** : faire `tools/get_datasets.sh push flir` sur le PC avant |
+| flir | API Kaggle (`get_datasets.sh kaggle-download flir`, miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2` ; jeton dans les secrets Colab), puis `push flir` pour les sessions suivantes |
 
 À vérifier au premier essai : `drive.mount()` (`colab.mount_drive`) demande une
 autorisation dans le notebook. Si elle ne s'affiche pas sous VS Code, monter Drive par la
@@ -76,7 +76,7 @@ Ordre conseillé, un notebook à la fois par runtime :
 1. `voc/tiny-yolov3-voc_train` (archive sur Drive, référence de M2) ;
 2. `kitti/tiny-yolov3-kitti_train`, puis `_sweep` ;
 3. `visdrone/tiny-yolov3-visdrone_train`, puis `_sweep` ;
-4. `flir/tiny-yolov3-flir_train` une fois `flir.tar` sur Drive.
+4. `flir/tiny-yolov3-flir_train` (premier lancement : téléchargement Kaggle).
 
 ## Coupure de session
 

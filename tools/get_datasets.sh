@@ -3,8 +3,8 @@
 #
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
-#   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
-#   tools/get_datasets.sh kaggle-download <jeu>…   crowdhuman | visdrone | exdark, par l'API
+#   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
+#   tools/get_datasets.sh kaggle-download <jeu>…   crowdhuman | visdrone | exdark | flir, par l'API
 #                                    Kaggle (ExDark : images seules), puis kaggle
 #   tools/get_datasets.sh ready <jeu>…              code de retour 0 si tous sont prêts
 #   tools/get_datasets.sh pack <jeu>…               data/<racine> → data_archives/<jeu>.tar
@@ -70,6 +70,7 @@ declare -A HOWTO=(
     $0 kaggle les relie, ExDark_Annno/ et imageclasslist.txt viennent toujours de GitHub, Groundtruth/)
     data/exdark/ExDark/<Classe>/, data/exdark/ExDark_Annno/<Classe>/<image>.txt, data/exdark/imageclasslist.txt"
   [flir]="https://www.flir.com/oem/adas/adas-dataset-form/ (inscription) : FLIR ADAS v2
+    (ou kaggle.com/datasets/samdazel/teledyne-flir-adas-thermal-dataset-v2 dans data/FLIR Dataset/, puis : $0 kaggle)
     data/flir/images_thermal_{train,val}/coco.json et data/"
 )
 
@@ -82,8 +83,10 @@ declare -A KAGGLE_ID=(
   [crowdhuman]=leducnhuan/crowdhuman
   [visdrone]=kushagrapandya/visdrone-dataset
   [exdark]=washingtongold/exdark-dataset
+  [flir]=samdazel/teledyne-flir-adas-thermal-dataset-v2
 )
-declare -A KAGGLE_DIR=([crowdhuman]=CrowdHuman [visdrone]="VisDrone Dataset" [exdark]="ExDark Dataset")
+declare -A KAGGLE_DIR=([crowdhuman]=CrowdHuman [visdrone]="VisDrone Dataset" [exdark]="ExDark Dataset"
+  [flir]="FLIR Dataset")
 
 known() {
   [[ -n "${MARKER[$1]:-}" ]] || { echo "jeu inconnu : $1" >&2; exit 1; }
@@ -187,6 +190,13 @@ kaggle() {
     link "../ExDark Dataset/ExDark_Annno/ExDark_Annno" exdark/ExDark_Annno
     link "../ExDark Dataset/ExDark_Annno" exdark/ExDark_Annno
     link "../ExDark Dataset/imageclasslist.txt" exdark/imageclasslist.txt
+  fi
+  # FLIR : profondeur du miroir Kaggle incertaine (FLIR_ADAS_v2/…) ; data/flir pointe sur le
+  # dossier qui contient images_thermal_val/.
+  local d
+  if [[ -d "$DATA_DIR/FLIR Dataset" ]]; then
+    d=$(find "$DATA_DIR/FLIR Dataset" -maxdepth 3 -type d -name images_thermal_val -print -quit)
+    if [[ -n $d ]]; then link "$(dirname "${d#"$DATA_DIR"/}")" flir; fi
   fi
 }
 

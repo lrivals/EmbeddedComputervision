@@ -5,11 +5,11 @@ disque local de la session) en essayant, dans l'ordre :
 
 1. le témoin de `tools/get_datasets.sh` (déjà prêt : utilisé tel quel) ;
 2. l'archive `<drive_dir>/data/<jeu>.tar` sur le Drive monté (Colab), envoyée depuis le PC
-   par `tools/get_datasets.sh push <jeu>` (seule voie pour ExDark et FLIR) ;
+   par `tools/get_datasets.sh push <jeu>` (seule voie pour ExDark) ;
 3. la même archive par rclone (`get_datasets.sh pull <jeu>`, remote `remote`) : le PC
    sans le jeu, si rclone est installé ;
 4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
-   pour CrowdHuman et VisDrone (jeton dans les secrets Colab KAGGLE_USERNAME, KAGGLE_KEY).
+   pour CrowdHuman, VisDrone et FLIR (jeton dans les secrets Colab KAGGLE_USERNAME, KAGGLE_KEY).
 
 Mise en place de rclone et export des jeux : docs/tasks/donnees-drive.md.
 
@@ -38,6 +38,7 @@ DOWNLOAD = {
     "kitti": ["tools/get_datasets.sh", "kitti"],
     "crowdhuman": ["tools/get_datasets.sh", "kaggle-download", "crowdhuman"],
     "visdrone": ["tools/get_datasets.sh", "kaggle-download", "visdrone"],
+    "flir": ["tools/get_datasets.sh", "kaggle-download", "flir"],
 }
 
 

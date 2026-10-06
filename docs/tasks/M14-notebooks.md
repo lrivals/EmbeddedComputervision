@@ -149,11 +149,11 @@ de la session) en essayant, dans l'ordre :
 2. l'archive `<DRIVE_DIR>/data/<jeu>.tar` sur Google Drive ;
 3. la même archive par rclone (`tools/get_datasets.sh pull <jeu>`), sur un PC sans le jeu ;
 4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
-   (`get_datasets.sh kaggle-download crowdhuman|visdrone`, avec un jeton dans les secrets
+   (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, avec un jeton dans les secrets
    Colab `KAGGLE_USERNAME` et `KAGGLE_KEY`).
 
 Drive ne sert qu'à ce qui ne se télécharge pas : ExDark (les annotations ne sont pas sur
-Kaggle), FLIR (inscription), ou un jeu qu'on ne veut pas retélécharger. Le Drive gratuit
+Kaggle), ou un jeu qu'on ne veut pas retélécharger. Le Drive gratuit
 (15 Go) ne contiendrait pas tout `data/`.
 
 ```

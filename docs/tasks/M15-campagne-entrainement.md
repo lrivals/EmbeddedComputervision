@@ -191,7 +191,9 @@ au balayage, split complet ensuite).
 
 ### [ ] T15.13 — FLIR
 - **Spec** : §10.2 · **Dépend de** : T11.7 · **Taille** : L
-- **Livrables** : FLIR sur le Drive (`tools/get_datasets.sh push flir`) ; balayage ; runs
+- **Livrables** : FLIR sur le Drive (`kaggle-download flir` sur Colab, miroir Kaggle
+  `samdazel/teledyne-flir-adas-thermal-dataset-v2`, puis `tools/get_datasets.sh push flir`) ;
+  balayage ; runs
   longs à 1 et 3 canaux
 - **Acceptation** : mAP (`--metric coco`, AP@[.5:.95] et AP50) à 1 canal face à
   3 canaux ; relie [T11.7](M11-jeux-de-donnees.md)

@@ -53,7 +53,7 @@ ls -l data_archives/                 # doivent être identiques
 | crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | ✓ (6 oct. 2026) | aussi par l'API Kaggle ; le plus long à envoyer |
 | coco | ≈ 1,3 Go | `coco/annotations/instances_val2017.json` | — | absent du PC ; se retélécharge (`get_datasets.sh coco`) |
 | kitti | ≈ 12 Go | `kitti/training/image_2/000000.png` | — | absent du PC ; se retélécharge (`get_datasets.sh kitti`) |
-| flir | — | `flir/images_thermal_val/coco.json` | — | inscription ; seule voie une fois téléchargé |
+| flir | — | `flir/images_thermal_val/coco.json` | — | inscription, ou l'API Kaggle (miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2`) |
 
 Les tailles sont celles de `du -shL` sur le PC. Ensemble, les quatre premiers jeux font environ 17 Go.
 C'est plus que le Drive gratuit (15 Go), mais le compte du projet a 100 Go. Vérifier la place
@@ -69,7 +69,7 @@ Drive** ; en dernier recours, il est téléchargé, mais seulement sur Colab.
 |---|---|---|
 | PC, ligne de commande | rien à faire | `tools/get_datasets.sh pull <jeu>` |
 | PC, notebook | utilisé tel quel | `env.prepare` lance `pull` (rclone) ; à défaut, `Prerequis` avec les commandes |
-| Colab | utilisé tel quel | Drive monté + `unpack` ; à défaut, téléchargement direct (VOC, COCO, KITTI, Kaggle) |
+| Colab | utilisé tel quel | Drive monté + `unpack` ; à défaut, téléchargement direct (VOC, COCO, KITTI, Kaggle : CrowdHuman, VisDrone, FLIR) |
 
 `pull` ne fait rien si le témoin est présent. Sinon, il copie `gdrive:EmbeddedCV/data/<jeu>.tar`
 dans `data_archives/`, puis l'extrait dans `data/` (`unpack`). Le code de retour est différent de 0 si rclone,
