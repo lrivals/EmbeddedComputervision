@@ -11,6 +11,9 @@ MyDrive/EmbeddedCV/
   runs/               sorties et checkpoints des notebooks (colab.sync_outputs ; M14, T14.8)
 ```
 
+Les runs d'entraînement suivent le même chemin que dans le dépôt (section « Runs
+d'entraînement » plus bas).
+
 ## Mise en place de rclone (une fois par PC)
 
 ```bash
@@ -89,6 +92,33 @@ colab.prepare_data("exdark")   # "ready" | "drive" | "rclone" | "download"
 Si aucune voie n'aboutit, la fonction lève `RuntimeError` avec la commande `push` à lancer sur
 le PC qui a le jeu. En local, les notebooks appellent `prepare_data` sans téléchargement
 (`env.prepare`) : un téléchargement de plusieurs Go reste une commande explicite.
+
+## Runs d'entraînement
+
+Sur Colab, avec `DRIVE_DIR` (défaut `/content/drive/MyDrive/EmbeddedCV`), les notebooks
+`_train` et `_sweep` copient leur dossier toutes les 10 min, puis en fin de cellule
+(`colab.sync_outputs`). La copie va dans `runs/` sous le même chemin relatif que dans le
+dépôt :
+
+```
+MyDrive/EmbeddedCV/runs/build/notebooks/<jeu>/<modèle>/
+  final.weights, loss.csv, run.json …   run « train » (notebook _train)
+  runs/b16-sall/, runs/b8-s500/ …       balayage lot × sous-ensemble (notebook _sweep)
+  eval/<run>/                           évaluations des notebooks d'inférence
+```
+
+En début de session, `colab.restore_outputs` les recopie dans `build/notebooks/`. Un
+entraînement coupé reprend ainsi au dernier checkpoint copié (`--resume`), et le notebook
+d'inférence retrouve les runs (`RUN`, `COMPARE` ; M14, T14.11). Pour récupérer les runs
+entraînés sur Colab sur le PC :
+
+```bash
+rclone copy gdrive:EmbeddedCV/runs/build/notebooks build/notebooks   # tous les runs
+rclone copy gdrive:EmbeddedCV/runs/build/notebooks/kitti build/notebooks/kitti
+```
+
+Les notebooks d'inférence en local lisent ensuite ces runs comme ceux entraînés sur le PC.
+Un run entraîné sur GPU l'indique dans `run.json` (`device`).
 
 ## Pièges
 
