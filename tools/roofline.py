@@ -42,6 +42,9 @@ BRAM18_BITS = 18 * 1024
 BRAM18_WIDTH = 36
 UTIL = 0.8
 REQUANT_DSP = 4  # produit acc · M0 (32 × 31 bits) en DSP48 par canal de sortie
+# PE à décalages (ACC_WMODE_POW2, T9.2.4) : deux décaleurs 7:1 sur 8 bits et un additionneur
+# 15 bits par MAC, ordre de grandeur hors base (results/req_yolo.md). Estimation, pas mesure.
+POW2_LUT_PER_MAC = 40
 TM_TN = (1, 2, 4, 8, 12, 16, 24, 32, 48, 64)
 TR_TC = (2, 4, 7, 8, 13, 16, 26, 52)
 
@@ -75,6 +78,11 @@ def bram18(tm, tn, tr, tc):
 
 def dsp(tm, tn, macs_per_dsp=1):
     return math.ceil(tm * tn / macs_per_dsp) + REQUANT_DSP * tm
+
+
+def lut_pow2(tm, tn):
+    """LUT estimées des MAC de la PE à décalages (hors contrôle, chargeurs et requantification)."""
+    return POW2_LUT_PER_MAC * tm * tn
 
 
 def evaluate(layers, tm, tn, tr, tc, freq_hz, bw_bytes):

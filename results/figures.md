@@ -107,10 +107,10 @@ Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOP
 
 ### T13.24 — `ressources`
 
-DSP et mémoire sur puce estimés des architectures (moteur unique INT8 et 4 bits, streaming) face au budget de la KV260.
+DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2 et 4 bits, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse.
 
 - Commande : `python -m tools.figures ressources`
-- Source : `hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json`
+- Source : `hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json, hls/proj_kv260_synth*/sol/syn/report/csynth.xml`
 
 ![ressources](figures/resultats/ressources.png)
 
@@ -252,10 +252,10 @@ Lignes par dossier (python, tools, cpp, hls, sw, docs, results) commit par commi
 
 ### T13.30 — `tests`
 
-Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest).
+Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest), et leur durée quand `make test-durations` a été lancé.
 
 - Commande : `python -m tools.figures tests`
-- Source : `pytest --collect-only -q, ctest -N`
+- Source : `pytest --collect-only -q, ctest -N, build/figures/pytest.xml, build/*/ctest.xml`
 
 ![tests](figures/projet/tests.png)
 

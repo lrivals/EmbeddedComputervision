@@ -86,4 +86,4 @@ reporter ici l'avancement par jalon.
 | M10 | 13 (+ renvoi T10.12) | 0 |
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
-| M13 | 53 | 51 (+ 2 partielles : T13.24 pow2 et LUT, T13.30 durées pytest) |
+| M13 | 53 | 53 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |

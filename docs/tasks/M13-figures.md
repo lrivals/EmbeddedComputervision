@@ -15,9 +15,12 @@ ajoute des figures sur cinq axes :
 Chaque figure est **régénérable par une commande** et lit ses données dans un fichier
 versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la main.
 
-**État** : 51 tâches faites sur 53. `make figures` produit 54 figures en une minute environ,
-réunies dans la galerie [results/figures.md](../../results/figures.md). Restent T13.24 (pow2
-et LUT, faute d'estimation chiffrée) et les durées pytest de T13.30.
+**État** : 53 tâches faites sur 53. `make figures` produit 54 figures en une minute environ,
+réunies dans la galerie [results/figures.md](../../results/figures.md). Le code est complet ;
+restent des données à produire :
+- les synthèses Vitis (`make hls-synth`, `hls-synth-pow2`, `hls-synth-stream`), qui rendent
+  pleines les barres de T13.24 ;
+- `make test-durations` (palier N), pour le panneau des durées de T13.30.
 
 ## Conventions communes
 
@@ -410,7 +413,7 @@ et LUT, faute d'estimation chiffrée) et les durées pytest de T13.30.
 - **Notes** : l'annotation donne l'auteur et l'année (colonne `travail`). Les colonnes vides
   (puissance de ce travail) restent « à mesurer ».
 
-### [~] T13.24 — Ressources face au budget KV260
+### [x] T13.24 — Ressources face au budget KV260
 - **Spec** : §10.1 · **Dépend de** : M9.2, M9.3, M9.4 · **Taille** : S
 - **Livrables** : `figures/resultats/ressources.png`, des barres DSP / BRAM / LUT
   rapportées au budget XCK26 (1 248 DSP, etc.) pour quatre variantes :
@@ -424,10 +427,18 @@ et LUT, faute d'estimation chiffrée) et les durées pytest de T13.30.
   - les barres sont hachurées tant que ce sont des estimations ;
   - elles deviennent pleines avec `hls_report.md` après synthèse.
 - **Notes** : à recouper avec T13.14 pour l'arbitrage précision / surface.
-- **Partiel** :
-  - faits : DSP et mémoire sur puce du moteur unique INT8 et 4 bits et du streaming W8A8 /
-    W4A4 ;
-  - à faire : la variante pow2 et les LUT (aucune estimation chiffrée dans `req_yolo.md`).
+- **Fait** :
+  - trois panneaux (DSP, mémoire sur puce, LUT) et cinq variantes : moteur unique INT8, pow2
+    et 4 bits, streaming W8A8 et W4A4 ;
+  - LUT de la PE à décalages : `tools/roofline.py:lut_pow2` (40 LUT par MAC, ordre de
+    grandeur de `req_yolo.md`) ; budget LUT dans `hw/boards/kv260.yaml` ; les autres LUT
+    sont marquées « à mesurer » ;
+  - une synthèse présente remplace l'estimation (barre pleine), lue dans
+    `hls/proj_kv260_<step>/sol/syn/report/csynth.xml` par `tools/hls_report.read_synth` :
+    `synth` (INT8), `synth_pow2` (nouvelle cible `make hls-synth-pow2`,
+    `hls/scripts/synth_pow2.tcl`, `-DACC_WMODE_POW2`) et `synth_stream` (W8A8) ;
+  - le 4 bits n'a pas de noyau HLS propre : il reste une estimation (2 MAC par DSP).
+- **En attente** : les synthèses Vitis (machine avec Vitis HLS).
 
 ### [x] T13.25 — Post-traitement matériel
 - **Spec** : §10.3 · **Dépend de** : M9.1 · **Taille** : S
@@ -482,7 +493,7 @@ et LUT, faute d'estimation chiffrée) et les durées pytest de T13.30.
   au décompte actuel.
 - **Notes** : variante par langage (Python, C++, CMake, Markdown).
 
-### [~] T13.30 — Tests et dépendances
+### [x] T13.30 — Tests et dépendances
 - **Spec** : — · **Dépend de** : T0.3 · **Taille** : S
 - **Livrables** :
   - `figures/projet/tests.png` : nombre de tests par module Python
@@ -492,11 +503,15 @@ et LUT, faute d'estimation chiffrée) et les durées pytest de T13.30.
     image et coloré selon T13.28.
 - **Acceptation** : le total des tests est égal à la collecte pytest + ctest
 - **Notes** : le graphe reste défini une seule fois, dans le README ; la figure le parse.
-- **Partiel** :
-  - fait : `tests.png` (collecte pytest et `ctest -N`) et `dependances.png` (mermaid du
-    README parsé, rendu en Graphviz) ;
-  - à faire : les durées `--durations`, qui demandent de relancer toute la suite pytest
-    (palier N).
+- **Fait** :
+  - `tests.png` (collecte pytest et `ctest -N`) et `dependances.png` (mermaid du README
+    parsé, rendu en Graphviz) ;
+  - durées : `make test-durations` relance toute la suite, slow compris (palier N), avec
+    `--junitxml=build/figures/pytest.xml` et `ctest --output-junit ctest.xml` dans chaque
+    build C++. La figure ajoute alors un panneau de durées par module
+    (`projet.load_test_durations`) ; sans ces rapports, elle garde le seul panneau des
+    comptes.
+- **En attente** : un premier `make test-durations`.
 
 ## F. Réimplémentation de zéro : fonctions mathématiques
 

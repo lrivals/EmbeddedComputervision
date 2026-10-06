@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures
+.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -20,6 +20,7 @@ help:
 	@echo "hls-cycles  estimation de cycles par couche en C-sim → build/hls/cycles_conv.csv"
 	@echo "csim        C-simulation HLS dans Vitis (BOARD=$(BOARD))"
 	@echo "hls-synth   synthèse Vitis HLS (T6.5)"
+	@echo "hls-synth-pow2  synthèse de la PE à décalages, ACC_WMODE_POW2 (T9.2.4, T13.24)"
 	@echo "hls-cosim   co-simulation RTL sur une image (T6.5, long)"
 	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
 	@echo "hls-report  results/hls_report.md (T6.5)"
@@ -39,6 +40,7 @@ help:
 	@echo "ci-model    export synthétique → model/ (sans poids Darknet ni VOC, T10.13)"
 	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
 	@echo "figures     figures M13 dont les données sont présentes → results/figures/, results/figures.md"
+	@echo "test-durations  suite pytest complète (slow compris, palier N) → build/figures/pytest.xml (T13.30)"
 
 test: test-py test-cpp
 
@@ -86,6 +88,15 @@ roofline:
 # sautées avec un message) et la galerie results/figures.md.
 figures:
 	python -m tools.figures all
+
+# T13.30 : durées des tests pour figures/projet/tests.png. Toute la suite, slow compris
+# (palier N) ; le rapport JUnit donne le temps de chaque test.
+test-durations:
+	mkdir -p build/figures
+	cd python && python -m pytest -q -m "" --junitxml=../build/figures/pytest.xml
+	-for d in build/golden build/hls build/sw; do \
+	  [ -f $$d/CTestTestfile.cmake ] && (cd $$d && ctest --output-junit ctest.xml); done
+	python -m tools.figures tests
 
 lint:
 	ruff check python tools
@@ -136,6 +147,9 @@ csim:
 
 hls-synth:
 	cd hls && vitis_hls -f scripts/synth.tcl -tclargs $(BOARD)
+
+hls-synth-pow2:
+	cd hls && vitis_hls -f scripts/synth_pow2.tcl -tclargs $(BOARD)
 
 hls-cosim:
 	cd hls && vitis_hls -f scripts/cosim.tcl -tclargs $(BOARD)

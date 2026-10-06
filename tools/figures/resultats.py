@@ -866,10 +866,32 @@ def etat_art(out_dir):
 # --- T13.24 : ressources face au budget KV260 ---------------------------------------------
 
 BRAM18_BYTES = 18 * 1024 // 8
+URAM_BYTES = 288 * 1024 // 8
+EST, MES = "estimation", "synthèse"
+# Rapports csynth de chaque variante (make hls-synth, hls-synth-pow2, hls-synth-stream). Le
+# 4 bits n'a pas de noyau HLS propre : il reste une estimation (2 MAC par DSP).
+SYNTH_DIRS = {"moteur unique INT8": "synth", "moteur unique pow2": "synth_pow2",
+              "streaming W8A8": "synth_stream"}
+
+
+def load_synth(board_file, step):
+    """{"dsp", "lut", "mem"} mesurés par `csynth.xml` de hls/proj_<carte>_<step>, ou None."""
+    d = ROOT / "hls" / f"proj_{board_file}_{step}" / "sol" / "syn" / "report"
+    syn = _tools("hls_report").read_synth(d)
+    if not syn or not syn["resources"]:
+        return None
+
+    def used(k):
+        v = syn["resources"].get(k, ("0",))[0]
+        return int(v) if v and v.strip().isdigit() else 0
+
+    return {"dsp": used("DSP") or used("DSP48E"), "lut": used("LUT"),
+            "mem": used("BRAM_18K") * BRAM18_BYTES + used("URAM") * URAM_BYTES}
 
 
 def load_resources(board="kv260"):
-    """[(variante, DSP, octets sur puce)] estimés, et (DSP, octets) de la puce entière."""
+    """Variantes [{name, dsp, mem, lut}] (chaque valeur : (nombre, EST | MES) ou None) et
+    budget de la puce {dsp, mem, lut}. Une synthèse présente remplace l'estimation."""
     rl, pm = _tools("roofline"), _tools("perf_model")
     try:
         b = rl.load_board(need(ROOT / "hw" / "boards" / f"{board}.yaml"))
@@ -877,52 +899,79 @@ def load_resources(board="kv260"):
         raise MissingSource(f"pyyaml absent ({e})") from e
     t = pm.TILES
     mem = rl.bram18(t["tm"], t["tn"], t["tr"], t["tc"]) * BRAM18_BYTES
-    rows = [("moteur unique INT8", rl.dsp(t["tm"], t["tn"], 1), mem),
-            ("moteur unique 4 bits", rl.dsp(t["tm"], t["tn"], 2), mem)]
+    rows = [
+        {"name": "moteur unique INT8", "dsp": (rl.dsp(t["tm"], t["tn"], 1), EST),
+         "mem": (mem, EST), "lut": None},
+        # MAC par décalages : plus de DSP de multiplication, seule la requantification reste.
+        {"name": "moteur unique pow2", "dsp": (rl.REQUANT_DSP * t["tm"], EST),
+         "mem": (mem, EST), "lut": (rl.lut_pow2(t["tm"], t["tn"]), EST)},
+        {"name": "moteur unique 4 bits", "dsp": (rl.dsp(t["tm"], t["tn"], 2), EST),
+         "mem": (mem, EST), "lut": None},
+    ]
     budget_mem = None
     for wb in (8, 4):
         p = ROOT / "build" / "m9" / f"stream_plan_w{wb}.json"
         if p.exists():
             d = _read_json(p)
-            rows.append((f"streaming W{d['wbits']}A{d['abits']}", d["dsp"], d["onchip_bytes"]))
+            rows.append({"name": f"streaming W{d['wbits']}A{d['abits']}",
+                         "dsp": (d["dsp"], EST), "mem": (d["onchip_bytes"], EST), "lut": None})
             budget_mem = d["onchip_budget"] / rl.UTIL
+    for r in rows:
+        step = SYNTH_DIRS.get(r["name"])
+        m = load_synth(b["file"], step) if step else None
+        if m:
+            r.update({k: (v, MES) for k, v in m.items()})
     if budget_mem is None:
-        budget_mem = (b["bram18"] * BRAM18_BYTES + b.get("uram", 0) * 288 * 1024 // 8)
-    return b, rows, (b["dsp"], budget_mem)
+        budget_mem = b["bram18"] * BRAM18_BYTES + b.get("uram", 0) * URAM_BYTES
+    return b, rows, {"dsp": b["dsp"], "mem": budget_mem, "lut": b.get("lut")}
 
 
 def plot_resources(board, rows, budget, out_dir, name="ressources"):
     plt = st.plt()
-    fig, axes = plt.subplots(1, 2, figsize=(st.FULL, 3.6), sharey=True)
+    panels = [(k, lab) for k, lab in (("dsp", "DSP"), ("mem", "mémoire sur puce"), ("lut", "LUT"))
+              if budget.get(k)]
+    fig, axes = plt.subplots(1, len(panels), figsize=(st.FULL, 0.45 * len(rows) + 1.9),
+                             sharey=True, squeeze=False)
     y = np.arange(len(rows))[::-1]
-    for ax, k, lab, tot in ((axes[0], 1, "DSP", budget[0]),
-                            (axes[1], 2, "mémoire sur puce (BRAM + URAM)", budget[1])):
+    for i, (ax, (k, lab)) in enumerate(zip(axes[0], panels)):
+        tot = budget[k]
         for yi, r in zip(y, rows):
-            frac = r[k] / tot * 100
-            ax.barh(yi, frac, 0.6, color="white", edgecolor=st.PALETTE[k - 1], hatch="///",
-                    linewidth=1.2)
-            txt = f"{r[k]:.0f}" if k == 1 else f"{r[k] / 1e6:.2f} Mo"
-            ax.text(frac + 1.5, yi, f"{txt} ({frac:.0f} %)", va="center", fontsize=7.5)
+            if r.get(k) is None:
+                ax.text(1.5, yi, "à mesurer", va="center", fontsize=7, color=st.MUTED,
+                        style="italic")
+                continue
+            v, status = r[k]
+            frac = v / tot * 100
+            if status == MES:
+                ax.barh(yi, frac, 0.6, color=st.PALETTE[i], edgecolor=st.PALETTE[i])
+            else:
+                ax.barh(yi, frac, 0.6, color="white", edgecolor=st.PALETTE[i], hatch="///",
+                        linewidth=1.2)
+            txt = f"{v / 1e6:.2f} Mo" if k == "mem" else f"{v:,.0f}".replace(",", " ")
+            ax.text(min(frac, 118) + 1.5, yi, f"{txt} ({frac:.0f} %)", va="center",
+                    fontsize=7)
         ax.axvline(100, color=st.INK2, lw=1.2)
         ax.axvline(80, color=st.MUTED, lw=0.9, ls="--")
         ax.text(80, y[-1] - 0.55, " 80 %", fontsize=7, color=st.MUTED, va="center")
-        ax.set_xlim(0, 135)
+        ax.set_xlim(0, 150)
         ax.set_xlabel(f"% du budget {board['name']}")
-        ax.set_title(f"{lab} — total {tot:.0f}" if k == 1 else
-                     f"{lab} — total {tot / 1e6:.2f} Mo")
+        total = f"{tot / 1e6:.2f} Mo" if k == "mem" else f"{tot:,.0f}".replace(",", " ")
+        ax.set_title(f"{lab} — total {total}", fontsize=9)
         ax.grid(axis="y", visible=False)
-    axes[0].set_yticks(y, [r[0] for r in rows])
-    fig.tight_layout(rect=(0, 0.05, 1, 1))
-    fig.text(0.01, 0.01, "Hachuré : estimation (modèles roofline et streaming) ; les barres "
-             "deviendront pleines avec hls_report.md après synthèse.", fontsize=7,
+    axes[0][0].set_yticks(y, [r["name"] for r in rows], fontsize=8)
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.text(0.01, 0.01, "Hachuré : estimation (modèles roofline, streaming, LUT par MAC de "
+             "req_yolo.md) ; plein : rapport csynth (make hls-synth, hls-synth-pow2, "
+             "hls-synth-stream). « à mesurer » : aucune estimation.", fontsize=6.5,
              color=st.MUTED)
     return st.save(fig, out_dir, name)
 
 
 @figure("ressources", "resultats", "T13.24",
-        "DSP et mémoire sur puce estimés des architectures (moteur unique INT8 et 4 bits, "
-        "streaming) face au budget de la KV260.",
-        "hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json")
+        "DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2 et 4 bits, "
+        "streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse.",
+        "hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json, "
+        "hls/proj_kv260_synth*/sol/syn/report/csynth.xml")
 def ressources(out_dir):
     b, rows, budget = load_resources()
     return plot_resources(b, rows, budget, out_dir)

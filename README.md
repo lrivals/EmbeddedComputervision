@@ -76,6 +76,8 @@ make m8-inputs m8-int bench-sim map-stades   # mAP flottant / entier / FPGA (C-s
 make bench-report                   # results/benchmarks.csv, results/mesures.md (protocole : results/protocole.md)
 make ci-model ci                    # CI (T10.13) : export synthétique, sans VOC ni poids Darknet
 make count-macs                     # tableaux du §3 (paramètres, MACs)
+make figures                        # figures M13 → results/figures/, galerie results/figures.md
+make test-durations                 # suite complète (slow compris) : durées des tests pour la figure T13.30
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
 tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)

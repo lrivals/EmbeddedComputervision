@@ -4,6 +4,7 @@ name: Kria KV260
 part: xck26-sfvc784-2LV-c
 family: zynq-ultrascale+
 dsp: 1248
+lut: 117120        # CLB LUT du XCK26
 bram18: 288         # 144 BRAM36
 uram: 64            # 288 Kb chacune ; non utilisées par le modèle de tampons (BRAM seules)
 ddr: DDR4 64 bits, 2400 MT/s

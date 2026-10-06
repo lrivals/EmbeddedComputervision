@@ -103,7 +103,9 @@ Vérification : `hls/tb/tb_conv.cpp` (chaque conv seule) et `hls/tb/tb_net.cpp` 
 le driver, chaque couche contrôlée juste après son appel, avant que les tampons ping-pong
 A/B soient réécrits). C-sim avec g++ (`make csim-gcc`, en-têtes `ap_int` open source) ou
 Vitis (`make csim`) ; synthèse, co-sim, export : `make hls-synth | hls-cosim | hls-export`,
-rapport `make hls-report` → `results/hls_report.md`.
+rapport `make hls-report` → `results/hls_report.md`. La PE à décalages (`ACC_WMODE_POW2`,
+T9.2.4) se synthétise à part avec `make hls-synth-pow2` (`hls/proj_<carte>_synth_pow2/`) ;
+la figure T13.24 lit les rapports csynth des deux variantes et du streaming.
 
 ### Architecture streaming (M9.4, T10.8, T10.9)
 

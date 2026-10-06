@@ -85,7 +85,9 @@ petite puce. 2019-ding (Virtex-7, FFT + puissances de 2) annonce 314 images/s
 
 - ADMM convergé (ρ plus grand, plus d'itérations, plan par couche), sans dégrader le
   réseau flottant.
-- Synthèse des deux variantes de PE : DSP, LUT et timing mesurés.
+- Synthèse des deux variantes de PE : DSP, LUT et timing mesurés (`make hls-synth` et
+  `make hls-synth-pow2` ; la figure `results/figures/resultats/ressources.png`, T13.24,
+  passe alors de l'estimation à la mesure).
 - Codes 6 bits stockés en mémoire au lieu de l'int8 (gain de 25 % sur les poids).
 
 Figures : `results/figures/resultats/map_formats.png` (T13.14) et `entrainement_admm-mixed6.png` (T13.26, résidus ADMM), `python -m tools.figures map_formats entrainement`.

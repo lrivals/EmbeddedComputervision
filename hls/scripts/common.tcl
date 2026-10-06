@@ -5,7 +5,8 @@
 # La carte (défaut kv260) choisit hls/configs/<carte>.tcl : part, horloge, tuiles.
 # Avant `source`, le script d'étape fixe `step` (nom du projet) et `tb` (testbench), et
 # éventuellement `top` (défaut yolo_conv ; yolo_post pour le post-traitement, T9.1 ;
-# yolo_stream pour le streaming, T10.8, avec la ROM de build/hls/stream_rom).
+# yolo_stream pour le streaming, T10.8, avec la ROM de build/hls/stream_rom) et `extra_defs`
+# (variante du noyau, par exemple -DACC_WMODE_POW2, T9.2.4).
 
 set board kv260
 set tb_args {}
@@ -19,6 +20,7 @@ source [file join $root hls configs $board.tcl]
 # Noyau : C++14 (défaut Vitis), tuiles de la carte. Testbench : C++17 (golden, driver).
 set inc "-I$root/hls/kernels -I$root/cpp/golden/include -I$root/sw/driver"
 set defs "-DACC_TM=$TM -DACC_TN=$TN -DACC_TR=$TR -DACC_TC=$TC"
+if {[info exists extra_defs]} { append defs " $extra_defs" }
 set kflags "$inc $defs"
 set tbflags "-std=c++17 $inc $defs"
 if {[llength $tb_args] == 0} { set tb_args $default_tb_args }

@@ -309,29 +309,72 @@ def load_ctest_counts():
     return out
 
 
-def plot_tests(py, cpp, out_dir, name="tests"):
+PYTEST_XML = ROOT / "build" / "figures" / "pytest.xml"
+
+
+def _junit_cases(path):
+    import xml.etree.ElementTree as ET
+
+    for case in ET.parse(path).getroot().iter("testcase"):
+        yield case.get("classname") or "", case.get("name") or "", float(case.get("time") or 0)
+
+
+def load_test_durations():
+    """{module ou « ctest <build> »: secondes} des rapports JUnit de `make test-durations`
+    (pytest --junitxml, ctest --output-junit) ; vide si la suite n'a pas été relancée."""
+    out = {}
+    if PYTEST_XML.exists():
+        for cls, _, t in _junit_cases(PYTEST_XML):
+            m = re.search(r"(test_\w+)", cls)
+            if m:
+                out[m.group(1)] = out.get(m.group(1), 0.0) + t
+    for d in ("build/golden", "build/hls", "build/sw"):
+        x = ROOT / d / "ctest.xml"
+        if x.exists():
+            out[f"ctest {d}"] = sum(t for _, _, t in _junit_cases(x))
+    return out
+
+
+def plot_tests(py, cpp, out_dir, durations=None, name="tests"):
     plt = st.plt()
     items = sorted(py.items(), key=lambda kv: kv[1]) + [(f"ctest {k}", v) for k, v in cpp.items()]
-    fig, ax = plt.subplots(figsize=(st.FULL, 0.2 * len(items) + 1.2))
+    durations = durations or {}
+    ncol = 2 if durations else 1
+    fig, axes = plt.subplots(1, ncol, figsize=(st.FULL, 0.2 * len(items) + 1.2), sharey=True,
+                             squeeze=False)
+    ax = axes[0][0]
     y = np.arange(len(items))
-    ax.barh(y, [v for _, v in items], 0.7,
-            color=[st.PALETTE[0] if not k.startswith("ctest") else st.PALETTE[1]
-                   for k, _ in items])
+    colors = [st.PALETTE[1] if k.startswith("ctest") else st.PALETTE[0] for k, _ in items]
+    ax.barh(y, [v for _, v in items], 0.7, color=colors)
     ax.set_yticks(y, [k for k, _ in items], fontsize=6.5)
     ax.set_xscale("log")
     ax.set_xlabel("tests (log)")
     ax.set_title(f"Tests : {sum(py.values())} pytest (slow compris, {len(py)} modules) + "
-                 f"{sum(cpp.values())} ctest")
+                 f"{sum(cpp.values())} ctest", fontsize=9)
     ax.grid(axis="y", visible=False)
+    if durations:
+        ax2 = axes[0][1]
+        secs = [durations.get(k) for k, _ in items]
+        ax2.barh(y, [max(t or 0, 1e-3) for t in secs], 0.7, color=colors)
+        for yi, t in zip(y, secs):
+            if t is None:
+                ax2.text(1.2e-3, yi, "non relancé", va="center", fontsize=6, color=st.MUTED)
+        ax2.set_xscale("log")
+        ax2.set_xlabel("durée (s, log)")
+        ax2.set_title(f"Durée : {sum(t for t in secs if t) / 60:.1f} min au total "
+                      "(make test-durations)", fontsize=9)
+        ax2.grid(axis="y", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("tests", "projet", "T13.30",
-        "Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest).",
-        "pytest --collect-only -q, ctest -N")
+        "Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest), "
+        "et leur durée quand `make test-durations` a été lancé.",
+        "pytest --collect-only -q, ctest -N, build/figures/pytest.xml, build/*/ctest.xml")
 def tests(out_dir):
-    return plot_tests(load_pytest_counts(), load_ctest_counts(), out_dir)
+    return plot_tests(load_pytest_counts(), load_ctest_counts(), out_dir,
+                      durations=load_test_durations())
 
 
 # --- T13.30 (suite) : graphe des dépendances ----------------------------------------------

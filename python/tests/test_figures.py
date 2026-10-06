@@ -233,10 +233,42 @@ def test_benchmarks_load_equals_csv(tmp_path):
     _pngs(resultats.plot_benchmarks(rows, tmp_path))
 
 
+def test_resources_synth_replaces_estimate(tmp_path, monkeypatch):
+    """T13.24 : estimations du modèle roofline, remplacées par le csynth.xml quand il existe."""
+    pytest.importorskip("yaml")
+    rl = resultats._tools("roofline")
+    t = resultats._tools("perf_model").TILES
+    b, rows, budget = resultats.load_resources()
+    by = {r["name"]: r for r in rows}
+    assert by["moteur unique pow2"]["lut"] == (rl.lut_pow2(t["tm"], t["tn"]), resultats.EST)
+    assert by["moteur unique pow2"]["dsp"] == (rl.REQUANT_DSP * t["tm"], resultats.EST)
+    assert by["moteur unique INT8"]["dsp"] == (rl.dsp(t["tm"], t["tn"]), resultats.EST)
+    assert budget == {"dsp": b["dsp"], "mem": budget["mem"], "lut": b["lut"]}
+
+    rep = tmp_path / "hls" / "proj_kv260_synth_pow2" / "sol" / "syn" / "report"
+    rep.mkdir(parents=True)
+    rep.joinpath("csynth.xml").write_text(
+        "<profile><AreaEstimates><Resources><BRAM_18K>100</BRAM_18K><DSP>130</DSP>"
+        "<FF>5000</FF><LUT>40000</LUT><URAM>2</URAM></Resources><AvailableResources>"
+        "<DSP>1248</DSP></AvailableResources></AreaEstimates></profile>")
+    monkeypatch.setattr(resultats, "ROOT", tmp_path)
+    m = resultats.load_synth("kv260", "synth_pow2")
+    assert m == {"dsp": 130, "lut": 40000,
+                 "mem": 100 * resultats.BRAM18_BYTES + 2 * resultats.URAM_BYTES}
+    assert resultats.load_synth("kv260", "synth") is None
+
+
 def test_resources_hwpp_plots(tmp_path):
     board = {"name": "B"}
-    _pngs(resultats.plot_resources(board, [("a", 896, 258048), ("b", 968, 2.0e6)],
-                                   (1248, 3.0e6), tmp_path))
+    rows = [{"name": "a", "dsp": (896, resultats.EST), "mem": (258048, resultats.EST),
+             "lut": None},
+            {"name": "b", "dsp": (128, resultats.MES), "mem": (2.0e6, resultats.MES),
+             "lut": (30720, resultats.MES)}]
+    _pngs(resultats.plot_resources(board, rows, {"dsp": 1248, "mem": 3.0e6, "lut": 117120},
+                                   tmp_path))
+    # Sans budget LUT (carte sans champ `lut`) : deux panneaux.
+    _pngs(resultats.plot_resources(board, rows, {"dsp": 1248, "mem": 3.0e6, "lut": None},
+                                   tmp_path))
     _pngs(resultats.plot_hwpp(0.5566, 0.5556, 0.5556, RNG.integers(0, 200, 500), tmp_path))
 
 
@@ -389,6 +421,26 @@ def test_code_and_tests_plots(tmp_path):
     series = {"python": np.array([10, 20]), "docs": np.array([5, 6]), "autres": np.array([0, 0])}
     _pngs(projet.plot_code(["M0 : a", "docs : b"], series, tmp_path))
     _pngs(projet.plot_tests({"test_a": 3, "test_b": 10}, {"build/golden": 4}, tmp_path))
+    _pngs(projet.plot_tests({"test_a": 3, "test_b": 10}, {"build/golden": 4}, tmp_path,
+                            durations={"test_a": 0.5, "ctest build/golden": 12.0}))
+
+
+def test_test_durations_read_junit(tmp_path, monkeypatch):
+    """T13.30 : durées par module = somme des `time` du rapport JUnit, classes comprises."""
+    xml = tmp_path / "build" / "figures" / "pytest.xml"
+    xml.parent.mkdir(parents=True)
+    xml.write_text('<testsuites><testsuite name="pytest">'
+                   '<testcase classname="tests.test_a" name="t1" time="0.25"/>'
+                   '<testcase classname="tests.test_a.TestX" name="t2" time="1.5"/>'
+                   '<testcase classname="tests.test_b" name="t3" time="2"/>'
+                   '</testsuite></testsuites>')
+    (tmp_path / "build" / "golden").mkdir()
+    (tmp_path / "build" / "golden" / "ctest.xml").write_text(
+        '<testsuite><testcase name="g" classname="g" time="3.0"/></testsuite>')
+    monkeypatch.setattr(projet, "ROOT", tmp_path)
+    monkeypatch.setattr(projet, "PYTEST_XML", xml)
+    assert projet.load_test_durations() == {"test_a": 1.75, "test_b": 2.0,
+                                            "ctest build/golden": 3.0}
 
 
 # --- mode automatique ---------------------------------------------------------------------
