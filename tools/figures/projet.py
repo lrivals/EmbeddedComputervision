@@ -332,3 +332,87 @@ def plot_tests(py, cpp, out_dir, name="tests"):
         "pytest --collect-only -q, ctest -N")
 def tests(out_dir):
     return plot_tests(load_pytest_counts(), load_ctest_counts(), out_dir)
+
+
+# --- T13.30 (suite) : graphe des dépendances ----------------------------------------------
+
+NODE = re.compile(r'(\w+)(?:\[\"?([^\]\"]+)\"?\])?')
+ARROW = re.compile(r'\s*(-->|-\.->|--\s*"[^"]*"\s*-->)\s*')
+
+
+def load_mermaid(readme=None):
+    """Graphe mermaid de docs/tasks/README.md : ({id: libellé}, [(src, dst, libellé, pointillé)])."""
+    readme = Path(readme or TASKS / "README.md")
+    if not readme.exists():
+        raise MissingSource(f"{readme} absent")
+    m = re.search(r"```mermaid\n(.*?)```", readme.read_text(), flags=re.S)
+    if not m:
+        raise MissingSource("README sans graphe mermaid")
+    nodes, edges = {}, []
+    for line in m.group(1).splitlines()[1:]:
+        parts = ARROW.split(line.strip())
+        if len(parts) < 3:
+            continue
+        groups = []
+        for tok in parts[::2]:
+            ids = []
+            for item in tok.split("&"):
+                n = NODE.fullmatch(item.strip())
+                nodes.setdefault(n.group(1), n.group(1))
+                if n.group(2):
+                    nodes[n.group(1)] = n.group(2)
+                ids.append(n.group(1))
+            groups.append(ids)
+        for arrow, a, b in zip(parts[1::2], groups, groups[1:]):
+            lab = re.search(r'"([^"]*)"', arrow)
+            for s in a:
+                for d in b:
+                    edges.append((s, d, lab.group(1) if lab else "", "-.->" in arrow))
+    return nodes, edges
+
+
+def dependency_dot(nodes, edges, prog):
+    def color(label):
+        c = prog.get(label)
+        if not c:
+            return "white", st.MUTED
+        total = sum(c.values()) or 1
+        done = c["faite"] / total
+        fill = (st.PALETTE[5] if done == 1 else st.PALETTE[3] if done > 0 or c["partielle"]
+                or c[CATEGORIES[2]] else st.GREY)
+        return fill, f"{c['faite']}/{total}"
+
+    lines = ["digraph jalons {", "  rankdir=LR; nodesep=0.3; ranksep=0.45;",
+             '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11];',
+             '  edge [color="#8a8984", fontname="Helvetica", fontsize=8, arrowsize=0.7];']
+    for nid, label in nodes.items():
+        fill, sub = color(label)
+        text = f"{label}\\n{sub}" if sub != st.MUTED else label
+        fc = "white" if fill == st.PALETTE[5] else st.INK
+        lines.append(f'  {nid} [label="{text}", fillcolor="{fill}", fontcolor="{fc}"];')
+    for s, d, lab, dashed in edges:
+        attrs = [f'label="{lab}"'] if lab else []
+        if dashed:
+            attrs.append("style=dashed")
+        lines.append(f"  {s} -> {d}{' [' + ', '.join(attrs) + ']' if attrs else ''};")
+    lines.append('  label="vert : jalon fait · ambre : commencé ou vérifié sur PC · gris : à faire '
+                 '· n/N : tâches faites"; labelloc=b; fontname="Helvetica"; fontsize=10;')
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+@figure("dependances", "projet", "T13.30",
+        "Graphe des jalons du README (défini une seule fois, en mermaid), coloré selon "
+        "l'avancement de T13.28.",
+        "docs/tasks/README.md (mermaid et suivi), docs/tasks/M*.md (Graphviz dot)")
+def dependances(out_dir):
+    dot = shutil.which("dot")
+    if not dot:
+        raise MissingSource("Graphviz (dot) absent")
+    nodes, edges = load_mermaid()
+    tasks = load_tasks()
+    src = dependency_dot(nodes, edges, progress(tasks, load_tracking()))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png = out_dir / "dependances.png"
+    subprocess.run([dot, "-Tpng", "-Gdpi=150", "-o", str(png)], input=src, text=True, check=True)
+    return [png]

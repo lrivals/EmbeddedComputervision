@@ -2,6 +2,12 @@
 
 Galerie générée par `python -m tools.figures all` (`make figures`) à partir du registre de `tools/figures/` ; ne pas éditer à la main. Chaque figure se régénère par sa commande et lit ses données dans la source indiquée. Les figures absentes attendent leur donnée (voir la commande de la tâche).
 
+## En bref : la chaîne de vérification
+
+Chaîne de vérification bit-exact, du flottant NumPy à la carte : critère et état de chaque passage.
+
+![chaine_verif](figures/materiel/chaine_verif.png)
+
 ## Résultats (D)
 
 ### T13.13 — `map_stades`
@@ -128,6 +134,15 @@ Courbes d'entraînement : perte et composantes lissées, taux d'apprentissage, r
 ![entrainement_qat-w4a4](figures/resultats/entrainement_qat-w4a4.png)
 ![entrainement_runs](figures/resultats/entrainement_runs.png)
 
+### T13.19 — `detections`
+
+Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : les colonnes entier et C-sim sont identiques.
+
+- Commande : `python -m tools.figures detections`
+- Source : `weights/, build/m8/<net>/int.jsonl et sim/dets_*.jsonl, data/VOCdevkit`
+
+![detections](figures/resultats/detections.png)
+
 ## Modèles (B)
 
 ### T13.2 — `profil_couches`
@@ -167,6 +182,7 @@ Nuage (w, h) des boîtes VOC avec les ancres k-means (distance 1 − IoU) et les
 - Source : `data/VOCdevkit, results/anchors.md, tools/kmeans_anchors.py:dataset_wh`
 
 ![ancres](figures/modeles/ancres.png)
+![ancres_k](figures/modeles/ancres_k.png)
 
 ### T13.7 — `voc_stats`
 
@@ -176,6 +192,34 @@ Statistiques de VOC : objets par classe en trainval et en test, aires des boîte
 - Source : `data/VOCdevkit (comptes égaux à tools/voc_stats.py)`
 
 ![voc_stats](figures/modeles/voc_stats.png)
+
+### T13.4 — `ancres_k`
+
+IoU moyenne des ancres k-means selon k (1 à 12), avec les ancres Darknet en repère.
+
+- Commande : `python -m tools.figures ancres_k`
+- Source : `data/VOCdevkit, yolo.data.anchors.kmeans_anchors`
+
+![ancres_k](figures/modeles/ancres_k.png)
+
+### T13.5 — `sortie_yolo`
+
+Sortie YOLO pas à pas sur une image : grille, cellules responsables et ancres, boîtes décodées avant NMS (par tête), détections finales.
+
+- Commande : `python -m tools.figures sortie_yolo`
+- Source : `weights/*.weights, VOC2007/JPEGImages/000001.jpg, yolo.infer.decode et nms`
+
+![sortie_yolo_tiny-yolov2-voc](figures/modeles/sortie_yolo_tiny-yolov2-voc.png)
+![sortie_yolo_tiny-yolov3-coco](figures/modeles/sortie_yolo_tiny-yolov3-coco.png)
+
+### T13.6 — `augmentations`
+
+Images d'origine (letterbox) puis quatre tirages d'augmentation, boîtes cibles transformées.
+
+- Commande : `python -m tools.figures augmentations`
+- Source : `data/VOCdevkit, yolo.data.loader.VOCDataset (tirages de tools/show_augment.py)`
+
+![augmentations](figures/modeles/augmentations.png)
 
 ## Développement du projet (E)
 
@@ -214,3 +258,263 @@ Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest
 - Source : `pytest --collect-only -q, ctest -N`
 
 ![tests](figures/projet/tests.png)
+
+### T13.30 — `dependances`
+
+Graphe des jalons du README (défini une seule fois, en mermaid), coloré selon l'avancement de T13.28.
+
+- Commande : `python -m tools.figures dependances`
+- Source : `docs/tasks/README.md (mermaid et suivi), docs/tasks/M*.md (Graphviz dot)`
+
+![dependances](figures/projet/dependances.png)
+
+## Matériel (C)
+
+### T13.8 — `soc`
+
+Schéma du SoC : application et driver sur l'ARM, registres AXI-Lite, ports m_axi du noyau et découpage de l'arène DDR.
+
+- Commande : `python -m tools.figures soc`
+- Source : `sw/driver/regmap.hpp, pragmas de hls/kernels/conv_pe.cpp, model/<net>/manifest.json`
+
+![soc](figures/materiel/soc.png)
+
+### T13.9 — `moteur`
+
+Moteur unique : chargeurs ping-pong, réseau Tm × Tn de MACs, accumulateur, étage de sortie, et chronogramme du recouvrement sur 3 tuiles.
+
+- Commande : `python -m tools.figures moteur`
+- Source : `hls/kernels/accel_config.hpp, conv_pe.cpp, output_stage.hpp, tools/perf_model.py`
+
+![moteur](figures/materiel/moteur.png)
+
+### T13.10 — `tuilage`
+
+Tuilage de deux couches : tuiles spatiales et voies d'entrée, avec le pliage de L00 (cin = 3) et la couche 13×13 couverte par une seule tuile.
+
+- Commande : `python -m tools.figures tuilage`
+- Source : `model/<net>/manifest.json, tools/perf_model.py:tile_grid, accel_config.hpp`
+
+![tuilage](figures/materiel/tuilage.png)
+
+### T13.11 — `streaming`
+
+Architecture streaming face au moteur unique : mémoire et parallélisme par étage, cycles par couche, chronogramme sur deux images (estimations).
+
+- Commande : `python -m tools.figures streaming`
+- Source : `tools/stream_model.py:plan, tools/perf_model.py, hw/boards/kv260.yaml`
+
+![streaming](figures/materiel/streaming.png)
+
+### T13.12 — `chaine_verif`
+
+Chaîne de vérification bit-exact, du flottant NumPy à la carte : critère et état de chaque passage.
+
+- Commande : `python -m tools.figures chaine_verif`
+- Source : `tableau de suivi de docs/tasks/README.md, build/m8/<net>/map_stades.json, dumps`
+
+![chaine_verif](figures/materiel/chaine_verif.png)
+
+## Réimplémentation de zéro (F)
+
+### T13.31 — `carte`
+
+Carte de la réimplémentation : chaque module de python/yolo/, la brique qu'il réécrit, la bibliothèque évitée, son test et la planche qui l'explique.
+
+- Commande : `python -m tools.figures carte`
+- Source : `python/yolo/ (parcours du paquet), python/tests/`
+
+![carte](figures/maths/carte.png)
+
+### T13.32 — `convolution`
+
+Convolution : la formule sur un patch, le dépliage im2col en produit de matrices, et le temps des boucles face à im2col.
+
+- Commande : `python -m tools.figures convolution`
+- Source : `yolo.layers.conv (conv_forward_naive, conv_forward, conv_backward)`
+
+![convolution](figures/maths/convolution.png)
+
+### T13.33 — `retropropagation`
+
+Rétropropagation écrite à la main : formule du gradient renvoyé par chaque couche, puis l'erreur du gradcheck par couche face au seuil 1e-7.
+
+- Commande : `python -m tools.figures retropropagation`
+- Source : `yolo.layers.*, yolo.models.graph, yolo.testing.gradcheck`
+
+![retropropagation](figures/maths/retropropagation.png)
+
+### T13.34 — `activations`
+
+Leaky ReLU et sa dérivée, sigmoïde stable face à la forme naïve, BCE sur logits et son gradient, softmax stable.
+
+- Commande : `python -m tools.figures activations`
+- Source : `yolo.layers.activations, yolo.train.loss (softplus, bce_logits)`
+
+![activations](figures/maths/activations.png)
+
+### T13.35 — `batchnorm`
+
+Batch normalization : normalisation par canal, moyennes glissantes, puis fusion dans la convolution (sortie identique).
+
+- Commande : `python -m tools.figures batchnorm`
+- Source : `yolo.layers.batchnorm.bn_forward, yolo.quant.fuse_bn.fuse_bn`
+
+![batchnorm](figures/maths/batchnorm.png)
+
+### T13.36 — `pool_upsample_route`
+
+Maxpool 2×2/2 et 2×2/1 (avec la réplication du bord), upsample ×2 et route, avec les gradients qui remontent.
+
+- Commande : `python -m tools.figures pool_upsample_route`
+- Source : `yolo.layers.pool, upsample, route`
+
+![pool_upsample_route](figures/maths/pool_upsample_route.png)
+
+### T13.37 — `boites_decodage`
+
+IoU de deux boîtes et IoU de forme des ancres, décodage du centre dans sa cellule, taille selon t_w pour les 5 ancres de Tiny-YOLOv2.
+
+- Commande : `python -m tools.figures boites_decodage`
+- Source : `yolo.infer.boxes (iou, iou_wh, cxcywh_to_xyxy), yolo.infer.decode.decode_head`
+
+![boites_decodage](figures/maths/boites_decodage.png)
+
+### T13.38 — `perte`
+
+Cibles et perte YOLO : encodage d'une vérité, la perte terme par terme, le poids ω = 2 − g_w g_h, le masque ignore et la part de chaque terme sur un lot.
+
+- Commande : `python -m tools.figures perte`
+- Source : `yolo.data.targets.build_targets, yolo.train.loss (yolo_loss, ignore_mask)`
+
+![perte](figures/maths/perte.png)
+
+### T13.39 — `optimisation`
+
+SGD avec et sans momentum sur une quadratique mal conditionnée, taux d'apprentissage (montée puis paliers) et tailles multi-échelles.
+
+- Commande : `python -m tools.figures optimisation`
+- Source : `yolo.train.optim.SGD, yolo.train.schedule.lr_at, yolo.train.trainer.multiscale_size`
+
+![optimisation](figures/maths/optimisation.png)
+
+### T13.40 — `kmeans`
+
+k-means des ancres avec la distance 1 − IoU face à la distance euclidienne, et l'initialisation k-means++ sur des boîtes jouets.
+
+- Commande : `python -m tools.figures kmeans`
+- Source : `yolo.data.anchors (kmeans_anchors, _init_plusplus, mean_best_iou)`
+
+![kmeans](figures/maths/kmeans.png)
+
+### T13.41 — `nms_map`
+
+NMS pas à pas, appariement détections / vérités et courbe précision-rappel, AP VOC07 sur 11 points face à l'aire sous l'enveloppe, égale à la référence du devkit.
+
+- Commande : `python -m tools.figures nms_map`
+- Source : `yolo.infer.nms (nms), yolo.infer.metrics (eval_class, voc_ap), tests/voc_eval_ref.py`
+
+![nms_map](figures/maths/nms_map.png)
+
+### T13.42 — `pretraitement`
+
+Letterbox face à stretch, interpolation bilinéaire de Darknet, aller-retour RGB → HSV → RGB et transformation affine des boîtes.
+
+- Commande : `python -m tools.figures pretraitement`
+- Source : `yolo.data.letterbox, yolo.infer.pipeline (resize_darknet, preprocess), yolo.data.augment`
+
+![pretraitement](figures/maths/pretraitement.png)
+
+### T13.43 — `quantification`
+
+Quantification symétrique : l'escalier et son erreur, échelles par canal face à une échelle par couche, choix du seuil d'écrêtage par la MSE.
+
+- Commande : `python -m tools.figures quantification`
+- Source : `yolo.quant.quantize (round_half_up, quantize, weight_scales), yolo.quant.calibrate`
+
+![quantification](figures/maths/quantification.png)
+
+### T13.44 — `entier`
+
+Arithmétique entière du matériel : chaîne d'une sortie, multiplicateur fixe M0/2ⁿ, leaky entière 13/128 et marge des accumulateurs int32.
+
+- Commande : `python -m tools.figures entier`
+- Source : `yolo.quant.int_layers (conv_acc, requantize, leaky_int, clip_q), quantize.requant_params`
+
+![entier](figures/maths/entier.png)
+
+### T13.45 — `lut`
+
+Sigmoïde et exponentielles par tables de 256 entrées en Q16 : valeurs, erreurs aux points de la grille et de bout en bout, seuil entier sans sigmoïde.
+
+- Commande : `python -m tools.figures lut`
+- Source : `yolo.quant.lut (sigmoid_lut, exp_lut, softmax_exp_lut, logit_threshold_q)`
+
+![lut](figures/maths/lut.png)
+
+### T13.46 — `basse_precision`
+
+Basse précision : fake-quant et estimateur straight-through, niveaux équidistants face aux puissances de 2 et multiplication par décalages, ADMM, découpage 4 bits.
+
+- Commande : `python -m tools.figures basse_precision`
+- Source : `yolo.quant.fake_quant, yolo.quant.pow2, yolo.train.admm, yolo.quant.int_layers.split4`
+
+![basse_precision](figures/maths/basse_precision.png)
+
+### T13.47 — `formats`
+
+Formats lus et écrits à la main : un .weights Darknet octet par octet, le parser .cfg et l'arène exportée (décalages égaux au manifest).
+
+- Commande : `python -m tools.figures formats`
+- Source : `yolo.io.darknet_weights, yolo.models.cfg.parse_cfg, yolo.io.export.layout`
+
+![formats](figures/maths/formats.png)
+
+## Réseaux en détail (G)
+
+### T13.48 — `fiche`
+
+Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, champ réceptif et pas cumulé (CSV à côté de l'image).
+
+- Commande : `python -m tools.figures fiche`
+- Source : `model/<net>/manifest.json, yolo.models.specs`
+
+![fiche_tiny-yolov2-voc](figures/reseaux/fiche_tiny-yolov2-voc.png)
+![fiche_tiny-yolov3-coco](figures/reseaux/fiche_tiny-yolov3-coco.png)
+
+### T13.49 — `champ_receptif`
+
+Champ réceptif et pas cumulé par couche, puis une cellule de chaque tête sur une image 416 avec son champ réceptif et ses ancres.
+
+- Commande : `python -m tools.figures champ_receptif`
+- Source : `model/<net>/manifest.json, yolo.models.cfg (ancres, masques)`
+
+![champ_receptif](figures/reseaux/champ_receptif.png)
+
+### T13.50 — `flux`
+
+Flux des tenseurs couche par couche, un bloc par tenseur (largeur selon C, hauteur selon H) ; en v3, route, upsample et seconde tête.
+
+- Commande : `python -m tools.figures flux`
+- Source : `model/<net>/manifest.json, yolo.models.specs.infer_shapes`
+
+![flux_tiny-yolov2-voc](figures/reseaux/flux_tiny-yolov2-voc.png)
+![flux_tiny-yolov3-coco](figures/reseaux/flux_tiny-yolov3-coco.png)
+
+### T13.51 — `tete`
+
+La tête de sortie : disposition des canaux (ancres × (5 + C)), puis le vecteur d'une cellule en int8 et décodé (sigmoïdes, exponentielles, softmax).
+
+- Commande : `python -m tools.figures tete`
+- Source : `model/<net>/dumps/<image>/L<tête>.npy, manifest, yolo.infer.decode.decode_head`
+
+![tete](figures/reseaux/tete.png)
+
+### T13.52 — `une_couche`
+
+Une couche suivie du flottant au noyau HLS : formules, types et largeurs, écarts mesurés entre stades (SNR, octets).
+
+- Commande : `python -m tools.figures une_couche`
+- Source : `model/<net>/dumps, build/golden/out, suivi du README ; noms vérifiés dans le code`
+
+![une_couche](figures/reseaux/une_couche.png)

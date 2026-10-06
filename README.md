@@ -39,7 +39,9 @@ d'acceptation mesurable.
 - **[M12](docs/tasks/M12-profils-pc.md)** : profils de test sur PC (R/M/N), avec un critère
   et une décision par évaluation, avant de passer sur la carte.
 - **[M13](docs/tasks/M13-figures.md)** : figures régénérables par `make figures`
-  (architecture des modèles et de l'accélérateur, résultats, suivi du projet).
+  (architecture des modèles et de l'accélérateur, résultats, suivi du projet,
+  réimplémentation de zéro expliquée par ses formules, réseaux couche par couche) ;
+  galerie dans [results/figures.md](results/figures.md).
 
 ## Arborescence
 

@@ -80,3 +80,58 @@ def smooth(values, window):
         return v
     k = np.ones(min(window, len(v)))
     return np.convolve(v, k, "same") / np.convolve(np.ones_like(v), k, "same")
+
+
+def draw_boxes(ax, xyxy, texts=(), color=PALETTE[0], lw=1.6, ls="-", fontsize=6.5):
+    """Rectangles `xyxy` (pixels) et étiquettes sur une image affichée par `imshow`."""
+    from matplotlib.patches import Rectangle
+
+    texts = list(texts) + [""] * (len(xyxy) - len(texts))
+    for (x1, y1, x2, y2), t in zip(xyxy, texts):
+        ax.add_patch(Rectangle((x1, y1), x2 - x1, y2 - y1, fill=False, ec=color, lw=lw, ls=ls))
+        if t:
+            ax.text(x1 + 1, y1 + 1, t, fontsize=fontsize, color="white", va="top",
+                    bbox=dict(fc=color, ec="none", pad=0.6, alpha=0.9))
+
+
+def image_axes(ax, title=""):
+    """Axes d'image : sans grille ni graduations."""
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.grid(False)
+    for s in ax.spines.values():
+        s.set_visible(False)
+    if title:
+        ax.set_title(title)
+
+
+def block(ax, x, y, w, h, text="", color=PALETTE[0], fill=0.14, hatch="", fontsize=8,
+          weight="normal", ls="-", align="center"):
+    """Bloc de schéma (coordonnées de données) : cadre coloré, fond léger, texte centré."""
+    from matplotlib.colors import to_rgba
+    from matplotlib.patches import FancyBboxPatch
+
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.08",
+                                fc=to_rgba(color, fill), ec=color, lw=1.2, hatch=hatch, ls=ls))
+    if text:
+        tx = x + w / 2 if align == "center" else x + 0.08
+        ax.text(tx, y + h / 2, text, ha=align, va="center", fontsize=fontsize, color=INK,
+                weight=weight, linespacing=1.25)
+
+
+def arrow(ax, p, q, text="", color=INK2, ls="-", lw=1.2, fontsize=7, offset=(0, 0.12),
+          both=False):
+    """Flèche de `p` à `q` avec une étiquette au milieu."""
+    ax.annotate("", q, p, arrowprops=dict(arrowstyle="<->" if both else "->", color=color, lw=lw,
+                                          ls=ls, shrinkA=2, shrinkB=2))
+    if text:
+        ax.text((p[0] + q[0]) / 2 + offset[0], (p[1] + q[1]) / 2 + offset[1], text,
+                ha="center", va="bottom", fontsize=fontsize, color=color)
+
+
+def schema_axes(ax, xlim, ylim):
+    """Axes de schéma : repère de données fixe, sans axes."""
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_aspect("equal")
+    ax.axis("off")

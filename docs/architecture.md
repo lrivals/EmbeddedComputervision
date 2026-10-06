@@ -161,7 +161,7 @@ Procédure carte : [hw/boards/kv260/README.md](../hw/boards/kv260/README.md).
 | Fichier | Rôle |
 |---|---|
 | `sw/app/yolo_bench.cpp` | suite d'images (`--images` JPEG ou `--inputs` int8) : temps par étage et par image (pre, load, acc, post), moyenne et p99, détections JSONL au seuil de la mAP, puissance INA260 du SOM (`--power`) |
-| `tools/perf_model.py` | modèle de cycles du noyau, égal aux compteurs C-sim (`make perf-model`) ; scénarios d'optimisation chiffrés ; `--manifest` : cycles d'un export quelconque (élagué, précision mixte) |
+| `tools/perf_model.py` | modèle de cycles du noyau, égal aux compteurs C-sim (`make perf-model`) ; découpage en tuiles (`tile_grid`) ; scénarios d'optimisation chiffrés ; `--manifest` : cycles d'un export quelconque (élagué, précision mixte) |
 | `tools/mixed_precision.py` | précision mixte par couche (T10.10) : sensibilité, front glouton, mAP complète de la configuration retenue → `results/precision_mixte.md` |
 | `tools/prune.py`, `tools/prune_study.sh` | élagage structuré par norme de filtre (T10.11), puis affinage, calibration, mAP et cycles par taux → `results/elagage.md` |
 | `tools/make_ci_model.py` | export synthétique de `model/` pour la CI (T10.13), sans VOC ni poids Darknet |
@@ -169,6 +169,7 @@ Procédure carte : [hw/boards/kv260/README.md](../hw/boards/kv260/README.md).
 | `tools/bench_sim.sh` | stade FPGA en C-sim sur PC : paquets distribués aux cœurs, reprise (`make bench-sim`) |
 | `tools/map_stades.py` | mAP flottant / entier / FPGA, égalité image par image → `results/map_stades.md` |
 | `tools/bench_report.py` | `results/benchmarks.csv` (base + ce travail), `results/mesures.md` ; lit `times*.csv`, `utilization.rpt`, `power.rpt` |
+| `tools/figures/` | figures M13 (`make figures`) : un module par famille (modèles, matériel, résultats, projet, maths, réseaux), lues dans les sources ci-dessus → `results/figures/`, galerie `results/figures.md` |
 
 Périmètres de mesure : [results/protocole.md](../results/protocole.md) ; comparaison et
 pistes : [results/rapport.md](../results/rapport.md).

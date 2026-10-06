@@ -86,4 +86,4 @@ reporter ici l'avancement par jalon.
 | M10 | 13 (+ renvoi T10.12) | 0 |
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
-| M13 | 53 | 20 (+ 3 partielles ; B, D, E sur les données existantes ; C, F, G à faire) |
+| M13 | 53 | 51 (+ 2 partielles : T13.24 pow2 et LUT, T13.30 durées pytest) |

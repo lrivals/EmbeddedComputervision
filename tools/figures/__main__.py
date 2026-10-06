@@ -26,6 +26,11 @@ def gallery(status=None, results=RESULTS, build=BUILD):
              "registre de `tools/figures/` ; ne pas éditer à la main. Chaque figure se "
              "régénère par sa commande et lit ses données dans la source indiquée. Les "
              "figures absentes attendent leur donnée (voir la commande de la tâche).", ""]
+    lead = FIGURES.get("chaine_verif")
+    if lead and images_of(lead, results, build):
+        rel = os.path.relpath(images_of(lead, results, build)[0], path.parent)
+        lines += ["## En bref : la chaîne de vérification", "", lead.caption, "",
+                  f"![chaine_verif]({rel})", ""]
     for fam, title in FAMILY_TITLES.items():
         figs = [f for f in FIGURES.values() if f.family == fam]
         if not figs:

@@ -112,4 +112,4 @@ def _rel(p):
     return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else p.name
 
 
-from tools.figures import modeles, projet, resultats  # noqa: E402,F401  (enregistrement)
+from tools.figures import maths, materiel, modeles, projet, resultats, reseaux  # noqa: E402,F401  (enregistrement)

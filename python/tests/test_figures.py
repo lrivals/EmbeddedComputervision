@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import tools.figures as F  # noqa: E402
-from tools.figures import auto, modeles, projet, resultats  # noqa: E402
+from tools.figures import auto, maths, materiel, modeles, projet, resultats, reseaux  # noqa: E402,F401
 from tools.figures.__main__ import gallery  # noqa: E402
 
 RNG = np.random.default_rng(0)
@@ -40,14 +40,16 @@ def test_registry_is_consistent():
 
 
 def test_all_skips_cleanly_without_data(tmp_path, monkeypatch):
-    """`make figures` sans données : chaque figure est sautée, aucune exception."""
-    for mod in (resultats, modeles, projet):
+    """`make figures` sans données : chaque figure est sautée, aucune exception. Les planches
+    de la section F (`maths`) n'ont pas de donnée d'entrée (jouets) : elles sont produites."""
+    for mod in (resultats, modeles, projet, materiel, reseaux, maths):
         monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(resultats, "DEVKIT", tmp_path / "VOCdevkit")
     monkeypatch.setattr(modeles, "DEVKIT", tmp_path / "VOCdevkit")
     monkeypatch.setattr(projet, "TASKS", tmp_path / "docs" / "tasks")
-    status = F.run(F.select(["all"]), tmp_path / "res", tmp_path / "build", verbose=False)
-    assert set(status) == set(F.FIGURES)
+    figs = [f for f in F.select(["all"]) if f.family != "maths"]
+    status = F.run(figs, tmp_path / "res", tmp_path / "build", verbose=False)
+    assert set(status) == {f.name for f in figs}
     assert all(s == "sautée" for s, _ in status.values()), status
     assert not (tmp_path / "res").exists()
 
@@ -448,3 +450,169 @@ def test_yolo_package_never_imports_matplotlib():
     """ADR 0001 : le paquet yolo reste en NumPy pur."""
     for p in (ROOT / "python" / "yolo").rglob("*.py"):
         assert "matplotlib" not in p.read_text(), p
+
+
+# --- B, D, E (suite) ----------------------------------------------------------------------
+
+def test_anchors_by_k_increasing():
+    """IoU moyenne croissante avec k (l'égalité à anchors.md est vérifiée par la figure)."""
+    wh = RNG.uniform(10, 400, (400, 2))
+    by_k = modeles.anchors_by_k(wh, ks=range(1, 6))
+    ious = [by_k[k][1] for k in range(1, 6)]
+    assert all(b >= a - 1e-9 for a, b in zip(ious, ious[1:]))
+    assert all(by_k[k][0].shape == (k, 2) for k in by_k)
+
+
+def test_yolo_stages_equal_detect():
+    """T13.5 : les boîtes finales de la planche == `pipeline.detect` sur la même image."""
+    image = modeles.DEVKIT / "VOC2007" / "JPEGImages" / f"{modeles.DEMO_IMAGE}.jpg"
+    if not image.exists() or not (ROOT / modeles.WEIGHTS["tiny-yolov2-voc"]).exists():
+        pytest.skip("VOC ou poids absents")
+    from yolo.infer.decode import to_original
+
+    d = modeles.yolo_stages(modeles.load_net("tiny-yolov2-voc"), image)
+    fb, fs, fl = d["final"]
+    db, ds, dl = d["detect"]
+    assert np.allclose(to_original(fb, *d["wh"], d["size"]), db)
+    assert np.array_equal(fl, dl) and np.allclose(fs, ds)
+
+
+def test_detections_int_equals_csim():
+    """T13.19 : colonnes entier et C-sim identiques (sorties de build/m8)."""
+    m8 = ROOT / "build" / "m8" / resultats.NET
+    if not (m8 / "int.jsonl").exists() or not list(m8.glob("sim/dets_*.jsonl")):
+        pytest.skip("build/m8 absent (make m8-int bench-sim)")
+    from tools.map_stades import read_jsonl
+
+    ints = read_jsonl([m8 / "int.jsonl"])
+    sims = read_jsonl(sorted(m8.glob("sim/dets_*.jsonl")))
+    for iid in resultats.DET_IMAGES:
+        assert resultats.same_detections(resultats._thr(ints[iid]), resultats._thr(sims[iid]))
+
+
+def test_mermaid_graph_and_dependencies(tmp_path):
+    readme = tmp_path / "README.md"
+    readme.write_text('```mermaid\ngraph LR\n  M0 --> M1 --> M2\n  M1 -- "T1.9 x" --> M3\n'
+                      '  M2 --> M9 --> M91[M9.1] & M93[M9.3]\n  M3 -.-> M9\n```\n')
+    nodes, edges = projet.load_mermaid(readme)
+    assert nodes["M91"] == "M9.1" and nodes["M0"] == "M0"
+    assert ("M1", "M3", "T1.9 x", False) in edges and ("M3", "M9", "", True) in edges
+    assert ("M9", "M91", "", False) in edges and ("M9", "M93", "", False) in edges
+    prog = {"M0": dict.fromkeys(projet.CATEGORIES, 0) | {"faite": 2}}
+    dot = projet.dependency_dot(nodes, edges, prog)
+    assert 'M0 [label="M0\\n2/2"' in dot and "M3 -> M9 [style=dashed];" in dot
+
+
+# --- C : matériel -------------------------------------------------------------------------
+
+def test_soc_names_from_code():
+    _manifest(materiel.NET)
+    soc = materiel.load_soc()
+    regs = dict(soc["regs"])
+    assert regs["CTRL"] == 0 and regs["ACT_IN"] == 0x10 and regs["D"] == 0x40
+    assert ("act_in", "gmem_in") in soc["ports"] and ("wts", "gmem_w") in soc["ports"]
+
+
+def test_require_names_detects_missing():
+    materiel.require_names(materiel.KERNEL, ["load_input"])
+    with pytest.raises(AssertionError):
+        materiel.require_names(materiel.KERNEL, ["fonction_inexistante"])
+
+
+def test_tile_grid_counts_match_layer_cycles():
+    """Le tuilage dessiné est celui du modèle de cycles (même `tile_grid`)."""
+    from tools import perf_model as pm
+
+    d = {"layer": 0, "k": 3, "pad": 1, "cin": 3, "cout": 16, "h": 416, "w": 416, "pool_k": 2,
+         "pool_s": 2, "prepool": False}
+    g = pm.tile_grid(d, tile_pool=14)
+    assert (g["Rp"], g["Pr"], g["n_r"], g["n_m"], g["nti"]) == (208, 7, 30, 1, 1)
+    gf = pm.tile_grid(d, fold=True)
+    assert gf["folded"] and gf["lanes"] == 9
+    assert pm.tile_grid({**d, "cin": 1024, "cout": 1024, "h": 13, "w": 13, "pool_k": 0,
+                         "pool_s": 0})["n_r"] == 1
+
+
+def test_chain_states_from_tracking():
+    tr = {"M4": (7, 7, ""), "M5": (6, 6, ""), "M6": (6, 1, "T6.0-T6.3 en C-sim"),
+          "M7": (4, 0, "backend sim"), "M8": (3, 0, "C-sim ; mesures carte en attente")}
+    assert materiel.chain_states(tr) == ["vérifié", "vérifié", "vérifié sur PC",
+                                         "vérifié sur PC", "à faire"]
+
+
+def test_materiel_plots(tmp_path):
+    if not (ROOT / "model" / materiel.NET / "manifest.json").exists():
+        pytest.skip("export absent")
+    for name in ("soc", "moteur", "tuilage", "streaming"):
+        _pngs(F.FIGURES[name].fn(tmp_path))
+    _pngs(materiel.plot_chain(["vérifié", "vérifié", "vérifié sur PC", "vérifié sur PC",
+                               "à faire"], {"flottant": "56.30", "entier": "55.66",
+                                            "carte": "à mesurer", "dumps": 3,
+                                            "csim_eq": "4952 / 4952"}, tmp_path))
+
+
+# --- G : réseaux --------------------------------------------------------------------------
+
+def test_receptive_fields_strides():
+    """Pas finaux 32 (v2, v3 tête 1) et 16 (v3 tête 2) ; r_l = r_{l−1} + (k − 1)·j."""
+    from yolo.models.specs import TINY_YOLOV2_VOC, TINY_YOLOV3_VOC
+
+    rf2 = reseaux.receptive_fields(TINY_YOLOV2_VOC)
+    rf3 = reseaux.receptive_fields(TINY_YOLOV3_VOC)
+    assert rf2[0] == (3, 1) and rf2[1] == (4, 2) and rf2[-1][1] == 32
+    assert rf3[16][1] == 32 and rf3[23][1] == 16
+    assert rf3[17] == rf3[13]  # route : reprend sa source
+
+
+@pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782)])
+def test_layer_table_totals(net, gmac, tmp_path):
+    _manifest(net)
+    rows = reseaux.layer_table(reseaux._desc(net))
+    assert round(sum(r["macs"] for r in rows) / 1e9, 3) == gmac
+    assert [r["macs"] for r in rows] == [r[2] for r in modeles.load_profile(net)]
+    paths = _pngs(reseaux.plot_layer_table(net, rows, tmp_path, "f"))
+    assert paths[0].with_suffix(".csv").exists()
+
+
+def test_tensor_layout_v3_branches():
+    from yolo.models.specs import TINY_YOLOV3_VOC
+
+    lay = reseaux.tensor_layout(TINY_YOLOV3_VOC)
+    rows = {i: r for i, _, r, *_ in lay}
+    assert rows[16] == 0 and rows[17] == 1 and rows[23] == 1
+    assert lay[20][6] == [19, 8]
+
+
+def test_head_vector_decodes_dump():
+    if not (ROOT / "model" / "tiny-yolov2-voc" / "dumps" / "000001").exists():
+        pytest.skip("dumps absents (make export)")
+    v = reseaux.head_vector()
+    assert v["q"].shape == (25,) and v["mode"] == "v2"
+    assert np.allclose(v["t"], v["q"] * v["scale"]) and np.isclose(v["scores"].sum() / v["obj"], 1)
+
+
+# --- F : maths ----------------------------------------------------------------------------
+
+def test_map_covers_every_module():
+    rows = maths.load_map()
+    mods = maths.package_modules()
+    assert [r[0] for r in rows] == mods and "layers/conv" in mods
+    assert all(r[1] != "?" for r in rows), [r[0] for r in rows if r[1] == "?"]
+    assert all(r[4] for r in rows), [r[3] for r in rows if not r[4]]
+
+
+def test_gradcheck_errors_below_threshold():
+    errs = maths.gradcheck_errors()
+    assert all(v <= 1e-7 for k, v in errs.items() if "faux" not in k), errs
+    assert errs["témoin faux (x³ ↦ 2x²)"] > 1e-5
+
+
+def test_conv_timings_same_output():
+    rows = maths.conv_timings(sizes=(6, 8), reps=1)
+    assert all(r[3] < 1e-12 for r in rows)
+
+
+def test_math_plates_generate(tmp_path):
+    """Toutes les planches F se génèrent sur leurs jouets (palier R)."""
+    for f in F.select(["maths"]):
+        _pngs(f.fn(tmp_path))

@@ -88,24 +88,37 @@ def layer_tiling(d, tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"], fold=False,
     return tr, tc, folded
 
 
+def tile_grid(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"], fold=False,
+              tile_pool=None):
+    """Découpage d'une conv en tuiles : tuile (tr, tc), voies d'entrée, sorties R × C (puis
+    Rp × Cp après pooling, Pr × Pc par tuile) et nombres de tuiles n_r, n_c, n_m (Tm), nti (Tn)."""
+    tr, tc, folded = layer_tiling(d, tn, tr, tc, fold, tile_pool)
+    k = d["k"]
+    lanes = d["cin"] * k if folded else d["cin"]
+    R = d["h"] + 2 * d["pad"] - k + 1
+    C = d["w"] + 2 * d["pad"] - k + 1
+    pk, ps = (d["pool_k"], d["pool_s"]) if d["pool_k"] > 0 else (1, 1)
+    Rp = R if ps == 1 else (R - pk) // ps + 1
+    Cp = C if ps == 1 else (C - pk) // ps + 1
+    Pr, Pc = (tr - pk) // ps + 1, (tc - pk) // ps + 1
+    return dict(tr=tr, tc=tc, folded=folded, lanes=lanes, R=R, C=C, Rp=Rp, Cp=Cp, Pr=Pr, Pc=Pc,
+                pk=pk, ps=ps, n_r=_cdiv(Rp, Pr), n_c=_cdiv(Cp, Pc), n_m=_cdiv(d["cout"], tm),
+                nti=_cdiv(lanes, tn))
+
+
 def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"],
                  width=1, trim=False, requant=1, prepool_all=False, fold=False,
                  tile_pool=None):
     """Cycles d'une conv : dict load_in, load_w, compute, store, sequential, overlapped."""
-    tr, tc, folded = layer_tiling(d, tn, tr, tc, fold, tile_pool)
-    k, cin, cout = d["k"], d["cin"], d["cout"]
+    g = tile_grid(d, tm, tn, tr, tc, fold, tile_pool)
+    tr, tc, folded, lanes = g["tr"], g["tc"], g["folded"], g["lanes"]
+    k, cout = d["k"], d["cout"]
     kh = 1 if folded else k  # lignes du noyau parcourues par le calcul
-    lanes = cin * k if folded else cin
     ir, ic = tr + K_MAX - 1, tc + K_MAX - 1
-    R = d["h"] + 2 * d["pad"] - k + 1
-    C = d["w"] + 2 * d["pad"] - k + 1
+    R, C, Rp, Cp, Pr, Pc = (g[x] for x in ("R", "C", "Rp", "Cp", "Pr", "Pc"))
     pooled = d["pool_k"] > 0
-    pk, ps = (d["pool_k"], d["pool_s"]) if pooled else (1, 1)
-    Rp = R if ps == 1 else (R - pk) // ps + 1
-    Cp = C if ps == 1 else (C - pk) // ps + 1
-    Pr, Pc = (tr - pk) // ps + 1, (tc - pk) // ps + 1
-    n_r, n_c, n_m = _cdiv(Rp, Pr), _cdiv(Cp, Pc), _cdiv(cout, tm)
-    nti = _cdiv(lanes, tn)
+    pk, ps = g["pk"], g["ps"]
+    n_r, n_c, n_m, nti = g["n_r"], g["n_c"], g["n_m"], g["nti"]
 
     def words(n):  # une ligne de n octets, alignement quelconque
         return _cdiv(n + width - 1, width)

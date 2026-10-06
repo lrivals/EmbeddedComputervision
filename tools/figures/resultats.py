@@ -1136,3 +1136,94 @@ def plot_map_summary(rows, out_dir, name="map_resume", title=""):
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
+
+
+# --- T13.19 : détections côte à côte ------------------------------------------------------
+
+DET_IMAGES = ("000004", "000014", "000025", "000058")  # test ; 000014 et 000058 : flottant ≠ entier
+DET_CONF = 0.25  # seuil d'affichage (les JSONL d'évaluation descendent à 0,005)
+
+
+def _thr(d, conf=DET_CONF):
+    b, s, lab = (np.asarray(v) for v in d)
+    keep = s > conf
+    return b.reshape(-1, 4)[keep], s[keep], lab[keep]
+
+
+def load_detections(ids=DET_IMAGES, root=None):
+    """{id: {sample, vérité, flottant, entier, csim}} ; boîtes (cx, cy, w, h) normalisées
+    dans l'image d'origine, prétraitement stretch (celui de `build/m8/`).
+
+    Le flottant est recalculé par `pipeline.detect` ; entier et C-sim viennent de
+    `int.jsonl` et `sim/dets_*.jsonl` (`tools/map_stades.read_jsonl`).
+    """
+    from PIL import Image
+
+    from yolo.infer.pipeline import detect, preprocess
+
+    from tools.figures.modeles import load_net
+    from tools.map_stades import read_jsonl
+
+    m8 = Path(root or ROOT) / "build" / "m8" / NET
+    ints = read_jsonl([need(m8 / "int.jsonl")])
+    sims = read_jsonl(sorted(m8.glob("sim/dets_*.jsonl")))
+    if not sims:
+        raise MissingSource(f"{m8.relative_to(ROOT)}/sim/dets_*.jsonl absent (make bench-sim)")
+    samples = {s["id"]: s for s in test_samples()}
+    model = load_net(NET)
+    out = {}
+    for iid in ids:
+        s = samples[iid]
+        with Image.open(s["image"]) as img:
+            x, wh = preprocess(img, 416, "stretch")
+        out[iid] = {"sample": s,
+                    "vérité": (s["boxes"][~s["difficult"]], np.ones((~s["difficult"]).sum()),
+                               s["labels"][~s["difficult"]]),
+                    "flottant": detect(model, x[None], [wh], "stretch", DET_CONF)[0],
+                    "entier": _thr(ints[iid]), "csim": _thr(sims[iid])}
+    return out
+
+
+def same_detections(a, b):
+    return all(np.array_equal(np.asarray(u), np.asarray(v)) for u, v in zip(a, b))
+
+
+def plot_detections(dets, out_dir, name="detections"):
+    from PIL import Image
+
+    from yolo.data.voc import VOC_CLASSES
+    from yolo.infer.boxes import cxcywh_to_xyxy
+
+    plt = st.plt()
+    cols = [("vérité", st.PALETTE[5]), ("flottant", st.STAGE_COLORS["flottant"]),
+            ("entier", st.STAGE_COLORS["entier"]), ("csim", st.STAGE_COLORS["csim"])]
+    fig, axes = plt.subplots(len(dets), len(cols), figsize=(st.FULL, 2.2 * len(dets) + 0.4))
+    for r, (iid, d) in enumerate(dets.items()):
+        s = d["sample"]
+        with Image.open(s["image"]) as img:
+            arr = np.asarray(img.convert("RGB"))
+        for c, (key, color) in enumerate(cols):
+            ax = axes[r, c]
+            ax.imshow(arr)
+            b, sc, lab = d[key]
+            xyxy = cxcywh_to_xyxy(np.asarray(b).reshape(-1, 4)) * np.tile([s["width"], s["height"]], 2)
+            texts = [VOC_CLASSES[k] if key == "vérité" else f"{VOC_CLASSES[k]} {v:.2f}"
+                     for k, v in zip(lab, sc)]
+            st.draw_boxes(ax, xyxy, texts, color=color, lw=1.4)
+            ax.set_xlim(0, s["width"])
+            ax.set_ylim(s["height"], 0)
+            label = {"csim": "C-sim"}.get(key, key)
+            if key == "csim":
+                label += " (= entier)" if same_detections(d["csim"], d["entier"]) else " (≠ entier !)"
+            st.image_axes(ax, f"{iid} : {label}, {len(b)}" if c == 0 else f"{label}, {len(b)}")
+    fig.suptitle(f"{NET}, VOC2007 test, stretch, score > {DET_CONF}", fontsize=9)
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    return st.save(fig, out_dir, name)
+
+
+@figure("detections", "resultats", "T13.19",
+        "Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : les "
+        "colonnes entier et C-sim sont identiques.",
+        "weights/, build/m8/<net>/int.jsonl et sim/dets_*.jsonl, data/VOCdevkit")
+def detections(out_dir):
+    return plot_detections(load_detections(), out_dir)
