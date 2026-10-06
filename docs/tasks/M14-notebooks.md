@@ -18,9 +18,9 @@ les images, les courbes et les tables, et garde la trace des paramètres. Comme 
 de [M13](M13-figures.md), il **appelle le code du dépôt** (`python/yolo/` et les `main()`
 de `tools/`), jamais une réécriture.
 
-**État** : 3 tâches faites sur 10 (T14.0, T14.2, T14.7). Les 7 autres sont implémentées ;
-il leur manque un passage long (palier N), un essai sur Colab ou un entraînement (« Reste »
-de chaque tâche).
+**État** : 5 tâches faites sur 12 (T14.0, T14.2, T14.7, T14.10, T14.11). Les 7 autres sont
+implémentées ; il leur manque un passage long (palier N), un essai sur Colab ou un
+entraînement (« Reste » de chaque tâche).
 
 ## Conventions communes
 
@@ -101,8 +101,25 @@ d'inférence hors domaine sans toucher au générateur.
 | crowdhuman | `tiny-yolov2-voc`, `tiny-yolov3-coco` | — | T11.6 |
 
 Les modèles `tiny-yolov3-<jeu>` sont les cfg produits par `tools/make_cfg.py`
-(`build/m11/cfg/tiny-yolov3-<jeu>.cfg`) ; leur notebook d'inférence demande les poids
-`final.weights` de l'entraînement correspondant et le dit en tête s'ils manquent.
+(`build/m11/cfg/tiny-yolov3-<jeu>.cfg`). Chaque jeu de la colonne Entraînement a aussi un
+notebook de **balayage** `<modèle>_sweep` (lot × sous-ensemble, T14.10). Le notebook
+d'inférence de ces modèles choisit les poids parmi les runs de `_train` et `_sweep`
+(`RUN`, T14.11) et le dit en tête s'il n'y en a aucun.
+
+### Runs d'entraînement
+
+`build/notebooks/<jeu>/<modèle>/` (`RUNS_DIR`, `tools/notebooks/runs.py`) :
+
+```
+final.weights, loss.csv, run.json …   run « train » (notebook _train)
+runs/b16-sall/                        balayage : lot 16, tout le split d'entraînement
+runs/b8-s500/                         lot 8, 500 premières images
+eval/<run>/                           évaluations des notebooks d'inférence
+```
+
+Un run compte dès qu'il a un `final.weights` ; `run.json` donne lot, sous-ensemble,
+itérations, backend et révision. Sur Colab, `colab.sync_outputs` copie tout le dossier,
+`runs/` compris, dans `<DRIVE_DIR>/runs/`.
 
 ---
 
@@ -351,7 +368,47 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - cellule de vitesse : s/image d'après `loss.csv`.
 - **Reste** : la reprise kitti sur Colab, et le gain GPU mesuré, à renvoyer à T12.11-e.
 
-## D. Validation
+## D. Balayages et choix du run
+
+### [x] T14.10 — Notebook `_sweep` : grille lot × sous-ensemble d'entraînement
+- **Spec** : §7 · **Dépend de** : T14.6 · **Taille** : M
+- **Livrables** : `notebooks/<jeu>/<modèle>_sweep.ipynb` pour voc, kitti, visdrone et flir ;
+  `tools/notebooks/runs.py`.
+- **Contenu** :
+  - paramètres `BATCHES` (défaut `[8, 16, 32]`), `TRAIN_SUBSETS` (défaut `[500, 0]`, où 0
+    veut dire tout le split, et n les n premières images, `train.py --subset`), `ITERS`
+    (600 par run), `SKIP_DONE` ;
+  - préparation et aperçu communs avec `_train` ;
+  - table du plan (images, époques effectives, durée estimée) ;
+  - un run par case dans `runs/b<lot>-s<n|all>/` avec `run.json`, `--resume` si
+    interrompu, synchronisation Drive comme T14.8 ;
+  - comparaison : mAP sur `SUBSET` images, perte finale et s/image (`runs.table`), puis
+    courbes superposées (`plot_training`, M13).
+- **Acceptation** : la commande d'une case est celle du notebook `_train` à `--batch` et
+  `--subset` près (test) ; un run fini n'est pas relancé.
+- **Notes** : le taux d'apprentissage n'est pas ajusté au lot ; une mAP sur `SUBSET`
+  images classe les runs, elle n'est pas publiable (règles de M12).
+- **Fait** : notebooks et `runs.py` ; tests de la commande d'une case, de
+  `find_runs`/`pick`/`table` et de `read_map` (tables VOC et COCO de `eval_voc.py`).
+- **Reste** : aucun balayage lancé (pas d'entraînement pendant l'implémentation).
+
+### [x] T14.11 — Inférence : choix d'un run et comparaison
+- **Spec** : §8 · **Dépend de** : T14.3, T14.10 · **Taille** : S
+- **Livrables** : paramètres `RUNS_DIR`, `RUN` et `COMPARE` des notebooks d'inférence des
+  modèles affinés (`tiny-yolov3-voc`, `tiny-yolov3-<jeu>`).
+- **Contenu** :
+  - `WEIGHTS = None` prend `final.weights` du run `RUN` (None : le plus récent ; `'train'`,
+    `'b16-sall'`…) ; sur Colab, les runs sont d'abord restaurés depuis Drive ;
+  - sans run, arrêt en tête avec la liste et le notebook à lancer ;
+  - sorties dans `RUNS_DIR/eval/<run>/` ;
+  - `COMPARE = True` évalue chaque run sur les mêmes `SUBSET` images (mAP réutilisée si
+    déjà calculée) et affiche la table des runs.
+- **Acceptation** : avec deux runs présents, le plus récent est choisi par défaut et la
+  table compare les deux.
+- **Fait** : vérifié de bout en bout sur deux faux runs `tiny-yolov3-voc` (poids
+  initialisés au hasard, sans entraînement) : choix du plus récent, mAP de chacun, table.
+
+## E. Validation
 
 ### [ ] T14.9 — Exécution de fumée de tous les notebooks
 - **Spec** : — · **Dépend de** : T14.3 à T14.7 · **Taille** : S · **Palier** : M
@@ -396,4 +453,6 @@ graph LR
   T141 & T142 --> T146[T14.6]
   T146 --> T147[T14.7] & T148[T14.8]
   T143 & T144 & T145 & T146 & T147 --> T149[T14.9]
+  T146 --> T1410[T14.10]
+  T143 & T1410 --> T1411[T14.11]
 ```

@@ -31,7 +31,7 @@ def select(targets):
 
 def _palier(nb):
     """« premier passage / complet » pour l'inférence ; ITERS par défaut pour l'entraînement."""
-    if nb.role == "train":
+    if nb.trains:
         return palier_of(nb, 0, M11_TRAIN["iters"])
     return f"{palier_of(nb, SUBSET_FIRST)} / {palier_of(nb)}"
 
@@ -50,7 +50,7 @@ def index():
     for nb in NOTEBOOKS.values():
         pal = _palier(nb)
         req = "<br>".join(f"{k} : `{v}` ({how_to_get(k, nb)})" for k, v in prerequis(nb).items()
-                          if not (nb.role == "train" and k == "cfg"))
+                          if not (nb.trains and k == "cfg"))
         badge = (f"[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]"
                  f"({COLAB}/notebooks/{nb.path.as_posix()})")
         lines.append(f"| {nb.dataset} | [{nb.model}]({nb.path.as_posix()}) | "

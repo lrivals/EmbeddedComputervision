@@ -42,9 +42,10 @@ d'acceptation mesurable.
   (architecture des modèles et de l'accélérateur, résultats, suivi du projet,
   réimplémentation de zéro expliquée par ses formules, réseaux couche par couche) ;
   galerie dans [results/figures.md](results/figures.md).
-- **[M14](docs/tasks/M14-notebooks.md)** : notebooks Jupyter d'inférence et d'entraînement,
-  un par modèle × jeu, générés par `make notebooks` et exécutables en local comme sur Colab
-  (GPU) ; index dans [notebooks/README.md](notebooks/README.md).
+- **[M14](docs/tasks/M14-notebooks.md)** : notebooks Jupyter d'inférence, d'entraînement et
+  de balayage (lot × sous-ensemble), un par modèle × jeu, générés par `make notebooks` et
+  exécutables en local comme sur Colab (GPU) ; l'inférence choisit ou compare les runs
+  entraînés ; index dans [notebooks/README.md](notebooks/README.md).
 
 ## Arborescence
 

@@ -6,7 +6,9 @@
 - Inférence, poids affinés : `tiny-yolov3-<jeu>` pour chaque jeu de `TRAINABLE`, avec les
   poids `final.weights` du notebook d'entraînement correspondant.
 - Entraînement : `TRAINABLE`, seule liste écrite à la main (COCO train2017 est trop grand en
-  NumPy ; ExDark et CrowdHuman ne sont pas affinés, T11.3, T11.6).
+  NumPy ; ExDark et CrowdHuman ne sont pas affinés, T11.3, T11.6) : un notebook `train`
+  (affinage unique de tools/m11.sh) et un notebook `sweep` (balayage lot × sous-ensemble,
+  T14.10) par jeu. L'inférence affinée lit l'un ou l'autre de leurs runs (`runs.py`).
 
 Ajouter un jeu à `DATASETS` (avec ses `MAPPINGS`) ajoute ses notebooks d'inférence hors
 domaine sans toucher au générateur.
@@ -44,7 +46,7 @@ TASKS = {("voc", "infer"): ("T3.4", "T4.5", "T11.0"), ("coco", "infer"): ("T11.1
          ("hors-domaine", "infer"): ("T11.2",), ("voc", "train"): ("T2.9", "T9.2", "T9.3"),
          ("kitti", "train"): ("T11.4",), ("visdrone", "train"): ("T11.5",),
          ("flir", "train"): ("T11.7",), ("exdark", "infer"): ("T11.3",),
-         ("crowdhuman", "infer"): ("T11.6",)}
+         ("crowdhuman", "infer"): ("T11.6",), ("sweep", "sweep"): ("T14.10",)}
 
 
 def family_of(net):
@@ -79,11 +81,13 @@ def build_registry():
             model, cfg, inp = finetuned(ds)
             out.append(Notebook(ds, model, "infer", cfg,
                                 f"build/notebooks/{ds}/{model}/final.weights", ds,
-                                _tasks(ds, "train") + ("T14.6",), **inp))
-    for ds in TRAINABLE:
-        model, cfg, inp = finetuned(ds)
-        out.append(Notebook(ds, model, "train", cfg, f"weights/{PRETRAINED['tiny-yolov3-coco']}",
-                            ds, _tasks(ds, "train"), **inp))
+                                _tasks(ds, "train") + ("T14.6", "T14.11"), **inp))
+    init = f"weights/{PRETRAINED['tiny-yolov3-coco']}"
+    for role in ("train", "sweep"):
+        for ds in TRAINABLE:
+            model, cfg, inp = finetuned(ds)
+            tasks = _tasks(ds, "train") + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
+            out.append(Notebook(ds, model, role, cfg, init, ds, tasks, **inp))
     return {f"{nb.dataset}/{nb.name}": nb for nb in out}
 
 
@@ -106,7 +110,7 @@ def palier(images=0, iters=0):
 def palier_of(nb, subset=0, iters=0):
     """Palier d'un passage du notebook : `subset` images (0 : split complet)."""
     images = subset or SPLIT_IMAGES.get(nb.dataset)
-    if nb.role == "train":
+    if nb.trains:
         return palier(0, iters)
     return palier(images)
 
@@ -114,7 +118,9 @@ def palier_of(nb, subset=0, iters=0):
 def prerequis(nb):
     """{type: chemin ou commande} : ce que le notebook demande avant de tourner."""
     req = {"données": DATA_MARKERS[nb.dataset]}
-    req["poids"] = nb.weights
+    # Poids affinés : le run choisi (RUN) parmi ceux du notebook _train ou _sweep.
+    req["poids"] = (f"{nb.train_dir}/[runs/<run>/]final.weights" if nb.finetuned
+                    else nb.weights)
     if nb.net.endswith(".cfg"):
         req["cfg"] = nb.net
     return req
@@ -129,8 +135,8 @@ def how_to_get(kind, nb):
             return f"tools/get_datasets.sh {nb.dataset} (inscription : source affichée)"
         return f"tools/get_datasets.sh {nb.dataset}"
     if kind == "poids":
-        return (f"notebooks/{nb.dataset}/{nb.model}_train.ipynb" if nb.finetuned
-                else "tools/get_weights.sh")
+        return (f"notebooks/{nb.dataset}/{nb.model}_train.ipynb ou _sweep.ipynb"
+                if nb.finetuned else "tools/get_weights.sh")
     return f"notebooks/{nb.dataset}/{nb.model}_train.ipynb (préparation)"
 
 

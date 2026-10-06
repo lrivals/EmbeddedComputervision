@@ -15,9 +15,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.notebooks import commandes as C  # noqa: E402
+from tools.notebooks import runs  # noqa: E402
+from tools.notebooks.env import Prerequis  # noqa: E402
 from tools.notebooks.__main__ import generate, main  # noqa: E402
 from tools.notebooks.gabarits import M12_ADMM, M12_QAT, dumps, render  # noqa: E402
-from tools.notebooks.matrice import DATA_MARKERS, NOTEBOOKS, prerequis  # noqa: E402
+from tools.notebooks.matrice import DATA_MARKERS, NOTEBOOKS, TRAINABLE, prerequis  # noqa: E402
 from yolo.data.datasets import DATASETS, MAPPINGS  # noqa: E402
 
 
@@ -80,6 +82,13 @@ def test_structure_fixe():
         if nb.role == "train":
             for k in ("ITERS", "BATCH", "LR", "INIT", "QAT", "ADMM", "DRIVE_DIR"):
                 assert k in p
+        if nb.role == "sweep":
+            for k in ("BATCHES", "TRAIN_SUBSETS", "ITERS", "LR", "INIT", "SKIP_DONE"):
+                assert k in p
+            assert "BATCH" not in p and "QAT" not in p
+        if nb.role == "infer" and nb.finetuned:
+            assert p["WEIGHTS"] is None and p["RUN"] is None and p["COMPARE"] is False
+            assert p["RUNS_DIR"] == nb.train_dir and p["OUT"] == f"{nb.train_dir}/eval"
 
 
 def test_check_detecte_une_retouche(tmp_path, capsys):
@@ -117,6 +126,10 @@ def test_matrice():
         if nb.role == "infer" and nb.net.endswith(".cfg"):
             assert nb.finetuned and "cfg" in prerequis(nb)
     assert NOTEBOOKS["flir/tiny-yolov3-flir_train"].net == "build/m11/cfg/tiny-yolov3-flir-c1.cfg"
+    for ds in TRAINABLE:  # T14.10 : un balayage par jeu affiné, mêmes cfg et dossier
+        train, sweep = (next(nb for nb in NOTEBOOKS.values() if nb.dataset == ds
+                             and nb.role == role) for role in ("train", "sweep"))
+        assert (sweep.net, sweep.train_dir) == (train.net, train.train_dir)
 
 
 def test_temoins_de_get_datasets():
@@ -221,6 +234,76 @@ def test_kitti_identique_a_m11():
     assert p["NET"] == C.cfg_path("tiny-yolov3", "kitti")
 
 
+def test_sweep_ne_change_que_lot_et_sous_ensemble():
+    """Une case (b, s) du balayage = la commande du notebook _train à --batch et --subset
+    près ; dossier OUT/runs/b<b>-s<s>."""
+    nb = NOTEBOOKS["kitti/tiny-yolov3-kitti_sweep"]
+    src = re.sub(r"\s+", " ", "\n".join(_code(render(nb))))
+    assert ("C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS, batch=b, "
+            "lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE, subset=s, save_every=SAVE_EVERY, "
+            "workers=WORKERS, device=DEVICE, data_root=DATA_ROOT)") in src
+    p = _params(render(nb))
+    t = _params(render(NOTEBOOKS["kitti/tiny-yolov3-kitti_train"]), ITERS=p["ITERS"], BATCH=8)
+    d = f"{nb.train_dir}/runs/{runs.run_name(8, 500)}"
+    got = C.cmd_train(p["NET"], d, p["DATASET"], p["INIT"], p["INIT_NET"], False,
+                      iters=p["ITERS"], batch=8, lr=p["LR"], burn_in=p["BURN_IN"],
+                      multiscale=p["MULTISCALE"], subset=500, save_every=p["SAVE_EVERY"],
+                      workers=p["WORKERS"], device=p["DEVICE"], data_root=p["DATA_ROOT"])
+    want = _train(t, d)
+    assert _opts(got)[1] == {**_opts(want)[1], "--subset": 500.0}
+    assert d.endswith("/runs/b8-s500") and runs.run_name(16, 0) == "b16-sall"
+    assert p["BATCHES"] and 0 in p["TRAIN_SUBSETS"]
+
+
+def _fake_run(root, rel, mtime, **meta):
+    d = root / rel
+    d.mkdir(parents=True)
+    (d / "final.weights").write_bytes(b"w")
+    (d / "loss.csv").write_text("it,lr,size,loss,coord,obj,noobj,cls,seconds\n"
+                                "1,0.001,416,4.0,1,1,1,1,8.0\n2,0.001,416,2.0,1,1,1,1,8.0\n")
+    if meta:
+        runs.write_meta(d, **meta)
+    os.utime(d / "final.weights", (mtime, mtime))
+
+
+def test_runs_trouves_et_choisis(tmp_path, monkeypatch):
+    monkeypatch.setattr(runs, "ROOT", tmp_path)
+    _fake_run(tmp_path, "m", 100)
+    _fake_run(tmp_path, "m/runs/b8-s500", 300, batch=8, subset=500, iters=600)
+    _fake_run(tmp_path, "m/runs/b16-sall", 200, batch=16, subset=0, iters=600)
+    (tmp_path / "m" / "runs" / "b32-sall").mkdir()  # sans final.weights : ignoré
+    found = runs.find_runs("m")
+    assert [r.name for r in found] == ["train", "b16-sall", "b8-s500"]
+    assert found[1].weights == "m/runs/b16-sall/final.weights" and found[1].meta["batch"] == 16
+    assert runs.pick("m").name == "b8-s500"  # le plus récent
+    assert runs.pick("m", "train").weights == "m/final.weights"
+    with pytest.raises(Prerequis, match="b16-sall"):
+        runs.pick("m", "b64-sall")
+    with pytest.raises(Prerequis, match="aucun run"):
+        runs.pick("vide")
+    row = runs.row(found[2], 41.5, 50)
+    assert row["perte finale"] == 3.0 and row["s/image"] == 1.0 and row["images"] == 500
+    text = runs.table([runs.row(found[1], 30.0), row, runs.row(found[0], None)])
+    assert text.splitlines()[2].startswith("| b8-s500 | 8 | 500 |")
+    assert text.splitlines()[-1].startswith("| train |")
+
+
+def test_read_map_des_tables_eval_voc(tmp_path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("eval_voc", ROOT / "tools" / "eval_voc.py")
+    ev = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ev)
+    monkeypatch.setattr(runs, "ROOT", tmp_path)
+    (tmp_path / "voc.md").write_text(ev.table([0.5, 0.25], 0.375, "t", ["a", "b"]))
+    assert runs.read_map("voc.md") == 37.5
+    stats = {k: 0.1 * (i + 1) for i, k in enumerate(ev.coco_eval.STATS)}
+    res = {**stats, "ap_class": [0.2, 0.4], "ap50_class": [0.5, 0.6]}
+    (tmp_path / "coco.md").write_text(ev.coco_table(res, "t", ["a", "b"]))
+    assert runs.read_map("coco.md") == 10.0
+    assert runs.read_map("absent.md") is None
+
+
 @pytest.mark.parametrize("profile,over,lowbit", [("qat", M12_QAT, "w4a4"),
                                                  ("admm", M12_ADMM, "")])
 def test_qat_admm_identiques_a_m12(profile, over, lowbit):
@@ -269,13 +352,17 @@ def test_anchors_k(tmp_path):
 # ---------------------------------------------------------------------- T14.9 fumée
 
 SMOKE = {"SUBSET": 4, "ITERS": 2, "BATCH": 2, "SHOW": 2, "CALIB_IMAGES": 8, "JOBS": 2,
-         "WORKERS": 2, "INT8": True}
+         "WORKERS": 2, "INT8": True, "BATCHES": [2], "TRAIN_SUBSETS": [4]}
 
 
 def _missing(nb):
     req = prerequis(nb)
-    if nb.role == "train":
+    if nb.trains:
         req.pop("cfg", None)
+    if nb.finetuned:  # poids : un run de _train ou _sweep (runs.find_runs)
+        w = req.pop("poids")
+        if not runs.find_runs(nb.train_dir):
+            return [w]
     return [v for v in req.values() if not (ROOT / v).exists()]
 
 
@@ -289,7 +376,7 @@ def test_fumee(key):
         pytest.skip("jupyter absent (pip install -e 'python[notebooks]')")
     if missing := _missing(nb):
         pytest.skip(f"{key} : {', '.join(missing)} absent(s)")
-    out = f"build/notebooks/smoke/{nb.dataset}/{nb.model}"
+    out = f"build/notebooks/smoke/{nb.dataset}/{nb.name}"
     shutil.rmtree(ROOT / out, ignore_errors=True)
     data = render(nb)
     cell = next(c for c in data["cells"] if "parameters" in c["metadata"].get("tags", ()))

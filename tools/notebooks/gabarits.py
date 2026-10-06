@@ -18,8 +18,11 @@ from tools.notebooks.matrice import SPLIT_IMAGES, how_to_get, palier_of, prerequ
 REPO_URL = "https://github.com/lrivals/EmbeddedComputervision.git"
 REV = "main"
 COLAB = "https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main"
-ROLE_TITLES = {"infer": "inférence", "train": "entraînement"}
+ROLE_TITLES = {"infer": "inférence", "train": "entraînement",
+               "sweep": "balayage lot × sous-ensemble"}
 SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
+# Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu).
+SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "iters": 600}
 
 # Paramètres des profils M12 pour le notebook voc/tiny-yolov3-voc_train (T14.7).
 M12_QAT = {"NET": "tiny-yolov2-voc", "INIT": "weights/yolov2-tiny-voc.weights",
@@ -88,6 +91,11 @@ def header(nb):
         full = palier_of(nb, 0, M11_TRAIN["iters"])
         cost = (f"palier **{full}** ({M11_TRAIN['iters']} itérations par défaut, "
                 "plusieurs heures sur CPU) ; évaluation finale sur `SUBSET` images")
+    elif nb.role == "sweep":
+        n = len(SWEEP["batches"]) * len(SWEEP["subsets"])
+        cost = (f"palier **{palier_of(nb, 0, SWEEP['iters'])}** ({n} runs de "
+                f"{SWEEP['iters']} itérations par défaut) ; chaque run est évalué sur "
+                "`SUBSET` images, puis comparé aux autres")
     else:
         n = SPLIT_IMAGES.get(nb.dataset)
         full = palier_of(nb)
@@ -96,7 +104,7 @@ def header(nb):
                 "`SUBSET = 0`)")
     req = prerequis(nb)
     reqs = "\n".join(f"- {k} : `{v}` — {how_to_get(k, nb)}" for k, v in req.items()
-                     if not (nb.role == "train" and k == "cfg"))
+                     if not (nb.trains and k == "cfg"))
     domain = (f" Poids {nb.family.upper()} hors domaine : seules les classes communes sont "
               "évaluées." if nb.out_of_domain and nb.role == "infer" else "")
     colab = f"{COLAB}/notebooks/{nb.path.as_posix()}"
@@ -128,18 +136,31 @@ def _assign(pairs):
     return "\n".join(f"{k:{width}s} = {v!r}" + (f"  # {c}" if c else "") for k, v, c in pairs)
 
 
+def _weights_param(nb):
+    if nb.role == "infer" and nb.finetuned:
+        return ("WEIGHTS", None, "None : final.weights du run RUN ; ou un chemin")
+    if nb.role == "infer":
+        return ("WEIGHTS", nb.weights, "poids évalués")
+    if nb.role == "sweep":
+        return ("WEIGHTS", None, "par run : OUT/runs/<run>/final.weights")
+    return ("WEIGHTS", f"{nb.out_dir}/final.weights", "poids produits, évalués à la fin")
+
+
 def params(nb):
     p = [("NET", nb.net, "nom de CFG_FILES ou cfg (relative à la racine)"),
          ("DATASET", nb.dataset, "clé de DATASETS"),
          ("SPLIT", None, "None : split d'évaluation du jeu"),
-         ("WEIGHTS", nb.weights if nb.role == "infer" else f"{nb.out_dir}/final.weights",
-          "poids évalués" if nb.role == "infer" else "poids produits, évalués à la fin"),
+         _weights_param(nb),
          ("DEVICE", "cpu", "cpu | gpu (entraînement seulement ; le reste sur CPU)"),
          ("SUBSET", SUBSET_FIRST, "images évaluées ; 0 : split complet (palier N)"),
          ("SIZE", nb.size, "entrée LxH (ex. '640x192') ; None : celle de la cfg"),
          ("RESIZE", "stretch", "stretch (référence M12) | letterbox"),
          ("METRIC", None, "None : celle du jeu (coco pour coco et flir)"),
          ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)")]
+    if nb.role == "infer" and nb.finetuned:
+        p += [("RUNS_DIR", nb.train_dir, "runs des notebooks _train et _sweep"),
+              ("RUN", None, "None : le plus récent ; ex. 'train', 'b16-sall', 'b8-s500'"),
+              ("COMPARE", False, "évalue tous les runs et les compare (T14.11)")]
     if nb.role == "infer":
         p += [("INT8", False, "volet entier : calibration et mAP INT8 (T14.4)"),
               ("CALIB_IMAGES", 500, "images de calibration (split calib du jeu)"),
@@ -150,22 +171,30 @@ def params(nb):
               ("CHANNELS", nb.channels, "canaux de la cfg (1 : thermique)"),
               ("ANCHORS_K", 6, "ancres de la cfg (6 : Tiny-YOLOv3)"),
               ("INIT", "coco", "coco | he | chemin d'un .weights"),
-              ("INIT_NET", None, "réseau des poids de INIT s'il diffère de NET"),
-              ("ITERS", M11_TRAIN["iters"], "itérations (palier N au-delà de 600)"),
-              ("BATCH", M11_TRAIN["batch"], None),
-              ("LR", M11_TRAIN["lr"], None),
+              ("INIT_NET", None, "réseau des poids de INIT s'il diffère de NET")]
+        if nb.role == "sweep":
+            p += [("BATCHES", SWEEP["batches"], "tailles de lot essayées"),
+                  ("TRAIN_SUBSETS", SWEEP["subsets"],
+                   "images d'entraînement (n premières) ; 0 : tout le split"),
+                  ("ITERS", SWEEP["iters"], "itérations par run (palier N dès 600)"),
+                  ("SKIP_DONE", True, "saute les runs qui ont déjà final.weights")]
+        else:
+            p += [("ITERS", M11_TRAIN["iters"], "itérations (palier N au-delà de 600)"),
+                  ("BATCH", M11_TRAIN["batch"], None)]
+        p += [("LR", M11_TRAIN["lr"], None),
               ("BURN_IN", M11_TRAIN["burn_in"], None),
               ("MULTISCALE", M11_TRAIN["multiscale"], "320-608 tous les 10 lots"),
               ("SAVE_EVERY", M11_TRAIN["save_every"], "None : défaut de train.py (200)"),
-              ("WORKERS", M11_TRAIN["workers"], None),
-              ("QAT", "", "schéma wXaY (ex. 'w4a4') : QAT (T9.3, T12.5)"),
+              ("WORKERS", M11_TRAIN["workers"], None)]
+        if nb.role == "train":
+            p += [("QAT", "", "schéma wXaY (ex. 'w4a4') : QAT (T9.3, T12.5)"),
               ("QAT_STEPS", None, "steps.json de quant_lowbit.py (PTQ)"),
               ("ADMM", None, "plan JSON de poids ({} : mixed6 partout, T9.2, T12.6)"),
               ("ADMM_RHO", 1e-3, None),
               ("ADMM_GROWTH", 1.3, None),
               ("ADMM_EVERY", 100, None)]
     p += [("DRIVE_DIR", DRIVE_DIR, "Colab : archives data/<jeu>.tar"
-           + (", sorties et reprise dans runs/" if nb.role == "train" else "")
+           + (", sorties et reprise dans runs/" if nb.trains else "")
            + " ; None : pas de Drive"),
           ("JOBS", 4, "processus des évaluations"),
           ("SHOW", 6, "images affichées"),
@@ -178,8 +207,22 @@ def params(nb):
 # --------------------------------------------------------------------- environnement
 
 def environment(nb):
+    pre = ""
     if nb.role == "infer":
         needs = ("WEIGHTS", "NET", repr(how_to_get("poids", nb)))
+        if nb.finetuned:  # T14.11 : poids d'un run de _train ou _sweep
+            pre = f"""
+        from tools.notebooks import colab, runs
+
+        if COLAB and DRIVE_DIR:  # runs entraînés sur Colab : copiés dans <DRIVE_DIR>/runs/
+            env.mount_drive(DRIVE_DIR)
+            colab.restore_outputs(RUNS_DIR, DRIVE_DIR)
+        RUNS = runs.find_runs(RUNS_DIR)
+        print(f"runs de {{RUNS_DIR}} :\\n{{runs.listing(RUNS)}}")
+        if WEIGHTS is None:
+            CHOSEN = runs.pick(RUNS_DIR, RUN, hint={needs[2]})
+            WEIGHTS, OUT = CHOSEN.weights, f"{{OUT}}/{{CHOSEN.name}}"
+            print(f"run choisi : {{CHOSEN.name}} ({{WEIGHTS}})")"""
     else:
         needs = ("INIT if str(INIT).endswith('.weights') else "
                  "'weights/yolov3-tiny.weights' if INIT == 'coco' else ()", "None", "''")
@@ -230,7 +273,7 @@ def environment(nb):
         from tools.notebooks import env
 
         TRACE = env.trace(DEVICE)
-        env.check_device(DEVICE)
+        env.check_device(DEVICE){pre}
         env.prepare(DATASET, {needs[0]}, {needs[1]}, DATA_ROOT, COLAB, hint={needs[2]},
                     drive_dir=DRIVE_DIR)
         Path(OUT).mkdir(parents=True, exist_ok=True)
@@ -313,7 +356,26 @@ def infer_body(nb):
         display(Markdown(map_float.read_text()))
         for png in sorted(Path(OUT, "dets", "figures").glob("pr*.png")):
             display(Image.open(png))
-        """), md("""
+        """)]
+    if nb.finetuned:
+        cells += [md("""
+            ## Comparaison des runs (T14.11)
+
+            Avec `COMPARE = True`, chaque run trouvé dans `RUNS_DIR` (notebook `_train` et
+            balayage `_sweep`) est évalué sur les mêmes `SUBSET` images ; une mAP déjà
+            calculée pour ce `SUBSET` est réutilisée. Le run évalué plus haut se choisit par
+            `RUN`.
+            """), code("""
+            if COMPARE:
+                rows = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                                      DATA_ROOT, out_dir=f"{RUNS_DIR}/eval/{r.name}")
+                        for r in RUNS]
+                display(Markdown(runs.table(rows)))
+            else:
+                print("COMPARE = False : comparaison sautée ; runs trouvés :")
+                print(runs.listing(RUNS))
+            """)]
+    cells += [md("""
         ## Volet entier (T14.4)
 
         Activé par `INT8 = True`. Calibration par `tools/calibrate.py` sur le split `calib`
@@ -364,43 +426,8 @@ def infer_body(nb):
 
 # ---------------------------------------------------------------------------- train
 
-def train_body(nb):
-    qat = _assign([(k, v, None) for k, v in M12_QAT.items()])
-    admm = _assign([(k, v, None) for k, v in M12_ADMM.items()])
-    variants = ""
-    if nb.dataset == "voc":
-        variants = textwrap.dedent("""
-
-        ### Variantes QAT et ADMM (T14.7)
-
-        Paramètres du profil `tools/m12.sh qat ref` (T12.5) ; `QAT_STEPS` vient de la PTQ
-        `tools/quant_lowbit.py --scheme w4a4` (T12.4) :
-
-        ```python
-        @QAT@
-        ```
-
-        Paramètres du profil `tools/m12.sh admm ref` (T12.6) ; le plan `{}` (mixed6
-        partout) est écrit s'il manque :
-
-        ```python
-        @ADMM@
-        ```
-
-        L'évaluation passe alors par `tools/quant_lowbit.py` puis
-        `tools/eval_quant.py --variants int --model-dir`, pas par la mAP flottante.
-        """).replace("@QAT@", qat).replace("@ADMM@", admm)
-    affinage = textwrap.dedent("""
-        ## Affinage
-
-        `tools/train.py` dans un sous-processus dont la sortie est relayée ligne à ligne ; une
-        interruption du noyau laisse le dernier `checkpoint.npz` (tous les `SAVE_EVERY`), et
-        relancer la cellule reprend (`--resume`). Sur Colab avec `DRIVE_DIR`, `OUT` est copié
-        dans `<DRIVE_DIR>/runs/` toutes les 10 min et en fin de cellule
-        (`colab.sync_outputs`), puis restauré en début de session (`colab.restore_outputs`) :
-        une session coupée reprend au dernier checkpoint copié, sur le même backend
-        (T12.11, T14.8).
-        """) + variants
+def _prep_preview_cells():
+    """Préparation (ancres, cfg) et aperçu des cibles, communs à `train` et `sweep`."""
     return [md("""
         ## Préparation (jeux hors VOC)
 
@@ -450,10 +477,50 @@ def train_body(nb):
             hwc = (np.clip(chw.transpose(1, 2, 0), 0, 1) * 255).astype(np.uint8)
             img = Image.fromarray(hwc[..., 0] if channels == 1 else hwc)
             display(draw(img, boxes, np.ones(len(labels)), labels, names))
-        """), md(affinage), code("""
+        """)]
+
+
+def train_body(nb):
+    qat = _assign([(k, v, None) for k, v in M12_QAT.items()])
+    admm = _assign([(k, v, None) for k, v in M12_ADMM.items()])
+    variants = ""
+    if nb.dataset == "voc":
+        variants = textwrap.dedent("""
+
+        ### Variantes QAT et ADMM (T14.7)
+
+        Paramètres du profil `tools/m12.sh qat ref` (T12.5) ; `QAT_STEPS` vient de la PTQ
+        `tools/quant_lowbit.py --scheme w4a4` (T12.4) :
+
+        ```python
+        @QAT@
+        ```
+
+        Paramètres du profil `tools/m12.sh admm ref` (T12.6) ; le plan `{}` (mixed6
+        partout) est écrit s'il manque :
+
+        ```python
+        @ADMM@
+        ```
+
+        L'évaluation passe alors par `tools/quant_lowbit.py` puis
+        `tools/eval_quant.py --variants int --model-dir`, pas par la mAP flottante.
+        """).replace("@QAT@", qat).replace("@ADMM@", admm)
+    affinage = textwrap.dedent("""
+        ## Affinage
+
+        `tools/train.py` dans un sous-processus dont la sortie est relayée ligne à ligne ; une
+        interruption du noyau laisse le dernier `checkpoint.npz` (tous les `SAVE_EVERY`), et
+        relancer la cellule reprend (`--resume`). Sur Colab avec `DRIVE_DIR`, `OUT` est copié
+        dans `<DRIVE_DIR>/runs/` toutes les 10 min et en fin de cellule
+        (`colab.sync_outputs`), puis restauré en début de session (`colab.restore_outputs`) :
+        une session coupée reprend au dernier checkpoint copié, sur le même backend
+        (T12.11, T14.8).
+        """) + variants
+    return [*_prep_preview_cells(), md(affinage), code("""
         import threading
 
-        from tools.notebooks import colab
+        from tools.notebooks import colab, runs
 
         RUN = Path(OUT)
         SYNC = COLAB and bool(DRIVE_DIR)
@@ -469,6 +536,8 @@ def train_body(nb):
               + (f"≈ {seconds / 3600:.1f} h sur {DEVICE}" if seconds else
                  f"durée non mesurée sur {DEVICE} (T12.11-e)"))
         resume = (RUN / "checkpoint.npz").exists()
+        runs.write_meta(RUN, batch=BATCH, subset=0, iters=ITERS, lr=LR, device=DEVICE,
+                        net=NET, dataset=DATASET, qat=QAT, admm=bool(ADMM), rev=TRACE["rev"])
         stop = threading.Event()
 
 
@@ -539,7 +608,111 @@ def train_body(nb):
         """)]
 
 
+def sweep_body(nb):
+    return [*_prep_preview_cells(), md("""
+        ## Plan du balayage (T14.10)
+
+        Un run par case de la grille `BATCHES × TRAIN_SUBSETS`, tous les autres paramètres
+        égaux (ceux de `tools/m11.sh <jeu>-train`, `ITERS` à part). `TRAIN_SUBSETS` prend les
+        n premières images du split d'entraînement (`train.py --subset`), 0 tout le split.
+        À itérations égales, un lot plus grand voit plus d'images : la colonne « époques »
+        le montre. Le taux d'apprentissage n'est pas ajusté au lot.
+        """), code("""
+        import threading
+
+        from tools.notebooks import colab, runs
+
+        PLAN = [(b, s, runs.run_name(b, s)) for b in BATCHES for s in TRAIN_SUBSETS]
+        rows = ["| run | lot | images | époques | durée estimée |", "|---|---|---|---|---|"]
+        total = 0
+        for b, s, name in PLAN:
+            n = min(s, len(samples)) if s else len(samples)
+            sec = estimate(ITERS, b, DEVICE)
+            total += sec or 0
+            done = (Path(OUT) / "runs" / name / "final.weights").exists()
+            rows.append(f"| {name}{' (fait)' if done else ''} | {b} | {n} | "
+                        f"{ITERS * b / n:.2f} | "
+                        + (f"{sec / 3600:.1f} h |" if sec else "non mesurée |"))
+        display(Markdown("\\n".join(rows)))
+        print(f"{len(PLAN)} runs de {ITERS} itérations"
+              + (f", ≈ {total / 3600:.1f} h sur {DEVICE} au total" if total else ""))
+        """), md("""
+        ## Entraînements
+
+        Chaque run va dans `OUT/runs/<run>/` (`b16-sall`, `b8-s500`…), avec son `run.json`.
+        Relancer la cellule reprend le run interrompu (`--resume`) et saute ceux qui sont
+        finis (`SKIP_DONE`). Sur Colab avec `DRIVE_DIR`, `OUT` est copié dans
+        `<DRIVE_DIR>/runs/` toutes les 10 min et en fin de cellule (T14.8).
+        """), code("""
+        SYNC = COLAB and bool(DRIVE_DIR)
+        if SYNC:
+            env.mount_drive(DRIVE_DIR)
+            colab.restore_outputs(OUT, DRIVE_DIR)
+        stop = threading.Event()
+
+
+        def sync_loop(every=600):
+            while not stop.wait(every):
+                colab.sync_outputs(OUT, DRIVE_DIR)
+
+
+        if SYNC:
+            threading.Thread(target=sync_loop, daemon=True).start()
+        try:
+            for b, s, name in PLAN:
+                run_dir = Path(OUT) / "runs" / name
+                if SKIP_DONE and (run_dir / "final.weights").exists():
+                    print(f"{name} : déjà entraîné, sauté")
+                    continue
+                resume = (run_dir / "checkpoint.npz").exists()
+                runs.write_meta(run_dir, batch=b, subset=s, iters=ITERS, lr=LR, device=DEVICE,
+                                net=NET, dataset=DATASET, rev=TRACE["rev"])
+                C.run(C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS,
+                                  batch=b, lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE,
+                                  subset=s, save_every=SAVE_EVERY, workers=WORKERS,
+                                  device=DEVICE, data_root=DATA_ROOT),
+                      log=run_dir / "log.txt")
+        finally:
+            stop.set()
+            if SYNC:
+                colab.sync_outputs(OUT, DRIVE_DIR)
+        """), md("""
+        ## Comparaison
+
+        mAP flottante de chaque run sur les mêmes `SUBSET` images (`tools/eval_voc.py`,
+        réutilisée si déjà calculée), perte finale et vitesse ; courbes de perte superposées
+        (`tools.figures.resultats.plot_training`, M13). Les notebooks d'inférence
+        `<modèle>_infer` lisent ces runs (`RUN`, `COMPARE`).
+        """), code("""
+        from tools.figures import MissingSource
+        from tools.figures import resultats as FR
+
+        RESULTS = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE, DATA_ROOT)
+                   for r in runs.find_runs(OUT) if r.name != runs.TRAIN]
+        display(Markdown(runs.table(RESULTS)))
+        curves = []
+        for b, s, name in PLAN:
+            try:
+                curves.append(FR.load_training(Path(OUT) / "runs" / name))
+            except MissingSource:
+                pass
+        if curves:
+            for png in FR.plot_training(curves, Path(OUT) / "figures", "balayage"):
+                if str(png).endswith(".png"):
+                    display(Image.open(png))
+        """), md("## Résumé"), code("""
+        print(f"runs : {OUT}/runs/ ; backend {DEVICE} ; révision {TRACE['rev']}")
+        best = max((r for r in RESULTS if r["mAP"] is not None), key=lambda r: r["mAP"],
+                   default=None)
+        if best:
+            print(f"meilleur run sur {SUBSET or 'toutes les'} images : {best['run']} "
+                  f"(mAP {best['mAP']:.2f}) ; inférence : RUN = {best['run']!r}")
+        print("commandes équivalentes :")
+        for c in C.HISTORY:
+            print("  " + c)
+        """)]
+
+
 def render(nb):
-    body = infer_body(nb) if nb.role == "infer" else train_body(nb)
-    return notebook([header(nb), *params(nb), *environment(nb), *body],
-                    gpu=nb.role == "train")
+    body = {"infer": infer_body, "train": train_body, "sweep": sweep_body}[nb.role](nb)
+    return notebook([header(nb), *params(nb), *environment(nb), *body], gpu=nb.trains)

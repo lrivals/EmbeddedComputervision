@@ -23,7 +23,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M11](M11-jeux-de-donnees.md) | Autres jeux de données (optionnel) | mAP flottante / entière / FPGA hors VOC |
 | [M12](M12-profils-pc.md) | Profils de test sur PC (avant la carte) | chaque évaluation a un profil R/M/N, un critère et une décision |
 | [M13](M13-figures.md) | Figures (optionnel) | `make figures` régénère les figures d'architecture, de résultats, de suivi et des maths réimplémentées |
-| [M14](M14-notebooks.md) | Notebooks (optionnel) | `make notebooks` génère un notebook d'entraînement ou d'inférence par modèle × jeu, exécutable en local et sur Colab |
+| [M14](M14-notebooks.md) | Notebooks (optionnel) | `make notebooks` génère un notebook d'inférence, d'entraînement et de balayage (lot × sous-ensemble) par modèle × jeu, exécutable en local et sur Colab |
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
@@ -94,4 +94,4 @@ reporter ici l'avancement par jalon.
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
 | M13 | 53 | 53 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
-| M14 | 10 | 3 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
+| M14 | 12 | 5 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
