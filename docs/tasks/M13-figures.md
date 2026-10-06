@@ -36,11 +36,11 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - une couleur fixe par stade : flottant, entier, C-sim, carte ;
   - une couleur fixe par réseau : v2, v3 ;
   - largeur 1 colonne (6,4 in) ou pleine page (10 in) ;
-  - enregistrement en PNG 150 dpi et en SVG.
+  - enregistrement en PNG 150 dpi seulement.
 
 ### Sorties
 
-- **Fichiers** : `results/figures/<famille>/<nom>.png` et `.svg`.
+- **Fichiers** : `results/figures/<famille>/<nom>.png` (PNG seulement).
 - **Index** : `results/figures.md`, une galerie avec pour chaque figure l'image, une phrase
   d'explication, la commande et la source des données.
 - **Renvois** : chaque `.md` de résultat concerné renvoie aussi à sa figure (par exemple
@@ -115,7 +115,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ### [x] T13.1 — Schéma couche par couche de Tiny-YOLOv2 et Tiny-YOLOv3
 - **Spec** : §3 · **Dépend de** : T1.7 · **Taille** : M
-- **Livrables** : `figures/modeles/graphe_<net>.{svg,png}`, généré en Graphviz depuis
+- **Livrables** : `figures/modeles/graphe_<net>.png`, généré en Graphviz depuis
   `python/yolo/models/cfg.py` et `graph.py`
 - **Acceptation** : un nœud par couche du cfg. Chaque nœud porte :
   - le type de couche (conv, maxpool, route, upsample, yolo) ;
@@ -203,7 +203,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ### [ ] T13.8 — Schéma du SoC
 - **Spec** : §10.1 · **Dépend de** : T7.1 · **Taille** : S
-- **Livrables** : `figures/materiel/soc.svg`, un schéma blocs avec :
+- **Livrables** : `figures/materiel/soc.png`, un schéma blocs avec :
   - le PS : ARM A53, driver `sw/driver/`, application `yolo_app` ;
   - l'interface AXI-Lite (registres de `sw/driver/regmap.hpp`) ;
   - le PL (noyau `accel`) ;
@@ -216,7 +216,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ### [ ] T13.9 — Schéma du moteur unique
 - **Spec** : §10.2, §10.3 · **Dépend de** : T6.2, T10.1, T10.2 · **Taille** : M
-- **Livrables** : `figures/materiel/moteur.svg`, qui montre :
+- **Livrables** : `figures/materiel/moteur.png`, qui montre :
   - les chargeurs `in_buf` et `w_buf` en ping-pong (mots de 64 bits) ;
   - le réseau Tm × Tn de MACs (32 × 24) ;
   - l'accumulateur 32 bits ;
@@ -240,7 +240,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 ### [ ] T13.11 — Streaming face au moteur unique
 - **Spec** : §10.1 · **Dépend de** : T9.4.x · **Taille** : M
 - **Livrables** :
-  - `figures/materiel/streaming.svg` : un étage par conv, line buffers, maxpool fusionné ;
+  - `figures/materiel/streaming.png` : un étage par conv, line buffers, maxpool fusionné ;
   - un chronogramme comparé des deux architectures sur une image.
 - **Acceptation** : les profondeurs de line buffer et les ressources par étage viennent de
   `tools/stream_model.py`
@@ -249,7 +249,7 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
 
 ### [ ] T13.12 — Chaîne de vérification bit-exact
 - **Spec** : §10.5 · **Dépend de** : M5, M6, M8 · **Taille** : S
-- **Livrables** : `figures/materiel/chaine_verif.svg`. Les stades sont :
+- **Livrables** : `figures/materiel/chaine_verif.png`. Les stades sont :
   - NumPy flottant ;
   - entier Python (`IntNetwork`) ;
   - golden C++ ;
@@ -465,13 +465,13 @@ versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la 
   - `figures/projet/tests.png` : nombre de tests par module Python
     (`pytest --collect-only -q`, slow inclus) et par exécutable C++ (`ctest -N`), avec la
     durée relevée par `--durations` ;
-  - `figures/projet/dependances.svg` : le graphe mermaid des jalons du README, rendu en
+  - `figures/projet/dependances.png` : le graphe mermaid des jalons du README, rendu en
     image et coloré selon T13.28.
 - **Acceptation** : le total des tests est égal à la collecte pytest + ctest
 - **Notes** : le graphe reste défini une seule fois, dans le README ; la figure le parse.
 - **Partiel** :
   - fait : `tests.png` (collecte pytest et `ctest -N`) ;
-  - à faire : les durées `--durations` et `dependances.svg`.
+  - à faire : les durées `--durations` et `dependances.png`.
 
 ## F. Réimplémentation de zéro : fonctions mathématiques
 
@@ -484,7 +484,7 @@ mathématique » (voir [Règles](#règles)). Module : `tools/figures/maths.py`, 
 
 ### [ ] T13.31 — Carte de la réimplémentation
 - **Spec** : §4 à §9, §11 · **Dépend de** : M1 à M4 · **Taille** : S
-- **Livrables** : `figures/maths/carte.svg`, un schéma en colonnes :
+- **Livrables** : `figures/maths/carte.png`, un schéma en colonnes :
   - brique (convolution, BN, activations, pool, route/upsample, graphe et rétropropagation,
     perte, SGD, k-means, NMS, mAP, prétraitement, quantification, entier, LUT, formats) ;
   - module et fonction (`python/yolo/…`) ;
@@ -521,7 +521,7 @@ mathématique » (voir [Règles](#règles)). Module : `tools/figures/maths.py`, 
 ### [ ] T13.33 — Rétropropagation écrite à la main
 - **Spec** : §4, §11 · **Dépend de** : T1.1, T1.7 · **Taille** : M
 - **Livrables** :
-  - `figures/maths/retropropagation.svg` : le graphe d'une tranche de réseau (conv → BN →
+  - `figures/maths/retropropagation.png` : le graphe d'une tranche de réseau (conv → BN →
     leaky → maxpool, plus une route et un upsample de v3) avec, sur chaque arête, la passe
     avant et la formule du gradient renvoyé. Les gradients d'une carte lue deux fois
     (route) s'additionnent, comme dans `Network.backward` ;
@@ -728,7 +728,7 @@ mathématique » (voir [Règles](#règles)). Module : `tools/figures/maths.py`, 
 
 ### [ ] T13.47 — Formats de fichiers lus et écrits à la main
 - **Spec** : §7.1, §10.2 · **Dépend de** : T1.7, T1.9, T4.7 · **Taille** : S
-- **Livrables** : `figures/maths/formats.svg`, en trois bandes :
+- **Livrables** : `figures/maths/formats.png`, en trois bandes :
   - un `.weights` Darknet octet par octet : en-tête (major, minor, revision, seen), puis
     par conv [β, γ, μ, σ²] ou [biais], puis les poids (F, C, k, k), en float32 ;
   - le parser `.cfg` : sections `[convolutional]`, `[maxpool]`, `[route]`, `[upsample]`,
@@ -795,7 +795,7 @@ au niveau de la couche et du tenseur. Les données viennent de `python/yolo/mode
 
 ### [ ] T13.52 — Une couche à travers toutes les représentations
 - **Spec** : §9, §10.2 · **Dépend de** : T4.3, T5.3, T6.2 · **Taille** : M
-- **Livrables** : `figures/reseaux/une_couche.svg`. Une même couche (conv 3×3 + BN + leaky
+- **Livrables** : `figures/reseaux/une_couche.png`. Une même couche (conv 3×3 + BN + leaky
   + maxpool, par exemple L02 de v2) suivie à travers les stades :
   - flottant : conv, BN, leaky, maxpool (float32) ;
   - BN fusionnée : W', b' ;

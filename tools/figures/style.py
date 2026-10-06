@@ -48,19 +48,18 @@ def plt():
             "grid.color": GRID, "grid.linewidth": 0.6, "xtick.color": INK2,
             "ytick.color": INK2, "xtick.labelsize": 8, "ytick.labelsize": 8,
             "legend.fontsize": 8, "legend.frameon": False, "font.size": 9,
-            "lines.linewidth": 1.6, "hatch.linewidth": 0.6, "svg.fonttype": "none",
+            "lines.linewidth": 1.6, "hatch.linewidth": 0.6,
         })
         _plt = pyplot
     return _plt
 
 
 def save(fig, out_dir, name):
-    """PNG 150 dpi + SVG dans `out_dir` ; ferme la figure ; rend les deux chemins."""
+    """PNG 150 dpi dans `out_dir` ; ferme la figure ; rend [chemin]."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths = [out_dir / f"{name}.png", out_dir / f"{name}.svg"]
+    paths = [out_dir / f"{name}.png"]
     fig.savefig(paths[0], dpi=DPI, bbox_inches="tight")
-    fig.savefig(paths[1], bbox_inches="tight")
     plt().close(fig)
     return paths
 

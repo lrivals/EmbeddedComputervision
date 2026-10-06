@@ -24,7 +24,7 @@ RNG = np.random.default_rng(0)
 def _pngs(paths):
     pngs = [Path(p) for p in paths if str(p).endswith(".png")]
     assert pngs and all(p.stat().st_size > 1000 for p in pngs)
-    assert all(Path(p).with_suffix(".svg").exists() for p in pngs)
+    assert all(str(p).endswith(".png") for p in paths)  # PNG seulement
     return pngs
 
 
@@ -67,7 +67,7 @@ def test_gallery_links_existing_images_only(tmp_path):
         assert f"`{f.name}`" in text
 
 
-def test_style_save_png_svg(tmp_path):
+def test_style_save_png(tmp_path):
     from tools.figures import style as st
 
     fig, ax = st.plt().subplots()

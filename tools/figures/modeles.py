@@ -143,11 +143,10 @@ def graphe(out_dir):
         out_dir.mkdir(parents=True, exist_ok=True)
         stem = out_dir / f"graphe_{net}"
         stem.with_suffix(".dot").write_text(src)
-        for fmt, opt in (("svg", []), ("png", ["-Gdpi=150"])):
-            subprocess.run([dot, f"-T{fmt}", *opt, "-o", str(stem.with_suffix(f".{fmt}")),
-                            str(stem.with_suffix(".dot"))], check=True)
+        subprocess.run([dot, "-Tpng", "-Gdpi=150", "-o", str(stem.with_suffix(".png")),
+                        str(stem.with_suffix(".dot"))], check=True)
         stem.with_suffix(".dot").unlink()
-        paths += [stem.with_suffix(".png"), stem.with_suffix(".svg")]
+        paths.append(stem.with_suffix(".png"))
     if not paths:
         raise MissingSource("aucun manifest (make export)")
     return paths
