@@ -1,8 +1,9 @@
-# Résultats des balayages et inférences (VOC, VisDrone, KITTI)
+# Résultats des balayages et inférences (VOC, VisDrone, KITTI, FLIR)
 
 Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
-`notebooks/voc/`, `notebooks/visdrone/` et `notebooks/kitti/`, sur un runtime Colab à GPU
-([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI : `9a76534`). Les runs sont dans
+`notebooks/voc/`, `notebooks/visdrone/`, `notebooks/kitti/` et `notebooks/flir/`, sur un runtime
+Colab à GPU ([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI :
+`9a76534` ; balayage FLIR : `4e47dbc`). Les runs sont dans
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
@@ -13,7 +14,8 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 |---|---|---|
 | VOC | [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb) | [tiny-yolov3-voc](../../notebooks/voc/tiny-yolov3-voc_infer.ipynb), [tiny-yolov3-coco](../../notebooks/voc/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb) |
 | VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
-| KITTI | à relancer en entier (« Run All ») pour être versionné : exécution partielle | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
+| KITTI | [tiny-yolov3-kitti_sweep](../../notebooks/kitti/tiny-yolov3-kitti_sweep.ipynb) | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
+| FLIR | [tiny-yolov3-flir_sweep](../../notebooks/flir/tiny-yolov3-flir_sweep.ipynb) | non lancée |
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
 réécrit les PNG de [figures/resultats/](figures/resultats/). Toutes les figures du dépôt
@@ -25,7 +27,7 @@ rien exécuter.
 | | |
 |---|---|
 | palier | **R** : mAP sur les 50 premières images (`SUBSET = 50`) |
-| évaluation | VOC2007 test ou visdrone val, 416×416 `stretch` (Pillow), conf 0,005, NMS 0,45, AP 11 points |
+| évaluation | split d'évaluation du jeu (VOC2007 test, val pour les autres), 416×416 `stretch` (Pillow), conf 0,005, NMS 0,45 ; AP 11 points, sauf FLIR : métrique COCO (AP@[.5:.95], 101 points) |
 | entraînement | 600 itérations par run, LR 0,001 (non ajusté au lot), burn-in 500, multi-échelle 320-608, init COCO (`weights/yolov3-tiny.weights`), `--device gpu` |
 | grille | `BATCHES = [8, 16, 32]` × `TRAIN_SUBSETS = [500, 0]` (500 premières images, ou tout le split) |
 
@@ -39,7 +41,8 @@ split complet ([results/map_float.md](../../results/map_float.md)).
 
 ![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
 
-Chaque panneau a sa propre échelle : VOC plafonne à 36,27, VisDrone à 2,24, KITTI à 2,38.
+Chaque panneau a sa propre échelle : VOC plafonne à 36,27, VisDrone à 2,24, KITTI à 2,38,
+FLIR à 0,7 (AP@[.5:.95], qui ne se compare pas aux AP 11 points des autres jeux).
 
 ## VOC
 
@@ -132,9 +135,34 @@ est à 49,7 pour COCO et 29,6 pour Tiny-YOLOv2 VOC, contre 16,8 pour le run affi
 
 ![Run affiné face aux poids publiés](figures/resultats/balayage_modeles.png)
 
+## FLIR
+
+### Balayage `tiny-yolov3-flir` (cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, 15 classes, 1 canal, 10 742 images)
+
+| run | lot | images | époques | perte finale | mAP AP@[.5:.95] (50 images) | AP50 |
+|---|---|---|---|---|---|---|
+| **b8-sall** | 8 | tout | 0,45 | 67,27 | **0,7** | 2,9 |
+| **b16-sall** | 16 | tout | 0,89 | 64,38 | **0,7** | 2,6 |
+| b16-s500 | 16 | 500 | 19,20 | 55,84 | 0,6 | 1,5 |
+| b32-sall | 32 | tout | 1,79 | 59,68 | 0,4 | 1,7 |
+| b32-s500 | 32 | 500 | 38,40 | 52,19 | 0,3 | 1,4 |
+| b8-s500 | 8 | 500 | 9,60 | 63,55 | 0,3 | 1,3 |
+
+Aucun run n'apprend : AP50 au plus 2,9, tous les écarts sont dans le bruit à 50 images, et
+le classement des autres jeux (`b32-sall` en tête) ne se retrouve pas. Par classe, seules
+person (AP50 11,6 pour b8-sall, 2,9 pour b16-sall), bike (7,9 et 9,8) et car (3,2 et 6,6)
+sortent de zéro ; 7 des 15 classes n'ont aucune instance dans ces 50 images (AP -100 dans
+la table de `eval_voc.py`). Pertes finales de 52 à 67, trois fois celles de KITTI.
+
+Seules les têtes sont réinitialisées (couches 15 et 22) ; L00 vient des poids COCO, sommée
+sur les canaux RGB. Le réseau voit pourtant des images thermiques, loin du domaine COCO,
+et 600 itérations (moins de deux époques) ne suffisent pas à l'y adapter. Durée : ≈ 10 min par run de lot 32 (577 s pour b32-sall), comme sur
+les autres jeux.
+
 ## Meilleurs paramètres
 
-**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur les trois jeux. C'est le
+**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur VOC, VisDrone et KITTI.
+FLIR ne départage aucun run (voir plus haut). C'est le
 run par défaut des notebooks d'inférence (`RUN = None` prend le plus récent, ici
 `b32-sall`).
 
@@ -187,6 +215,6 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
 - **Confirmer le classement** sur le split complet : notebook `_infer` avec
   `COMPARE = True` et `SUBSET = 0` (palier N), puis volet entier (`INT8 = True`, T14.4)
   sur le run retenu.
-- FLIR : pas de résultat. Le notebook s'arrête à la cellule d'environnement (jeu absent
-  du Drive : `tools/get_datasets.sh push flir`) ; exécution partielle, donc non
-  versionnée : le notebook est remis à vide.
+- FLIR : le balayage a tourné mais n'apprend pas (AP50 ≤ 2,9). Avant un run long, comparer
+  à 3 canaux (`CHANNELS = None`) et mesurer les poids COCO hors
+  domaine (`tiny-yolov3-coco_infer`), comme pour les autres jeux ([M15, T15.13](M15-campagne-entrainement.md)).

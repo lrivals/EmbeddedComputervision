@@ -18,8 +18,10 @@ Constat de départ ([resultats-balayages.md](resultats-balayages.md), palier R,
   (1,6 point) est dans le bruit.
 - Seuls le lot et le sous-ensemble sont balayés ; LR (0,001), burn-in (500 sur 600
   itérations) et taille d'entrée sont fixes.
-- FLIR (jeu absent du Drive) n'a pas de résultat ; ExDark et CrowdHuman n'ont pas été
-  lancés.
+- **FLIR** (1 canal, rév. `4e47dbc`) : aucun run n'apprend, AP@[.5:.95] au plus 0,7 et
+  AP50 au plus 2,9 (`b8-sall`, `b16-sall`) ; le classement des autres jeux ne s'y
+  retrouve pas.
+- ExDark et CrowdHuman n'ont pas été lancés.
 
 Coûts mesurés sur Colab : entraînement GPU ≈ 0,033 s/image (624 s pour 600 itérations
 au lot 32, soit ≈ 1 s/itération) ; évaluation sur CPU ≈ 0,27 s/image, soit ≈ 22 min pour
@@ -200,9 +202,18 @@ au balayage, split complet ensuite).
 - **Notes** : `CHANNELS = 1` dans `_sweep` (cfg `tiny-yolov3-flir-c1.cfg`, L00 sommée sur
   les canaux RGB).
 
-  | run | lot | images | canaux | mAP (50 images) | mAP (complet) |
-  |---|---|---|---|---|---|
-  | à remplir | | | | | |
+  | run | lot | images | canaux | AP (50 images) | AP50 (50 images) | AP (complet) |
+  |---|---|---|---|---|---|---|
+  | b8-sall | 8 | tout | 1 | 0,7 | 2,9 | |
+  | b16-sall | 16 | tout | 1 | 0,7 | 2,6 | |
+  | b16-s500 | 16 | 500 | 1 | 0,6 | 1,5 | |
+  | b32-sall | 32 | tout | 1 | 0,4 | 1,7 | |
+  | b32-s500 | 32 | 500 | 1 | 0,3 | 1,4 | |
+  | b8-s500 | 8 | 500 | 1 | 0,3 | 1,3 | |
+  | à remplir (3 canaux) | | | 3 | | | |
+
+  Balayage à un canal fait (rév. `4e47dbc`) ; FLIR est sur le Drive. Restent les poids COCO
+  hors domaine, la comparaison à 3 canaux et les runs longs.
 
 ### [ ] T15.14 — ExDark et CrowdHuman
 - **Spec** : §8 · **Dépend de** : T11.3, T11.6 · **Taille** : M
