@@ -4,7 +4,7 @@ Index généré par `python -m tools.notebooks all` (`make notebooks`) depuis le
 
 Palier (règles de M12) : premier passage (`SUBSET = 50`) / passage complet (`SUBSET = 0`, ou `ITERS = 4000` à l'entraînement).
 
-Affichage seul : [figures_live.ipynb](figures_live.ipynb) montre les figures (M13, runs) et les réaffiche dès qu'une image est produite.
+Affichage seul : [figures_live.ipynb](figures_live.ipynb) montre les figures (M13, runs) et les regroupe par dossier.
 
 | Jeu | Modèle | Rôle | Palier | Prérequis | Colab |
 |---|---|---|---|---|---|

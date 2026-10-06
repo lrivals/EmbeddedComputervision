@@ -48,7 +48,7 @@ def index():
              f"Palier (règles de M12) : premier passage (`SUBSET = {SUBSET_FIRST}`) / passage "
              f"complet (`SUBSET = 0`, ou `ITERS = {M11_TRAIN['iters']}` à l'entraînement).", "",
              f"Affichage seul : [{VIEWER}]({VIEWER}) montre les figures (M13, runs) et les "
-             "réaffiche dès qu'une image est produite.", "",
+             "regroupe par dossier.", "",
              "| Jeu | Modèle | Rôle | Palier | Prérequis | Colab |", "|---|---|---|---|---|---|"]
     for nb in NOTEBOOKS.values():
         pal = _palier(nb)

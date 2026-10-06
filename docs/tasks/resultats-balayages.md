@@ -16,8 +16,8 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 | KITTI | à relancer en entier (« Run All ») pour être versionné : exécution partielle | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
-réécrit les PNG de [figures/resultats/](figures/resultats/). Pour les voir se mettre à jour
-pendant qu'on travaille : [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb).
+réécrit les PNG de [figures/resultats/](figures/resultats/). Toutes les figures du dépôt
+s'affichent dans [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb).
 
 ## Conditions
 
