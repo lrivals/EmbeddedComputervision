@@ -749,7 +749,8 @@ def viewer():
         Affichage seul des PNG de `DIRS` (sous-dossiers compris), par dossier, les plus
         récents en tête. Les figures se produisent ailleurs : `make figures`,
         `python -m tools.figures <nom>` (M13), notebooks `_train` et `_sweep` (M14).
-        Relancer la cellule pour voir les nouvelles images.
+        Relancer la cellule pour voir les nouvelles images. Noyau **local** : les PNG sont
+        sur le PC ; un noyau Colab ne voit que son propre clone du dépôt.
         Notebook généré par `python -m tools.notebooks` : modifier
         `tools/notebooks/gabarits.py:viewer`, pas ce fichier.
         """),
@@ -763,13 +764,21 @@ def viewer():
 
         from IPython.display import Image, Markdown, display
 
-        ROOT = next(d for d in (Path.cwd(), *Path.cwd().parents) if (d / "tools").is_dir())
+        # Racine du dépôt : dossier courant ou un parent ; sur Colab, le clone des notebooks.
+        CANDIDATES = (Path.cwd(), *Path.cwd().parents, Path("/content/EmbeddedComputervision"))
+        ROOT = next((d for d in CANDIDATES if (d / "tools" / "figures").is_dir()), None)
+        if ROOT is None:
+            raise SystemExit(f"dépôt introuvable depuis {Path.cwd()} : ouvrir le notebook avec "
+                             "un noyau local (les PNG sont sur le PC, pas sur Colab)")
+        print(f"dépôt : {ROOT}")
         for d in DIRS:
             pngs = sorted((p for p in (ROOT / d).rglob("*.png") if FILTER in str(p)),
                           key=lambda p: -p.stat().st_mtime)
+            print(f"{d} : {len(pngs)} image(s)")
             if pngs:
                 display(Markdown(f"## `{d}` ({len(pngs)})"))
             for p in pngs:
-                display(Markdown(f"`{p.relative_to(ROOT)}`"), Image(filename=str(p), width=WIDTH))
+                display(Markdown(f"`{p.relative_to(ROOT)}`"))
+                display(Image(data=p.read_bytes(), format="png", width=WIDTH))
         """),
     ])

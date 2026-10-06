@@ -58,7 +58,8 @@ entraînement (« Reste » de chaque tâche).
 - **Visionneuse** : `notebooks/figures_live.ipynb`, hors registre modèle × jeu, générée
   avec l'index (`gabarits.viewer`). Affichage seul : une cellule montre les PNG de
   `results/figures/`, `build/figures/`, `docs/tasks/figures/` et `build/notebooks/`, par
-  dossier, les plus récents en tête ; la relancer pour voir les nouvelles images.
+  dossier, les plus récents en tête ; la relancer pour voir les nouvelles images. À ouvrir
+  avec un noyau **local** : un noyau Colab ne voit pas les PNG du PC (la cellule le dit).
 - **Résultats d'exécution** : `build/notebooks/<jeu>/<modèle>/` (checkpoints, JSON des mAP,
   figures). Un notebook n'écrit **jamais** dans `results/`.
 
