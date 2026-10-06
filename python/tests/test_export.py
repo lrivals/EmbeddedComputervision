@@ -122,3 +122,20 @@ def test_export_wbits4_roundtrip(tmp_path):
     assert back.convs[i].wbits == 4 and np.array_equal(back.convs[i].qW, c.qW)
     a, b = IntNetwork(qm).forward(qx), IntNetwork(back).forward(qx)
     assert all(np.array_equal(a[k], b[k]) for k in a)
+
+
+@pytest.mark.parametrize("d", EXPORTS, ids=lambda p: p.name)
+def test_real_dump_inputs_reproduced(d):
+    """Prétraitement actuel (letterbox PIL de `preprocess`, puis `quantize_input`) == entrées
+    des dumps exportés, à l'octet : garde de non-régression du prétraitement (T11.4, T11.7)."""
+    from PIL import Image
+
+    from yolo.infer.pipeline import preprocess
+
+    jpegs = ROOT / "data" / "VOCdevkit" / "VOC2007" / "JPEGImages"
+    if not (d / "manifest.json").exists() or not jpegs.exists():
+        pytest.skip(f"{d.name} non exporté ou VOC2007 absent")
+    for dd in sorted((d / "dumps").iterdir()):
+        with Image.open(jpegs / f"{dd.name}.jpg") as img:
+            x, _ = preprocess(img, 416)
+        assert np.array_equal(quantize_input(x[None]), np.load(dd / "input.npy")), dd.name

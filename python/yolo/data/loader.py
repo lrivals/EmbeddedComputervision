@@ -1,7 +1,7 @@
 """Chargement des lots d'entraînement, en parallèle (§7.1).
 
 `VOCDataset` rend une image prétraitée (CHW float32 dans [0, 1]) et ses boîtes normalisées
-dans le repère du carré d'entrée. `DataLoader` assemble des lots, la taille d'entrée de
+dans le repère de l'entrée (S × S, ou H × W pour un réseau non carré). `DataLoader` assemble des lots, la taille d'entrée de
 chaque lot étant donnée par `size_fn(itération)` (multi-échelle, §2.2), et charge les images
 dans un `multiprocessing.Pool` avec un nombre borné d'images d'avance.
 
@@ -24,8 +24,9 @@ class VOCDataset:
     """
 
     def __init__(self, samples, train=True, keep_difficult=False, jitter=0.2, hsv=1.5,
-                 flip=True):
+                 flip=True, channels=3):
         self.samples = samples
+        self.channels = channels
         self.train = train
         self.keep_difficult = keep_difficult
         self.aug = {"jitter": jitter, "hsv": hsv, "flip": flip}
@@ -40,7 +41,8 @@ class VOCDataset:
         keep = np.ones(len(s["labels"]), bool) if self.keep_difficult else ~s["difficult"]
         params = random_params(rng, **self.aug) if self.train else IDENTITY
         with Image.open(s["image"]) as img:
-            out, boxes, labels = augment(img, s["boxes"][keep], s["labels"][keep], size, params)
+            out, boxes, labels = augment(img, s["boxes"][keep], s["labels"][keep], size, params,
+                                         self.channels)
         return np.ascontiguousarray(out.transpose(2, 0, 1)), boxes, labels
 
 
@@ -58,7 +60,7 @@ def _load_task(task):
 
 
 class DataLoader:
-    """Lots `(images (N, 3, S, S), [boîtes], [labels])` d'une époque."""
+    """Lots `(images (N, C, H, W), [boîtes], [labels])` d'une époque."""
 
     def __init__(self, dataset, batch_size, shuffle=True, workers=0, seed=0, prefetch=2,
                  drop_last=True):
@@ -91,7 +93,8 @@ class DataLoader:
         order = self._order(epoch)
         tasks = []
         for b in range(skip, len(self)):
-            size = int(size_fn(first_iter + b - skip))
+            size = size_fn(first_iter + b - skip)
+            size = tuple(map(int, size)) if isinstance(size, (tuple, list)) else int(size)
             for k in order[b * self.batch_size:(b + 1) * self.batch_size]:
                 tasks.append((int(k), size, [self.seed, epoch, int(k)]))
         results = self._run(tasks)

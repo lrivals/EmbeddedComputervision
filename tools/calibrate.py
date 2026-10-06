@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "python"))
 import numpy as np  # noqa: E402
 
 from yolo.data import datasets  # noqa: E402
+from yolo.data.letterbox import input_size  # noqa: E402
 from yolo.infer.pipeline import preprocess  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import PRETRAINED, build  # noqa: E402
@@ -34,9 +35,9 @@ from yolo.quant.fuse_bn import fuse_network  # noqa: E402
 def _load(task):
     from PIL import Image
 
-    path, size = task
+    path, size, channels = task
     with Image.open(path) as img:
-        return preprocess(img, size)[0]
+        return preprocess(img, size, channels=channels)[0]
 
 
 def net_tag(name):
@@ -61,11 +62,13 @@ def calib_images(root, n, seed=0, split=None, dataset="voc"):
     return [samples[i]["image"] for i in sorted(idx)]
 
 
-def collect(fused, paths, size=416, batch=8, workers=4):
+def collect(fused, paths, size=None, batch=8, workers=4):
+    """`size` : défaut, l'entrée de la cfg (S ou (H, W))."""
     stats = ActStats(fused)
+    size, channels = input_size(fused.net, size), fused.net["input"][0]
     t0 = time.time()
     with mp.Pool(workers) as pool:
-        it = pool.imap(_load, [(p, size) for p in paths], chunksize=4)
+        it = pool.imap(_load, [(p, size, channels) for p in paths], chunksize=4)
         for start in range(0, len(paths), batch):
             n = min(batch, len(paths) - start)
             x = np.stack([next(it) for _ in range(n)])

@@ -103,7 +103,7 @@ def main():
         calib = args.calib or ROOT / "build" / "quant" / args.net / "calib.json"
         plan, qm = pow2_model(args.net, calib, args.checkpoint, args.weights_plan)
         export_model(qm, out)
-        write_dumps(qm, samples, out, 416)
+        write_dumps(qm, samples, out)
         (out / "plan.json").write_text(json.dumps({str(k): v for k, v in plan.items()},
                                                   indent=1) + "\n")
         for i, kind in plan.items():
@@ -113,7 +113,7 @@ def main():
 
     qat, qm = lowbit_model(args.net, args.scheme, args.devkit, args.checkpoint, int8_layers)
     export_model(qm, out)
-    write_dumps(qm, samples, out, 416)
+    write_dumps(qm, samples, out)
     steps = steps_table(qat)
     (out / "steps.json").write_text(json.dumps({
         "scheme": args.scheme,

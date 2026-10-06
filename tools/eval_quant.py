@@ -42,6 +42,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import numpy as np  # noqa: E402
 
 from yolo.data import datasets  # noqa: E402
+from yolo.data.letterbox import input_size, parse_size  # noqa: E402
 from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import evaluate, to_voc_pixels  # noqa: E402
 from yolo.infer.nms import IOU_THR  # noqa: E402
@@ -98,9 +99,9 @@ def _run(task):
 
     if "error" in _W:
         raise _W["error"]
-    path, width, height, size, mode, variants = task
+    path, width, height, size, mode, variants, channels = task
     with Image.open(path) as img:
-        x, wh = preprocess(img, size, mode)
+        x, wh = preprocess(img, size, mode, channels=channels)
     x = x[None]
     fused, qm, conf, iou = _W["fused"], _W["qm"], _W["conf"], _W["iou"]
     inet = _Memo(_W["inet"])  # une seule passe entière pour int et int-hwpp
@@ -158,9 +159,11 @@ def run(args, samples, variants):
     os.environ.setdefault("OPENBLAS_NUM_THREADS", str(args.blas_threads))
     os.environ.setdefault("OMP_NUM_THREADS", str(args.blas_threads))
     ctx = mp.get_context("spawn")  # les variables d'environnement BLAS valent pour les fils
-    n_classes = load_cfg(args.net)["classes"]
+    cfg = load_cfg(args.net)
+    n_classes, channels = cfg["classes"], cfg["input"][0]
     per = {v: {c: ([], [], []) for c in range(n_classes)} for v in variants}
-    tasks = [(s["image"], s["width"], s["height"], args.size, args.resize, variants)
+    size = input_size(cfg, args.size)
+    tasks = [(s["image"], s["width"], s["height"], size, args.resize, variants, channels)
              for s in samples]
     t0 = time.time()
     raw = open(args.save_dets, "w") if args.save_dets else None  # noqa: SIM115
@@ -204,7 +207,7 @@ def main():
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
-    ap.add_argument("--size", type=int, default=416)
+    ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="letterbox")
     ap.add_argument("--conf", type=float, default=0.005)
     ap.add_argument("--iou", type=float, default=IOU_THR)

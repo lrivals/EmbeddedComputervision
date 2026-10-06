@@ -1,6 +1,6 @@
 """Perte YOLOv3 (§6.2) et variante YOLOv2 à softmax de classes (§2.2, §8.1), avec gradients.
 
-Pour chaque tête, la sortie `(N, A·(5+C), S, S)` est vue en `(N, A, 5+C, S, S)`, canaux
+Pour chaque tête, la sortie `(N, A·(5+C), S_h, S_w)` est vue en `(N, A, 5+C, S_h, S_w)`, canaux
 `t_x, t_y, t_w, t_h, t_o`, puis les classes (docs/conventions.md).
 
     L = λ_coord Σ_obj ω [(σ(t_x)−x*)² + (σ(t_y)−y*)² + (t_w−t_w*)² + (t_h−t_h*)²]
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from yolo.data.targets import anchors_frac, build_targets
+from yolo.data.targets import ANCHOR_REF, anchors_frac, build_targets
 from yolo.infer.boxes import iou
 from yolo.layers.activations import sigmoid
 
@@ -43,20 +43,20 @@ def bce_logits(t, y):
     return softplus(t) - y * t
 
 
-def _grid(s):
-    i, j = np.meshgrid(np.arange(s), np.arange(s), indexing="ij")
+def _grid(sh, sw):
+    i, j = np.meshgrid(np.arange(sh), np.arange(sw), indexing="ij")
     return i, j
 
 
 def predicted_boxes(p, anchors):
-    """Boîtes prédites (N, A, S, S, 4) en `(cx, cy, w, h)` normalisés (§8.1).
+    """Boîtes prédites (N, A, S_h, S_w, 4) en `(cx, cy, w, h)` normalisés (§8.1).
 
-    `p` : (N, A, 5+C, S, S) ; `anchors` : (A, 2) en fraction de l'image.
+    `p` : (N, A, 5+C, S_h, S_w) ; `anchors` : (A, 2) en fraction de l'image.
     """
-    s = p.shape[-1]
-    i, j = _grid(s)
-    bx = (sigmoid(p[:, :, 0]) + j) / s
-    by = (sigmoid(p[:, :, 1]) + i) / s
+    sh, sw = p.shape[-2:]
+    i, j = _grid(sh, sw)
+    bx = (sigmoid(p[:, :, 0]) + j) / sw
+    by = (sigmoid(p[:, :, 1]) + i) / sh
     # e^{t} borné : seule l'IoU du masque ignore en dépend.
     bw = anchors[None, :, 0, None, None] * np.exp(np.clip(p[:, :, 2], -50, 50))
     bh = anchors[None, :, 1, None, None] * np.exp(np.clip(p[:, :, 3], -50, 50))
@@ -64,7 +64,7 @@ def predicted_boxes(p, anchors):
 
 
 def ignore_mask(p, anchors, obj, gt_boxes, thresh):
-    """(ignore, best_iou) de forme (N, A, S, S) — §5.1, 4."""
+    """(ignore, best_iou) de forme (N, A, S_h, S_w) — §5.1, 4."""
     pred = predicted_boxes(p, anchors)
     best = np.zeros(obj.shape)
     for n, gt in enumerate(gt_boxes):
@@ -75,28 +75,30 @@ def ignore_mask(p, anchors, obj, gt_boxes, thresh):
 
 
 def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
-              class_mode="sigmoid", lambda_coord=1.0, ignore_thresh=0.5):
+              class_mode="sigmoid", lambda_coord=1.0, ignore_thresh=0.5,
+              anchor_ref=ANCHOR_REF):
     """Perte et gradients par rapport aux sorties brutes des têtes (§6.2).
 
-    `outputs` : {id: (N, A·(5+C), S, S)} (sortie de `Network.forward`) ;
+    `outputs` : {id: (N, A·(5+C), S_h, S_w)} (sortie de `Network.forward`) ;
     `gt_boxes[n]` : (k, 4) `(cx, cy, w, h)` normalisés ; `gt_labels[n]` : (k,) ;
-    `head_list` : `yolo.data.targets.heads(net)`.
+    `head_list` : `yolo.data.targets.heads(net)` ; `anchor_ref` :
+    `yolo.data.targets.anchor_ref(net)`.
     """
     if class_mode not in ("sigmoid", "softmax"):
         raise ValueError(f"class_mode inconnu : {class_mode!r}")
-    grids = {hid: outputs[hid].shape[-1] for hid, _ in head_list}
-    targets = build_targets(gt_boxes, gt_labels, anchors_px, head_list, grids)
-    all_anchors = anchors_frac(anchors_px)
+    grids = {hid: tuple(outputs[hid].shape[-2:]) for hid, _ in head_list}
+    targets = build_targets(gt_boxes, gt_labels, anchors_px, head_list, grids, anchor_ref)
+    all_anchors = anchors_frac(anchors_px, anchor_ref)
     c5 = 5 + num_classes
     parts = dict.fromkeys(("coord", "obj", "noobj", "cls"), 0.0)
     douts, terms, masks = {}, {}, {}
     for hid, mask in head_list:
         out = outputs[hid]
-        n, _, s, _ = out.shape
+        n, _, sh, sw = out.shape
         a = len(mask)
         if out.shape[1] != a * c5:
             raise ValueError(f"tête {hid} : {out.shape[1]} canaux, attendu {a}×{c5}")
-        p = out.reshape(n, a, c5, s, s).astype(np.float64)
+        p = out.reshape(n, a, c5, sh, sw).astype(np.float64)
         t = targets[hid]
         obj = t["obj"]
         ignore, best = ignore_mask(p, all_anchors[mask], obj, gt_boxes, ignore_thresh)

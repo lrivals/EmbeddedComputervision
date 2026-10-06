@@ -7,8 +7,9 @@
 Même prétraitement que le modèle entier de `tools/eval_quant.py --resize stretch` :
 `preprocess(img, 416, "stretch", "pil")` puis `quantize_input`. La carte lit ces octets au
 lieu de décoder les JPEG (stb ≠ PIL) : les détections sont alors comparables bit à bit.
-Format : (3, S, S) int8 par image, concaténées dans l'ordre de `ids.txt`, sans en-tête
-(lu par `sw/app/yolo_bench --inputs`).
+Format : (C, H, W) int8 par image (entrée de la cfg du réseau : 3 ou 1 canal, carrée ou
+non), concaténées dans l'ordre de `ids.txt`, sans en-tête (lu par
+`sw/app/yolo_bench --inputs`).
 """
 
 import argparse
@@ -23,25 +24,27 @@ sys.path.insert(0, str(ROOT / "python"))
 import numpy as np  # noqa: E402
 
 from yolo.data import datasets  # noqa: E402
+from yolo.data.letterbox import as_hw, input_size, parse_size, size_label  # noqa: E402
 from yolo.infer.pipeline import MODES, preprocess  # noqa: E402
+from yolo.models.tiny_yolo import load_cfg  # noqa: E402
 from yolo.quant.quantize import quantize_input  # noqa: E402
 
 
 def _load(task):
     from PIL import Image
 
-    path, size, mode = task
+    path, size, mode, channels = task
     with Image.open(path) as img:
-        x, _ = preprocess(img, size, mode)
+        x, _ = preprocess(img, size, mode, channels=channels)
     return quantize_input(x).tobytes()
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--net", default="tiny-yolov2-voc")
+    ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau ou chemin d'un .cfg")
     datasets.add_args(ap)
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
-    ap.add_argument("--size", type=int, default=416)
+    ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="stretch")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--out", type=Path, default=None,
@@ -51,20 +54,23 @@ def main():
     samples = datasets.load_args(args)
     if args.subset:
         samples = samples[:args.subset]
-    out = args.out or (ROOT / "build" / "m8" / args.net if args.dataset == "voc"
-                       else ROOT / "build" / "m11" / args.dataset / args.net)
+    cfg = load_cfg(args.net)
+    size, channels = input_size(cfg, args.size), cfg["input"][0]
+    name = Path(args.net).stem
+    out = args.out or (ROOT / "build" / "m8" / name if args.dataset == "voc"
+                       else ROOT / "build" / "m11" / args.dataset / name)
     out.mkdir(parents=True, exist_ok=True)
 
     t0 = time.time()
-    tasks = [(s["image"], args.size, args.resize) for s in samples]
+    tasks = [(s["image"], size, args.resize, channels) for s in samples]
     with mp.Pool(args.workers) as pool, (out / "inputs.bin").open("wb") as f:
         for k, b in enumerate(pool.imap(_load, tasks, chunksize=8), 1):
-            assert len(b) == 3 * args.size * args.size
+            assert len(b) == channels * np.prod(as_hw(size))
             f.write(b)
             if k % 1000 == 0:
                 print(f"{k}/{len(samples)} images  {time.time() - t0:.0f} s", flush=True)
     (out / "ids.txt").write_text("".join(s["id"] + "\n" for s in samples))
-    print(f"{len(samples)} entrées ({np.dtype(np.int8).name}, 3×{args.size}×{args.size}, "
+    print(f"{len(samples)} entrées ({np.dtype(np.int8).name}, {channels} × {size_label(size)}, "
           f"{args.resize}) → {out}/inputs.bin, ids.txt")
 
 

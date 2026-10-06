@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT / "python"))
 import numpy as np  # noqa: E402
 
 from yolo.data import datasets  # noqa: E402
+from yolo.data.letterbox import input_size, parse_size, size_label  # noqa: E402
 from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import (evaluate, read_detections, to_voc_pixels,  # noqa: E402
                                 write_detections)
@@ -41,15 +42,16 @@ from yolo.models.tiny_yolo import build, load_cfg  # noqa: E402
 def _load(task):
     from PIL import Image
 
-    path, size, mode, interp = task
+    path, size, mode, interp, channels = task
     with Image.open(path) as img:
-        return preprocess(img, size, mode, interp)
+        return preprocess(img, size, mode, interp, channels)
 
 
 def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers):
     """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle."""
     per_class = {c: ([], [], []) for c in range(net.net["classes"])}
-    tasks = [(s["image"], size, mode, interp) for s in samples]
+    channels = net.net["input"][0]
+    tasks = [(s["image"], size, mode, interp, channels) for s in samples]
     t0 = time.time()
     with mp.Pool(workers) as pool:
         it = pool.imap(_load, tasks, chunksize=4)
@@ -101,7 +103,7 @@ def main():
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
-    ap.add_argument("--size", type=int, default=416)
+    ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="letterbox")
     ap.add_argument("--interp", choices=INTERPS, default="pil")
     ap.add_argument("--conf", type=float, default=0.005)
@@ -133,6 +135,7 @@ def main():
             ap.error("--weights ou --dets requis")
         net = build(args.net)
         load_darknet_weights(net, args.weights)
+        args.size = input_size(net.net, args.size)
         dets = run_inference(net, samples, args.size, args.resize, args.interp, args.conf,
                              args.iou, args.batch, args.workers)
         dets = datasets.remap_detections(dets, view.det_lut)
@@ -142,7 +145,7 @@ def main():
         write_detections(dets, view.names, out)
         print(f"détections : {out}")
         title = (f"{args.net} ({args.weights.name}), {where}, {len(samples)} images, "
-                 f"{args.size}×{args.size} {args.resize} ({args.interp}), conf {args.conf}, "
+                 f"{size_label(args.size)} {args.resize} ({args.interp}), conf {args.conf}, "
                  f"NMS {args.iou}")
 
     if metric == "coco":

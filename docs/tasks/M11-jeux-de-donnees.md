@@ -57,6 +57,10 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   - KITTI : découpage train/val 80/20 à graine fixe.
   - Données : `tools/get_datasets.sh` (COCO et KITTI ; consignes pour les autres jeux) ;
     profils : `tools/m11.sh`.
+  - Versions Kaggle de CrowdHuman, VisDrone et ExDark : `tools/get_datasets.sh kaggle` les
+    relie par liens symboliques aux arborescences attendues. CrowdHuman a ses images de val
+    dans `Images_val/`, que le chargeur lit aussi. ExDark sur Kaggle n'a que les images :
+    `ExDark_Annno/` et `imageclasslist.txt` viennent du dépôt GitHub (Groundtruth/).
 - **Acceptation vérifiée** : `tools/m11.sh voc-regress` donne VOC2007 test, stretch, une
   mAP de 56,30 en flottant (`eval_voc.py`, puis `eval_quant.py`) et de 55,66 en entier,
   inchangées.
@@ -139,9 +143,28 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   - `tools/train.py --dataset kitti --init coco` ;
   - profils `kitti-prep` et `kitti-train`.
 
-  L'affinage n'est pas lancé.
-- **Reste** : l'entrée non carrée dans le manifeste, le golden, les tuiles en bord et le
-  décodage, puis les mesures. L'affinage tourne en letterbox 416×416.
+  **Entrée non carrée, de Python au HLS** (convention : [conventions.md](../conventions.md)).
+  - Ancres en pixels de l'entrée `width × height` de la cfg (`targets.anchor_ref`). Un réseau
+    carré garde 416 × 416.
+  - Grilles `(S_h, S_w)` dans le décodage, les cibles et la perte. Letterbox, prétraitement et
+    augmentation acceptent `(H, W)`.
+  - En multi-échelle, le rapport d'aspect est conservé (`trainer.scaled_input`).
+  - `--size LxH` dans tous les outils, avec par défaut l'entrée de la cfg.
+    `make_cfg --size`, `kmeans_anchors --size`.
+  - Post-traitement matériel : `hw_postproc.py`, `hwpp` du golden, noyau `yolo_post`
+    (`PD_GRID_H`/`PD_GRID_W`) et driver. Un pas commun aux deux axes est vérifié.
+  - Golden : `postproc.hpp` et `engine`.
+  - ARM : `preprocess_stretch` en H × W. `yolo_app` et `yolo_bench` n'exigent plus une
+    entrée carrée.
+  - Tests (`test_nonsquare.py`) : réseau synthétique 128 × 64, exporté puis passé dans le
+    golden C++, `tb_net` et `tb_post` (C-sim), `yolo_bench --hw-post` et `perf_model`.
+    Tout est égal au Python à l'octet. Le streaming `hls/stream/` reste à 416 × 416.
+
+  Profils : `SIZE=640x192 tools/m11.sh kitti-prep | kitti-train`. Les ancres sont écrites
+  dans `results/anchors_kitti_640x192.md`, et la cfg dans
+  `build/m11/cfg/tiny-yolov3-kitti-640x192.cfg`. L'affinage n'est pas lancé.
+- **Reste** : les affinages (letterbox 416 × 416 et 640 × 192) et les mesures, à savoir la
+  mAP, le golden et la C-sim sur l'export réel, et `perf_model` aux deux résolutions.
 
 ### [ ] T11.5 — VisDrone-DET (drone, petits objets)
 - **Spec** : §3, §10.2 · **Dépend de** : T11.0, T2.8 · **Taille** : L
@@ -157,12 +180,20 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   - Ce jeu donne un argument chiffré pour une troisième tête ou une entrée plus grande.
   - À plus haute résolution, il faut aussi vérifier la place sur puce des line buffers de
     `hls/stream/` (M9.4).
-- **Préparé** : profils `visdrone-prep`, `visdrone-train` et `visdrone-size` (416, 608 et
-  832, métrique VOC). L'affinage n'est pas lancé.
+- **Préparé** :
+  - profils `visdrone-prep`, `visdrone-train` et `visdrone-size` (416, 608 et 832, avec
+    `--metric coco` pour l'AP par taille, l'aire étant w·h des boîtes) ;
+  - Tiny-YOLOv2 : `NET=tiny-yolov2 tools/m11.sh visdrone-prep | visdrone-train |
+    visdrone-size`, avec 5 ancres et une cfg `[region]`.
+  - L'affinage part des poids VOC hors tête (`train.py --init <.weights> --init-net
+    tiny-yolov2-voc`, copie partielle de `copy_matching`).
+
+  L'affinage n'est pas lancé.
 - **Reste** :
-  - AP par taille d'objet, avec `--metric coco` et l'aire des boîtes ;
-  - affinage de Tiny-YOLOv2 ;
-  - `perf_model` et roofline aux grandes entrées.
+  - les affinages et les mesures ;
+  - `perf_model` et roofline aux grandes entrées (cfg à `--size 608` ou `832`, puis export) ;
+  - les régions ignorées de VisDrone, retirées et non marquées : une détection qui y tombe
+    compte comme fausse alarme.
 
 ### [ ] T11.6 — CrowdHuman (scènes denses, NMS matérielle)
 - **Spec** : §8.2, §10.3 · **Dépend de** : T11.0, T9.1.3 · **Taille** : M
@@ -182,10 +213,11 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
 - **Préparé** : profil `tools/m11.sh crowdhuman`. Il lance `int` et `int-hwpp` aux
   capacités 256 et 1 024 et mesure l'AP, le rappel final par classe (nouveau champ
   `recall` des JSON de `eval_quant`) et les candidates perdues.
-- **Reste** :
-  - téléchargement manuel de CrowdHuman ;
-  - cycles de la NMS par image (`tools/bench_sim.sh` avec `EXTRA=--hw-post`, sur des
-    entrées de `make_inputs.py --dataset crowdhuman`).
+  Cycles de la NMS par image : avec `--hw-post`, `yolo_bench` ajoute au CSV `--times` les
+  colonnes `overflow`, `post_cycles`, `nms_cycles`, `candidates` et `survivors`. Les cycles
+  viennent de l'estimation C-sim sur le backend sim. Le profil `crowdhuman-cycles`
+  (`N` images, 200 par défaut) enchaîne `make_inputs` et `bench_sim.sh`.
+- **Reste** : les mesures (CrowdHuman est en place, version Kaggle).
 
 ### [ ] T11.7 — FLIR ADAS (thermique, un canal)
 - **Spec** : §10.2 · **Dépend de** : T11.0, T2.8 · **Taille** : L
@@ -199,11 +231,23 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
     de L00 s'aggrave. C'est le cas d'usage qui justifie T10.3 (trim) et la PE dédiée de
     T10.4.
   - Le prétraitement ARM se simplifie (pas de conversion RGB).
-- **Préparé** : chargeur FLIR v2 (COCO JSON, classes par nom). Profils `flir-prep` et
-  `flir-train` : affinage à 3 canaux, les images thermiques en gris étant converties en
-  RGB. L'affinage n'est pas lancé.
-- **Reste** : l'entrée à 1 canal (manifeste, L00 avec cin = 1, golden, C-sim), puis les
-  mesures.
+- **Préparé** :
+  - chargeur FLIR v2 (COCO JSON, classes par nom) ;
+  - entrée à 1 canal : argument `channels` de `preprocess`, du letterbox et de
+    l'augmentation (exposition seule), lu dans la cfg par tous les outils et le loader ;
+  - `make_cfg --channels 1` ;
+  - L00 copiée des poids RGB par somme sur les canaux (`copy_matching`), ce qui est exact
+    pour une image grise recopiée sur R, G et B ;
+  - manifeste à `C = 1` (schéma), dumps d'export tirés du jeu choisi
+    (`export_model --dataset`), `make_inputs` à C × H × W ;
+  - prétraitement ARM à C canaux ;
+  - golden, `tb_net` (moteur conv à cin = 1) et `perf_model` égaux à l'octet et au cycle
+    près sur le réseau synthétique de `test_nonsquare.py`.
+
+  Profils : `CH=1 tools/m11.sh flir-prep | flir-train` (cfg `tiny-yolov3-flir-c1.cfg`). Sans
+  `CH`, l'affinage reste à 3 canaux. L'affinage n'est pas lancé.
+- **Reste** : téléchargement de FLIR, affinage, mesures (mAP et cycles de L00 à cin = 1
+  face à cin = 3).
 
 ### T11.8 — Affinage VOC07+12 (renvoi)
 Ce n'est pas une nouvelle tâche : VOC07+12 trainval reste le jeu d'affinage de référence,

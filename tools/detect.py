@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "python"))
 import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
+from yolo.data.letterbox import input_size, parse_size  # noqa: E402
 from yolo.data.voc import VOC_CLASSES  # noqa: E402
 from yolo.infer.boxes import cxcywh_to_xyxy  # noqa: E402
 from yolo.infer.nms import CONF_THR, IOU_THR  # noqa: E402
@@ -45,7 +46,8 @@ def main():
     ap.add_argument("images", nargs="+", type=Path)
     ap.add_argument("--net", default="tiny-yolov2-voc")
     ap.add_argument("--weights", type=Path, default=ROOT / "weights" / "yolov2-tiny-voc.weights")
-    ap.add_argument("--size", type=int, default=416)
+    ap.add_argument("--size", type=parse_size, default=None,
+                    help="S ou LxH ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="letterbox")
     ap.add_argument("--interp", choices=INTERPS, default="pil")
     ap.add_argument("--conf", type=float, default=CONF_THR)
@@ -56,10 +58,11 @@ def main():
 
     net = build(args.net)
     load_darknet_weights(net, args.weights)
+    size, channels = input_size(net.net, args.size), net.net["input"][0]
     out_dir = args.out if args.out and (len(args.images) > 1 or args.out.suffix == "") else None
     for path in args.images:
         with Image.open(path) as img:
-            x, wh = preprocess(img, args.size, args.resize, args.interp)
+            x, wh = preprocess(img, size, args.resize, args.interp, channels)
             boxes, scores, labels = detect(net, x[None], [wh], args.resize, args.conf,
                                            args.iou)[0]
             for b, s, c in zip(boxes, scores, labels):

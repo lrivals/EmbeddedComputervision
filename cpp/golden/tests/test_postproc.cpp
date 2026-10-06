@@ -35,7 +35,8 @@ TEST_CASE("détections == detections.json") {
         const Layer& l = m.layers[size_t(id)];
         postproc::Head h;
         h.data = data[k++].data.data();
-        h.grid = l.out_h;
+        h.grid_h = l.out_h;
+        h.grid_w = l.out_w;
         h.classes = m.classes;
         h.softmax = l.type == LayerType::Region;
         h.scale = l.scale;

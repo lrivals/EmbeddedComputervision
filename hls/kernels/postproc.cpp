@@ -42,7 +42,8 @@ heads:
   for (int hn = 0; hn < d.nheads && hn < POST_MAX_HEADS; ++hn) {
     const int32_t* hd = tab + d.desc_off + hn * POST_HEAD_WORDS;
     hwpp::HeadDesc h;
-    h.grid = hd[PD_GRID];
+    h.grid_h = hd[PD_GRID_H];
+    h.grid_w = hd[PD_GRID_W];
     h.classes = hd[PD_CLASSES];
     h.num_anchors = hd[PD_ANCHORS];
     h.stride_log2 = hd[PD_STRIDE_LOG2];
@@ -64,7 +65,7 @@ heads:
 #ifndef __SYNTHESIS__
     cyc.luts += 256;
 #endif
-    const int s = h.grid, nc = h.classes, plane = s * s;
+    const int gw = h.grid_w, nc = h.classes, plane = h.grid_h * gw;
     const int8_t* base = act + hd[PD_DATA_OFF];
   anchors:
     for (int a = 0; a < h.num_anchors; ++a) {
@@ -82,7 +83,7 @@ heads:
         for (int k = 0; k < nc; ++k) t[k] = p[(5 + k) * plane + cell];
         hwpp::cell_scores(h, int(p[4 * plane + cell]), t, sig, smexp, score);
         hwpp::Box b;
-        hwpp::decode_cell(h, a, cell / s, cell % s, p[cell], p[plane + cell],
+        hwpp::decode_cell(h, a, cell / gw, cell % gw, p[cell], p[plane + cell],
                           p[2 * plane + cell], p[3 * plane + cell], sig, ex, b);
 #ifndef __SYNTHESIS__
         ++cyc.survivors;

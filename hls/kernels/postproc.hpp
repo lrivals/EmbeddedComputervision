@@ -24,7 +24,8 @@ constexpr int POST_BOX_WORDS = 6;
 
 enum PostHeadField {
   PD_DATA_OFF,     // octets dans l'arène
-  PD_GRID,
+  PD_GRID_H,       // grille S_h × S_w (non carrée : T11.4)
+  PD_GRID_W,
   PD_CLASSES,
   PD_ANCHORS,
   PD_STRIDE_LOG2,

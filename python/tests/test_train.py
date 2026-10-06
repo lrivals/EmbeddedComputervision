@@ -161,3 +161,15 @@ def test_copy_matching():
     assert copy_matching(src, dst) == [4]
     np.testing.assert_array_equal(dst.params[2]["W"], src.params[2]["W"])
     assert not np.array_equal(dst.params[4]["W"][:21], src.params[4]["W"])
+
+
+def test_copy_matching_rgb_to_gray():
+    # T11.7 : L00 d'un réseau RGB vers un réseau à un canal, par somme sur les canaux ; même
+    # sortie de L00 sur une image grise recopiée sur R, G et B.
+    src = Network(TINY, dtype=np.float64, rng=1)
+    dst = Network(dict(TINY, input=(1, 32, 32)), dtype=np.float64, rng=2)
+    assert copy_matching(src, dst) == []
+    gray = np.random.default_rng(0).uniform(0, 1, (1, 1, 32, 32))
+    a = src.forward(np.repeat(gray, 3, axis=1), all_outputs=True)[0]
+    b = dst.forward(gray, all_outputs=True)[0]
+    np.testing.assert_allclose(a, b, rtol=1e-12, atol=1e-12)

@@ -34,7 +34,8 @@ inline PostTable post_table(const golden::Model& m, const std::vector<int64_t>& 
         t.words[lut + size_t(w) * 256 + size_t(i)] = int32_t(m.head_lut(l, w)[i]);
     int32_t* d = t.words.data() + size_t(nh) * 3 * 256 + size_t(k) * accel::POST_HEAD_WORDS;
     d[accel::PD_DATA_OFF] = int32_t(head_off[size_t(k)]);
-    d[accel::PD_GRID] = hd.desc.grid;
+    d[accel::PD_GRID_H] = hd.desc.grid_h;
+    d[accel::PD_GRID_W] = hd.desc.grid_w;
     d[accel::PD_CLASSES] = hd.desc.classes;
     d[accel::PD_ANCHORS] = hd.desc.num_anchors;
     d[accel::PD_STRIDE_LOG2] = hd.desc.stride_log2;

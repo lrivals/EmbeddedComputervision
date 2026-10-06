@@ -3,6 +3,7 @@
 #
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
+#   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
 #
 # Téléchargés ici (idempotent, comme get_voc.sh) : COCO val2017 + annotations 2017 (≈ 1,0 +
 # 0,25 Go ; les 500 images de calibration de train2017 : tools/coco_subset.py) et KITTI 2D
@@ -47,14 +48,46 @@ declare -A MARKER=(
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
+    (ou kaggle.com/datasets/kushagrapandya/visdrone-dataset dans data/VisDrone Dataset/, puis : $0 kaggle)
     data/visdrone/VisDrone2019-DET-{train,val}/{images,annotations}/"
   [crowdhuman]="https://www.crowdhuman.org/download.html : CrowdHuman_train0{1,2,3}.zip, CrowdHuman_val.zip, annotation_{train,val}.odgt
+    (ou kaggle.com/datasets/leducnhuan/crowdhuman dans data/CrowdHuman/, puis : $0 kaggle)
     data/crowdhuman/annotation_{train,val}.odgt, data/crowdhuman/Images/<ID>.jpg"
   [exdark]="https://github.com/cs-chan/Exclusively-Dark-Image-Dataset : ExDark.zip, ExDark_Annno.zip, imageclasslist.txt
+    (kaggle.com/datasets/washingtongold/exdark-dataset dans data/ExDark Dataset/ n'a que les images :
+    $0 kaggle les relie, ExDark_Annno/ et imageclasslist.txt viennent toujours de GitHub, Groundtruth/)
     data/exdark/ExDark/<Classe>/, data/exdark/ExDark_Annno/<Classe>/<image>.txt, data/exdark/imageclasslist.txt"
   [flir]="https://www.flir.com/oem/adas/adas-dataset-form/ (inscription) : FLIR ADAS v2
     data/flir/images_thermal_{train,val}/coco.json et data/"
 )
+
+link() {  # cible lien : lien relatif, seulement si la cible existe et que le lien manque
+  local target=$1 name=$2
+  [[ -e "$DATA_DIR/$name" || ! -e "$(dirname "$DATA_DIR/$name")/$target" ]] && return 0
+  ln -s "$target" "$DATA_DIR/$name"
+  echo "lien $name -> $target"
+}
+
+# Versions Kaggle : dossiers d'autre nom, souvent à double niveau ; on les relie aux
+# arborescences attendues sans rien déplacer.
+kaggle() {
+  link CrowdHuman/CrowdHuman crowdhuman
+  if [[ -d "$DATA_DIR/VisDrone Dataset" ]]; then
+    mkdir -p "$DATA_DIR/visdrone"
+    for s in train val test-dev; do
+      link "../VisDrone Dataset/VisDrone2019-DET-$s/VisDrone2019-DET-$s" \
+        "visdrone/VisDrone2019-DET-$s"
+    done
+  fi
+  if [[ -d "$DATA_DIR/ExDark Dataset" ]]; then
+    mkdir -p "$DATA_DIR/exdark"
+    link "../ExDark Dataset" exdark/ExDark
+    # Annotations GitHub décompressées à côté des images (zip à double niveau).
+    link "../ExDark Dataset/ExDark_Annno/ExDark_Annno" exdark/ExDark_Annno
+    link "../ExDark Dataset/ExDark_Annno" exdark/ExDark_Annno
+    link "../ExDark Dataset/imageclasslist.txt" exdark/imageclasslist.txt
+  fi
+}
 
 check() {
   local ds=$1
@@ -66,10 +99,13 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,12p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,13p' "$0"; exit 1; }
 status=0
 for ds in "$@"; do
   case "$ds" in
+  kaggle)
+    kaggle
+    ;&
   check)
     for d in coco kitti visdrone crowdhuman exdark flir; do check "$d" || true; done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \

@@ -19,6 +19,18 @@
   0-2 → tête 26×26.
 - Conversion en fraction : **toujours /416** (`yolo.data.targets.ANCHOR_REF`), y compris en
   multi-échelle : une ancre couvre la même part de l'image à toutes les tailles d'entrée.
+- Réseau **non carré** (T11.4, cfg `width ≠ height`) : ancres en pixels de l'entrée
+  `width × height` de la cfg, converties par `/width` et `/height`
+  (`yolo.data.targets.anchor_ref`, `hwpp::anchor_ref_w/_h` en C++). Un réseau carré garde la
+  référence 416 × 416 quelle que soit sa taille. Le pas des têtes doit être le même sur les
+  deux axes (`width / S_w = height / S_h`, puissance de 2 pour `yolo_post`) ; les coins du
+  post-traitement matériel sont en pixels Q4 de ce repère.
+- Taille d'entrée des outils : `--size S` ou `--size LxH` (largeur × hauteur, ex.
+  `640x192`) ; défaut : l'entrée de la cfg. En interne, `(H, W)`
+  (`yolo.data.letterbox.as_hw`). En multi-échelle, un réseau non carré garde son rapport
+  d'aspect (`yolo.train.trainer.scaled_input`).
+- Entrée à **un canal** (T11.7, cfg `channels=1`) : luminance PIL (`convert("L")`) en Python,
+  luminance de stb (`stbi_load(…, 1)`) sur l'ARM ; augmentation sans teinte ni saturation.
 - Perte : somme sur le lot dans `yolo_loss`, divisée par N dans le trainer ; seuil *ignore*
   0,5 par défaut (§2.3 ; les `.cfg` Darknet utilisent 0,7).
 

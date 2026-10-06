@@ -11,6 +11,7 @@
 #   hors-domaine                   T11.2  poids VOC et COCO sans affinage (ExDark, KITTI, VisDrone)
 #   exdark                         T11.3  calibration ExDark, histogrammes L00-L04
 #   crowdhuman                     T11.6  NMS sans tri et capacité de sélection, scènes denses
+#   crowdhuman-cycles              T11.6  cycles de yolo_post par image en C-sim (N images)
 #   kitti-prep | visdrone-prep | flir-prep    ancres k-means et cfg d'affinage
 #   kitti-train | visdrone-train | flir-train   affinage (long : plusieurs heures à jours)
 #   visdrone-size                  T11.5  entrée 416 / 608 / 832 des poids affinés
@@ -18,7 +19,11 @@
 # Sorties dans build/m11/<profil>/ (journal log.txt, JSON des mAP) ; rien n'est écrit dans
 # results/ sauf par calibrate.py et kmeans_anchors.py (rapports de calibration et
 # d'ancres). Variables : JOBS (défaut 16), SUBSET (défaut 0 = tout), DEVICE (cpu | gpu),
-# ITERS (affinages, défaut 4000), BATCH (défaut 16).
+# ITERS (affinages, défaut 4000), BATCH (défaut 16), NET (réseau des profils -prep, -train
+# et visdrone-size : tiny-yolov3, défaut, ou tiny-yolov2), N (images de crowdhuman-cycles,
+# défaut 200), SIZE (entrée LxH non carrée des profils -prep et -train, ex. 640x192 pour
+# KITTI, T11.4 ; défaut : 416 × 416), CH (canaux d'entrée, 1 pour FLIR, T11.7 ; défaut 3).
+# SIZE et CH s'ajoutent au nom de la cfg et du dossier d'affinage.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -27,6 +32,7 @@ SUBSET=${SUBSET:-0}
 DEVICE=${DEVICE:-cpu}
 ITERS=${ITERS:-4000}
 BATCH=${BATCH:-16}
+NET=${NET:-tiny-yolov3}
 M11=build/m11
 V2=tiny-yolov2-voc
 V3=tiny-yolov3-coco
@@ -66,34 +72,59 @@ report() {
   python tools/m12_report.py map "$@" | tee -a "$LOG"
 }
 
-# Ancres à 6 (Tiny-YOLOv3) de results/anchors_<jeu>.md, au format de make_cfg.py.
-anchors6() {
-  python - "$1" <<'EOF'
+# Ancres à k de results/anchors_<jeu>.md (5 : Tiny-YOLOv2, 6 : Tiny-YOLOv3), au format de
+# make_cfg.py.
+anchors_k() {  # k fichier
+  python - "$1" "$2" <<'EOF'
 import re, sys
-for line in open(sys.argv[1]):
-    if line.startswith("| 6 |"):
+for line in open(sys.argv[2]):
+    if line.startswith(f"| {sys.argv[1]} |"):
         print(re.findall(r"`([^`]*)`", line)[0])
         break
 EOF
 }
 
-prep() {  # jeu : ancres sur le split d'entraînement, cfg Tiny-YOLOv3 à N classes
-  local ds=$1
-  setup "$ds"
-  need "$ds"
-  step python tools/kmeans_anchors.py --dataset "$ds"
-  step python tools/make_cfg.py --base tiny-yolov3-voc --dataset "$ds" \
-    --anchors "$(anchors6 "results/anchors_$ds.md")" --out "$M11/cfg/tiny-yolov3-$ds.cfg"
+case "$NET" in
+  tiny-yolov3) K=6; INIT=(--init coco) ;;
+  # Pas de poids COCO Tiny-YOLOv2 dans weights/ : départ des poids VOC, hors tête.
+  tiny-yolov2) K=5; INIT=(--init weights/yolov2-tiny-voc.weights --init-net $V2) ;;
+  *) echo "NET inconnu : $NET (tiny-yolov3 | tiny-yolov2)" >&2; exit 1 ;;
+esac
+
+# Variante d'entrée : suffixe des cfg et dossiers (-640x192, -c1), options de make_cfg.
+VAR=${SIZE:+-$SIZE}${CH:+-c$CH}
+CFG_OPTS=(${SIZE:+--size "$SIZE"} ${CH:+--channels "$CH"})
+
+# Dossier d'affinage : build/m11/<jeu>/train (Tiny-YOLOv3), train-tiny-yolov2 sinon ; suffixe
+# de la variante d'entrée.
+train_dir() {
+  local d=$M11/$1/train
+  [[ $NET == tiny-yolov3 ]] || d=$d-$NET
+  echo "$d$VAR"
 }
 
-train() {  # jeu : affinage depuis les poids COCO (têtes réinitialisées), puis mAP flottante
-  local ds=$1 d=$M11/$1/train cfg=$M11/cfg/tiny-yolov3-$1.cfg
+prep() {  # jeu : ancres sur le split d'entraînement (à l'entrée SIZE), cfg $NET à N classes
+  local ds=$1 anchors=results/anchors_$1${SIZE:+_$SIZE}.md
   setup "$ds"
   need "$ds"
-  [[ -f $cfg ]] || { echo "$cfg absent : tools/m11.sh $ds-prep" >&2; exit 1; }
+  step python tools/kmeans_anchors.py --dataset "$ds" --size "${SIZE:-416}" --out "$anchors"
+  step python tools/make_cfg.py --base "$NET-voc" --dataset "$ds" "${CFG_OPTS[@]}" \
+    --anchors "$(anchors_k $K "$anchors")" --out "$M11/cfg/$NET-$ds$VAR.cfg"
+}
+
+train() {  # jeu : affinage (couches de forme différente, les têtes, réinitialisées), mAP
+  # Entrée à un canal : L00 copiée des poids RGB par somme sur les canaux (copy_matching).
+  local ds=$1 d cfg=$M11/cfg/$NET-$1$VAR.cfg
+  d=$(train_dir "$ds")
+  setup "$ds"
+  need "$ds"
+  [[ -f $cfg ]] || {
+    echo "$cfg absent : NET=$NET SIZE=${SIZE:-} CH=${CH:-} tools/m11.sh $ds-prep" >&2
+    exit 1
+  }
   local resume=()
   [[ -f $d/checkpoint.npz ]] && resume=(--resume)
-  step python tools/train.py --net "$cfg" --dataset "$ds" --init coco "${resume[@]}" \
+  step python tools/train.py --net "$cfg" --dataset "$ds" "${INIT[@]}" "${resume[@]}" \
     --iters "$ITERS" --batch "$BATCH" --lr 1e-3 --burn-in 500 --multiscale --workers 4 \
     --device "$DEVICE" --out "$d"
   step python tools/eval_voc.py --net "$cfg" --weights "$d/final.weights" --dataset "$ds" \
@@ -189,6 +220,20 @@ crowdhuman)  # NMS sans tri face à la NMS triée, débordements de la sélectio
   done
   report $M11/crowdhuman/*.json
   ;;
+crowdhuman-cycles)  # T11.6 : cycles de yolo_post par image (C-sim), N images (défaut 200)
+  setup crowdhuman
+  need crowdhuman
+  CXXFLAGS="-DACC_NO_APINT -march=native" step cmake -S sw -B build/sw-fast -DSW_BACKEND=sim
+  step cmake --build build/sw-fast -j --target yolo_bench
+  for net in $V2 $V3; do
+    d=$M11/crowdhuman/fpga_$net
+    step python tools/make_inputs.py --net $net --dataset crowdhuman --subset "${N:-200}" \
+      --out "$d"
+    # times_c*.csv : colonnes overflow, post_cycles, nms_cycles, candidates, survivors.
+    BENCH=build/sw-fast/yolo_bench EXTRA=--hw-post step tools/bench_sim.sh "$d" \
+      model/$net "$JOBS"
+  done
+  ;;
 # ------------------------------------------------- T11.4, T11.5, T11.7 préparation, affinage
 kitti-prep | visdrone-prep | flir-prep)
   prep "${profile%-prep}"
@@ -196,17 +241,17 @@ kitti-prep | visdrone-prep | flir-prep)
 kitti-train | visdrone-train | flir-train)
   train "${profile%-train}"
   ;;
-visdrone-size)  # T11.5 : entrée plus grande, mêmes poids
+visdrone-size)  # T11.5 : entrée plus grande, mêmes poids ; AP par taille (métrique COCO)
   setup visdrone
   need visdrone
   for s in 416 608 832; do
-    step python tools/eval_voc.py --net $M11/cfg/tiny-yolov3-visdrone.cfg \
-      --weights $M11/visdrone/train/final.weights --dataset visdrone --resize stretch \
-      --size "$s" --subset "$SUBSET" --markdown $M11/visdrone/size.md
+    step python tools/eval_voc.py --net "$M11/cfg/$NET-visdrone.cfg" \
+      --weights "$(train_dir visdrone)/final.weights" --dataset visdrone --resize stretch \
+      --size "$s" --metric coco --subset "$SUBSET" --markdown "$M11/visdrone/size-$NET.md"
   done
   ;;
 *)
-  sed -n '2,20p' "$0"
+  sed -n '2,26p' "$0"
   exit 1
   ;;
 esac

@@ -23,6 +23,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M11](M11-jeux-de-donnees.md) | Autres jeux de données (optionnel) | mAP flottante / entière / FPGA hors VOC |
 | [M12](M12-profils-pc.md) | Profils de test sur PC (avant la carte) | chaque évaluation a un profil R/M/N, un critère et une décision |
 | [M13](M13-figures.md) | Figures (optionnel) | `make figures` régénère les figures d'architecture, de résultats, de suivi et des maths réimplémentées |
+| [M14](M14-notebooks.md) | Notebooks (optionnel) | `make notebooks` génère un notebook d'entraînement ou d'inférence par modèle × jeu, exécutable en local et sur Colab |
 
 ## Dépendances
 
@@ -42,6 +43,9 @@ graph LR
   M9 --> M12
   M8 --> M13[M13]
   M12 -.-> M13
+  M11 --> M14[M14]
+  M12 -.-> M14
+  M13 -.-> M14
 ```
 
 - **Raccourci T1.9 → M3** : avec les poids Darknet pré-entraînés, la mAP de référence est
@@ -87,3 +91,4 @@ reporter ici l'avancement par jalon.
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
 | M13 | 53 | 53 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
+| M14 | 10 | 0 |

@@ -139,6 +139,15 @@ def test_crowdhuman(tmp_path):
     np.testing.assert_allclose(s["xyxy"][1], [91, 1, 100, 50])  # fbox bornée à l'image
 
 
+def test_crowdhuman_images_val(tmp_path):
+    # Version Kaggle : images de val dans Images_val/.
+    _image(tmp_path / "Images_val" / "1,ab.jpg", 100, 50)
+    line = {"ID": "1,ab", "gtboxes": [{"tag": "person", "fbox": [10, 5, 20, 20]}]}
+    (tmp_path / "annotation_val.odgt").write_text(json.dumps(line) + "\n")
+    (s,) = D.load("crowdhuman", tmp_path, "val")
+    assert s["image"] == tmp_path / "Images_val" / "1,ab.jpg"
+
+
 def test_exdark(tmp_path):
     _image(tmp_path / "ExDark" / "Bicycle" / "2015_00001.PNG", 300, 200)
     _image(tmp_path / "ExDark" / "Car" / "2015_00002.jpg", 300, 200)

@@ -81,5 +81,6 @@ make test-durations                 # suite complète (slow compris) : durées d
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
 tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)
+tools/get_datasets.sh kaggle        # relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
 tools/m11.sh coco-float             # profils de M11 (liste : tools/m11.sh)
 ```

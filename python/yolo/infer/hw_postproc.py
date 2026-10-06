@@ -5,8 +5,9 @@ Référence bit-exacte du noyau `yolo_post` (hls/kernels/postproc.cpp) et de son
 boîtes :
 
 - **Seuil d'objectness** sur l'entier t_o (§9.4), puis tables Q16 de `lut.py`.
-- **Coins en pixels Q4** (entrée 416 = `ANCHOR_REF`, pas de grille 416/S puissance de 2) :
-  cx = ((σ_q + j·2¹⁶) · pas) ≫ₐ 12, w = (ancre_Q8 · e_q) ≫ₐ (8 + f − 4), écrêtée à
+- **Coins en pixels Q4** de l'entrée de référence des ancres (W × H = 416 × 416 pour un
+  réseau carré, width × height de la cfg sinon, `anchor_ref` ; même pas W/S_w = H/S_h,
+  puissance de 2, sur les deux axes) : cx = ((σ_q + j·2¹⁶) · pas) ≫ₐ 12, w = (ancre_Q8 · e_q) ≫ₐ (8 + f − 4), écrêtée à
   `W_MAX` ; x₁ = cx − ⌊w/2⌋, x₂ = x₁ + w (≫ₐ : décalage arrondi, `rshift_round`).
 - **Scores Q16** : v3 (σ_o · σ_c) ≫ₐ 16 ; v2 softmax en trois étages avec **une
   réciproque par cellule**, r = ⌊2³² / Σ e⌋, puis (σ_o · e_c · r) ≫ₐ 32. Une candidate
@@ -28,10 +29,10 @@ from fractions import Fraction
 
 import numpy as np
 
-from yolo.data.targets import heads
+from yolo.data.targets import anchor_ref, heads
 from yolo.quant.lut import FRAC_BITS, OFFSET, SOFTMAX_OFFSET, logit_threshold_q
 
-ANCHOR_REF = 416  # ancres en pixels pour une entrée de 416
+ANCHOR_REF = 416  # ancres en pixels pour une entrée de 416 (réseau carré)
 ANCHOR_FRAC = 8   # ancres en Q8
 BOX_FRAC = 4      # coins en pixels Q4
 W_MAX = (1 << 20) - 1  # largeur / hauteur max (Q4) : aires < 2⁴⁰, (p+q)·inter < 2⁶³
@@ -65,7 +66,7 @@ def anchors_q8(anchors_px):
 
 @dataclass
 class HwHead:
-    """Une tête int8 (A·(5+C), S, S) et ce que le noyau reçoit pour elle."""
+    """Une tête int8 (A·(5+C), S_h, S_w) et ce que le noyau reçoit pour elle."""
 
     data: np.ndarray
     anchors_q8: np.ndarray  # (A, 2)
@@ -76,29 +77,35 @@ class HwHead:
     sigmoid: np.ndarray
     exp: np.ndarray
     softmax_exp: np.ndarray
+    ref: tuple = (ANCHOR_REF, ANCHOR_REF)  # (W, H) de référence des ancres
 
     @property
     def grid(self):
-        return self.data.shape[-1]
+        """(S_h, S_w)."""
+        return tuple(self.data.shape[-2:])
 
     @property
     def stride_log2(self):
-        stride = ANCHOR_REF // self.grid
-        if stride * self.grid != ANCHOR_REF or stride & (stride - 1):
-            raise ValueError("pas de grille 416/S non puissance de 2")
+        (gh, gw), (rw, rh) = self.grid, self.ref
+        stride = rw // gw
+        if stride * gw != rw or stride * gh != rh or stride & (stride - 1):
+            raise ValueError(f"pas de grille {rw}×{rh} / {gw}×{gh} non commun ou non "
+                             "puissance de 2")
         return stride.bit_length() - 1
 
 
 def make_heads(outputs, net, luts, image=0):
-    """Têtes de l'image `image` de `outputs` ({id: (N, C, S, S)}) ; `luts` : {id: HeadLuts}."""
+    """Têtes de l'image `image` de `outputs` ({id: (N, C, S_h, S_w)}) ; `luts` :
+    {id: HeadLuts}."""
     out = []
+    ref = anchor_ref(net)
     for hid, mask in heads(net):
         lut = luts[hid]
         out.append(HwHead(np.asarray(outputs[hid][image]), anchors_q8(np.asarray(
             net["anchors"], dtype=np.float64)[mask]), net["classes"],
             net["layers"][hid]["type"] == "region", lut.scale, lut.exp_frac,
             np.asarray(lut.sigmoid, np.int64), np.asarray(lut.exp, np.int64),
-            np.asarray(lut.softmax_exp, np.int64)))
+            np.asarray(lut.softmax_exp, np.int64), ref))
     return out
 
 
@@ -108,8 +115,8 @@ def decode_head(h, conf, out):
     Chaque candidate : (x1, y1, x2, y2, score Q16, classe), entiers Python.
     """
     a_n = len(h.anchors_q8)
-    s, nc = h.grid, h.classes
-    p = np.asarray(h.data, dtype=np.int64).reshape(a_n, 5 + nc, s, s)
+    (gh, gw), nc = h.grid, h.classes
+    p = np.asarray(h.data, dtype=np.int64).reshape(a_n, 5 + nc, gh, gw)
     thr_o = logit_threshold_q(conf, h.scale)
     thr_s = conf_q16(conf)
     sl = h.stride_log2
@@ -183,13 +190,15 @@ def run(heads_, conf, iou, cap=CAP):
     return nms_nosort(cands, p, q, cap)
 
 
-def to_detections(boxes):
+def to_detections(boxes, ref=(ANCHOR_REF, ANCHOR_REF)):
     """Boîtes du noyau → (boxes (m, 4) (cx, cy, w, h) normalisées, scores, labels), triées
-    par score décroissant (stable) comme `filter_and_nms`. Seule étape flottante (hôte)."""
+    par score décroissant (stable) comme `filter_and_nms`. Seule étape flottante (hôte).
+    `ref` : (W, H) de référence des ancres (`anchor_ref`)."""
     if not boxes:
         return np.zeros((0, 4)), np.zeros(0), np.zeros(0, dtype=np.int64)
     r = np.asarray(boxes, dtype=np.int64)
-    unit = float(ANCHOR_REF << BOX_FRAC)
+    rw, rh = ref
+    unit = np.array([rw, rh, rw, rh], dtype=np.float64) * (1 << BOX_FRAC)
     b = np.stack([(r[:, 0] + r[:, 2]) / 2, (r[:, 1] + r[:, 3]) / 2,
                   r[:, 2] - r[:, 0], r[:, 3] - r[:, 1]], axis=1) / unit
     s = r[:, 4] / float(1 << FRAC_BITS)
@@ -204,7 +213,7 @@ def postprocess_hw_counted(outputs, net, luts, conf_thr, iou_thr, cap=CAP, overf
     out = []
     for b in range(n):
         boxes, ov = run(make_heads(outputs, net, luts, b), conf_thr, iou_thr, cap)
-        out.append(to_detections(boxes))
+        out.append(to_detections(boxes, anchor_ref(net)))
         if overflow is not None:
             overflow.append(ov)
     return out

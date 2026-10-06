@@ -110,10 +110,10 @@ int main(int argc, char** argv) {
       x = golden::npy_load_int8(input).data;
     } else {
       int n = 0;
-      rgb = stbi_load(image.c_str(), &W, &H, &n, 3);
+      if (m.in_c != 1 && m.in_c != 3) throw std::runtime_error("entrée à 1 ou 3 canaux attendue");
+      rgb = stbi_load(image.c_str(), &W, &H, &n, m.in_c);  // 1 canal : luminance de stb
       if (!rgb) throw std::runtime_error("lecture impossible : " + image);
-      if (m.in_h != m.in_w || m.in_c != 3) throw std::runtime_error("entrée carrée RGB attendue");
-      x = sw::preprocess_stretch(rgb, W, H, m.in_w, m.input_scale);
+      x = sw::preprocess_stretch(rgb, W, H, m.in_c, m.in_h, m.in_w, m.input_scale);
     }
     if (x.size() != size_t(m.in_c) * m.in_h * m.in_w)
       throw std::runtime_error("entrée de taille inattendue");
@@ -134,7 +134,9 @@ int main(int argc, char** argv) {
       acc.run_all(slot);
       t_acc += sw::seconds_since(t0);
       t0 = std::chrono::steady_clock::now();
-      dets = hw_post ? sw::hw_detections(acc.run_post(conf, 0.45, nullptr, nullptr, slot))
+      dets = hw_post ? sw::hw_detections(acc.run_post(conf, 0.45, nullptr, nullptr, slot),
+                                       hwpp::anchor_ref_w(m.in_h, m.in_w),
+                                       hwpp::anchor_ref_h(m.in_h, m.in_w))
                      : sw::detect(m, acc.program(), acc.arena(slot), conf);
       t_post += sw::seconds_since(t0);
       if (next.joinable()) next.join();
@@ -153,6 +155,12 @@ int main(int argc, char** argv) {
     if (!out.empty()) golden::write_detections(out, dets);
     if (!draw_path.empty()) {
       if (!rgb) throw std::runtime_error("--draw demande --image");
+      if (m.in_c != 3) {  // entrée à 1 canal : image rechargée en RGB pour le dessin
+        int n = 0;
+        stbi_image_free(rgb);
+        rgb = stbi_load(image.c_str(), &W, &H, &n, 3);
+        if (!rgb) throw std::runtime_error("lecture impossible : " + image);
+      }
       draw(rgb, W, H, dets);
       if (!stbi_write_jpg(draw_path.c_str(), W, H, 3, rgb, 90))
         throw std::runtime_error("écriture impossible : " + draw_path);

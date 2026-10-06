@@ -37,6 +37,9 @@ inline std::vector<postproc::Detection> detect(const golden::Model& m, const dri
 
 // Boîtes entières de `yolo_post` (T9.1) → détections (cx, cy, w, h) normalisées, triées par
 // score décroissant (stable) ; mêmes doubles que `to_detections` (hw_postproc.py).
-std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes);
+// `ref_w` × `ref_h` : repère des coins (hwpp::anchor_ref_w / _h du modèle).
+std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes,
+                                               int ref_w = hwpp::ANCHOR_REF,
+                                               int ref_h = hwpp::ANCHOR_REF);
 
 }  // namespace sw

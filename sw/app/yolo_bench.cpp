@@ -8,7 +8,7 @@
 //              [--power /sys/class/hwmon/hwmonN/power1_input] [--idle-s 5]
 //              [--backend sim|uio] [--uio /dev/uioN] [--udmabuf udmabufN] [--poll] [--cached]
 //
-// --inputs : entrées int8 (3, S, S) concaténées, produites par tools/make_inputs.py avec le
+// --inputs : entrées int8 (C, H, W) concaténées, produites par tools/make_inputs.py avec le
 // prétraitement du modèle entier Python : sortie comparable bit à bit (mAP au stade FPGA).
 // Un `--inputs` en .npy (une ou quelques entrées, ex. dumps/<id>/input.npy) est accepté.
 // --images : un chemin JPEG/PNG par ligne, prétraitement `stretch` sur l'ARM (preprocess.hpp)
@@ -24,6 +24,9 @@
 // de leur somme ; détections identiques au mode séquentiel.
 // --engine stream (T10.9) : architecture streaming `yolo_stream` + AXI DMA (Tiny-YOLOv2) au
 // lieu du moteur unique ; acc = transfert MM2S → noyau → S2MM de la tête ; post sur l'ARM.
+// --hw-post : colonnes en plus dans --times, débordements de la sélection de `yolo_post` et,
+// sur le backend sim, cycles estimés par la C-sim (total, NMS), candidates et survivantes
+// (T11.6).
 // --power : µW lus dans hwmon (INA260 du SOM KV260) toutes les 10 ms, au repos pendant
 // --idle-s secondes puis pendant la boucle mesurée.
 #include <algorithm>
@@ -50,6 +53,9 @@
 #include "heads.hpp"
 #include "options.hpp"
 #include "preprocess.hpp"
+#ifdef SW_HAVE_SIM
+#include "postproc.hpp"
+#endif
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -184,8 +190,8 @@ int main(int argc, char** argv) {
     if (engine == "stream") sacc = std::make_unique<driver::StreamAccelerator>(*dev, m, n_slots);
     else acc_p = std::make_unique<driver::Accelerator>(*dev, m, n_slots);
     const size_t in_bytes = size_t(m.in_c) * m.in_h * m.in_w;
-    if (!images.empty() && (m.in_h != m.in_w || m.in_c != 3))
-      throw std::runtime_error("entrée carrée RGB attendue");
+    if (!images.empty() && m.in_c != 1 && m.in_c != 3)
+      throw std::runtime_error("entrée à 1 ou 3 canaux attendue");
 
     const std::vector<std::string> list = read_lines(inputs.empty() ? images : ids_path);
     const long n_all = long(list.size());
@@ -224,9 +230,9 @@ int main(int argc, char** argv) {
         return list[size_t(k)];
       }
       int W = 0, H = 0, n = 0;
-      uint8_t* rgb = stbi_load(list[size_t(k)].c_str(), &W, &H, &n, 3);
+      uint8_t* rgb = stbi_load(list[size_t(k)].c_str(), &W, &H, &n, m.in_c);
       if (!rgb) throw std::runtime_error("lecture impossible : " + list[size_t(k)]);
-      x = sw::preprocess_stretch(rgb, W, H, m.in_w, m.input_scale);
+      x = sw::preprocess_stretch(rgb, W, H, m.in_c, m.in_h, m.in_w, m.input_scale);
       stbi_image_free(rgb);
       return stem(list[size_t(k)]);
     };
@@ -240,10 +246,27 @@ int main(int argc, char** argv) {
       load(0);
       return run_acc(0);
     };
+    // Dernier appel de `yolo_post` (--hw-post) : débordements, puis compteurs de la C-sim.
+#ifdef SW_HAVE_SIM
+    const bool sim_cycles = std::string(dev->name()) == "sim";
+#endif
+    std::string post_stats;
     auto detect = [&](int slot) {
       if (sacc) return sw::detect(m, {sacc->head().data()}, conf, iou);
-      return hw_post ? sw::hw_detections(acc_p->run_post(conf, iou, nullptr, nullptr, slot))
-                     : sw::detect(m, acc_p->program(), acc_p->arena(slot), conf, iou);
+      if (!hw_post) return sw::detect(m, acc_p->program(), acc_p->arena(slot), conf, iou);
+      int overflow = 0;
+      const auto boxes = acc_p->run_post(conf, iou, &overflow, nullptr, slot);
+      post_stats = "," + std::to_string(overflow);
+#ifdef SW_HAVE_SIM
+      if (sim_cycles) {
+        const accel::PostCycles& c = accel::post_cycles;
+        post_stats += "," + std::to_string(c.total) + "," + std::to_string(c.nms) + "," +
+                      std::to_string(c.candidates) + "," + std::to_string(c.survivors);
+      } else
+#endif
+        post_stats += ",,,,";
+      return sw::hw_detections(boxes, hwpp::anchor_ref_w(m.in_h, m.in_w),
+                               hwpp::anchor_ref_h(m.in_h, m.in_w));
     };
 
     std::FILE* times = nullptr;
@@ -251,7 +274,8 @@ int main(int argc, char** argv) {
     if (!times_path.empty()) {
       times = std::fopen(times_path.c_str(), "w");
       if (!times) throw std::runtime_error("impossible d'écrire " + times_path);
-      std::fprintf(times, "id,pre_ms,load_ms,acc_ms,post_ms,arm_ms\n");
+      std::fprintf(times, "id,pre_ms,load_ms,acc_ms,post_ms,arm_ms%s\n",
+                   hw_post ? ",overflow,post_cycles,nms_cycles,candidates,survivors" : "");
     }
     if (!dets_path.empty()) {
       dets = std::fopen(dets_path.c_str(), "w");
@@ -292,8 +316,8 @@ int main(int argc, char** argv) {
       t_arm.push_back(1e3 * arm);
       t_tot.push_back(1e3 * (pre + load + a + post));
       if (times)
-        std::fprintf(times, "%s,%.6f,%.6f,%.6f,%.6f,%.6f\n", id.c_str(), 1e3 * pre, 1e3 * load,
-                     1e3 * a, 1e3 * post, 1e3 * arm);
+        std::fprintf(times, "%s,%.6f,%.6f,%.6f,%.6f,%.6f%s\n", id.c_str(), 1e3 * pre,
+                     1e3 * load, 1e3 * a, 1e3 * post, 1e3 * arm, post_stats.c_str());
       if (dets) {
         std::fprintf(dets, "%s\n",
                      golden::detections_json(d, "\"image\": \"" + id + "\", ").c_str());

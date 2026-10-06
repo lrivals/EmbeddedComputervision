@@ -16,7 +16,7 @@
 
 namespace hwpp {
 
-constexpr int ANCHOR_REF = 416;  // ancres en pixels pour une entrée de 416
+constexpr int ANCHOR_REF = 416;  // ancres en pixels pour une entrée de 416 (réseau carré)
 constexpr int ANCHOR_FRAC = 8;   // ancres en Q8
 constexpr int BOX_FRAC = 4;      // coins en pixels Q4
 constexpr int LUT_FRAC = 16;     // tables σ et softmax en Q16
@@ -32,6 +32,11 @@ constexpr int MAX_CLASSES = 80;
 #endif
 constexpr int CAP = HWPP_CAP;
 
+// (W, H) de référence des ancres (T11.4) : 416 × 416 pour une entrée carrée, quelle que soit
+// sa taille ; width × height de l'entrée sinon. Les coins sont en pixels Q4 de ce repère.
+inline int anchor_ref_w(int in_h, int in_w) { return in_h == in_w ? ANCHOR_REF : in_w; }
+inline int anchor_ref_h(int in_h, int in_w) { return in_h == in_w ? ANCHOR_REF : in_h; }
+
 // Boîte retenue : coins en pixels Q4, score Q16, classe.
 struct Box {
   int32_t x1, y1, x2, y2;
@@ -41,8 +46,8 @@ struct Box {
 
 // Ce que le noyau reçoit pour une tête (registres) ; les tables sont à part.
 struct HeadDesc {
-  int grid = 0, classes = 0, num_anchors = 0;
-  int stride_log2 = 0;  // log2(416 / grid)
+  int grid_h = 0, grid_w = 0, classes = 0, num_anchors = 0;
+  int stride_log2 = 0;  // log2(W / grid_w) = log2(H / grid_h), repère `anchor_ref_*`
   int exp_frac = 0;
   int obj_thr_q = 0;    // plus petit t_o gardé (§9.4)
   bool softmax = false;
@@ -158,7 +163,7 @@ struct Selector {
 // --------------------------------------------------------------------------- référence
 struct HeadData {
   HeadDesc desc;
-  const int8_t* data = nullptr;  // (A·(5+C), S, S)
+  const int8_t* data = nullptr;  // (A·(5+C), S_h, S_w)
   const uint32_t* sigmoid = nullptr;
   const uint32_t* exp = nullptr;
   const uint32_t* softmax_exp = nullptr;
@@ -168,15 +173,15 @@ struct HeadData {
 template <class F>
 inline void for_each_candidate(const HeadData& hd, const Params& prm, F&& emit) {
   const HeadDesc& h = hd.desc;
-  const int s = h.grid, nc = h.classes;
-  const size_t plane = size_t(s) * s;
+  const int gh = h.grid_h, gw = h.grid_w, nc = h.classes;
+  const size_t plane = size_t(gh) * gw;
   int t[MAX_CLASSES];
   int32_t score[MAX_CLASSES];
   for (int a = 0; a < h.num_anchors; ++a) {
     const int8_t* p = hd.data + size_t(a) * (5 + nc) * plane;
-    for (int i = 0; i < s; ++i)
-      for (int j = 0; j < s; ++j) {
-        const size_t cell = size_t(i) * s + j;
+    for (int i = 0; i < gh; ++i)
+      for (int j = 0; j < gw; ++j) {
+        const size_t cell = size_t(i) * gw + j;
         auto q = [&](int ch) { return int(p[size_t(ch) * plane + cell]); };
         if (q(4) < h.obj_thr_q) continue;
         for (int k = 0; k < nc; ++k) t[k] = q(5 + k);

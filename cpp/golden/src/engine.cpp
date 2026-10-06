@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "golden/hw_postproc.hpp"
+
 namespace golden {
 
 ConvParams conv_params(const Layer& l, int in_h, int in_w) {
@@ -146,7 +148,10 @@ std::vector<postproc::Head> make_heads(const Engine& e) {
     if (v.nseg != 1 || v.seg[0].up != 0) throw std::runtime_error("tête non contiguë");
     postproc::Head h;
     h.data = v.seg[0].base;
-    h.grid = l.out_h;
+    h.grid_h = l.out_h;
+    h.grid_w = l.out_w;
+    h.ref_w = hwpp::anchor_ref_w(m.in_h, m.in_w);
+    h.ref_h = hwpp::anchor_ref_h(m.in_h, m.in_w);
     h.classes = m.classes;
     h.softmax = l.type == LayerType::Region;
     h.scale = l.scale;

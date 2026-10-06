@@ -41,7 +41,8 @@ TEST_CASE("descripteurs de têtes") {
     for (int id : m.heads()) {
       const Layer& l = m.layers[size_t(id)];
       const hwpp::HeadData hd = make_hw_head(m, l, nullptr, 0.25);
-      REQUIRE((1 << hd.desc.stride_log2) * hd.desc.grid == 416);
+      REQUIRE((1 << hd.desc.stride_log2) * hd.desc.grid_w == 416);
+      REQUIRE(hd.desc.grid_h == hd.desc.grid_w);
       REQUIRE(hd.desc.obj_thr_q == -8);  // σ(q/8) > 0,25 ⟺ q ≥ −8 (têtes au pas 1/8)
     }
   }

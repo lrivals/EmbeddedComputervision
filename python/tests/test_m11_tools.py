@@ -66,3 +66,21 @@ def test_level_stats():
     clip, levels = ah.level_stats(np.array([0.0, 0.1, 0.24, 1.0, 200.0]), 1.0)
     assert clip == pytest.approx(0.2)
     assert levels == 3  # 0, 1, 127
+
+
+def test_train_init_net(tmp_path):
+    # --init <weights> --init-net : copie partielle (tête à N classes réinitialisée).
+    train = _load("train")
+    from yolo.io.darknet_weights import save_darknet_weights
+
+    src = build("tiny-yolov2-voc", rng=1)
+    weights = tmp_path / "v2.weights"
+    save_darknet_weights(src, weights)
+    path = tmp_path / "n.cfg"
+    path.write_text(make_cfg.make_cfg((CFG_DIR / CFG_FILES["tiny-yolov2-voc"]).read_text(), 3))
+    dst = build(path, rng=2)
+    train.init_weights(dst, str(path), str(weights), np.float32, "tiny-yolov2-voc")
+    last = len(dst.params) - 1 - [bool(p) for p in dst.params][::-1].index(True)
+    for i, (ps, pd) in enumerate(zip(src.params, dst.params)):
+        for k in pd:
+            assert np.array_equal(ps[k], pd[k]) == (i != last), (i, k)

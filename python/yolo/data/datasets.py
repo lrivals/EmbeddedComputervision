@@ -256,13 +256,17 @@ def load_visdrone(root, split):
 
 
 def load_crowdhuman(root, split):
-    """`root/annotation_<split>.odgt`, images dans `root/Images/<ID>.jpg`."""
+    """`root/annotation_<split>.odgt`, images dans `root/Images/<ID>.jpg` (ou
+    `root/Images_val/`, comme dans la version Kaggle).
+    """
     out = []
     for line in (root / f"annotation_{split}.odgt").read_text().splitlines():
         if not line.strip():
             continue
         i, boxes, difficult = parse_crowdhuman(line)
         image = root / "Images" / f"{i}.jpg"
+        if not image.exists():
+            image = root / "Images_val" / f"{i}.jpg"
         out.append(make_sample(i, image, *_image_size(image), boxes, [0] * len(boxes),
                                difficult))
     return out

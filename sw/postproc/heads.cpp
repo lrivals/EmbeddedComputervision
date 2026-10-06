@@ -28,7 +28,10 @@ std::vector<postproc::Head> make_heads(const golden::Model& m,
     const Layer& l = m.layers[size_t(ids[k])];
     postproc::Head h;
     h.data = data[k];
-    h.grid = l.out_h;
+    h.grid_h = l.out_h;
+    h.grid_w = l.out_w;
+    h.ref_w = hwpp::anchor_ref_w(m.in_h, m.in_w);
+    h.ref_h = hwpp::anchor_ref_h(m.in_h, m.in_w);
     h.classes = m.classes;
     h.softmax = l.type == LayerType::Region;
     h.scale = l.scale;
@@ -47,13 +50,14 @@ std::vector<postproc::Head> make_heads(const golden::Model& m,
   return heads;
 }
 
-std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes) {
-  const double unit = double(hwpp::ANCHOR_REF << hwpp::BOX_FRAC);
+std::vector<postproc::Detection> hw_detections(const std::vector<hwpp::Box>& boxes, int ref_w,
+                                               int ref_h) {
+  const double ux = double(ref_w << hwpp::BOX_FRAC), uy = double(ref_h << hwpp::BOX_FRAC);
   std::vector<postproc::Detection> dets;
   for (const hwpp::Box& b : boxes)
-    dets.push_back(postproc::Detection{{(double(b.x1) + b.x2) / 2 / unit,
-                                        (double(b.y1) + b.y2) / 2 / unit,
-                                        double(b.x2 - b.x1) / unit, double(b.y2 - b.y1) / unit},
+    dets.push_back(postproc::Detection{{(double(b.x1) + b.x2) / 2 / ux,
+                                        (double(b.y1) + b.y2) / 2 / uy,
+                                        double(b.x2 - b.x1) / ux, double(b.y2 - b.y1) / uy},
                                        b.score / double(1 << hwpp::LUT_FRAC), b.cls});
   std::stable_sort(dets.begin(), dets.end(), [](const auto& x, const auto& y) {
     return x.score > y.score;

@@ -15,15 +15,17 @@
 
 namespace postproc {
 
-constexpr double ANCHOR_REF = 416.0;  // ancres en pixels pour une entrée de 416
+constexpr double ANCHOR_REF = 416.0;  // ancres en pixels pour une entrée de 416 (carrée)
 constexpr double LUT_ONE = 65536.0;   // tables σ et softmax en Q16
 constexpr int LUT_OFFSET = 128;       // index = q + 128
 constexpr int SOFTMAX_OFFSET = 255;   // index = d + 255, d = q_c − q_max ∈ [−255, 0]
 
-// Une tête int8 (A·(5+C), S, S) d'échelle `scale` et ses tables (luts.bin).
+// Une tête int8 (A·(5+C), S_h, S_w) d'échelle `scale` et ses tables (luts.bin).
 struct Head {
   const int8_t* data = nullptr;
-  int grid = 0;
+  int grid_h = 0, grid_w = 0;
+  // (W, H) de référence des ancres : 416 × 416 (entrée carrée), width × height sinon (T11.4).
+  double ref_w = ANCHOR_REF, ref_h = ANCHOR_REF;
   int classes = 0;
   bool softmax = false;  // region (YOLOv2) : softmax ; yolo (YOLOv3) : sigmoïdes
   double scale = 0.125;
@@ -31,7 +33,7 @@ struct Head {
   const uint32_t* sigmoid = nullptr;      // σ(q s) en Q16
   const uint32_t* exp = nullptr;          // e^{q s} en Q`exp_frac`
   const uint32_t* softmax_exp = nullptr;  // e^{d s} en Q16
-  std::vector<std::pair<double, double>> anchors;  // pixels (416)
+  std::vector<std::pair<double, double>> anchors;  // pixels (repère ref_w × ref_h)
 };
 
 // Boîte (cx, cy, w, h) normalisée dans l'image d'entrée.
@@ -54,22 +56,22 @@ inline int logit_threshold_q(double theta, double scale) {
 // §8.1, §9.4 : cellules dont l'entier t_o passe le seuil, dans l'ordre (ancre, ligne,
 // colonne) ; les tables ne servent qu'aux survivantes.
 inline void decode_head(const Head& h, double obj_thr, std::vector<Candidate>& out) {
-  const int s = h.grid, nc = h.classes, a_n = int(h.anchors.size());
+  const int gh = h.grid_h, gw = h.grid_w, nc = h.classes, a_n = int(h.anchors.size());
   const int thr = logit_threshold_q(obj_thr, h.scale);
-  const size_t plane = size_t(s) * s;
+  const size_t plane = size_t(gh) * gw;
   for (int a = 0; a < a_n; ++a) {
     const int8_t* p = h.data + size_t(a) * (5 + nc) * plane;
-    const double aw = h.anchors[size_t(a)].first / ANCHOR_REF;
-    const double ah = h.anchors[size_t(a)].second / ANCHOR_REF;
-    for (int i = 0; i < s; ++i)
-      for (int j = 0; j < s; ++j) {
-        const size_t cell = size_t(i) * s + j;
+    const double aw = h.anchors[size_t(a)].first / h.ref_w;
+    const double ah = h.anchors[size_t(a)].second / h.ref_h;
+    for (int i = 0; i < gh; ++i)
+      for (int j = 0; j < gw; ++j) {
+        const size_t cell = size_t(i) * gw + j;
         auto t = [&](int ch) { return int(p[size_t(ch) * plane + cell]); };
         if (t(4) < thr) continue;
         Candidate c;
-        // §8.1 : b_x = (σ(t_x) + j)/S, b_w = p_w e^{t_w}
-        c.box[0] = (h.sigmoid[t(0) + LUT_OFFSET] / LUT_ONE + j) / s;
-        c.box[1] = (h.sigmoid[t(1) + LUT_OFFSET] / LUT_ONE + i) / s;
+        // §8.1 : b_x = (σ(t_x) + j)/S_w, b_w = p_w e^{t_w}
+        c.box[0] = (h.sigmoid[t(0) + LUT_OFFSET] / LUT_ONE + j) / gw;
+        c.box[1] = (h.sigmoid[t(1) + LUT_OFFSET] / LUT_ONE + i) / gh;
         const double ef = std::ldexp(1.0, h.exp_frac);
         c.box[2] = aw * (h.exp[t(2) + LUT_OFFSET] / ef);
         c.box[3] = ah * (h.exp[t(3) + LUT_OFFSET] / ef);

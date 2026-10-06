@@ -13,14 +13,17 @@ inline hwpp::HeadData make_hw_head(const Model& m, const Layer& l, const int8_t*
                                    double conf) {
   hwpp::HeadData hd;
   hwpp::HeadDesc& h = hd.desc;
-  h.grid = l.out_h;
+  h.grid_h = l.out_h;
+  h.grid_w = l.out_w;
   h.classes = m.classes;
   h.softmax = l.type == LayerType::Region;
   h.exp_frac = l.exp_frac;
   h.obj_thr_q = hwpp::logit_threshold_q(conf, l.scale);
-  const int stride = hwpp::ANCHOR_REF / h.grid;
-  if (stride * h.grid != hwpp::ANCHOR_REF || (stride & (stride - 1)))
-    throw std::runtime_error("post-traitement matériel : pas 416/S non puissance de 2");
+  const int rw = hwpp::anchor_ref_w(m.in_h, m.in_w), rh = hwpp::anchor_ref_h(m.in_h, m.in_w);
+  const int stride = rw / h.grid_w;
+  if (stride * h.grid_w != rw || stride * h.grid_h != rh || (stride & (stride - 1)))
+    throw std::runtime_error("post-traitement matériel : pas W/S_w = H/S_h non commun ou non "
+                             "puissance de 2");
   while ((1 << h.stride_log2) < stride) ++h.stride_log2;
   std::vector<int> idx;
   if (h.softmax)

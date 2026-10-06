@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from yolo.backend import copy_into, get_xp, to_numpy
-from yolo.data.targets import heads
+from yolo.data.targets import anchor_ref, heads
 from yolo.train.loss import yolo_loss
 
 MULTISCALE_SIZES = tuple(range(320, 609, 32))  # §2.2 : multiples de 32 de 320 à 608
@@ -37,10 +37,21 @@ def multiscale_size(it, seed=0, sizes=MULTISCALE_SIZES, every=10):
     return int(sizes[rng.integers(len(sizes))])
 
 
+def scaled_input(net, s, ref=416, step=32):
+    """Taille multi-échelle `s` (côté d'un carré de référence `ref`) pour l'entrée de `net` :
+    `s` si elle est carrée, sinon (H, W) de la cfg × s/ref, arrondis à un multiple de `step`
+    (T11.4 : même rapport d'aspect à toutes les échelles)."""
+    _, h, w = net["input"]
+    if h == w:
+        return s
+    return tuple(max(step, int(round(v * s / ref / step)) * step) for v in (h, w))
+
+
 class Trainer:
     """Entraîne `net` (`yolo.models.graph.Network`).
 
-    `size` : taille d'entrée fixe, ou `None` pour le multi-échelle (`multiscale_size`).
+    `size` : taille d'entrée fixe (S ou (H, W)), ou `None` pour le multi-échelle
+    (`multiscale_size`, ramenée au rapport d'aspect du réseau par `scaled_input`).
     `grad_hook(trainer, grads)` : appelé avant le pas SGD (terme de pénalité de l'ADMM, T9.2).
     Les autres options sont passées à `yolo_loss` (`ignore_thresh`, `lambda_coord`).
     """
@@ -55,7 +66,8 @@ class Trainer:
         self.it = 0
         self.head_list = heads(net.net)
         region = any(net.layers[h]["type"] == "region" for h, _ in self.head_list)
-        self.loss_kwargs = {"class_mode": "softmax" if region else "sigmoid", **loss_kwargs}
+        self.loss_kwargs = {"class_mode": "softmax" if region else "sigmoid",
+                            "anchor_ref": anchor_ref(net.net), **loss_kwargs}
         self.log_path = Path(log_path) if log_path else None
         self.grad_hook = grad_hook
 
@@ -64,7 +76,9 @@ class Trainer:
         return get_xp(*(v for p in self.net.params for v in p.values()))
 
     def size_for(self, it):
-        return self.size if self.size else multiscale_size(it, self.seed)
+        if self.size:
+            return self.size
+        return scaled_input(self.net.net, multiscale_size(it, self.seed))
 
     def step(self, images, boxes, labels):
         """Une itération ; rend le `LossResult` (somme sur le lot) et le taux utilisé."""
@@ -84,7 +98,8 @@ class Trainer:
         if self.grad_hook:
             self.grad_hook(self, grads)
         self.optimizer.step(grads, lr)
-        self._log(lr, images.shape[-1], n, res, time.perf_counter() - t0)
+        h, w = images.shape[-2:]
+        self._log(lr, w if h == w else f"{h}x{w}", n, res, time.perf_counter() - t0)
         self.it += 1
         return res, lr
 
@@ -151,19 +166,35 @@ class Trainer:
             self.optimizer.load_state_dict(velocity)
 
 
+def _rgb_to_gray(ws, wd):
+    """Noyau RGB (cout, 3, k, k) adapté à une entrée à un canal (cout, 1, k, k) : somme sur
+    les canaux, exacte pour une image grise recopiée sur R, G et B (T11.7) ; None sinon."""
+    if ws.ndim == 4 and ws.shape[1] == 3 and wd.shape == (ws.shape[0], 1, *ws.shape[2:]):
+        return ws.sum(axis=1, keepdims=True)
+    return None
+
+
 def copy_matching(src, dst):
     """Copie les paramètres et l'état BN de `src` vers `dst` couche par couche quand les formes
-    concordent (transfert COCO → VOC : tout sauf les têtes). Rend les couches non copiées.
+    concordent (transfert COCO → VOC : tout sauf les têtes). Une première conv RGB vers une
+    entrée à un canal est copiée par somme sur les canaux (`_rgb_to_gray`). Rend les couches
+    non copiées.
     """
     skipped = []
     for i, (ps, pd) in enumerate(zip(src.params, dst.params)):
         if not pd:
             continue
-        if ps.keys() != pd.keys() or any(ps[k].shape != pd[k].shape for k in pd):
+        adapted = {}
+        if ps.keys() == pd.keys() and "W" in pd and ps["W"].shape != pd["W"].shape:
+            gray = _rgb_to_gray(to_numpy(ps["W"]), pd["W"])
+            if gray is not None:
+                adapted["W"] = gray
+        if ps.keys() != pd.keys() or any(
+                k not in adapted and ps[k].shape != pd[k].shape for k in pd):
             skipped.append(i)
             continue
         for k in pd:
-            pd[k][...] = ps[k]
+            pd[k][...] = adapted.get(k, ps[k])
         for k in dst.state[i]:
             dst.state[i][k][...] = src.state[i][k]
     return skipped

@@ -1,22 +1,25 @@
 """Augmentation de données (§7.1) : échelle et translation aléatoires jusqu'à 20 %, exposition
 et saturation jusqu'à un facteur 1,5 en HSV ; retournement horizontal en option (hors base).
 
-La géométrie est une seule affinité, des pixels de l'image d'origine vers le carré d'entrée
-`size` : letterbox (`yolo.data.letterbox`), puis échelle `r` et translation autour du centre,
+La géométrie est une seule affinité, des pixels de l'image d'origine vers l'entrée `size`
+(S × S, ou (H, W) pour un réseau non carré) : letterbox (`yolo.data.letterbox`), puis échelle `r` et translation autour du centre,
 puis retournement. Les mêmes coefficients transforment l'image (PIL `Image.transform`) et les
 coins des boîtes, ce qui garantit que boîtes et pixels restent alignés.
+
+Entrée à un canal (T11.7) : pas de teinte ni de saturation, l'exposition seule s'applique
+(gain `val` sur l'intensité).
 """
 
 import numpy as np
 
-from yolo.data.letterbox import GRAY, letterbox_params
+from yolo.data.letterbox import GRAY, as_hw, image_mode, letterbox_params, to_array
 
 
 def random_params(rng, jitter=0.2, hsv=1.5, flip=True):
     """Tirage des paramètres d'une augmentation (§7.1)."""
     return {
         "scale": rng.uniform(1 - jitter, 1 + jitter),
-        "shift": rng.uniform(-jitter, jitter, 2),          # en fraction de `size`
+        "shift": rng.uniform(-jitter, jitter, 2),          # en fraction de (W, H)
         "flip": bool(flip and rng.random() < 0.5),
         "sat": _rand_factor(rng, hsv),
         "val": _rand_factor(rng, hsv),
@@ -32,21 +35,22 @@ def _rand_factor(rng, f):
 
 
 def affine(width, height, size, params):
-    """Matrice 2×3 `M` : (x, y) pixels d'origine → (u, v) pixels du carré `size`."""
+    """Matrice 2×3 `M` : (x, y) pixels d'origine → (u, v) pixels de l'entrée `size`."""
+    sh, sw = as_hw(size)
     nw, nh, dx, dy = letterbox_params(width, height, size)
     r = params["scale"]
-    c = size / 2
-    tx, ty = np.asarray(params["shift"]) * size
+    cx, cy = sw / 2, sh / 2
+    tx, ty = np.asarray(params["shift"]) * (sw, sh)
     # u = c + r·((nw/w)·x + dx − c) + t_x
-    m = np.array([[r * nw / width, 0.0, c + r * (dx - c) + tx],
-                  [0.0, r * nh / height, c + r * (dy - c) + ty]])
+    m = np.array([[r * nw / width, 0.0, cx + r * (dx - cx) + tx],
+                  [0.0, r * nh / height, cy + r * (dy - cy) + ty]])
     if params["flip"]:
-        m[0] = [-m[0, 0], 0.0, size - m[0, 2]]
+        m[0] = [-m[0, 0], 0.0, sw - m[0, 2]]
     return m
 
 
 def transform_boxes(boxes, width, height, size, m, min_size=2.0):
-    """Boîtes normalisées (origine) → normalisées dans le carré `size`, rognées au carré.
+    """Boîtes normalisées (origine) → normalisées dans l'entrée `size`, rognées à l'entrée.
 
     Rend (boîtes, masque des boîtes gardées) ; une boîte dont un côté rogné fait moins de
     `min_size` pixels est retirée.
@@ -58,25 +62,28 @@ def transform_boxes(boxes, width, height, size, m, min_size=2.0):
     y2 = (b[:, 1] + b[:, 3] / 2) * height
     u = m[0, 0] * np.stack([x1, x2]) + m[0, 2]
     v = m[1, 1] * np.stack([y1, y2]) + m[1, 2]
-    u1, u2 = np.clip(u.min(axis=0), 0, size), np.clip(u.max(axis=0), 0, size)
-    v1, v2 = np.clip(v.min(axis=0), 0, size), np.clip(v.max(axis=0), 0, size)
+    sh, sw = as_hw(size)
+    u1, u2 = np.clip(u.min(axis=0), 0, sw), np.clip(u.max(axis=0), 0, sw)
+    v1, v2 = np.clip(v.min(axis=0), 0, sh), np.clip(v.max(axis=0), 0, sh)
     keep = (u2 - u1 >= min_size) & (v2 - v1 >= min_size)
-    out = np.stack([(u1 + u2) / 2, (v1 + v2) / 2, u2 - u1, v2 - v1], axis=1) / size
+    out = np.stack([(u1 + u2) / 2, (v1 + v2) / 2, u2 - u1, v2 - v1], axis=1) / (sw, sh, sw, sh)
     return out[keep], keep
 
 
-def warp_image(img, size, m):
-    """Image PIL → (size, size, 3) float32 dans [0, 1], fond gris (letterbox)."""
+def warp_image(img, size, m, channels=3):
+    """Image PIL → (H, W, C) float32 dans [0, 1], fond gris (letterbox)."""
     from PIL import Image
 
+    sh, sw = as_hw(size)
     # PIL attend l'affinité inverse : (u, v) → (x, y).
     a, c = m[0, 0], m[0, 2]
     e, f = m[1, 1], m[1, 2]
     inv = (1 / a, 0.0, -c / a, 0.0, 1 / e, -f / e)
-    fill = (int(round(GRAY * 255)),) * 3
-    out = img.convert("RGB").transform((size, size), Image.AFFINE, inv,
-                                       resample=Image.BILINEAR, fillcolor=fill)
-    return np.asarray(out, dtype=np.float32) / 255.0
+    g = int(round(GRAY * 255))
+    fill = (g,) * 3 if channels == 3 else g
+    out = img.convert(image_mode(channels)).transform((sw, sh), Image.AFFINE, inv,
+                                                     resample=Image.BILINEAR, fillcolor=fill)
+    return to_array(out, channels)
 
 
 def rgb_to_hsv(rgb):
@@ -106,19 +113,23 @@ def hsv_to_rgb(hsv):
 
 
 def adjust_hsv(img, sat, val):
-    """§7.1 : saturation et exposition multipliées par `sat`, `val` (bornées à [0, 1])."""
+    """§7.1 : saturation et exposition multipliées par `sat`, `val` (bornées à [0, 1]).
+    Un canal : exposition seule."""
     if sat == 1.0 and val == 1.0:
         return img
+    if img.shape[-1] == 1:
+        return np.clip(img * val, 0, 1).astype(np.float32)
     hsv = rgb_to_hsv(img)
     hsv[..., 1] = np.clip(hsv[..., 1] * sat, 0, 1)
     hsv[..., 2] = np.clip(hsv[..., 2] * val, 0, 1)
     return hsv_to_rgb(hsv).astype(np.float32)
 
 
-def augment(img, boxes, labels, size, params):
-    """Image PIL et boîtes normalisées (origine) → (HWC float32, boîtes, labels) au carré `size`."""
+def augment(img, boxes, labels, size, params, channels=3):
+    """Image PIL et boîtes normalisées (origine) → (HWC float32, boîtes, labels) à l'entrée
+    `size` (S ou (H, W)), à `channels` canaux."""
     m = affine(img.width, img.height, size, params)
-    out = warp_image(img, size, m)
+    out = warp_image(img, size, m, channels)
     out = adjust_hsv(out, params["sat"], params["val"])
     b, keep = transform_boxes(boxes, img.width, img.height, size, m)
     return out, b, np.asarray(labels)[keep]

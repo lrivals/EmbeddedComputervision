@@ -30,6 +30,10 @@ avec `run_compare`).
 | `acc` | pour chaque conv : écriture des registres AXI-Lite, `ap_start`, attente de l'interruption ; somme sur les 9 (v2) ou 13 (v3) convs | — |
 | `post` | têtes lues en place dans l'arène, décodage par tables, seuil, NMS par classe | dessin des boîtes |
 
+Avec `--hw-post`, le CSV a cinq colonnes de plus pour `yolo_post` : `overflow` (candidates
+perdues par la sélection) et, sur le backend sim seulement, `post_cycles`, `nms_cycles`,
+`candidates` et `survivors` (estimation de la C-sim, T11.6).
+
 - **Latence** = `pre + load + acc + post` ; moyenne et **p99** (rang le plus proche :
   990e valeur triée sur 1 000) par étage et de bout en bout.
 - **FPS** = 1 000 / latence moyenne (débit séquentiel ; un recouvrement `pre` / `acc` sur deux

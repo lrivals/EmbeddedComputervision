@@ -18,6 +18,9 @@
     # poids COCO hors têtes
     python tools/train.py --net build/m11/cfg/tiny-yolov3-kitti.cfg --dataset kitti \
         --init coco --out build/m11/kitti/train
+    # Tiny-YOLOv2 à N classes depuis les poids VOC (tout sauf la tête)
+    python tools/train.py --net build/m11/cfg/tiny-yolov2-visdrone.cfg --dataset visdrone \
+        --init weights/yolov2-tiny-voc.weights --init-net tiny-yolov2-voc --out …
 
 Hors VOC, les classes du jeu sont ramenées à celles du réseau : identité si le réseau a
 autant de classes que le jeu, sinon correspondance VOC / COCO de `yolo.data.datasets`.
@@ -42,6 +45,7 @@ sys.path.insert(0, str(ROOT / "python"))
 from yolo import backend  # noqa: E402
 from yolo.data.loader import DataLoader, VOCDataset  # noqa: E402
 from yolo.data import datasets  # noqa: E402
+from yolo.data.letterbox import input_size, parse_size  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights, save_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import build  # noqa: E402
 from yolo.quant.fuse_bn import fuse_network  # noqa: E402
@@ -54,15 +58,18 @@ from yolo.train.trainer import Trainer, copy_matching  # noqa: E402
 COCO_WEIGHTS = ("tiny-yolov3-coco", ROOT / "weights" / "yolov3-tiny.weights")
 
 
-def init_weights(net, name, init, dtype):
+def init_weights(net, name, init, dtype, init_net=None):
+    """`init_net` : réseau des poids `init` quand il diffère de `net` (copie partielle,
+    comme `--init coco`)."""
     if init == "he":
         return
     if init == "coco":
-        src_name, path = COCO_WEIGHTS
-        src = build(src_name, dtype=dtype)
-        load_darknet_weights(src, path)
+        init_net, init = COCO_WEIGHTS
+    if init_net:
+        src = build(init_net, dtype=dtype)
+        load_darknet_weights(src, init)
         skipped = copy_matching(src, net)
-        print(f"poids COCO {path.name} copiés ; couches réinitialisées : {skipped}")
+        print(f"poids {Path(init).name} copiés ; couches réinitialisées : {skipped}")
         return
     load_darknet_weights(net, init)
     print(f"poids {init} chargés")
@@ -72,6 +79,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--net", default="tiny-yolov3-voc")
     ap.add_argument("--init", default="he", help="he | coco | chemin d'un .weights Darknet")
+    ap.add_argument("--init-net", default=None,
+                    help="réseau (nom ou cfg) des poids de --init s'il diffère de --net : "
+                         "copie des couches de même forme (ex. tiny-yolov2-voc vers une cfg "
+                         "Tiny-YOLOv2 à N classes)")
     ap.add_argument("--dataset", choices=sorted(datasets.DATASETS), default="voc")
     ap.add_argument("--data-root", "--devkit", dest="data_root", type=Path, default=None,
                     help="racine du jeu (défaut data/<dossier du jeu>)")
@@ -84,7 +95,8 @@ def main():
     ap.add_argument("--burn-in", type=int, default=1000)
     ap.add_argument("--steps", default="", help="ex. 16000,18000")
     ap.add_argument("--scales", default="", help="ex. 0.1,0.1")
-    ap.add_argument("--size", type=int, default=416)
+    ap.add_argument("--size", type=parse_size, default=None,
+                    help="S ou LxH (entrée non carrée) ; défaut : entrée de la cfg")
     ap.add_argument("--multiscale", action="store_true", help="§2.2 : 320-608 tous les 10 lots")
     ap.add_argument("--ignore-thresh", type=float, default=0.5)
     ap.add_argument("--workers", type=int, default=4)
@@ -122,7 +134,7 @@ def main():
         # Réseau à BN fusionnée (§9.1) : initialisé ici, écrasé par le checkpoint en reprise.
         from yolo.quant.lowbit import qat_from_steps
 
-        init_weights(net, args.net, args.init, dtype)
+        init_weights(net, args.net, args.init, dtype, args.init_net)
         fused = fuse_network(net, dtype=dtype)
         scheme = args.qat or "w8a8"
         steps = json.loads(args.qat_steps.read_text())["log2_steps"] if args.qat_steps else {}
@@ -131,7 +143,7 @@ def main():
         net = qat_from_steps(fused, scheme, steps) if args.qat else fused
         no_decay = NO_DECAY + ("log2_s",)
     elif not args.resume:
-        init_weights(net, args.net, args.init, dtype)
+        init_weights(net, args.net, args.init, dtype, args.init_net)
     if args.device == "gpu":
         net.to_device()  # avant l'ADMM et le SGD : Z, U et vitesses suivent les paramètres
     if args.admm:
@@ -146,7 +158,8 @@ def main():
     scales = [float(s) for s in args.scales.split(",") if s]
     trainer = Trainer(net, SGD(net.params, no_decay=no_decay),
                       StepSchedule(args.lr, args.burn_in, steps=steps, scales=scales),
-                      size=None if args.multiscale else args.size, seed=args.seed,
+                      size=None if args.multiscale else input_size(net.net, args.size),
+                      seed=args.seed,
                       log_path=args.out / "loss.csv", grad_hook=grad_hook,
                       ignore_thresh=args.ignore_thresh)
     ckpt = args.out / "checkpoint.npz"
@@ -161,7 +174,8 @@ def main():
     samples = datasets.remap(samples, datasets.class_lut(args.dataset, net.net["classes"]))
     if args.subset:
         samples = samples[:args.subset]
-    loader = DataLoader(VOCDataset(samples), args.batch, workers=args.workers, seed=args.seed)
+    loader = DataLoader(VOCDataset(samples, channels=net.net["input"][0]), args.batch,
+                        workers=args.workers, seed=args.seed)
     print(f"{len(samples)} images, {len(loader)} lots par époque")
 
     def report(tr, res, lr):
