@@ -96,7 +96,8 @@ roofline:
 figures:
 	python -m tools.figures all
 
-# M14 : notebooks versionnés sans sorties, régénérés depuis le registre (make ci : --check).
+# M14 : notebooks régénérés depuis le registre ; une exécution complète sans erreur est
+# gardée avec ses sorties, une exécution partielle ou en erreur est refusée (make ci : --check).
 notebooks:
 	python -m tools.notebooks all
 

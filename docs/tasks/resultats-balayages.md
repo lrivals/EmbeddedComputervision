@@ -6,6 +6,14 @@ Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
+Les notebooks exécutés sont versionnés avec leurs sorties (règle de
+[M14](M14-notebooks.md#règles)) ; toutes les tables et courbes ci-dessous s'y relisent :
+
+| jeu | balayage | inférence |
+|---|---|---|
+| VOC | [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb) | [tiny-yolov3-voc](../../notebooks/voc/tiny-yolov3-voc_infer.ipynb), [tiny-yolov3-coco](../../notebooks/voc/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb) |
+| VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
+
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
 réécrit les PNG de [figures/resultats/](figures/resultats/). Pour les voir se mettre à jour
 pendant qu'on travaille : [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb).
@@ -140,3 +148,4 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
   sur le run retenu.
 - FLIR et KITTI : pas de résultat. FLIR s'arrête à la cellule d'environnement (jeu absent
   du Drive : `tools/get_datasets.sh push flir`), KITTI a été interrompu avant les runs.
+  Exécutions partielles, donc non versionnées : les deux notebooks sont remis à vide.

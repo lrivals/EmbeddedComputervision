@@ -3,7 +3,8 @@
     python -m tools.notebooks all          # tous les notebooks + notebooks/README.md (make notebooks)
     python -m tools.notebooks kitti        # un jeu ; aussi un rôle (infer, train) ou un nom
     python -m tools.notebooks --list
-    python -m tools.notebooks --check      # échoue si un notebook versionné a changé (make ci)
+    python -m tools.notebooks --check      # échoue si un notebook versionné a changé ou porte
+                                           # une exécution partielle ou en erreur (make ci)
 
 Un notebook n'apporte aucun calcul : il lance les outils de `tools/` (commandes dans
 `commandes.py`) et affiche leurs sorties. Les notebooks sont écrits sans sorties dans

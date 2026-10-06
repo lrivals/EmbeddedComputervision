@@ -31,10 +31,13 @@ entraînement (« Reste » de chaque tâche).
   - `gabarits.py`, les cellules communes et les gabarits `infer` et `train` ;
   - `__main__.py`, la ligne de commande.
 - **Commandes** :
-  - `python -m tools.notebooks <nom|jeu|rôle|all>` écrit les notebooks demandés ;
+  - `python -m tools.notebooks <nom|jeu|rôle|all>` écrit les notebooks demandés, la
+    visionneuse `notebooks/figures_live.ipynb` et l'index ; un notebook exécuté en entier
+    sans erreur est gardé (« gardé » dans la sortie) ;
   - `python -m tools.notebooks --list` affiche le registre ;
   - `python -m tools.notebooks --check` échoue si un notebook versionné diffère de ce que
-    produirait le générateur ;
+    produirait le générateur, sorties et métadonnées du noyau mises à part, ou s'il porte
+    une exécution partielle ou en erreur (voir [Règles](#règles)) ;
   - `make notebooks` régénère tout ; `make ci` lance `--check`.
 - **Format** : JSON nbformat 4 écrit avec `json` de la bibliothèque standard. `nbformat`
   n'est pas une dépendance obligatoire ; il sert seulement à valider le schéma dans le test,
@@ -193,7 +196,10 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   `make notebooks`, `make ci` (`--check` après le lint). `python/tests/test_notebooks.py`
   vérifie l'idempotence, le format d'enregistrement de Jupyter, le schéma nbformat (s'il est
   installé), l'absence de sorties, le `compile()` des cellules et l'échec de `--check`
-  après une retouche, et que les notebooks versionnés sont à jour.
+  après une retouche, et que les notebooks versionnés sont à jour. Depuis la règle des
+  notebooks exécutés : `strip_outputs`, `executed_ok` et `state` de `__main__.py` ; tests
+  d'une exécution complète (acceptée, gardée par `make notebooks`), en erreur et partielle
+  (refusées).
 
 ### [ ] T14.1 — Cellules d'environnement et de paramètres (local et Colab)
 - **Spec** : — · **Dépend de** : T14.0, T12.11 · **Taille** : M
