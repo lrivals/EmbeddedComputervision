@@ -1,6 +1,8 @@
 """Entrées int8 du stade FPGA de la mAP (T8.2) : VOC2007 test → inputs.bin + ids.txt.
 
     python tools/make_inputs.py --net tiny-yolov2-voc        # → build/m8/tiny-yolov2-voc/
+    python tools/make_inputs.py --net tiny-yolov3-coco --dataset coco
+                                                    # → build/m11/coco/tiny-yolov3-coco/
 
 Même prétraitement que le modèle entier de `tools/eval_quant.py --resize stretch` :
 `preprocess(img, 416, "stretch", "pil")` puis `quantize_input`. La carte lit ces octets au
@@ -20,7 +22,7 @@ sys.path.insert(0, str(ROOT / "python"))
 
 import numpy as np  # noqa: E402
 
-from yolo.data.voc import load_split  # noqa: E402
+from yolo.data import datasets  # noqa: E402
 from yolo.infer.pipeline import MODES, preprocess  # noqa: E402
 from yolo.quant.quantize import quantize_input  # noqa: E402
 
@@ -37,20 +39,20 @@ def _load(task):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--net", default="tiny-yolov2-voc")
-    ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
-    ap.add_argument("--split", default="2007:test")
+    datasets.add_args(ap)
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--size", type=int, default=416)
     ap.add_argument("--resize", choices=MODES, default="stretch")
     ap.add_argument("--workers", type=int, default=8)
-    ap.add_argument("--out", type=Path, default=None, help="défaut build/m8/<net>")
+    ap.add_argument("--out", type=Path, default=None,
+                    help="défaut build/m8/<net> (VOC), build/m11/<jeu>/<net>")
     args = ap.parse_args()
 
-    year, split = args.split.split(":")
-    samples = load_split(args.devkit, int(year), split)
+    samples = datasets.load_args(args)
     if args.subset:
         samples = samples[:args.subset]
-    out = args.out or ROOT / "build" / "m8" / args.net
+    out = args.out or (ROOT / "build" / "m8" / args.net if args.dataset == "voc"
+                       else ROOT / "build" / "m11" / args.dataset / args.net)
     out.mkdir(parents=True, exist_ok=True)
 
     t0 = time.time()

@@ -17,6 +17,13 @@ exporté (manifest + blobs, ex. 4 bits ou puissances de 2, M9.2-M9.3) au lieu de
 `--calib` ; seules les variantes `int` et `int-hwpp` s'appliquent alors.
 Même prétraitement (`--resize` letterbox | stretch, PIL) et même seuil (0,005) que
 `tools/eval_voc.py`. La calibration (T4.2) est faite en letterbox dans les deux cas.
+
+Autres jeux (T11.0) : `--dataset coco|kitti|…` ; seules les classes communes au jeu et au
+modèle sont évaluées (`yolo.data.datasets.eval_view`), avec la métrique du jeu (`--metric`) ;
+`--calib build/quant/<net>/calib-<jeu>.json` pour une calibration faite sur ce jeu (T11.1,
+T11.3). Les détections de `--save-dets` restent en classes du modèle.
+
+    python tools/eval_quant.py --net tiny-yolov3-coco --dataset coco --variants float,int
 """
 
 import argparse
@@ -34,11 +41,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import numpy as np  # noqa: E402
 
-from yolo.data.voc import VOC_CLASSES, load_split  # noqa: E402
+from yolo.data import datasets  # noqa: E402
+from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import evaluate, to_voc_pixels  # noqa: E402
 from yolo.infer.nms import IOU_THR  # noqa: E402
 from yolo.infer.pipeline import MODES  # noqa: E402
-from yolo.models.tiny_yolo import PRETRAINED  # noqa: E402
+from yolo.models.tiny_yolo import PRETRAINED, load_cfg  # noqa: E402
 
 _W = {}
 
@@ -136,8 +144,6 @@ def dets_per_image(per_class, n_images):
 
 
 def expand(variants, name):
-    from yolo.models.tiny_yolo import load_cfg
-
     out = []
     for v in variants:
         if v == "fq:each":
@@ -152,7 +158,8 @@ def run(args, samples, variants):
     os.environ.setdefault("OPENBLAS_NUM_THREADS", str(args.blas_threads))
     os.environ.setdefault("OMP_NUM_THREADS", str(args.blas_threads))
     ctx = mp.get_context("spawn")  # les variables d'environnement BLAS valent pour les fils
-    per = {v: {c: ([], [], []) for c in range(len(VOC_CLASSES))} for v in variants}
+    n_classes = load_cfg(args.net)["classes"]
+    per = {v: {c: ([], [], []) for c in range(n_classes)} for v in variants}
     tasks = [(s["image"], s["width"], s["height"], args.size, args.resize, variants)
              for s in samples]
     t0 = time.time()
@@ -193,8 +200,9 @@ def main():
     ap.add_argument("--calib", type=Path, default=None,
                     help="échelles (défaut build/quant/<net>/calib.json)")
     ap.add_argument("--variants", default="float,int")
-    ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
-    ap.add_argument("--split", default="2007:test")
+    datasets.add_args(ap)
+    ap.add_argument("--metric", choices=("voc", "coco"), default=None,
+                    help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--size", type=int, default=416)
     ap.add_argument("--resize", choices=MODES, default="letterbox")
@@ -220,26 +228,43 @@ def main():
         args.weights = ROOT / "weights" / PRETRAINED[args.net]
     args.calib = args.calib or ROOT / "build" / "quant" / net_tag(args.net) / "calib.json"
 
-    year, split = args.split.split(":")
-    samples = load_split(args.devkit, int(year), split)
+    split = datasets.split_of(args)
+    metric = args.metric or datasets.DATASETS[args.dataset].metric
+    samples = datasets.load_args(args)
     if args.subset:
         samples = samples[:args.subset]
+    view = datasets.eval_view(args.dataset, load_cfg(args.net)["classes"])
+    samples = datasets.remap(samples, view.gt_lut)
     variants = expand(args.variants.split(","), args.net)
     dets, overflow = run(args, samples, variants)
+    dets = {v: datasets.remap_detections(d, view.det_lut) for v, d in dets.items()}
 
     res = {}
     for v in variants:
-        aps, m = evaluate(dets[v], samples, len(VOC_CLASSES), use_07=True)
-        res[v] = {"map": m, "aps": list(aps),
-                  "dets_per_image": dets_per_image(dets[v], len(samples))}
+        n_det = dets_per_image(dets[v], len(samples))
+        if metric == "coco":
+            stats = coco_eval.evaluate(dets[v], samples, len(view.names))
+            res[v] = {"map": stats["AP"], "aps": list(stats["ap_class"]),
+                      "coco": {k: stats[k] for k in coco_eval.STATS}}
+            line = " ".join(f"{k} {stats[k] * 100:.2f}" for k in ("AP", "AP50", "AP75"))
+        else:
+            aps, m, rec = evaluate(dets[v], samples, len(view.names), use_07=True,
+                                   with_recall=True)
+            res[v] = {"map": m, "aps": list(aps), "recall": float(rec.mean())}
+            line = f"mAP {m * 100:.2f}  rappel {rec.mean() * 100:.1f}"
+        res[v]["dets_per_image"] = n_det
         if v == "int-hwpp":
             res[v]["overflow"] = overflow
-        print(f"{v:8s} mAP {m * 100:.2f}  ({res[v]['dets_per_image']:.1f} détections par image)")
+        print(f"{v:8s} {line}  ({n_det:.1f} détections par image)")
+    tag = datasets.tag(args.dataset, split)
+    split_name = tag or split.split(":")[-1]
     out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / (
-        f"eval_{split}_{len(samples)}_{args.resize}_"
+        f"eval_{split_name}_{len(samples)}_{args.resize}_"
         f"{'-'.join(v.replace(':', '') for v in variants)}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"net": args.net, "images": len(samples), "resize": args.resize,
+    out.write_text(json.dumps({"net": args.net, "dataset": args.dataset, "split": split,
+                               "metric": metric, "classes": list(view.names),
+                               "images": len(samples), "resize": args.resize,
                                "calib": str(args.calib), "conf": args.conf, "iou": args.iou,
                                "model_dir": str(args.model_dir) if args.model_dir else None,
                                "hw_cap": args.hw_cap if "int-hwpp" in variants else None,

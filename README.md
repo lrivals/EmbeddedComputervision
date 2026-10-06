@@ -76,4 +76,6 @@ make ci-model ci                    # CI (T10.13) : export synthétique, sans VO
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
+tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)
+tools/m11.sh coco-float             # profils de M11 (liste : tools/m11.sh)
 ```

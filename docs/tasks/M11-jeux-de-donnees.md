@@ -34,7 +34,7 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
 
 ## Tâches
 
-### [ ] T11.0 — Adaptateur de jeu de données générique
+### [x] T11.0 — Adaptateur de jeu de données générique
 - **Spec** : §5, §8.3 · **Dépend de** : T3.3 · **Taille** : M
 - **Livrables** : `python/yolo/data/datasets.py` (registre `{nom: (classes, chargeur)}`) ;
   chaque chargeur rend le même dict que `voc.parse_annotation` (`boxes`, `xyxy`, `labels`,
@@ -46,6 +46,20 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
 - **Notes** : prérequis de toutes les tâches suivantes. Les formats à couvrir sont COCO
   JSON, KITTI txt, VisDrone txt, CrowdHuman odgt et ExDark bbGt. Une correspondance de
   classes explicite (`{classe source: classe modèle}`) sert à T11.2.
+- **Fait** : `python/yolo/data/datasets.py` (registre `DATASETS`, chargeurs VOC, COCO,
+  KITTI, VisDrone, CrowdHuman, ExDark et FLIR, `MAPPINGS`, `eval_view`) ; options communes
+  `--dataset`, `--data-root` (alias `--devkit`) et `--split`, avec aussi `tools/map_stades.py`
+  et la métrique au choix (`--metric voc|coco`) ; tests `test_datasets.py`.
+  - Les régions sans classe (`DontCare` de KITTI, régions ignorées de VisDrone) sont
+    retirées.
+  - Les objets à ignorer d'une classe connue (`iscrowd` de COCO, `mask` de CrowdHuman)
+    sont en `difficult`.
+  - KITTI : découpage train/val 80/20 à graine fixe.
+  - Données : `tools/get_datasets.sh` (COCO et KITTI ; consignes pour les autres jeux) ;
+    profils : `tools/m11.sh`.
+- **Acceptation vérifiée** : `tools/m11.sh voc-regress` donne VOC2007 test, stretch, une
+  mAP de 56,30 en flottant (`eval_voc.py`, puis `eval_quant.py`) et de 55,66 en entier,
+  inchangées.
 
 ### [ ] T11.1 — COCO val2017
 - **Spec** : §8.3, §10.4 · **Dépend de** : T11.0, T4.5 · **Taille** : M
@@ -61,6 +75,12 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   2023-zhai), à condition de signaler l'élagage et la métrique. On attend un AP50 proche
   de la valeur publiée par Darknet pour ce réseau (≈ 33), qui sert de référence externe et
   doit être reportée **avec sa source**.
+- **Préparé** : `python/yolo/infer/coco_eval.py`, égal à pycocotools à 1e-4 sur des
+  données aléatoires (`test_coco_eval.py`, extra `coco` de `pyproject.toml`) ;
+  `tools/coco_subset.py` (500 images de train2017 → split `calib2017`).
+  Profils `tools/m11.sh coco-float | coco-int | coco-calib | coco-fpga`.
+- **Reste** : télécharger COCO (`tools/get_datasets.sh coco`), lancer les profils, écrire
+  `results/map_coco.md`.
 
 ### [ ] T11.2 — Changement de domaine sans réentraînement
 - **Spec** : §9.2, §11 · **Dépend de** : T11.0 · **Taille** : S
@@ -72,6 +92,13 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   question précise : la calibration faite sur VOC reste-t-elle valable hors domaine ? Si
   l'écart flottant → entier se creuse, le problème vient de la quantification, pas des
   poids.
+- **Préparé** : correspondances `MAPPINGS` de `datasets.py`, à relire au téléchargement :
+  - Van compté en car, Cyclist sans équivalent ;
+  - people et pedestrian de VisDrone comptés en person.
+
+  Profil `tools/m11.sh hors-domaine` (ExDark, KITTI et VisDrone, poids VOC et COCO,
+  flottant et entier).
+- **Reste** : données, mesures, `results/hors_domaine.md`.
 
 ### [ ] T11.3 — ExDark (faible luminosité)
 - **Spec** : §9.2 · **Dépend de** : T11.2 · **Taille** : S
@@ -82,6 +109,13 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
 - **Notes** : les images sombres resserrent les activations des premières couches. Avec
   des échelles calibrées sur VOC, les 256 niveaux int8 sont alors mal exploités. Le 4 bits
   (M9.3) devrait y être plus fragile : à mesurer dès que T9.3.5 est fait.
+- **Préparé** :
+  - `tools/calibrate.py --dataset exdark` → `calib-exdark.json` et
+    `results/calibration_<net>-exdark.md` ;
+  - `tools/act_hist.py` : histogrammes de |x|/s de L00 à L04, part écrêtée et niveaux
+    int8 utilisés, par jeu ;
+  - profil `tools/m11.sh exdark`.
+- **Reste** : téléchargement manuel d'ExDark, mesures.
 
 ### [ ] T11.4 — KITTI 2D (automobile, entrée non carrée)
 - **Spec** : §5.2, §10.2 · **Dépend de** : T11.0, T2.8 · **Taille** : L
@@ -98,6 +132,16 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   - `LayerDesc` sépare déjà `h` et `w`. Il reste à vérifier le manifeste, le golden, les
     tuiles en bord et le décodage, qui suppose une grille carrée.
   - BDD100K (1280×720, 10 classes) est l'alternative plus grande, au même usage.
+- **Préparé** :
+  - découpage train/val (`datasets.kitti_ids`) ;
+  - `tools/kmeans_anchors.py --dataset kitti` ;
+  - `tools/make_cfg.py`, une cfg Tiny-YOLOv3 à N classes avec ses ancres ;
+  - `tools/train.py --dataset kitti --init coco` ;
+  - profils `kitti-prep` et `kitti-train`.
+
+  L'affinage n'est pas lancé.
+- **Reste** : l'entrée non carrée dans le manifeste, le golden, les tuiles en bord et le
+  décodage, puis les mesures. L'affinage tourne en letterbox 416×416.
 
 ### [ ] T11.5 — VisDrone-DET (drone, petits objets)
 - **Spec** : §3, §10.2 · **Dépend de** : T11.0, T2.8 · **Taille** : L
@@ -113,6 +157,12 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   - Ce jeu donne un argument chiffré pour une troisième tête ou une entrée plus grande.
   - À plus haute résolution, il faut aussi vérifier la place sur puce des line buffers de
     `hls/stream/` (M9.4).
+- **Préparé** : profils `visdrone-prep`, `visdrone-train` et `visdrone-size` (416, 608 et
+  832, métrique VOC). L'affinage n'est pas lancé.
+- **Reste** :
+  - AP par taille d'objet, avec `--metric coco` et l'aire des boîtes ;
+  - affinage de Tiny-YOLOv2 ;
+  - `perf_model` et roofline aux grandes entrées.
 
 ### [ ] T11.6 — CrowdHuman (scènes denses, NMS matérielle)
 - **Spec** : §8.2, §10.3 · **Dépend de** : T11.0, T9.1.3 · **Taille** : M
@@ -129,6 +179,13 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
     fixe seront réellement sollicitées.
   - Pas d'affinage nécessaire pour une première mesure : les poids VOC et COCO ont la
     classe person.
+- **Préparé** : profil `tools/m11.sh crowdhuman`. Il lance `int` et `int-hwpp` aux
+  capacités 256 et 1 024 et mesure l'AP, le rappel final par classe (nouveau champ
+  `recall` des JSON de `eval_quant`) et les candidates perdues.
+- **Reste** :
+  - téléchargement manuel de CrowdHuman ;
+  - cycles de la NMS par image (`tools/bench_sim.sh` avec `EXTRA=--hw-post`, sur des
+    entrées de `make_inputs.py --dataset crowdhuman`).
 
 ### [ ] T11.7 — FLIR ADAS (thermique, un canal)
 - **Spec** : §10.2 · **Dépend de** : T11.0, T2.8 · **Taille** : L
@@ -142,6 +199,11 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
     de L00 s'aggrave. C'est le cas d'usage qui justifie T10.3 (trim) et la PE dédiée de
     T10.4.
   - Le prétraitement ARM se simplifie (pas de conversion RGB).
+- **Préparé** : chargeur FLIR v2 (COCO JSON, classes par nom). Profils `flir-prep` et
+  `flir-train` : affinage à 3 canaux, les images thermiques en gris étant converties en
+  RGB. L'affinage n'est pas lancé.
+- **Reste** : l'entrée à 1 canal (manifeste, L00 avec cin = 1, golden, C-sim), puis les
+  mesures.
 
 ### T11.8 — Affinage VOC07+12 (renvoi)
 Ce n'est pas une nouvelle tâche : VOC07+12 trainval reste le jeu d'affinage de référence,

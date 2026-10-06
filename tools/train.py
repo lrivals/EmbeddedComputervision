@@ -14,6 +14,14 @@
     # même entraînement sur le GPU (CuPy, T12.11) ; le CPU reste le défaut et la référence
     python tools/train.py … --device gpu
 
+    # affinage sur un autre jeu (T11.4, T11.5, T11.7) : cfg à N classes de tools/make_cfg.py,
+    # poids COCO hors têtes
+    python tools/train.py --net build/m11/cfg/tiny-yolov3-kitti.cfg --dataset kitti \
+        --init coco --out build/m11/kitti/train
+
+Hors VOC, les classes du jeu sont ramenées à celles du réseau : identité si le réseau a
+autant de classes que le jeu, sinon correspondance VOC / COCO de `yolo.data.datasets`.
+
 Sorties dans `--out` : `checkpoint.npz` (reprise exacte), `loss.csv` (une ligne par
 itération), `final.weights` (format Darknet ; pas en QAT ni en ADMM : réseau à BN fusionnée,
 exporté par tools/quant_lowbit.py --checkpoint). Les checkpoints sont en NumPy quel que
@@ -33,7 +41,7 @@ sys.path.insert(0, str(ROOT / "python"))
 
 from yolo import backend  # noqa: E402
 from yolo.data.loader import DataLoader, VOCDataset  # noqa: E402
-from yolo.data.voc import load_split  # noqa: E402
+from yolo.data import datasets  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights, save_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import build  # noqa: E402
 from yolo.quant.fuse_bn import fuse_network  # noqa: E402
@@ -41,14 +49,16 @@ from yolo.train.optim import NO_DECAY, SGD  # noqa: E402
 from yolo.train.schedule import StepSchedule  # noqa: E402
 from yolo.train.trainer import Trainer, copy_matching  # noqa: E402
 
-COCO_WEIGHTS = {"tiny-yolov3-voc": ("tiny-yolov3-coco", ROOT / "weights" / "yolov3-tiny.weights")}
+# Source de `--init coco` : toute cfg Tiny-YOLOv3 (VOC, ou à N classes de tools/make_cfg.py) ;
+# les couches de forme différente (les têtes) restent à l'initialisation de He.
+COCO_WEIGHTS = ("tiny-yolov3-coco", ROOT / "weights" / "yolov3-tiny.weights")
 
 
 def init_weights(net, name, init, dtype):
     if init == "he":
         return
     if init == "coco":
-        src_name, path = COCO_WEIGHTS[name]
+        src_name, path = COCO_WEIGHTS
         src = build(src_name, dtype=dtype)
         load_darknet_weights(src, path)
         skipped = copy_matching(src, net)
@@ -62,8 +72,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--net", default="tiny-yolov3-voc")
     ap.add_argument("--init", default="he", help="he | coco | chemin d'un .weights Darknet")
-    ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
-    ap.add_argument("--splits", default="2007:trainval,2012:trainval")
+    ap.add_argument("--dataset", choices=sorted(datasets.DATASETS), default="voc")
+    ap.add_argument("--data-root", "--devkit", dest="data_root", type=Path, default=None,
+                    help="racine du jeu (défaut data/<dossier du jeu>)")
+    ap.add_argument("--splits", default=None,
+                    help="défaut : split d'entraînement du jeu (VOC : 2007:trainval,2012:trainval)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--iters", type=int, default=1000)
@@ -142,10 +155,8 @@ def main():
         print(f"reprise à l'itération {trainer.it}")
     print(f"backend : {args.device}")
 
-    samples = []
-    for item in args.splits.split(","):
-        year, split = item.split(":")
-        samples += load_split(args.devkit, int(year), split)
+    samples = datasets.load(args.dataset, args.data_root, args.splits, role="train")
+    samples = datasets.remap(samples, datasets.class_lut(args.dataset, net.net["classes"]))
     if args.subset:
         samples = samples[:args.subset]
     loader = DataLoader(VOCDataset(samples), args.batch, workers=args.workers, seed=args.seed)

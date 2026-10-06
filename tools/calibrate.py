@@ -2,9 +2,13 @@
 
     python tools/calibrate.py --net tiny-yolov2-voc     # → build/quant/<net>/calib.json
     python tools/calibrate.py --net tiny-yolov3-coco --images 500
+    # autre jeu (T11.1, T11.3) → build/quant/<net>/calib-<jeu>.json,
+    # results/calibration_<net>-<jeu>.md
+    python tools/calibrate.py --net tiny-yolov3-coco --dataset coco
 
-Images de calibration : tirées au hasard (graine fixe) dans VOC2007 trainval, jamais dans
-le split de test ; même prétraitement que l'évaluation (letterbox, PIL).
+Images de calibration : tirées au hasard (graine fixe) dans le split de calibration du jeu
+(VOC2007 trainval pour VOC, `calib2017` de tools/coco_subset.py pour COCO), jamais dans le
+split de test ; même prétraitement que l'évaluation (letterbox, PIL).
 """
 
 import argparse
@@ -18,7 +22,7 @@ sys.path.insert(0, str(ROOT / "python"))
 
 import numpy as np  # noqa: E402
 
-from yolo.data.voc import load_split  # noqa: E402
+from yolo.data import datasets  # noqa: E402
 from yolo.infer.pipeline import preprocess  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import PRETRAINED, build  # noqa: E402
@@ -49,9 +53,9 @@ def load_fused(name, weights=None, dtype=np.float32):
     return fuse_network(net, dtype=dtype)
 
 
-def calib_images(devkit, n, seed=0, split="2007:trainval"):
-    year, s = split.split(":")
-    samples = load_split(devkit, int(year), s)
+def calib_images(root, n, seed=0, split=None, dataset="voc"):
+    """`n` chemins d'images tirés sans remise ; `root`, `split` : défauts du jeu si None."""
+    samples = datasets.load(dataset, root, split, role="calib")
     idx = np.random.default_rng(seed).choice(len(samples), size=min(n, len(samples)),
                                              replace=False)
     return [samples[i]["image"] for i in sorted(idx)]
@@ -72,11 +76,11 @@ def collect(fused, paths, size=416, batch=8, workers=4):
     return stats
 
 
-def markdown(calib):
+def markdown(calib, source="VOC2007 trainval"):
     keys = [f"p{p:g}" for p in PERCENTILES] + ["max"]
     head = calib["head_scale"]
     lines = [
-        f"### {calib['network']} — {calib['images']} images VOC2007 trainval, "
+        f"### {calib['network']} — {calib['images']} images {source}, "
         f"choix « {calib['choice']} »",
         "",
         "Erreur quadratique moyenne FP32 / INT8 de la sortie de chaque convolution, pour "
@@ -112,7 +116,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau pré-entraîné, ou chemin d'un .cfg (élagué, T10.11 ; --weights requis)")
     ap.add_argument("--weights", type=Path, default=None)
-    ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
+    datasets.add_args(ap, "split de calibration ; défaut selon le jeu (VOC : 2007:trainval)")
     ap.add_argument("--images", type=int, default=500)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--choice", choices=CHOICES, default="mse")
@@ -125,16 +129,20 @@ def main():
 
     head = None if args.head_scale == "calib" else float(args.head_scale)
     fused = load_fused(args.net, args.weights)
-    paths = calib_images(args.devkit, args.images, args.seed)
+    split = datasets.split_of(args, "calib")
+    paths = calib_images(args.data_root, args.images, args.seed, split, args.dataset)
     stats = collect(fused, paths, workers=args.workers)
     scales, rows, groups = choose_scales(fused, stats, args.choice, head)
     calib = calib_dict(fused, scales, rows, groups, stats.images, args.choice, head)
-    out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / "calib.json"
+    suffix = "" if args.dataset == "voc" else f"-{args.dataset}"
+    out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / f"calib{suffix}.json"
     save_calib(out, calib)
-    text = markdown(calib)
+    source = (f"VOC{split.replace(':', ' ')}" if args.dataset == "voc"
+              else f"{args.dataset} {split}")
+    text = markdown(calib, source)
     print(text)
     print(f"échelles : {out}")
-    md = args.markdown or ROOT / "results" / f"calibration_{net_tag(args.net)}.md"
+    md = args.markdown or ROOT / "results" / f"calibration_{net_tag(args.net)}{suffix}.md"
     md.write_text(f"# Calibration INT8 — {args.net} (T4.2)\n\n" + text)
     print(f"rapport : {md}")
 

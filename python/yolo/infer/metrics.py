@@ -81,13 +81,19 @@ def class_gts(annotations, c):
             for a in annotations}
 
 
-def evaluate(detections, annotations, num_classes, iou_thr=0.5, use_07=True):
+def evaluate(detections, annotations, num_classes, iou_thr=0.5, use_07=True,
+             with_recall=False):
     """`detections` : {c: (image_ids, scores, coins)} ; `annotations` : sortie de
-    `yolo.data.voc.load_split`. Rend (AP par classe (C,), mAP).
+    `yolo.data.voc.load_split` (ou `yolo.data.datasets.load`). Rend (AP par classe (C,), mAP),
+    plus le rappel final par classe (C,) avec `with_recall` (T11.6).
     """
     empty = ([], np.zeros(0), np.zeros((0, 4)))
-    aps = np.array([eval_class(*detections.get(c, empty), class_gts(annotations, c),
-                               iou_thr, use_07)[2] for c in range(num_classes)])
+    res = [eval_class(*detections.get(c, empty), class_gts(annotations, c), iou_thr, use_07)
+           for c in range(num_classes)]
+    aps = np.array([r[2] for r in res])
+    if with_recall:
+        rec = np.array([r[0][-1] if len(r[0]) else 0.0 for r in res])
+        return aps, float(aps.mean()), rec
     return aps, float(aps.mean())
 
 

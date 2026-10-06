@@ -4,6 +4,14 @@
     python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights
     # évaluation seule de fichiers comp4_det_test_<classe>.txt existants
     python tools/eval_voc.py --dets build/eval/tiny-yolov2-voc-letterbox
+    # autre jeu (T11.0) : COCO val2017 avec la métrique COCO, poids VOC sur KITTI (T11.2)
+    python tools/eval_voc.py --net tiny-yolov3-coco --weights weights/yolov3-tiny.weights \
+        --dataset coco
+    python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights \
+        --dataset kitti
+
+Hors VOC, seules les classes communes au jeu et au modèle sont évaluées
+(`yolo.data.datasets.eval_view`) ; `--metric coco` donne AP@[.5:.95] (`yolo.infer.coco_eval`).
 
 Seuil de confiance bas (0,005, comme `darknet detector valid`) : la mAP intègre toute la
 courbe précision/rappel ; le 0,25 de la démo couperait les rappels élevés.
@@ -20,13 +28,14 @@ sys.path.insert(0, str(ROOT / "python"))
 
 import numpy as np  # noqa: E402
 
-from yolo.data.voc import VOC_CLASSES, load_split  # noqa: E402
+from yolo.data import datasets  # noqa: E402
+from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import (evaluate, read_detections, to_voc_pixels,  # noqa: E402
                                 write_detections)
 from yolo.infer.nms import IOU_THR  # noqa: E402
 from yolo.infer.pipeline import INTERPS, MODES, detect, preprocess  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
-from yolo.models.tiny_yolo import build  # noqa: E402
+from yolo.models.tiny_yolo import build, load_cfg  # noqa: E402
 
 
 def _load(task):
@@ -38,8 +47,8 @@ def _load(task):
 
 
 def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers):
-    """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}."""
-    per_class = {c: ([], [], []) for c in range(len(VOC_CLASSES))}
+    """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle."""
+    per_class = {c: ([], [], []) for c in range(net.net["classes"])}
     tasks = [(s["image"], size, mode, interp) for s in samples]
     t0 = time.time()
     with mp.Pool(workers) as pool:
@@ -64,11 +73,22 @@ def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers):
             for c, v in per_class.items()}
 
 
-def table(aps, m, title):
+def table(aps, m, title, names):
     lines = [f"### {title}", "", "| Classe | AP |", "|---|---|"]
-    lines += [f"| {name} | {ap * 100:.1f} |" for name, ap in zip(VOC_CLASSES, aps)]
+    lines += [f"| {name} | {ap * 100:.1f} |" for name, ap in zip(names, aps)]
     lines += [f"| **mAP** | **{m * 100:.2f}** |", ""]
     return "\n".join(lines)
+
+
+def coco_table(res, title, names):
+    """Table de la métrique COCO : résumé puis AP et AP50 par classe."""
+    lines = [f"### {title}", "", "| " + " | ".join(coco_eval.STATS) + " |",
+             "|---" * len(coco_eval.STATS) + "|",
+             "| " + " | ".join(f"{res[k] * 100:.1f}" for k in coco_eval.STATS) + " |", "",
+             "| Classe | AP | AP50 |", "|---|---|---|"]
+    lines += [f"| {n} | {a * 100:.1f} | {b * 100:.1f} |"
+              for n, a, b in zip(names, res["ap_class"], res["ap50_class"])]
+    return "\n".join(lines + [""])
 
 
 def main():
@@ -77,8 +97,9 @@ def main():
     ap.add_argument("--weights", type=Path, default=None)
     ap.add_argument("--dets", type=Path, default=None,
                     help="dossier de détections existantes (pas d'inférence)")
-    ap.add_argument("--devkit", type=Path, default=ROOT / "data" / "VOCdevkit")
-    ap.add_argument("--split", default="2007:test")
+    datasets.add_args(ap)
+    ap.add_argument("--metric", choices=("voc", "coco"), default=None,
+                    help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--size", type=int, default=416)
     ap.add_argument("--resize", choices=MODES, default="letterbox")
@@ -92,14 +113,19 @@ def main():
     ap.add_argument("--markdown", type=Path, default=None, help="ajoute la table à ce fichier")
     args = ap.parse_args()
 
-    year, split = args.split.split(":")
-    samples = load_split(args.devkit, int(year), split)
+    split = datasets.split_of(args)
+    metric = args.metric or datasets.DATASETS[args.dataset].metric
+    samples = datasets.load_args(args)
     if args.subset:
         samples = samples[:args.subset]
+    view = datasets.eval_view(args.dataset, load_cfg(args.net)["classes"])
+    samples = datasets.remap(samples, view.gt_lut)
+    where = (f"VOC{split.replace(':', ' ')}" if args.dataset == "voc"
+             else f"{args.dataset} {split}")
 
     if args.dets:
-        dets = read_detections(VOC_CLASSES, args.dets)
-        title = f"{args.dets.name} — VOC{year} {split}"
+        dets = read_detections(view.names, args.dets)
+        title = f"{args.dets.name} — {where}"
     else:
         if args.weights is None:
             ap.error("--weights ou --dets requis")
@@ -107,17 +133,23 @@ def main():
         load_darknet_weights(net, args.weights)
         dets = run_inference(net, samples, args.size, args.resize, args.interp, args.conf,
                              args.iou, args.batch, args.workers)
+        dets = datasets.remap_detections(dets, view.det_lut)
         run = f"{args.net}-{args.resize}" + ("-darknet" if args.interp == "darknet" else "")
-        out = args.out or ROOT / "build" / "eval" / run
-        write_detections(dets, VOC_CLASSES, out)
+        tag = datasets.tag(args.dataset, split)
+        out = args.out or ROOT / "build" / "eval" / (f"{run}-{tag}" if tag else run)
+        write_detections(dets, view.names, out)
         print(f"détections : {out}")
-        title = (f"{args.net} ({args.weights.name}), VOC{year} {split}, {len(samples)} images, "
+        title = (f"{args.net} ({args.weights.name}), {where}, {len(samples)} images, "
                  f"{args.size}×{args.size} {args.resize} ({args.interp}), conf {args.conf}, "
                  f"NMS {args.iou}")
 
-    aps, m = evaluate(dets, samples, len(VOC_CLASSES), use_07=not args.area)
-    title += ", AP " + ("aire" if args.area else "11 points")
-    text = table(aps, m, title)
+    if metric == "coco":
+        res = coco_eval.evaluate(dets, samples, len(view.names))
+        text = coco_table(res, title + ", métrique COCO (101 points)", view.names)
+    else:
+        aps, m = evaluate(dets, samples, len(view.names), use_07=not args.area)
+        title += ", AP " + ("aire" if args.area else "11 points")
+        text = table(aps, m, title, view.names)
     print(text)
     if args.markdown:
         with args.markdown.open("a") as f:
