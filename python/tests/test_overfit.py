@@ -2,11 +2,17 @@
 
 Tiny-YOLOv3-VOC complet, initialisation He, entrée 256×256 (grilles 8×8 et 16×16) pour
 tenir en une minute environ. Lancer avec `pytest -m slow` (ou `make test-slow`).
+
+T12.11, point c : `YOLO_DEVICE=gpu` (`make test-slow-gpu`) entraîne sur le GPU (CuPy), avec
+les mêmes critères ; le test est sauté sans CuPy ou sans GPU.
 """
+
+import os
 
 import numpy as np
 import pytest
 
+from yolo import backend
 from yolo.infer.boxes import iou
 from yolo.infer.decode import decode
 from yolo.models.tiny_yolo import tiny_yolov3_voc
@@ -21,6 +27,7 @@ BOXES = np.array([[0.30, 0.35, 0.30, 0.40],    # ancres 13×13 ou 26×26 selon l
                   [0.75, 0.20, 0.12, 0.15]])
 LABELS = np.array([7, 14, 2])
 COLORS = [(0.9, 0.2, 0.1), (0.1, 0.3, 0.9), (0.1, 0.8, 0.2)]
+DEVICE = os.environ.get("YOLO_DEVICE", "cpu")
 
 
 def _image():
@@ -36,9 +43,20 @@ def _image():
 def test_overfit_single_image():
     x = _image()
     net = tiny_yolov3_voc(rng=0)
-    schedule = StepSchedule(1e-3, burn_in=50, steps=(160,), scales=(0.1,))
-    trainer = Trainer(net, SGD(net.params), schedule, size=SIZE)
-    losses = [trainer.step(x, [BOXES], [LABELS])[0].total for _ in range(ITERS)]
+    if DEVICE == "gpu":
+        pytest.importorskip("cupy")
+        try:
+            backend.use("gpu")
+        except RuntimeError as exc:
+            pytest.skip(str(exc))
+        net.to_device()  # avant le SGD : les vitesses suivent les paramètres
+    try:
+        schedule = StepSchedule(1e-3, burn_in=50, steps=(160,), scales=(0.1,))
+        trainer = Trainer(net, SGD(net.params), schedule, size=SIZE)
+        losses = [trainer.step(x, [BOXES], [LABELS])[0].total for _ in range(ITERS)]
+    finally:
+        net.to_numpy()
+        backend.use("cpu")
     assert losses[-1] < 1e-3 * losses[0]
     assert np.mean(losses[-10:]) < 0.2
 

@@ -477,14 +477,14 @@ Chaque profil se rédige comme le diagnostic de l'ADMM (T12.6), dans cet ordre :
       et checkpoint sont identiques à l'octet avec ou sans `use("cpu")` / `to_device()`.
     - Points a, b et d (réduit) : sautés tant que CuPy est absent. Leur corps a été vérifié
       avec NumPy à la place de CuPy.
+  - Point c : `make test-slow-gpu` (`YOLO_DEVICE=gpu`) lance T2.8
+    (`python/tests/test_overfit.py`) sur le GPU, avec les mêmes critères. Le test est sauté
+    sans CuPy ou sans GPU ; sans la variable, il reste sur le CPU comme avant.
   - Reste à faire sur la machine :
     - pilote NVIDIA et `pip install cupy-cuda12x` ;
-    - `make test-py` (a, b, d), le point c (`make test-slow` sur GPU, à brancher) et le
+    - `make test-py` (a, b, d), le point c (`make test-slow-gpu`) et le
       point e (vitesse) avant toute décision.
 
----
-
-## Ordre conseillé
 ---
 
 ## Ordre conseillé

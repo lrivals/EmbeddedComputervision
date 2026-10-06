@@ -1,8 +1,9 @@
-.PHONY: help test test-py test-slow test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
 	@echo "test-slow   tests longs : surapprentissage d'une image (T2.8)"
+	@echo "test-slow-gpu  test-slow sur le GPU (CuPy, T12.11 point c)"
 	@echo "test-cpp    build + tests du golden model C++"
 	@echo "golden-check golden C++ sur les dumps de model/ + rapport par couche (T5.4)"
 	@echo "roofline    tuiles et performance par carte hw/boards → results/roofline.md (T5.6)"
@@ -65,6 +66,9 @@ test-py:
 
 test-slow:
 	cd python && python -m pytest -q -m slow
+
+test-slow-gpu:
+	cd python && YOLO_DEVICE=gpu python -m pytest -q -m slow
 
 test-cpp:
 	cmake -S cpp/golden -B build/golden -DGOLDEN_TESTS=ON
