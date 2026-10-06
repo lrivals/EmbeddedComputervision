@@ -25,6 +25,9 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M13](M13-figures.md) | Figures (optionnel) | `make figures` régénère les figures d'architecture, de résultats, de suivi et des maths réimplémentées |
 | [M14](M14-notebooks.md) | Notebooks (optionnel) | `make notebooks` génère un notebook d'entraînement ou d'inférence par modèle × jeu, exécutable en local et sur Colab |
 
+Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
+[donnees-drive.md](donnees-drive.md).
+
 ## Dépendances
 
 ```mermaid

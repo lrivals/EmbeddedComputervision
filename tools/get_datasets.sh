@@ -9,6 +9,9 @@
 #   tools/get_datasets.sh ready <jeu>…              code de retour 0 si tous sont prêts
 #   tools/get_datasets.sh pack <jeu>…               data/<racine> → data_archives/<jeu>.tar
 #   tools/get_datasets.sh unpack <dossier> <jeu>…   <dossier>/<jeu>.tar → data/ (Colab : Drive)
+#   tools/get_datasets.sh push <jeu>…               pack, puis rclone vers $DRIVE_REMOTE
+#   tools/get_datasets.sh pull <jeu>…               si absent : rclone depuis $DRIVE_REMOTE, unpack
+#                                    (docs/tasks/donnees-drive.md)
 #
 # Téléchargés ici (idempotent, comme get_voc.sh) : COCO val2017 + annotations 2017 (≈ 1,0 +
 # 0,25 Go ; les 500 images de calibration de train2017 : tools/coco_subset.py) et KITTI 2D
@@ -21,6 +24,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="${DATA_DIR:-$ROOT/data}"           # surchargés par les tests
 ARCHIVE_DIR="${ARCHIVE_DIR:-$ROOT/data_archives}"
+DRIVE_REMOTE="${DRIVE_REMOTE:-gdrive:EmbeddedCV/data}"  # remote rclone des archives
 
 download() {  # url fichier
   [[ -f "$2" ]] && return 0
@@ -113,6 +117,40 @@ unpack() {
   check "$ds"
 }
 
+need_rclone() {
+  command -v rclone > /dev/null || {
+    echo "rclone absent : sudo apt install rclone, puis rclone config create gdrive drive scope=drive" >&2
+    return 1
+  }
+  rclone listremotes | grep -qx "${DRIVE_REMOTE%%:*}:" || {
+    echo "remote ${DRIVE_REMOTE%%:*} absent : rclone config create ${DRIVE_REMOTE%%:*} drive scope=drive" >&2
+    return 1
+  }
+}
+
+# Export d'un jeu prêt vers Google Drive (PC) : l'archive reste dans data_archives/.
+push() {
+  local ds=$1
+  need_rclone || return 1
+  pack "$ds"
+  echo "envoi $ARCHIVE_DIR/$ds.tar → $DRIVE_REMOTE"
+  rclone copy "$ARCHIVE_DIR/$ds.tar" "$DRIVE_REMOTE" --progress
+}
+
+# Jeu absent en local : son archive est rapatriée de Google Drive, puis extraite.
+pull() {
+  local ds=$1
+  if check "$ds" > /dev/null; then
+    echo "$ds : déjà prêt"
+    return 0
+  fi
+  need_rclone || return 1
+  mkdir -p "$ARCHIVE_DIR"
+  echo "rapatriement $DRIVE_REMOTE/$ds.tar → $ARCHIVE_DIR"
+  rclone copy "$DRIVE_REMOTE/$ds.tar" "$ARCHIVE_DIR" --progress || return 1
+  unpack "$ARCHIVE_DIR" "$ds"
+}
+
 kaggle_download() {
   local ds=$1
   [[ -n "${KAGGLE_ID[$ds]:-}" ]] || { echo "$ds : pas de version Kaggle" >&2; return 1; }
@@ -162,7 +200,7 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,19p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,21p' "$0"; exit 1; }
 case "$1" in
 ready)
   shift
@@ -173,6 +211,17 @@ pack)
   shift
   for ds in "$@"; do known "$ds"; pack "$ds"; done
   exit 0
+  ;;
+push)
+  shift
+  for ds in "$@"; do known "$ds"; push "$ds"; done
+  exit 0
+  ;;
+pull)
+  shift
+  status=0
+  for ds in "$@"; do known "$ds"; pull "$ds" || status=1; done
+  exit $status
   ;;
 unpack)
   [[ $# -ge 3 ]] || { echo "usage : $0 unpack <dossier> <jeu>…" >&2; exit 1; }

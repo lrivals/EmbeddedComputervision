@@ -114,7 +114,8 @@ de la session) en essayant, dans l'ordre :
 
 1. le témoin du jeu (`tools/get_datasets.sh ready <jeu>`) ;
 2. l'archive `<DRIVE_DIR>/data/<jeu>.tar` sur Google Drive ;
-3. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
+3. la même archive par rclone (`tools/get_datasets.sh pull <jeu>`), sur un PC sans le jeu ;
+4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
    (`get_datasets.sh kaggle-download crowdhuman|visdrone`, avec un jeton dans les secrets
    Colab `KAGGLE_USERNAME` et `KAGGLE_KEY`).
 
@@ -123,9 +124,11 @@ Kaggle), FLIR (inscription), ou un jeu qu'on ne veut pas retélécharger. Le Dri
 (15 Go) ne contiendrait pas tout `data/`.
 
 ```
-tools/get_datasets.sh pack exdark                     # PC : data_archives/exdark.tar (1,5 Go)
-rclone copy data_archives/ gdrive:EmbeddedCV/data     # ou l'interface web de Drive
+tools/get_datasets.sh push exdark     # PC : pack (data_archives/exdark.tar), puis rclone
 ```
+
+Mise en place de rclone, export des autres jeux et accès selon l'environnement :
+[donnees-drive.md](donnees-drive.md).
 
 ```
 MyDrive/EmbeddedCV/

@@ -1,7 +1,9 @@
 """Cellule d'environnement des notebooks (T14.1), une fois le dépôt en place.
 
-En local, rien n'est installé ni téléchargé : `prepare` vérifie les données, les poids et
-la cfg, et lève `Prerequis` avec les commandes à lancer. Sur Colab, il lance
+En local, rien n'est installé : un jeu présent dans data/ est utilisé tel quel ; absent, son
+archive est rapatriée de Google Drive par rclone (`tools/get_datasets.sh pull <jeu>`,
+docs/tasks/donnees-drive.md) ; sinon `prepare` lève `Prerequis` avec les commandes à lancer,
+comme pour les poids et la cfg. Sur Colab, il lance
 `tools/get_weights.sh`, puis `colab.prepare_data` (témoin, archive `<DRIVE_DIR>/data/<jeu>.tar`
 ou téléchargement direct, docs/tasks/M14-notebooks.md#données-sur-colab). Drive n'est monté
 que si le jeu ne se télécharge pas : un notebook VOC ou KITTI part sans intervention.
@@ -55,12 +57,18 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
             if dataset not in colab.DOWNLOAD:  # ExDark, FLIR : seulement par Drive
                 mount_drive(drive_dir)
             colab.prepare_data(dataset, drive_dir)
+    elif not data_root and not data_ok(dataset):
+        try:  # local : archive sur Drive par rclone, jamais de téléchargement implicite
+            colab.prepare_data(dataset, drive_dir=None, download=False)
+        except RuntimeError as e:
+            print(e)
     if not data_ok(dataset, data_root):
         where = data_root or DATA_MARKERS[dataset]
         cmd = "tools/get_voc.sh" if dataset == "voc" else f"tools/get_datasets.sh {dataset}"
         if dataset in REGISTRATION:
-            cmd += (" (inscription ; pour Colab : tools/get_datasets.sh pack "
-                    f"{dataset}, archive sur Drive)")
+            cmd += " (inscription)"
+        cmd += (f", ou tools/get_datasets.sh pull {dataset} (archive sur Drive, "
+                "docs/tasks/donnees-drive.md)")
         missing.append(f"données {dataset} absentes ({where}) : {cmd}")
     for w in weights:
         if not (ROOT / w).exists():

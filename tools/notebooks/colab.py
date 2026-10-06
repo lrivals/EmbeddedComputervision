@@ -1,13 +1,17 @@
 """Données et sorties des notebooks sur Colab (M14, T14.1 et T14.8).
 
-Les jeux ne sont pas versionnés (33 Go). Sur Colab, `prepare_data` les met dans `data/`
-(disque local de la session) en essayant, dans l'ordre :
+Les jeux ne sont pas versionnés (33 Go). `prepare_data` les met dans `data/` (sur Colab, le
+disque local de la session) en essayant, dans l'ordre :
 
-1. le témoin de `tools/get_datasets.sh` (déjà prêt) ;
-2. l'archive `<drive_dir>/data/<jeu>.tar` sur Google Drive, préparée sur le PC par
-   `tools/get_datasets.sh pack <jeu>` (seule voie pour ExDark et FLIR) ;
-3. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
+1. le témoin de `tools/get_datasets.sh` (déjà prêt : utilisé tel quel) ;
+2. l'archive `<drive_dir>/data/<jeu>.tar` sur le Drive monté (Colab), envoyée depuis le PC
+   par `tools/get_datasets.sh push <jeu>` (seule voie pour ExDark et FLIR) ;
+3. la même archive par rclone (`get_datasets.sh pull <jeu>`, remote `remote`) : le PC
+   sans le jeu, si rclone est installé ;
+4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
    pour CrowdHuman et VisDrone (jeton dans les secrets Colab KAGGLE_USERNAME, KAGGLE_KEY).
+
+Mise en place de rclone et export des jeux : docs/tasks/donnees-drive.md.
 
 Les images ne sont jamais lues à travers le montage de Drive (lent pour des milliers de
 petits fichiers) : seul le tar y est lu, d'une traite.
@@ -25,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GET_DATASETS = ROOT / "tools" / "get_datasets.sh"
 DRIVE_MOUNT = "/content/drive"
 DRIVE_DIR = "/content/drive/MyDrive/EmbeddedCV"  # data/*.tar, runs/
+DRIVE_REMOTE = "gdrive:EmbeddedCV/data"  # le même dossier data/, vu par rclone
 
 # Téléchargement direct de chaque jeu (3e voie), relatif à la racine du dépôt.
 DOWNLOAD = {
@@ -60,8 +65,8 @@ def kaggle_credentials():
     return True
 
 
-def _sh(cmd, data_dir=None):
-    env = dict(os.environ, **({"DATA_DIR": str(data_dir)} if data_dir else {}))
+def _sh(cmd, data_dir=None, **extra):
+    env = dict(os.environ, **({"DATA_DIR": str(data_dir)} if data_dir else {}), **extra)
     print("$ " + " ".join(cmd), flush=True)
     return subprocess.run(["bash", *cmd], cwd=ROOT, env=env).returncode
 
@@ -73,8 +78,10 @@ def _check(dataset, data_dir=None):
                           capture_output=True).returncode == 0
 
 
-def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True):
-    """Met `dataset` dans data/ (ou `data_dir`) ; rend la voie prise : ready, drive, download.
+def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True,
+                 remote=DRIVE_REMOTE):
+    """Met `dataset` dans data/ (ou `data_dir`) ; rend la voie prise : ready, drive, rclone,
+    download. `drive_dir` (Drive monté) ou `remote` (rclone) à None : voie désactivée.
 
     Lève RuntimeError avec la marche à suivre si aucune voie n'aboutit.
     """
@@ -85,6 +92,9 @@ def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True):
     if archives and (archives / f"{dataset}.tar").is_file():
         if _sh([str(GET_DATASETS), "unpack", str(archives), dataset], data_dir) == 0:
             return "drive"
+    if remote and shutil.which("rclone"):
+        if _sh([str(GET_DATASETS), "pull", dataset], data_dir, DRIVE_REMOTE=remote) == 0:
+            return "rclone"
     if download and dataset in DOWNLOAD:
         if "kaggle-download" in DOWNLOAD[dataset]:
             kaggle_credentials()
@@ -93,9 +103,9 @@ def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True):
         if _sh(DOWNLOAD[dataset], data_dir) == 0 and _check(dataset, data_dir):
             return "download"
     raise RuntimeError(
-        f"{dataset} introuvable. Sur le PC : tools/get_datasets.sh pack {dataset}, puis "
-        f"copier data_archives/{dataset}.tar dans {archives or '<Drive>/EmbeddedCV/data'}/ "
-        f"(rclone copy data_archives/ gdrive:EmbeddedCV/data, ou l'interface de Drive).")
+        f"{dataset} introuvable. Sur le PC qui l'a : tools/get_datasets.sh push {dataset} "
+        f"(pack {dataset}, puis rclone vers {remote or DRIVE_REMOTE}) ; voir "
+        f"docs/tasks/donnees-drive.md.")
 
 
 def sync_outputs(src="build/notebooks", drive_dir=DRIVE_DIR):
