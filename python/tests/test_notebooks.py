@@ -220,7 +220,7 @@ def test_kitti_identique_a_m11():
             '"$(anchors_k $K "$anchors")"': "A", '"$anchors"': anchors, '"$ds"': "kitti",
             '"$cfg"': p["NET"], '"$d/final.weights"': f"{d}/final.weights", '"$d"': d,
             '"$NET-voc"': "tiny-yolov3-voc", '"${SIZE:-416}"': "416", '"$ITERS"': "4000",
-            '"$BATCH"': "16", '"$DEVICE"': "cpu", '"$SUBSET"': "0",
+            '"$BATCH"': "16", '"$DEVICE"': p["DEVICE"], '"$SUBSET"': "0",
             '"$M11/cfg/$NET-$ds$VAR.cfg"': "build/m11/cfg/tiny-yolov3-kitti.cfg"}
     want = (_steps(_block("m11.sh", "\nprep() {", "\n}\n"), subs)
             + _steps(_block("m11.sh", "\ntrain() {", "\n}\n"), subs))
@@ -310,7 +310,7 @@ def test_qat_admm_identiques_a_m12(profile, over, lowbit):
     nb = NOTEBOOKS["voc/tiny-yolov3-voc_train"]
     p = _params(render(nb), **over)
     d = nb.out_dir
-    subs = {'"$NET"': p["NET"], '"$INIT"': p["INIT"], '"$DEVICE"': "cpu", '"$d"': d,
+    subs = {'"$NET"': p["NET"], '"$INIT"': p["INIT"], '"$DEVICE"': p["DEVICE"], '"$d"': d,
             '"$d/checkpoint.npz"': f"{d}/checkpoint.npz", '"$d/model"': f"{d}/model",
             '"$d/map.json"': f"{d}/map.json", '"$d/plan_mixed6.json"': f"{d}/plan_mixed6.json",
             '"$JOBS"': str(p["JOBS"]), '"$SUBSET"': str(p["SUBSET"]),
@@ -352,7 +352,8 @@ def test_anchors_k(tmp_path):
 # ---------------------------------------------------------------------- T14.9 fumée
 
 SMOKE = {"SUBSET": 4, "ITERS": 2, "BATCH": 2, "SHOW": 2, "CALIB_IMAGES": 8, "JOBS": 2,
-         "WORKERS": 2, "INT8": True, "BATCHES": [2], "TRAIN_SUBSETS": [4]}
+         "WORKERS": 2, "INT8": True, "BATCHES": [2], "TRAIN_SUBSETS": [4],
+         "DEVICE": "cpu"}  # PC sans GPU
 
 
 def _missing(nb):

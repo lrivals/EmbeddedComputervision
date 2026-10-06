@@ -27,6 +27,8 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
+Entraînement sur un kernel Colab depuis VS Code (qui lance, qui suit) :
+[colab-vscode.md](colab-vscode.md).
 
 ## Dépendances
 

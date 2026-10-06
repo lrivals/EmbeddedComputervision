@@ -73,7 +73,8 @@ entraînement (« Reste » de chaque tâche).
 - **Paramètres par défaut prudents** : `SUBSET` petit (palier R) pour un premier passage.
   Les règles de [M12](M12-profils-pc.md#règles) s'appliquent : une mAP sur `--subset` n'est
   jamais publiée dans `results/`.
-- **GPU** : `DEVICE = "gpu"` passe `--device gpu` à `tools/train.py` (T12.11). Pas de
+- **GPU** : `DEVICE = "gpu"` (défaut des notebooks `_train` et `_sweep`, faits pour
+  Colab ; `"cpu"` sur un PC sans GPU) passe `--device gpu` à `tools/train.py` (T12.11). Pas de
   repli silencieux : sans CuPy ou sans GPU, la cellule s'arrête avec le message de
   `yolo.backend`. Tout ce qui est entier (`eval_quant.py`, export) reste sur CPU.
 - **Figures** : celles du mode automatique de M13 (`tools/figures/auto.py`), affichées
@@ -146,6 +147,8 @@ tools/get_datasets.sh push exdark     # PC : pack (data_archives/exdark.tar), pu
 
 Mise en place de rclone, export des autres jeux et accès selon l'environnement :
 [donnees-drive.md](donnees-drive.md).
+Exécution depuis VS Code sur un kernel Colab (paramètres, reprise, suivi par rclone) :
+[colab-vscode.md](colab-vscode.md).
 
 ```
 MyDrive/EmbeddedCV/
