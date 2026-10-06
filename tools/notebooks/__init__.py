@@ -7,7 +7,8 @@
 
 Un notebook n'apporte aucun calcul : il lance les outils de `tools/` (commandes dans
 `commandes.py`) et affiche leurs sorties. Les notebooks sont écrits sans sorties dans
-`notebooks/<jeu>/<modèle>_<rôle>.ipynb` ; leurs résultats vont dans
+`notebooks/<jeu>/<modèle>_<rôle>.ipynb` (une exécution complète sans erreur est gardée,
+règle M14) ; leurs résultats vont dans
 `build/notebooks/<jeu>/<modèle>/`, jamais dans `results/`. Ni Jupyter ni matplotlib ne
 sont importés ici ni depuis `python/yolo/` (ADR 0001).
 """

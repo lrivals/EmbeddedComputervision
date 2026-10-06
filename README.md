@@ -63,7 +63,7 @@ d'acceptation mesurable.
 | `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
 | `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
 | `model/` | modèles exportés (non versionnés) |
-| `notebooks/` | notebooks Jupyter de M14, versionnés sans sorties (générés par `tools/notebooks/`) |
+| `notebooks/` | notebooks Jupyter de M14 (générés par `tools/notebooks/`), versionnés vides ou exécutés en entier sans erreur |
 | `results/` | `benchmarks.csv` des mesures (format du §10.4), protocole, rapports mAP, roofline, rapport HLS, rapport comparatif (`rapport.md`) |
 | `data/`, `weights/` | jeux de données et poids (non versionnés) |
 

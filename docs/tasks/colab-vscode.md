@@ -68,8 +68,8 @@ un PC sans GPU). Paramètres à régler dans la cellule « Paramètres », avant
 | `_sweep` | `BATCHES` (`[8, 16, 32]`), `TRAIN_SUBSETS` (`[500, 0]`), `ITERS` (600 par run), `SKIP_DONE` |
 
 Ces changements ne se commitent pas : les notebooks sont générés depuis
-`tools/notebooks/gabarits.py` (`make notebooks`) et versionnés sans sorties. Pour changer
-une valeur par défaut, modifier le gabarit.
+`tools/notebooks/gabarits.py` (`make notebooks`) et `--check` refuse une cellule
+retouchée. Pour changer une valeur par défaut, modifier le gabarit.
 
 Ordre conseillé, un notebook à la fois par runtime :
 
@@ -114,11 +114,15 @@ les runs, elle n'est pas publiable (M12).
 Sous VS Code, les sorties d'un kernel Colab (texte, figures) s'enregistrent dans le
 `.ipynb` du PC. GitHub les affiche si le fichier est poussé avec, les images comprises
 (PNG en base64), mais pas le JavaScript ni les widgets, et l'aperçu échoue sur les gros
-notebooks. Le dépôt versionne pourtant les notebooks **sans sorties** :
+notebooks. Règle du dépôt ([M14](M14-notebooks.md#règles)) :
 
-- `make notebooks` régénère les fichiers et efface les sorties ;
-- une seule figure suffit à gonfler le diff de chaque exécution.
+- notebook **exécuté en entier sans erreur**, cellules du gabarit intactes : il se commite
+  avec ses sorties, et `make notebooks` le garde ;
+- exécution partielle ou en erreur (ex. jeu absent) : `make ci` la refuse ; vider les
+  sorties (« Clear All Outputs » dans VS Code, ou `make notebooks`) avant le commit, ou
+  relancer jusqu'au bout ;
+- les paramètres se changent sans commit, et une cellule ajoutée (ex. `!nvidia-smi`) se
+  retire avant le commit.
 
-Pour garder un résultat : les fichiers de `build/notebooks/<jeu>/<modèle>/` (copiés sur
-Drive), et les chiffres publiables dans `results/` par les scripts de M12. Avant un commit,
-vider les sorties (« Clear All Outputs » dans VS Code, ou `make notebooks`).
+Les fichiers de `build/notebooks/<jeu>/<modèle>/` (copiés sur Drive) restent la trace des
+runs, et les chiffres publiables vont dans `results/` par les scripts de M12.

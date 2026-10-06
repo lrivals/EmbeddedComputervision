@@ -1,6 +1,6 @@
 # Notebooks (M14)
 
-Index généré par `python -m tools.notebooks all` (`make notebooks`) depuis le registre de `tools/notebooks/matrice.py` ; ne pas éditer à la main. Les notebooks sont versionnés sans sorties ; leurs résultats vont dans `build/notebooks/<jeu>/<modèle>/`. Voir [docs/tasks/M14-notebooks.md](../docs/tasks/M14-notebooks.md).
+Index généré par `python -m tools.notebooks all` (`make notebooks`) depuis le registre de `tools/notebooks/matrice.py` ; ne pas éditer à la main. Les notebooks sont versionnés vides, ou exécutés en entier sans erreur (sorties visibles ici) ; leurs résultats vont dans `build/notebooks/<jeu>/<modèle>/`. Voir [docs/tasks/M14-notebooks.md](../docs/tasks/M14-notebooks.md).
 
 Palier (règles de M12) : premier passage (`SUBSET = 50`) / passage complet (`SUBSET = 0`, ou `ITERS = 4000` à l'entraînement).
 

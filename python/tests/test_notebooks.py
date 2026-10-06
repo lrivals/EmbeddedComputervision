@@ -115,6 +115,40 @@ def test_visionneuse_generee_et_affichage_seul(tmp_path):
     assert "tools.notebooks.commandes" not in src and "C.run" not in src  # aucun calcul
 
 
+def _execute(p, error=False, partial=False):
+    """Simule une exécution Jupyter : sorties, compteurs, métadonnées du noyau."""
+    nb = json.loads(p.read_text())
+    code = [c for c in nb["cells"] if c["cell_type"] == "code"]
+    for i, c in enumerate(code, 1):
+        c["execution_count"] = None if partial and i == len(code) else i
+        c["outputs"] = [{"name": "stdout", "output_type": "stream", "text": ["ok\n"]}]
+    if error:
+        code[1]["outputs"].append({"output_type": "error", "ename": "RuntimeError",
+                                   "evalue": "flir introuvable", "traceback": []})
+    nb["metadata"]["kernelspec"]["display_name"] = "Python 3 (ipykernel)"
+    nb["metadata"]["language_info"] = {"name": "python", "version": "3.13.15"}
+    p.write_text(json.dumps(nb, indent=1, ensure_ascii=False) + "\n")
+
+
+@pytest.mark.parametrize("error,partial,ok", [(False, False, True), (True, False, False),
+                                              (False, True, False)])
+def test_regle_executes_sans_erreur(tmp_path, capsys, error, partial, ok):
+    """Règle M14 : un notebook exécuté se versionne s'il a tourné en entier sans erreur."""
+    assert main(["all", "--out", str(tmp_path)]) == 0
+    p = tmp_path / "voc" / "tiny-yolov2-voc_infer.ipynb"
+    _execute(p, error, partial)
+    executed = p.read_text()
+    assert main(["--check", "--out", str(tmp_path)]) == (0 if ok else 1)
+    out = capsys.readouterr().out
+    assert ("dont 1 notebooks exécutés" in out) if ok else ("exécuté, refusé" in out)
+    main(["all", "--out", str(tmp_path)])  # make notebooks garde une exécution complète
+    assert (p.read_text() == executed) is ok
+    nb = json.loads(executed)
+    nb["cells"][2]["source"][0] = "NET = 'autre'\n"  # retouche d'une cellule : refusée
+    p.write_text(json.dumps(nb) + "\n")
+    assert main(["--check", "--out", str(tmp_path)]) == 1
+
+
 def test_notebooks_versionnes_a_jour():
     assert main(["--check"]) == 0
 

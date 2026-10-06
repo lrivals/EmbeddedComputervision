@@ -61,9 +61,14 @@ entraînement (« Reste » de chaque tâche).
 
 ### Règles
 
-- **Versionnés sans sorties** : ni `outputs`, ni `execution_count`, ni métadonnées de
-  noyau propres à une machine. Le diff d'un notebook ne montre que des changements de
-  gabarit. Un notebook exécuté se garde dans `build/`.
+- **Versionnés sans sorties, ou exécutés en entier sans erreur** : un notebook versionné
+  a les cellules du générateur, et soit aucune sortie (ni `outputs`, ni `execution_count`),
+  soit **toutes** ses cellules de code exécutées sans sortie d'erreur ; ses sorties sont
+  alors visibles sur GitHub. Les métadonnées du noyau (`kernelspec`, `language_info`) sont
+  ignorées. Une exécution partielle ou en erreur ne se versionne pas : `--check` la
+  refuse et `make notebooks` la remplace par le notebook vide. Une exécution complète est
+  gardée par `make notebooks` tant que le gabarit ne change pas ; une cellule ajoutée ou
+  retouchée à la main est refusée dans les deux cas.
 - **Structure fixe** de chaque notebook, dans cet ordre :
   1. titre, rôle, palier de coût M12, liens vers la tâche M11/M2/M9 concernée ;
   2. **cellule de paramètres** (tag `parameters`, compatible papermill sans l'exiger) :
