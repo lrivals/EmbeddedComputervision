@@ -256,7 +256,11 @@ def environment(nb):
                 ROOT = Path("/content/EmbeddedComputervision")
                 if not ROOT.exists():
                     subprocess.run(["git", "clone", REPO_URL, str(ROOT)], check=True)
-                subprocess.run(["git", "-C", str(ROOT), "checkout", REV], check=True)
+            # Clone d'une session précédente : remis à REV (notebook et code du même commit).
+            subprocess.run(["git", "-C", str(ROOT), "fetch", "-q", "origin", REV], check=True)
+            subprocess.run(["git", "-C", str(ROOT), "checkout", "-q", "FETCH_HEAD"], check=True)
+            for m in [m for m in sys.modules if m.split(".")[0] in ("tools", "yolo")]:
+                del sys.modules[m]  # modules importés avant la mise à jour
             subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e",
                             f"{{ROOT}}/python[data,plots]"], check=True)
             if DEVICE == "gpu":

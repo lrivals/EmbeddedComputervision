@@ -210,6 +210,9 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - en local, contrôle des témoins de `tools/get_datasets.sh` (`matrice.DATA_MARKERS`, que
     le test compare au script), des poids et de la cfg, puis arrêt (`env.Prerequis`) avec
     les commandes à lancer ;
+  - sur Colab, clone remis à `REV` à chaque exécution (`git fetch` puis `checkout
+    FETCH_HEAD`, modules `tools` et `yolo` déjà importés oubliés) : un clone d'une session
+    précédente ne reste pas en retard sur le notebook ;
   - sur Colab, branchement sur `colab.prepare_data(DATASET, DRIVE_DIR)`, avec montage de
     Drive seulement pour les jeux qui ne se téléchargent pas ;
   - contrôle GPU par `yolo.backend.use`, sans repli ; traçabilité par `env.trace` (révision,
