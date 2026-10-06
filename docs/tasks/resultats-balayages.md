@@ -1,8 +1,8 @@
-# Résultats des balayages et inférences (VOC, VisDrone)
+# Résultats des balayages et inférences (VOC, VisDrone, KITTI)
 
 Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
-`notebooks/voc/` et `notebooks/visdrone/`, sur un runtime Colab à GPU
-([colab-vscode.md](colab-vscode.md)), révision `1a967f4`. Les runs sont dans
+`notebooks/voc/`, `notebooks/visdrone/` et `notebooks/kitti/`, sur un runtime Colab à GPU
+([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI : `9a76534`). Les runs sont dans
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
@@ -13,6 +13,7 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 |---|---|---|
 | VOC | [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb) | [tiny-yolov3-voc](../../notebooks/voc/tiny-yolov3-voc_infer.ipynb), [tiny-yolov3-coco](../../notebooks/voc/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb) |
 | VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
+| KITTI | à relancer en entier (« Run All ») pour être versionné : exécution partielle | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
 réécrit les PNG de [figures/resultats/](figures/resultats/). Pour les voir se mettre à jour
@@ -37,7 +38,7 @@ split complet ([results/map_float.md](../../results/map_float.md)).
 
 ![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
 
-Chaque panneau a sa propre échelle : VisDrone plafonne à 2,24, VOC à 36,27.
+Chaque panneau a sa propre échelle : VOC plafonne à 36,27, VisDrone à 2,24, KITTI à 2,38.
 
 ## VOC
 
@@ -94,11 +95,45 @@ pedestrian et people → person, van → car, motor → motorbike ; tricycle et
 awning-tricycle ignorés) : elles ne se comparent pas directement à la mAP à 10 classes.
 Par classe, `car` est à 21,5 pour COCO contre 17,4 pour le run affiné.
 
+## KITTI
+
+### Balayage `tiny-yolov3-kitti` (cfg `build/m11/cfg/tiny-yolov3-kitti.cfg`, 8 classes, 5 985 images)
+
+| run | lot | images | époques | perte finale | mAP (50 images) |
+|---|---|---|---|---|---|
+| **b32-sall** | 32 | tout | 3,21 | 19,52 | **2,38** |
+| b16-sall | 16 | tout | 1,60 | 20,29 | 2,23 |
+| b8-sall | 8 | tout | 0,80 | 22,12 | 2,18 |
+| b32-s500 | 32 | 500 | 38,40 | 17,99 | 2,02 |
+| b16-s500 | 16 | 500 | 19,20 | 20,39 | 0,50 |
+| b8-s500 | 8 | 500 | 9,60 | 21,49 | 0,49 |
+
+Même classement que sur VOC et VisDrone : `b32-sall` en tête, les runs sur tout le split
+devant ceux à 500 images. Les quatre premiers se tiennent en 0,4 point, dans le bruit à
+50 images. Seule `Car` décolle (AP 16,8 pour b32-sall) ; Truck et Pedestrian 1,1, les
+autres classes à 0. Durée : ≈ 10 min par run de lot 32 (604 s pour b32-sall).
+
+Les images de KITTI (1242×375) sont écrasées en 416×416 par `stretch` : les objets
+perdent les deux tiers de leur hauteur relative. C'est l'argument pour l'entrée 640×192
+de T11.4 ([M15, T15.12](M15-campagne-entrainement.md)).
+
+### Inférence hors domaine (T11.2) sur les mêmes 50 images
+
+| modèle | classes évaluées | mAP |
+|---|---|---|
+| `tiny-yolov3-coco` | 4 (person, car, train, truck) | 20,55 |
+| `tiny-yolov2-voc` | 3 (car, person, train) | 17,50 |
+| `tiny-yolov3-kitti` `b32-sall` | 8 | 2,38 |
+
+Correspondances (`MAPPINGS`) : Car et Van → car, Pedestrian et Person_sitting → person,
+Tram → train, Truck → truck (COCO seulement) ; Cyclist et Misc ignorés. Par classe, `car`
+est à 49,7 pour COCO et 29,6 pour Tiny-YOLOv2 VOC, contre 16,8 pour le run affiné.
+
 ![Run affiné face aux poids publiés](figures/resultats/balayage_modeles.png)
 
 ## Meilleurs paramètres
 
-**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur les deux jeux. C'est le
+**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur les trois jeux. C'est le
 run par défaut des notebooks d'inférence (`RUN = None` prend le plus récent, ici
 `b32-sall`).
 
@@ -109,6 +144,9 @@ python tools/train.py --net tiny-yolov3-voc --init coco --iters 600 --batch 32 \
 python tools/train.py --net build/m11/cfg/tiny-yolov3-visdrone.cfg --dataset visdrone \
     --init coco --iters 600 --batch 32 --lr 0.001 --burn-in 500 --multiscale \
     --workers 4 --device gpu --out build/notebooks/visdrone/tiny-yolov3-visdrone/runs/b32-sall
+python tools/train.py --net build/m11/cfg/tiny-yolov3-kitti.cfg --dataset kitti \
+    --init coco --iters 600 --batch 32 --lr 0.001 --burn-in 500 --multiscale \
+    --workers 4 --device gpu --out build/notebooks/kitti/tiny-yolov3-kitti/runs/b32-sall
 ```
 
 Ce que montre la grille :
@@ -121,8 +159,8 @@ Ce que montre la grille :
   (0,29 époque) est le pire run VOC : le burn-in occupe 500 des 600 itérations, le LR
   n'atteint sa valeur qu'à la fin et le gradient d'un lot de 8 est bruité.
 - **Écarts faibles entre les deux meilleurs.** `b32-sall` et `b16-sall` (1,6 point sur
-  VOC) ne se départagent pas sur 50 images ; sur VisDrone, tous les runs sauf `b32-sall`
-  restent dans le bruit (0,6 à 1,4).
+  VOC, 0,15 sur KITTI) ne se départagent pas sur 50 images ; sur VisDrone, tous les runs
+  sauf `b32-sall` restent dans le bruit (0,6 à 1,4).
 
 ![Perte finale face à la mAP](figures/resultats/balayage_perte.png)
 
@@ -136,16 +174,18 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
 - **Entraînement trop court.** L'affinage de 600 itérations part des poids COCO, qui
   font 68,45 sur VOC avec la table de correspondance, et tombe à 36,27 : les têtes à
   20 classes repartent de zéro et n'ont vu qu'une époque. Sur VisDrone (petits objets
-  nombreux), l'écart est plus fort encore.
+  nombreux) et KITTI (images écrasées), le run affiné reste même sous les poids publiés
+  hors domaine.
 - **Pistes**, dans l'ordre :
   1. allonger `ITERS` sur la configuration retenue (lot 32, tout le split ; palier N) ;
      l'exemple de `tools/train.py` pour VOC est à 20 000 itérations ;
   2. raccourcir `BURN_IN` (100 à 200) ou ajuster le LR au lot pour les runs courts ;
   3. VisDrone : entrée plus grande (`SIZE`, ex. `608` ou non carrée) pour les petits
-     objets, avec les ancres k-means recalculées à cette taille.
+     objets, avec les ancres k-means recalculées à cette taille ; KITTI : entrée
+     `SIZE = '640x192'`.
 - **Confirmer le classement** sur le split complet : notebook `_infer` avec
   `COMPARE = True` et `SUBSET = 0` (palier N), puis volet entier (`INT8 = True`, T14.4)
   sur le run retenu.
-- FLIR et KITTI : pas de résultat. FLIR s'arrête à la cellule d'environnement (jeu absent
-  du Drive : `tools/get_datasets.sh push flir`), KITTI a été interrompu avant les runs.
-  Exécutions partielles, donc non versionnées : les deux notebooks sont remis à vide.
+- FLIR : pas de résultat. Le notebook s'arrête à la cellule d'environnement (jeu absent
+  du Drive : `tools/get_datasets.sh push flir`) ; exécution partielle, donc non
+  versionnée : le notebook est remis à vide.

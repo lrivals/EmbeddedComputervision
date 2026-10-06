@@ -145,7 +145,7 @@ Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : 
 
 ### T13.53 — `balayage`
 
-Balayages lot × sous-ensemble (VOC, VisDrone) : mAP par lot, perte finale face à la mAP, et run affiné face aux poids publiés. 50 images, palier R.
+Balayages lot × sous-ensemble, un panneau par jeu : mAP par lot, perte finale face à la mAP, et run affiné face aux poids publiés. 50 images, palier R.
 
 - Commande : `python -m tools.figures balayage`
 - Source : `docs/tasks/resultats-balayages.md (tables des notebooks _sweep et _infer)`

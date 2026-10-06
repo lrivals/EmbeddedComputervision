@@ -411,7 +411,8 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   images classe les runs, elle n'est pas publiable (règles de M12).
 - **Fait** : notebooks et `runs.py` ; tests de la commande d'une case, de
   `find_runs`/`pick`/`table` et de `read_map` (tables VOC et COCO de `eval_voc.py`).
-- **Reste** : balayages KITTI et FLIR. VOC et VisDrone lancés sur Colab (palier R) :
+- **Reste** : balayage FLIR (jeu absent du Drive). VOC, VisDrone et KITTI lancés sur
+  Colab (palier R) :
   [resultats-balayages.md](resultats-balayages.md).
 
 ### [x] T14.11 — Inférence : choix d'un run et comparaison

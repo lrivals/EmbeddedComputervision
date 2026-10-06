@@ -1458,7 +1458,7 @@ def plot_balayage_modeles(data, out_dir, name="balayage_modeles"):
 
 
 @figure("balayage", "resultats", "T13.53",
-        "Balayages lot × sous-ensemble (VOC, VisDrone) : mAP par lot, perte finale face à la "
+        "Balayages lot × sous-ensemble, un panneau par jeu : mAP par lot, perte finale face à la "
         "mAP, et run affiné face aux poids publiés. 50 images, palier R.",
         f"{BALAYAGES_MD} (tables des notebooks _sweep et _infer)", subset=True,
         dest=ROOT / "docs" / "tasks" / "figures")

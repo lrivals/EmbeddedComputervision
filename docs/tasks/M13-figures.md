@@ -465,7 +465,8 @@ restent des données à produire :
 - **Spec** : §7 · **Dépend de** : T14.10, T14.11 · **Taille** : S
 - **Livrables** : `docs/tasks/figures/resultats/balayage_{map,perte,modeles}.png`,
   illustrations de [resultats-balayages.md](resultats-balayages.md) :
-  - mAP par lot, une barre par sous-ensemble d'entraînement, un panneau par jeu ;
+  - mAP par lot, une barre par sous-ensemble d'entraînement, un panneau par jeu (VOC,
+    VisDrone, KITTI à ce jour) ;
   - perte finale face à la mAP (le surapprentissage des runs à 500 images) ;
   - run affiné face aux poids Darknet (hors domaine pour VisDrone).
 - **Acceptation** : les valeurs sont lues dans les tableaux de `resultats-balayages.md`

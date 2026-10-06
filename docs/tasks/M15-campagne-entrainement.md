@@ -12,16 +12,19 @@ Constat de départ ([resultats-balayages.md](resultats-balayages.md), palier R,
   réapprendre les têtes réinitialisées.
 - **VisDrone** : meilleur run `b32-sall`, mAP 2,24 ; pertes de 186 à 252, aucun run n'a
   convergé ; seule `car` décolle (AP 17,4).
+- **KITTI** : meilleur run `b32-sall`, mAP 2,38, en 416×416 `stretch` ; seule `Car`
+  décolle (AP 16,8), loin des poids COCO hors domaine (20,55 sur 4 classes, car 49,7).
 - Le classement repose sur 50 images : l'écart entre les deux meilleurs runs VOC
   (1,6 point) est dans le bruit.
 - Seuls le lot et le sous-ensemble sont balayés ; LR (0,001), burn-in (500 sur 600
   itérations) et taille d'entrée sont fixes.
-- FLIR (jeu absent du Drive) et KITTI (interrompu) n'ont pas de résultat ; ExDark et
-  CrowdHuman n'ont pas été lancés.
+- FLIR (jeu absent du Drive) n'a pas de résultat ; ExDark et CrowdHuman n'ont pas été
+  lancés.
 
 Coûts mesurés sur Colab : entraînement GPU ≈ 0,033 s/image (624 s pour 600 itérations
 au lot 32, soit ≈ 1 s/itération) ; évaluation sur CPU ≈ 0,27 s/image, soit ≈ 22 min pour
-VOC2007 test (4 952 images) et ≈ 2,5 min pour VisDrone val (548 images).
+VOC2007 test (4 952 images), ≈ 2,5 min pour VisDrone val (548 images) et ≈ 7 min pour
+KITTI val (1 496 images).
 
 **État** : 0 tâche faite sur 14.
 
@@ -50,16 +53,16 @@ VOC2007 test (4 952 images) et ≈ 2,5 min pour VisDrone val (548 images).
 
 ---
 
-## A. Mesures fiables (VOC, VisDrone)
+## A. Mesures fiables (VOC, VisDrone, KITTI)
 
 ### [ ] T15.1 — Classement sur le split complet
 - **Spec** : §8 · **Dépend de** : T14.11 · **Taille** : S
-- **Livrables** : table des 12 mAP (6 runs × 2 jeux) dans `resultats-balayages.md`
-- **Acceptation** : chaque run de VOC et VisDrone évalué sur tout le split ; meilleur run
-  confirmé ou remplacé
-- **Notes** : `notebooks/voc/tiny-yolov3-voc_infer.ipynb` et
-  `notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb` avec `COMPARE = True`,
-  `SUBSET = 0`. Compter ≈ 2 h 15 pour VOC (6 × 22 min), ≈ 15 min pour VisDrone.
+- **Livrables** : table des 18 mAP (6 runs × 3 jeux) dans `resultats-balayages.md`
+- **Acceptation** : chaque run de VOC, VisDrone et KITTI évalué sur tout le split ;
+  meilleur run confirmé ou remplacé
+- **Notes** : notebooks `_infer` de `tiny-yolov3-voc`, `tiny-yolov3-visdrone` et
+  `tiny-yolov3-kitti` avec `COMPARE = True`, `SUBSET = 0`. Compter ≈ 2 h 15 pour VOC
+  (6 × 22 min), ≈ 15 min pour VisDrone, ≈ 40 min pour KITTI.
 
 ### [ ] T15.2 — Bruit d'un run
 - **Spec** : §7 · **Dépend de** : T15.1 · **Taille** : S
@@ -163,16 +166,28 @@ au balayage, split complet ensuite).
 
 ### [ ] T15.12 — KITTI
 - **Spec** : §5.2, §10.2 · **Dépend de** : T11.4 · **Taille** : L
-- **Livrables** : balayage `notebooks/kitti/tiny-yolov3-kitti_sweep.ipynb` relancé
-  jusqu'au bout ; runs longs en letterbox 416×416 et à 640×192
+- **Livrables** : runs longs en 416×416 et à 640×192 ; balayage à 640×192
+  (`SIZE = '640x192'` dans `_sweep`)
 - **Acceptation** : mAP sur KITTI val (1 496 images) aux deux entrées ; relie
   [T11.4](M11-jeux-de-donnees.md)
-- **Notes** : le premier balayage a été interrompu avant les runs. À 640×192, l'image
-  occupe toute l'entrée au lieu de ≈ 30 % en letterbox.
+- **Notes** :
+  - balayage 416×416 `stretch` fait (rév. `1a967f4`, détails dans
+    [resultats-balayages.md](resultats-balayages.md#kitti)) : même meilleur run que VOC et
+    VisDrone. Le notebook `_sweep` est à relancer en entier (« Run All », runs sautés par
+    `SKIP_DONE`) pour être versionné avec ses sorties ;
+  - en `stretch` 416×416, une image 1242×375 perd les deux tiers de sa hauteur relative ;
+    en letterbox elle n'occupe que ≈ 30 % de l'entrée. À 640×192, elle occupe toute
+    l'entrée.
 
   | run | lot | images | entrée | mAP (50 images) | mAP (complet) |
   |---|---|---|---|---|---|
-  | à remplir | | | | | |
+  | b32-sall | 32 | tout | 416×416 | 2,38 | |
+  | b16-sall | 16 | tout | 416×416 | 2,23 | |
+  | b8-sall | 8 | tout | 416×416 | 2,18 | |
+  | b32-s500 | 32 | 500 | 416×416 | 2,02 | |
+  | b16-s500 | 16 | 500 | 416×416 | 0,50 | |
+  | b8-s500 | 8 | 500 | 416×416 | 0,49 | |
+  | à remplir (640×192) | | | 640×192 | | |
 
 ### [ ] T15.13 — FLIR
 - **Spec** : §10.2 · **Dépend de** : T11.7 · **Taille** : L

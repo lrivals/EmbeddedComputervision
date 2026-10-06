@@ -48,7 +48,7 @@ d'acceptation mesurable.
   entraînés ; index dans [notebooks/README.md](notebooks/README.md).
 - **[M15](docs/tasks/M15-campagne-entrainement.md)** : campagne d'entraînement sur Colab,
   du balayage rapide au run long confirmé sur le split complet, jeu par jeu ; premiers
-  résultats (VOC, VisDrone) dans
+  résultats (VOC, VisDrone, KITTI) dans
   [resultats-balayages.md](docs/tasks/resultats-balayages.md).
 
 ## Arborescence
