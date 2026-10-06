@@ -47,10 +47,10 @@ ls -l data_archives/                 # doivent être identiques
 
 | Jeu | Taille | Témoin (`data/…`) | Sur le Drive | Remarque |
 |---|---|---|---|---|
-| voc | 2,9 Go | `VOCdevkit/VOC2007/ImageSets/Main/test.txt` | à faire | aussi par `tools/get_voc.sh` |
+| voc | 2,9 Go | `VOCdevkit/VOC2007/ImageSets/Main/test.txt` | ✓ (6 oct. 2026) | aussi par `tools/get_voc.sh` |
 | exdark | 1,5 Go | `exdark/imageclasslist.txt` | ✓ (6 oct. 2026) | seule voie : annotations absentes de Kaggle |
-| visdrone | 1,9 Go | `visdrone/VisDrone2019-DET-val/annotations` | à faire | aussi par l'API Kaggle |
-| crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | à faire | aussi par l'API Kaggle ; le plus long à envoyer |
+| visdrone | 1,9 Go | `visdrone/VisDrone2019-DET-val/annotations` | ✓ (6 oct. 2026) | aussi par l'API Kaggle |
+| crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | ✓ (6 oct. 2026) | aussi par l'API Kaggle ; le plus long à envoyer |
 | coco | ≈ 1,3 Go | `coco/annotations/instances_val2017.json` | — | absent du PC ; se retélécharge (`get_datasets.sh coco`) |
 | kitti | ≈ 12 Go | `kitti/training/image_2/000000.png` | — | absent du PC ; se retélécharge (`get_datasets.sh kitti`) |
 | flir | — | `flir/images_thermal_val/coco.json` | — | inscription ; seule voie une fois téléchargé |
