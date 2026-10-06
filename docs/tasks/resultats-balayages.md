@@ -106,6 +106,8 @@ Ce que montre la grille :
 
 ## Limites et suite
 
+Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
+
 - **Entraînement trop court.** L'affinage de 600 itérations part des poids COCO, qui
   font 68,45 sur VOC avec la table de correspondance, et tombe à 36,27 : les têtes à
   20 classes repartent de zéro et n'ont vu qu'une époque. Sur VisDrone (petits objets

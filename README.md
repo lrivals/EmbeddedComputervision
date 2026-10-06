@@ -23,7 +23,7 @@ Détails : [docs/architecture.md](docs/architecture.md) · conventions :
 
 ## Plan de travail
 
-Le travail est découpé en jalons M0 à M14 dans [docs/tasks/](docs/tasks/README.md). Chaque
+Le travail est découpé en jalons M0 à M15 dans [docs/tasks/](docs/tasks/README.md). Chaque
 tâche indique la section de la spec, ses dépendances, ses livrables et un critère
 d'acceptation mesurable.
 
@@ -46,6 +46,10 @@ d'acceptation mesurable.
   de balayage (lot × sous-ensemble), un par modèle × jeu, générés par `make notebooks` et
   exécutables en local comme sur Colab (GPU) ; l'inférence choisit ou compare les runs
   entraînés ; index dans [notebooks/README.md](notebooks/README.md).
+- **[M15](docs/tasks/M15-campagne-entrainement.md)** : campagne d'entraînement sur Colab,
+  du balayage rapide au run long confirmé sur le split complet, jeu par jeu ; premiers
+  résultats (VOC, VisDrone) dans
+  [resultats-balayages.md](docs/tasks/resultats-balayages.md).
 
 ## Arborescence
 
