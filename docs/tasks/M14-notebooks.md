@@ -56,10 +56,12 @@ entraînement (« Reste » de chaque tâche).
   [results/figures.md](../../results/figures.md). Une ligne par notebook : jeu, modèle,
   rôle, palier de coût, poids requis, badge « Open in Colab ».
 - **Visionneuse** : `notebooks/figures_live.ipynb`, hors registre modèle × jeu, générée
-  avec l'index (`gabarits.viewer`). Affichage seul : une cellule montre les PNG de
-  `results/figures/`, `build/figures/`, `docs/tasks/figures/` et `build/notebooks/`, par
-  dossier, les plus récents en tête ; la relancer pour voir les nouvelles images. À ouvrir
-  avec un noyau **local** : un noyau Colab ne voit pas les PNG du PC (la cellule le dit).
+  avec l'index (`gabarits.viewer`). Affichage seul et **sans exécution** : une cellule
+  Markdown par dossier de PNG versionnés (`docs/tasks/figures/`, `results/figures/`), en
+  liens `![](../…)`, visibles dès l'ouverture dans VS Code comme sur GitHub. La liste est
+  lue sur le disque à la génération : après `make figures`, lancer `make notebooks`
+  (sinon `--check` signale la visionneuse). Les PNG de `build/` (non versionnés)
+  s'affichent par la dernière cellule, avec un noyau local.
 - **Résultats d'exécution** : `build/notebooks/<jeu>/<modèle>/` (checkpoints, JSON des mAP,
   figures). Un notebook n'écrit **jamais** dans `results/`.
 

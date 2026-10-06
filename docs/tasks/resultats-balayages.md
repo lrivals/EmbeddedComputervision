@@ -17,7 +17,8 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
 réécrit les PNG de [figures/resultats/](figures/resultats/). Toutes les figures du dépôt
-s'affichent dans [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb).
+s'affichent dans [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb), sans
+rien exécuter.
 
 ## Conditions
 

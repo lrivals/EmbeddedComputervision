@@ -736,24 +736,45 @@ def render(nb):
 # ------------------------------------------------------------- visionneuse de figures
 
 VIEWER = "figures_live.ipynb"  # affichage des figures, hors registre modèle × jeu × rôle
-VIEWER_DIRS = ["results/figures", "build/figures", "docs/tasks/figures", "build/notebooks"]
+# Figures versionnées, affichées sans exécution (cellules Markdown) ; celles de build/ (non
+# versionnées) par la cellule de code, à lancer avec un noyau local.
+VIEWER_STATIC = ["docs/tasks/figures", "results/figures"]
+VIEWER_DIRS = ["build/figures", "build/notebooks"]
+
+
+def _figure_cells():
+    """Une cellule Markdown par dossier de PNG versionnés : `![nom](../chemin)`."""
+    cells = []
+    for top in VIEWER_STATIC:
+        folders = {}
+        for p in sorted((ROOT / top).rglob("*.png")):
+            folders.setdefault(p.parent, []).append(p)
+        for folder, pngs in folders.items():
+            rel = folder.relative_to(ROOT).as_posix()
+            lines = [f"## `{rel}` ({len(pngs)})", ""]
+            for p in pngs:
+                lines += [f"**{p.stem}**", "", f"![{p.stem}](../{rel}/{p.name})", ""]
+            cells.append(md("\n".join(lines)))
+    return cells
 
 
 def viewer():
-    """Notebook d'affichage seul : montre les PNG des figures, groupés par dossier, les plus
-    récents en tête. Aucun calcul ; relancer la cellule pour voir les nouvelles images."""
+    """Notebook d'affichage seul : les PNG versionnés en cellules Markdown (visibles dès
+    l'ouverture, dans VS Code comme sur GitHub, sans rien exécuter), puis une cellule
+    facultative pour ceux de build/. Régénéré par `make notebooks` après `make figures`."""
     return notebook([
         md("""\
         # Figures
 
-        Affichage seul des PNG de `DIRS` (sous-dossiers compris), par dossier, les plus
-        récents en tête. Les figures se produisent ailleurs : `make figures`,
-        `python -m tools.figures <nom>` (M13), notebooks `_train` et `_sweep` (M14).
-        Relancer la cellule pour voir les nouvelles images. Noyau **local** : les PNG sont
-        sur le PC ; un noyau Colab ne voit que son propre clone du dépôt.
+        Affichage seul, sans exécution : chaque dossier de PNG versionnés
+        (`docs/tasks/figures/`, `results/figures/`) a sa cellule. Une nouvelle figure
+        apparaît ici après `make notebooks` (liste régénérée depuis le disque). Les figures
+        de `build/` (non versionnées) s'affichent par la dernière cellule, avec un noyau local.
         Notebook généré par `python -m tools.notebooks` : modifier
         `tools/notebooks/gabarits.py:viewer`, pas ce fichier.
         """),
+        *_figure_cells(),
+        md("## Figures de `build/` (noyau local)"),
         code(f"""\
         DIRS   = {VIEWER_DIRS!r}  # relatifs à la racine du dépôt
         FILTER = ''  # sous-chaîne du chemin (ex. 'balayage') ; '' : tout

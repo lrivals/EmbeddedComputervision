@@ -109,7 +109,12 @@ def test_visionneuse_generee_et_affichage_seul(tmp_path):
     assert tmp_path / VIEWER in files and VIEWER in files[tmp_path / "README.md"]
     nb = viewer()
     p = _params(nb)
-    assert "docs/tasks/figures" in p["DIRS"] and p["FILTER"] == ""
+    assert "build/figures" in p["DIRS"] and p["FILTER"] == ""
+    shown = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "markdown")
+    # figures versionnées affichées sans exécution, liens relatifs à notebooks/
+    assert "![balayage_map](../docs/tasks/figures/resultats/balayage_map.png)" in shown
+    for link in re.findall(r"\]\(\.\./([^)]+\.png)\)", shown):
+        assert (ROOT / link).exists(), link
     src = "\n".join(_code(nb))
     assert "Image(data=" in src and "SystemExit" in src
     assert "tools.notebooks.commandes" not in src and "C.run" not in src  # aucun calcul
