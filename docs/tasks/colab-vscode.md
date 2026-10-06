@@ -27,8 +27,12 @@ qui clique sur « Run All ».
 
 1. Ouvrir le notebook dans VS Code, par exemple
    [notebooks/kitti/tiny-yolov3-kitti_train.ipynb](../../notebooks/kitti/tiny-yolov3-kitti_train.ipynb).
-2. « Select Kernel » → « Colab » → nouveau serveur, type **GPU** (T4), puis connexion
-   Google.
+2. « Select Kernel » → « Colab » → **nouveau** serveur, type **GPU** (T4 ; L4 ou A100
+   avec Colab Pro), puis connexion Google. Un serveur créé en CPU ne change pas de type :
+   en créer un autre. Contrôle : `!nvidia-smi` dans une cellule affiche le GPU. Sur un
+   runtime CPU, la cellule « Environnement » s'arrête avec « runtime Colab sans GPU » (avant
+   ce contrôle, CuPy disait `cudaErrorInsufficientDriver`). La roue CuPy suit la version
+   CUDA du pilote (`cupy-cuda13x` à partir de 13, sinon `cupy-cuda12x`).
 3. Secrets Colab `KAGGLE_USERNAME` et `KAGGLE_KEY` si le jeu se télécharge depuis Kaggle
    (crowdhuman, visdrone sans archive sur Drive).
 

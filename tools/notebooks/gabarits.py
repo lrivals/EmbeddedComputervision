@@ -265,7 +265,17 @@ def environment(nb):
             subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e",
                             f"{{ROOT}}/python[data,plots]"], check=True)
             if DEVICE == "gpu":
-                subprocess.run([sys.executable, "-m", "pip", "install", "-q", "cupy-cuda12x"],
+                # Runtime CPU : pas de pilote, CuPy dirait « cudaErrorInsufficientDriver ».
+                try:
+                    smi = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
+                except FileNotFoundError:
+                    smi = None
+                if smi is None or smi.returncode != 0:
+                    raise RuntimeError("runtime Colab sans GPU : créer un nouveau serveur Colab "
+                                       "de type GPU (T4, L4 ou A100), ou DEVICE = 'cpu'")
+                cuda = smi.stdout.split("CUDA Version:")[-1].split()[0]  # version du pilote
+                cupy_pkg = "cupy-cuda13x" if int(cuda.split(".")[0]) >= 13 else "cupy-cuda12x"
+                subprocess.run([sys.executable, "-m", "pip", "install", "-q", cupy_pkg],
                                check=True)
         elif ROOT is None:
             raise RuntimeError("racine du dépôt introuvable : ouvrir le notebook depuis notebooks/")
