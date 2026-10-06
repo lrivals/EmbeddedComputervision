@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from tools.notebooks import NB_DIR, ROLES, ROOT
-from tools.notebooks.gabarits import COLAB, ROLE_TITLES, SUBSET_FIRST, dumps, render
+from tools.notebooks.gabarits import COLAB, ROLE_TITLES, SUBSET_FIRST, VIEWER, dumps, render, viewer
 from tools.notebooks.matrice import NOTEBOOKS, how_to_get, palier_of, prerequis
 from tools.notebooks.commandes import M11_TRAIN
 
@@ -46,6 +46,8 @@ def index():
              "[docs/tasks/M14-notebooks.md](../docs/tasks/M14-notebooks.md).", "",
              f"Palier (règles de M12) : premier passage (`SUBSET = {SUBSET_FIRST}`) / passage "
              f"complet (`SUBSET = 0`, ou `ITERS = {M11_TRAIN['iters']}` à l'entraînement).", "",
+             f"Affichage seul : [{VIEWER}]({VIEWER}) montre les figures (M13, runs) et les "
+             "réaffiche dès qu'une image est produite.", "",
              "| Jeu | Modèle | Rôle | Palier | Prérequis | Colab |", "|---|---|---|---|---|---|"]
     for nb in NOTEBOOKS.values():
         pal = _palier(nb)
@@ -61,6 +63,7 @@ def index():
 def generate(nbs, out_dir=NB_DIR):
     """{chemin: texte} des notebooks `nbs` et de l'index."""
     files = {Path(out_dir) / nb.path: dumps(render(nb)) for nb in nbs}
+    files[Path(out_dir) / VIEWER] = dumps(viewer())
     files[Path(out_dir) / "README.md"] = index()
     return files
 
@@ -106,7 +109,7 @@ def main(argv=None):
         if not p.exists() or p.read_text() != text:
             p.write_text(text)
             print(f"  écrit  {_rel(p)}")
-    print(f"{len(files) - 1} notebooks, index {_rel(args.out / 'README.md')}")
+    print(f"{len(files) - 2} notebooks + {VIEWER}, index {_rel(args.out / 'README.md')}")
     return 0
 
 

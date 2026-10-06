@@ -47,7 +47,7 @@ Perte de mAP quand une seule couche est quantifiée (INT8 en fake-quant face au 
 
 - Commande : `python -m tools.figures sensibilite`
 - Source : `build/quant/<net>/eval_test_*_fq*.json, build/m10/mixed/sensitivity.csv`
-- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée (règle M12).
+- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
 
 ### T13.17 — `calibration`
 
@@ -142,6 +142,14 @@ Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : 
 - Source : `weights/, build/m8/<net>/int.jsonl et sim/dets_*.jsonl, data/VOCdevkit`
 
 ![detections](figures/resultats/detections.png)
+
+### T13.53 — `balayage`
+
+Balayages lot × sous-ensemble (VOC, VisDrone) : mAP par lot, perte finale face à la mAP, et run affiné face aux poids publiés. 50 images, palier R.
+
+- Commande : `python -m tools.figures balayage`
+- Source : `docs/tasks/resultats-balayages.md (tables des notebooks _sweep et _infer)`
+- Sous-ensemble d'images : sortie dans `docs/tasks/figures/resultats/`, non publiée dans `results/` (règle M12).
 
 ## Modèles (B)
 

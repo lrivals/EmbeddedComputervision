@@ -1276,3 +1276,193 @@ def plot_detections(dets, out_dir, name="detections"):
         "weights/, build/m8/<net>/int.jsonl et sim/dets_*.jsonl, data/VOCdevkit")
 def detections(out_dir):
     return plot_detections(load_detections(), out_dir)
+
+
+# --- T13.53 : balayages lot × sous-ensemble (docs/tasks/resultats-balayages.md) -----------
+
+BALAYAGES_MD = "docs/tasks/resultats-balayages.md"
+
+
+def _md_number(cell):
+    """« **36,27** » → 36.27 ; None si la cellule n'est pas un nombre."""
+    t = cell.replace("*", "").replace("`", "").replace(" ", "").replace(" ", "")
+    try:
+        return float(t.replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _md_tables(text):
+    """Tables Markdown d'un texte : [(en-têtes, lignes)], cellules nettoyées du gras."""
+    tables, cur = [], []
+    for line in text.splitlines() + [""]:
+        if line.startswith("|"):
+            cur.append([c.strip() for c in line.strip().strip("|").split("|")])
+        elif cur:
+            if len(cur) > 2:
+                head = [c.lower() for c in cur[0]]
+                rows = [[c.replace("**", "").strip() for c in r] for r in cur[2:]]
+                tables.append((head, rows))
+            cur = []
+    return tables
+
+
+def load_balayages(path):
+    """Tables de resultats-balayages.md : {jeu: {"sweep": [run…], "infer": [modèle…]}}.
+
+    Une section `## <jeu>` par jeu ; table de balayage repérée par sa colonne « lot »
+    (run, lot, images, perte finale, mAP), table d'inférence par « modèle » (modèle,
+    classes évaluées, mAP). Les autres sections (conditions, analyse) sont ignorées."""
+    text = Path(need(path)).read_text()
+    out = {}
+    for block in text.split("\n## ")[1:]:
+        title, _, body = block.partition("\n")
+        sweep, infer = [], []
+        for head, rows in _md_tables(body):
+            col = {h: i for i, h in enumerate(head)}
+            mcol = next((i for h, i in col.items() if h.startswith("map")), None)
+            if mcol is None:
+                continue
+            if "lot" in col:
+                for r in rows:
+                    sweep.append({"run": r[col["run"]], "batch": int(r[col["lot"]]),
+                                  "subset": 0 if r[col["images"]] == "tout"
+                                  else int(r[col["images"]]),
+                                  "loss": _md_number(r[col["perte finale"]]),
+                                  "map": _md_number(r[mcol])})
+            elif "modèle" in col:
+                ccol = next((i for h, i in col.items() if h.startswith("classes")), None)
+                for r in rows:
+                    classes = r[ccol].split()[0] if ccol is not None else ""
+                    infer.append({"model": r[col["modèle"]].replace("`", ""),
+                                  "classes": int(classes) if classes.isdigit() else None,
+                                  "map": _md_number(r[mcol])})
+        if sweep or infer:
+            out[title.strip()] = {"sweep": sweep, "infer": infer}
+    if not out:
+        raise MissingSource(f"aucune table de balayage dans {path}")
+    return out
+
+
+SUBSET_STYLE = {0: dict(label="tout le split", color=st.PALETTE[0], hatch="", fill=True),
+                500: dict(label="500 images", color=st.PALETTE[1], hatch="///", fill=False)}
+
+
+def _subset_style(s):
+    return SUBSET_STYLE.get(s, dict(label=f"{s} images", color=st.PALETTE[2], hatch="..",
+                                    fill=False))
+
+
+def plot_balayage_map(data, out_dir, name="balayage_map"):
+    """mAP par lot, une barre par sous-ensemble, un panneau par jeu ; meilleur run marqué."""
+    plt = st.plt()
+    sets = [k for k, v in data.items() if v["sweep"]]
+    fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 3.4), squeeze=False)
+    for ax, ds in zip(axes[0], sets):
+        runs = data[ds]["sweep"]
+        batches = sorted({r["batch"] for r in runs})
+        subsets = sorted({r["subset"] for r in runs}, key=lambda s: (s == 0, s))
+        best = max(runs, key=lambda r: r["map"])
+        x = np.arange(len(batches))
+        w = 0.8 / len(subsets)
+        top = max(r["map"] for r in runs)
+        for k, s in enumerate(subsets):
+            sty = _subset_style(s)
+            for xi, b in zip(x, batches):
+                r = next((r for r in runs if r["batch"] == b and r["subset"] == s), None)
+                if r is None:
+                    continue
+                xb = xi + (k - (len(subsets) - 1) / 2) * w
+                ax.bar(xb, r["map"], w * 0.92, color=sty["color"] if sty["fill"] else "white",
+                       edgecolor=sty["color"], hatch=sty["hatch"], linewidth=1.2,
+                       label=sty["label"] if xi == 0 else None)
+                star = " ★" if r is best else ""
+                ax.text(xb, r["map"] + top * 0.02, f"{r['map']:.2f}{star}".replace(".", ","),
+                        ha="center", va="bottom", fontsize=7, color=st.INK,
+                        fontweight="bold" if r is best else "normal")
+        ax.set_xticks(x, [f"lot {b}" for b in batches])
+        ax.set_axisbelow(True)
+        ax.set_ylim(0, top * 1.18)
+        ax.set_ylabel("mAP (%)")
+        ax.set_title(f"{ds} — meilleur : {best['run']}")
+        ax.grid(axis="x", visible=False)
+    axes[0][0].legend(loc="upper left")
+    st.note(axes[0][-1], "50 images, palier R (non publiable)")
+    fig.tight_layout()
+    return st.save(fig, out_dir, name)
+
+
+def _label_offset(r, runs):
+    """Étiquette au-dessus à droite, ou en dessous si un voisin proche la masquerait."""
+    span_x = (max(q["loss"] for q in runs) - min(q["loss"] for q in runs)) or 1
+    span_y = (max(q["map"] for q in runs) - min(q["map"] for q in runs)) or 1
+    for q in runs:
+        if (q is not r and abs(q["loss"] - r["loss"]) < 0.08 * span_x
+                and 0 <= q["map"] - r["map"] < 0.08 * span_y):
+            return (5, -11)
+    return (5, 4)
+
+
+def plot_balayage_perte(data, out_dir, name="balayage_perte"):
+    """Perte finale face à la mAP : une perte basse sur 500 images ne fait pas une bonne mAP."""
+    plt = st.plt()
+    sets = [k for k, v in data.items() if v["sweep"]]
+    fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 3.4), squeeze=False)
+    for ax, ds in zip(axes[0], sets):
+        runs = data[ds]["sweep"]
+        for s in sorted({r["subset"] for r in runs}, key=lambda s: (s == 0, s)):
+            sty = _subset_style(s)
+            pts = [r for r in runs if r["subset"] == s]
+            ax.scatter([r["loss"] for r in pts], [r["map"] for r in pts], s=48, zorder=3,
+                       facecolor=sty["color"] if sty["fill"] else "white",
+                       edgecolor=sty["color"], linewidth=1.6, label=sty["label"])
+            for r in pts:
+                ax.annotate(r["run"], (r["loss"], r["map"]), xytext=_label_offset(r, runs),
+                            textcoords="offset points", fontsize=7, color=st.INK2)
+        ax.set_xlabel("perte finale (600 itérations)")
+        ax.set_ylabel("mAP (%)")
+        ax.set_title(ds)
+        ax.margins(x=0.18, y=0.15)
+    axes[0][0].legend(loc="lower left")
+    st.note(axes[0][-1], "50 images, palier R")
+    fig.tight_layout()
+    return st.save(fig, out_dir, name)
+
+
+def plot_balayage_modeles(data, out_dir, name="balayage_modeles"):
+    """mAP des poids publiés (hors domaine pour VisDrone) face au meilleur run affiné."""
+    plt = st.plt()
+    sets = [k for k, v in data.items() if v["infer"]]
+    fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 2.6), squeeze=False)
+    for ax, ds in zip(axes[0], sets):
+        rows = data[ds]["infer"][::-1]
+        top = max(r["map"] for r in rows)
+        y = np.arange(len(rows))
+        for yi, r in zip(y, rows):
+            color = st.NET_COLORS.get(r["model"], st.PALETTE[2])
+            ax.barh(yi, r["map"], 0.6, color=color)
+            ax.text(r["map"] + top * 0.02, yi, f"{r['map']:.2f}".replace(".", ","),
+                    va="center", fontsize=7, color=st.INK)
+        labels = [f"{r['model'].split()[0]}\n({r['classes']} classes)" if r["classes"]
+                  else r["model"] for r in rows]
+        ax.set_yticks(y, labels, fontsize=7)
+        ax.set_xlim(0, top * 1.2)
+        ax.set_axisbelow(True)
+        ax.set_xlabel("mAP (%)")
+        ax.set_title(ds)
+        ax.grid(axis="y", visible=False)
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.text(0.99, 0.01, "50 images, palier R ; hors domaine : classes communes seulement",
+             ha="right", va="bottom", fontsize=7, color=st.MUTED)
+    return st.save(fig, out_dir, name)
+
+
+@figure("balayage", "resultats", "T13.53",
+        "Balayages lot × sous-ensemble (VOC, VisDrone) : mAP par lot, perte finale face à la "
+        "mAP, et run affiné face aux poids publiés. 50 images, palier R.",
+        f"{BALAYAGES_MD} (tables des notebooks _sweep et _infer)", subset=True,
+        dest=ROOT / "docs" / "tasks" / "figures")
+def balayage(out_dir):
+    data = load_balayages(ROOT / BALAYAGES_MD)
+    return (plot_balayage_map(data, out_dir) + plot_balayage_perte(data, out_dir)
+            + plot_balayage_modeles(data, out_dir))

@@ -15,7 +15,7 @@ ajoute des figures sur cinq axes :
 Chaque figure est **régénérable par une commande** et lit ses données dans un fichier
 versionné ou produit par un outil existant. Aucun chiffre n'est recopié à la main.
 
-**État** : 53 tâches faites sur 53. `make figures` produit 54 figures en une minute environ,
+**État** : 54 tâches faites sur 54. `make figures` produit 55 figures en une minute environ,
 réunies dans la galerie [results/figures.md](../../results/figures.md). Le code est complet ;
 restent des données à produire :
 - les synthèses Vitis (`make hls-synth`, `hls-synth-pow2`, `hls-synth-stream`), qui rendent
@@ -460,6 +460,20 @@ restent des données à produire :
 - **Notes** :
   - superposer plusieurs runs (QAT 300 face à 600 itérations, CPU face à GPU de T12.11) ;
   - utile au diagnostic de T12.6 (ADMM non convergé).
+
+### [x] T13.53 — Balayages lot × sous-ensemble
+- **Spec** : §7 · **Dépend de** : T14.10, T14.11 · **Taille** : S
+- **Livrables** : `docs/tasks/figures/resultats/balayage_{map,perte,modeles}.png`,
+  illustrations de [resultats-balayages.md](resultats-balayages.md) :
+  - mAP par lot, une barre par sous-ensemble d'entraînement, un panneau par jeu ;
+  - perte finale face à la mAP (le surapprentissage des runs à 500 images) ;
+  - run affiné face aux poids Darknet (hors domaine pour VisDrone).
+- **Acceptation** : les valeurs sont lues dans les tableaux de `resultats-balayages.md`
+  (`load_balayages`, testé contre un tableau jouet), jamais recopiées
+- **Notes** : mAP sur 50 images (palier R), donc hors de `results/` (règle M12). Le champ
+  `dest` du registre envoie la figure dans `docs/tasks/figures/` pour qu'elle s'affiche
+  dans la doc. Un nouveau jeu ajouté au fichier (section `## <jeu>` avec ses tableaux)
+  ajoute un panneau sans toucher au code.
 
 ## E. Développement du projet
 

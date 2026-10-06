@@ -97,6 +97,6 @@ reporter ici l'avancement par jalon.
 | M10 | 13 (+ renvoi T10.12) | 0 |
 | M12 | 11 | 0 |
 | M11 | 8 (+ renvoi T11.8) | 0 |
-| M13 | 53 | 53 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
+| M13 | 54 | 54 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
 | M14 | 12 | 5 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
 | M15 | 14 | 0 |

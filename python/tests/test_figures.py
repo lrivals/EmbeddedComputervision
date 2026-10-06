@@ -272,6 +272,67 @@ def test_resources_hwpp_plots(tmp_path):
     _pngs(resultats.plot_hwpp(0.5566, 0.5556, 0.5556, RNG.integers(0, 200, 500), tmp_path))
 
 
+BALAYAGES = """# Résultats
+
+## Conditions
+
+| | |
+|---|---|
+| palier | R |
+
+## VOC
+
+### Balayage
+
+| run | lot | images | époques | perte finale | mAP (50 images) |
+|---|---|---|---|---|---|
+| **b32-sall** | 32 | tout | 1,16 | 14,66 | **36,27** |
+| b8-s500 | 8 | 500 | 9,60 | 18,00 | 30,14 |
+
+### Inférence
+
+| modèle | poids | classes évaluées | mAP |
+|---|---|---|---|
+| `tiny-yolov3-coco` | Darknet | 20 (via `MAPPINGS`) | **68,45** |
+| `tiny-yolov3-voc` | run `b32-sall` | 20 | 36,27 |
+
+## VisDrone
+
+| run | lot | images | époques | perte finale | mAP (50 images) |
+|---|---|---|---|---|---|
+| b16-s500 | 16 | 500 | 19,20 | 220,65 | 1,35 |
+
+## Meilleurs paramètres
+
+Texte.
+"""
+
+
+def test_balayages_parsed_as_doc(tmp_path):
+    md = tmp_path / "resultats-balayages.md"
+    md.write_text(BALAYAGES)
+    d = resultats.load_balayages(md)
+    assert list(d) == ["VOC", "VisDrone"]
+    assert d["VOC"]["sweep"][0] == {"run": "b32-sall", "batch": 32, "subset": 0,
+                                    "loss": 14.66, "map": 36.27}
+    assert d["VOC"]["sweep"][1]["subset"] == 500
+    assert d["VOC"]["infer"] == [{"model": "tiny-yolov3-coco", "classes": 20, "map": 68.45},
+                                 {"model": "tiny-yolov3-voc", "classes": 20, "map": 36.27}]
+    assert d["VisDrone"] == {"sweep": [{"run": "b16-s500", "batch": 16, "subset": 500,
+                                        "loss": 220.65, "map": 1.35}], "infer": []}
+    names = [p.name for p in _pngs(resultats.plot_balayage_map(d, tmp_path)
+                                   + resultats.plot_balayage_perte(d, tmp_path)
+                                   + resultats.plot_balayage_modeles(d, tmp_path))]
+    assert names == ["balayage_map.png", "balayage_perte.png", "balayage_modeles.png"]
+    with pytest.raises(F.MissingSource):
+        resultats.load_balayages(tmp_path / "absent.md")
+
+
+def test_dest_overrides_output_dir():
+    fig = F.FIGURES["balayage"]
+    assert fig.subset and F.out_dir_of(fig) == F.ROOT / "docs" / "tasks" / "figures" / "resultats"
+
+
 def test_training_load_and_plots(tmp_path):
     run = tmp_path / "run"
     run.mkdir()

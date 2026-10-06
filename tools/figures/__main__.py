@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-from tools.figures import BUILD, FIGURES, RESULTS, out_dir_of, run, select
+from tools.figures import BUILD, FIGURES, RESULTS, _rel, out_dir_of, run, select
 
 FAMILY_TITLES = {"resultats": "Résultats (D)", "modeles": "Modèles (B)",
                  "projet": "Développement du projet (E)", "materiel": "Matériel (C)",
@@ -41,8 +41,9 @@ def gallery(status=None, results=RESULTS, build=BUILD):
                       f"- Commande : `{f.command}`", f"- Source : `{f.source}`"]
             imgs = images_of(f, results, build)
             if f.subset:
-                lines.append("- Sous-ensemble d'images : sortie dans "
-                             f"`build/figures/{f.family}/`, non publiée (règle M12).")
+                where = _rel(out_dir_of(f, results, build))
+                lines.append(f"- Sous-ensemble d'images : sortie dans `{where}/`, non publiée "
+                             "dans `results/` (règle M12).")
             elif imgs:
                 lines.append("")
                 for p in imgs:

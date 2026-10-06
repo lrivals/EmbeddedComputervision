@@ -731,3 +731,100 @@ def sweep_body(nb):
 def render(nb):
     body = {"infer": infer_body, "train": train_body, "sweep": sweep_body}[nb.role](nb)
     return notebook([header(nb), *params(nb), *environment(nb), *body], gpu=nb.trains)
+
+
+# ------------------------------------------------------------- visionneuse de figures
+
+VIEWER = "figures_live.ipynb"  # dans notebooks/, hors registre modèle × jeu × rôle
+VIEWER_DIRS = ["results/figures", "build/figures", "docs/tasks/figures", "build/notebooks"]
+
+
+def viewer():
+    """Notebook d'affichage seul : surveille les PNG des figures et les réaffiche dès qu'un
+    fichier apparaît ou change (M13 `make figures`, `python -m tools.figures <nom>`, courbes
+    des runs de `_train` et `_sweep`). Aucun calcul, aucune dépendance hors IPython."""
+    return notebook([
+        md("""\
+        # Figures en direct
+
+        Affichage seul : les PNG des dossiers `DIRS` (sous-dossiers compris) sont affichés
+        par dossier, les plus récents en tête, et réaffichés dès qu'une image apparaît ou
+        change. Les figures se produisent ailleurs : `make figures`,
+        `python -m tools.figures <nom>` (M13), notebooks `_train` et `_sweep` (M14).
+        Arrêter la surveillance : interrompre le noyau (■).
+        Notebook généré par `python -m tools.notebooks` : modifier
+        `tools/notebooks/gabarits.py:viewer`, pas ce fichier.
+        """),
+        md("## Paramètres"),
+        code(f"""\
+        DIRS    = {VIEWER_DIRS!r}  # relatifs à la racine du dépôt
+        PATTERN = '*.png'
+        FILTER  = ''  # sous-chaîne du chemin (ex. 'balayage') ; '' : tout
+        EVERY   = 2.0  # secondes entre deux relevés
+        WIDTH   = 900  # largeur d'affichage (px)
+        """, tags=("parameters",)),
+        md("## Surveillance"),
+        code("""\
+        import time
+        from datetime import datetime
+        from pathlib import Path
+
+        from IPython.display import Image, Markdown, clear_output, display
+
+
+        def repo_root():
+            for d in (Path.cwd(), *Path.cwd().parents):
+                if (d / "tools" / "figures").is_dir():
+                    return d
+            return Path.cwd()
+
+
+        ROOT = repo_root()
+
+
+        def snapshot():
+            \"\"\"{chemin: mtime} des images surveillées.\"\"\"
+            seen = {}
+            for d in DIRS:
+                for p in (ROOT / d).rglob(PATTERN):
+                    if FILTER in str(p) and ".ipynb_checkpoints" not in p.parts:
+                        try:
+                            seen[p] = p.stat().st_mtime
+                        except FileNotFoundError:  # réécrite pendant le relevé
+                            pass
+            return seen
+
+
+        def show(seen, changed):
+            clear_output(wait=True)
+            now = datetime.now().strftime("%H:%M:%S")
+            display(Markdown(f"**{len(seen)} images** ; dernier relevé {now} ; "
+                             f"{len(changed)} nouvelle(s) ou modifiée(s)"))
+            for d in DIRS:
+                group = sorted((p for p in seen if p.is_relative_to(ROOT / d)),
+                               key=lambda p: -seen[p])
+                if not group:
+                    continue
+                display(Markdown(f"## `{d}` ({len(group)})"))
+                for p in group:
+                    t = datetime.fromtimestamp(seen[p]).strftime("%Y-%m-%d %H:%M:%S")
+                    new = " — **nouveau**" if p in changed else ""
+                    display(Markdown(f"`{p.relative_to(ROOT)}` · {t}{new}"))
+                    try:
+                        display(Image(filename=str(p), width=WIDTH))
+                    except (OSError, ValueError):  # PNG en cours d'écriture
+                        display(Markdown("*(illisible, réessai au prochain relevé)*"))
+
+
+        last = {}
+        try:
+            while True:
+                seen = snapshot()
+                if seen != last:
+                    show(seen, {p for p, m in seen.items() if last.get(p) != m} if last else set())
+                    last = seen
+                time.sleep(EVERY)
+        except KeyboardInterrupt:
+            print("surveillance arrêtée")
+        """),
+    ])

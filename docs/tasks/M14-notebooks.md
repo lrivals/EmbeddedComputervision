@@ -52,6 +52,10 @@ entraînement (« Reste » de chaque tâche).
 - **Index** : `notebooks/README.md`, réécrit depuis le registre comme
   [results/figures.md](../../results/figures.md). Une ligne par notebook : jeu, modèle,
   rôle, palier de coût, poids requis, badge « Open in Colab ».
+- **Visionneuse** : `notebooks/figures_live.ipynb`, hors registre modèle × jeu, générée
+  avec l'index (`gabarits.viewer`). Affichage seul : elle surveille les PNG de
+  `results/figures/`, `build/figures/`, `docs/tasks/figures/` et `build/notebooks/` et les
+  réaffiche dès qu'une image apparaît ou change.
 - **Résultats d'exécution** : `build/notebooks/<jeu>/<modèle>/` (checkpoints, JSON des mAP,
   figures). Un notebook n'écrit **jamais** dans `results/`.
 

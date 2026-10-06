@@ -6,6 +6,10 @@ Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
+Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
+réécrit les PNG de [figures/resultats/](figures/resultats/). Pour les voir se mettre à jour
+pendant qu'on travaille : [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb).
+
 ## Conditions
 
 | | |
@@ -20,6 +24,12 @@ Ces mAP **classent** les runs ; elles ne sont **pas publiables** (règles de
 classe peut n'avoir qu'une ou deux instances : son AP saute entre 0 et 100. Ordre de
 grandeur du biais : Tiny-YOLOv2 VOC fait 63,51 sur ces 50 images contre **56,30** sur le
 split complet ([results/map_float.md](../../results/map_float.md)).
+
+## Vue d'ensemble
+
+![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
+
+Chaque panneau a sa propre échelle : VisDrone plafonne à 2,24, VOC à 36,27.
 
 ## VOC
 
@@ -76,6 +86,8 @@ pedestrian et people → person, van → car, motor → motorbike ; tricycle et
 awning-tricycle ignorés) : elles ne se comparent pas directement à la mAP à 10 classes.
 Par classe, `car` est à 21,5 pour COCO contre 17,4 pour le run affiné.
 
+![Run affiné face aux poids publiés](figures/resultats/balayage_modeles.png)
+
 ## Meilleurs paramètres
 
 **Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur les deux jeux. C'est le
@@ -103,6 +115,11 @@ Ce que montre la grille :
 - **Écarts faibles entre les deux meilleurs.** `b32-sall` et `b16-sall` (1,6 point sur
   VOC) ne se départagent pas sur 50 images ; sur VisDrone, tous les runs sauf `b32-sall`
   restent dans le bruit (0,6 à 1,4).
+
+![Perte finale face à la mAP](figures/resultats/balayage_perte.png)
+
+Sur VOC, les runs à 500 images (marques creuses) ont les pertes les plus basses et les mAP
+les plus faibles : ils surapprennent.
 
 ## Limites et suite
 

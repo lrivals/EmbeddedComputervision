@@ -8,7 +8,8 @@
 Un générateur a la forme `fn(out_dir) -> list[Path]` ; il lève `MissingSource` quand sa
 donnée manque, et la figure est alors sautée avec un message (ce n'est pas une erreur).
 Les figures publiées vont dans `results/figures/<famille>/`. Celles qui portent sur un
-sous-ensemble d'images (`subset=True`, règle M12) vont dans `build/figures/<famille>/`.
+sous-ensemble d'images (`subset=True`, règle M12) vont dans `build/figures/<famille>/`, ou
+dans `dest/<famille>/` si la figure en donne un (illustrations de `docs/tasks/`).
 matplotlib n'est jamais importé depuis `python/yolo/` (ADR 0001) : il est chargé en
 paresseux par `style.plt()`.
 """
@@ -41,6 +42,7 @@ class Figure:
     source: str
     fn: Callable = field(repr=False)
     subset: bool = False
+    dest: Path | None = None
 
     @property
     def command(self):
@@ -50,13 +52,13 @@ class Figure:
 FIGURES: dict[str, Figure] = {}
 
 
-def figure(name, family, task, caption, source, subset=False):
+def figure(name, family, task, caption, source, subset=False, dest=None):
     """Décorateur : enregistre `fn(out_dir) -> list[Path]` sous `name`."""
     assert family in FAMILIES, family
 
     def deco(fn):
         assert name not in FIGURES, name
-        FIGURES[name] = Figure(name, family, task, caption, source, fn, subset)
+        FIGURES[name] = Figure(name, family, task, caption, source, fn, subset, dest)
         return fn
     return deco
 
@@ -71,6 +73,8 @@ def need(*paths):
 
 
 def out_dir_of(fig, results=RESULTS, build=BUILD):
+    if fig.dest is not None:
+        return Path(fig.dest) / fig.family
     return (build if fig.subset else results) / fig.family
 
 

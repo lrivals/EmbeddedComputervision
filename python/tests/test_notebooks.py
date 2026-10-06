@@ -102,6 +102,19 @@ def test_check_detecte_une_retouche(tmp_path, capsys):
     assert "voc/tiny-yolov2-voc_infer.ipynb" in capsys.readouterr().out
 
 
+def test_visionneuse_generee_et_affichage_seul(tmp_path):
+    from tools.notebooks.gabarits import VIEWER, viewer
+
+    files = generate([], tmp_path)
+    assert tmp_path / VIEWER in files and VIEWER in files[tmp_path / "README.md"]
+    nb = viewer()
+    p = _params(nb)
+    assert "docs/tasks/figures" in p["DIRS"] and p["PATTERN"] == "*.png"
+    src = "\n".join(_code(nb))
+    assert "clear_output" in src and "KeyboardInterrupt" in src
+    assert "tools.notebooks.commandes" not in src and "C.run" not in src  # aucun calcul
+
+
 def test_notebooks_versionnes_a_jour():
     assert main(["--check"]) == 0
 
