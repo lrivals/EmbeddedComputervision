@@ -4,6 +4,11 @@
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
+#   tools/get_datasets.sh kaggle-download <jeu>…   crowdhuman | visdrone | exdark, par l'API
+#                                    Kaggle (ExDark : images seules), puis kaggle
+#   tools/get_datasets.sh ready <jeu>…              code de retour 0 si tous sont prêts
+#   tools/get_datasets.sh pack <jeu>…               data/<racine> → data_archives/<jeu>.tar
+#   tools/get_datasets.sh unpack <dossier> <jeu>…   <dossier>/<jeu>.tar → data/ (Colab : Drive)
 #
 # Téléchargés ici (idempotent, comme get_voc.sh) : COCO val2017 + annotations 2017 (≈ 1,0 +
 # 0,25 Go ; les 500 images de calibration de train2017 : tools/coco_subset.py) et KITTI 2D
@@ -13,7 +18,9 @@
 # téléchargement (tableau de synthèse de M11).
 set -euo pipefail
 
-DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/data"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DATA_DIR="${DATA_DIR:-$ROOT/data}"           # surchargés par les tests
+ARCHIVE_DIR="${ARCHIVE_DIR:-$ROOT/data_archives}"
 
 download() {  # url fichier
   [[ -f "$2" ]] && return 0
@@ -39,6 +46,7 @@ fetch() {  # dossier url témoin : télécharge et décompresse si le témoin ma
 
 # Témoin de chaque jeu (relatif à data/), source et arborescence attendue.
 declare -A MARKER=(
+  [voc]=VOCdevkit/VOC2007/ImageSets/Main/test.txt
   [coco]=coco/annotations/instances_val2017.json
   [kitti]=kitti/training/image_2/000000.png
   [visdrone]=visdrone/VisDrone2019-DET-val/annotations
@@ -61,6 +69,59 @@ declare -A HOWTO=(
     data/flir/images_thermal_{train,val}/coco.json et data/"
 )
 
+# Dossier de chaque jeu dans data/ (Dataset.root de python/yolo/data/datasets.py) : contenu
+# de son archive.
+declare -A DIR=([voc]=VOCdevkit)
+
+# Versions Kaggle (kaggle-download) : jeu → identifiant et dossier de data/ attendu par kaggle().
+declare -A KAGGLE_ID=(
+  [crowdhuman]=leducnhuan/crowdhuman
+  [visdrone]=kushagrapandya/visdrone-dataset
+  [exdark]=washingtongold/exdark-dataset
+)
+declare -A KAGGLE_DIR=([crowdhuman]=CrowdHuman [visdrone]="VisDrone Dataset" [exdark]="ExDark Dataset")
+
+known() {
+  [[ -n "${MARKER[$1]:-}" ]] || { echo "jeu inconnu : $1" >&2; exit 1; }
+}
+
+# Archive d'un jeu prêt : un tar non compressé (images déjà en JPEG ou PNG), liens suivis
+# (-h) pour que l'arborescence attendue tienne sans les dossiers Kaggle d'origine ; les
+# archives téléchargées (data/kitti/*.zip…) restent dehors.
+pack() {
+  local ds=$1 dir=${DIR[$1]:-$1}
+  check "$ds" > /dev/null || { echo "$ds : absent, rien à archiver" >&2; return 1; }
+  mkdir -p "$ARCHIVE_DIR"
+  echo "archivage data/$dir → $ARCHIVE_DIR/$ds.tar"
+  tar -chf "$ARCHIVE_DIR/$ds.tar.part" -C "$DATA_DIR" --exclude='*.zip' --exclude='*.part' \
+    --exclude='*.tar' --exclude=__MACOSX "$dir"
+  mv "$ARCHIVE_DIR/$ds.tar.part" "$ARCHIVE_DIR/$ds.tar"
+}
+
+# Extraction depuis un dossier d'archives (Drive monté sur Colab) : une lecture séquentielle
+# du tar, puis les images sont lues sur le disque local, jamais à travers le montage.
+unpack() {
+  local src=$1 ds=$2
+  if check "$ds" > /dev/null; then
+    echo "$ds : déjà prêt"
+    return 0
+  fi
+  [[ -f "$src/$ds.tar" ]] || { echo "$ds : pas d'archive $src/$ds.tar" >&2; return 1; }
+  mkdir -p "$DATA_DIR"
+  echo "extraction $src/$ds.tar"
+  tar -xf "$src/$ds.tar" -C "$DATA_DIR"
+  check "$ds"
+}
+
+kaggle_download() {
+  local ds=$1
+  [[ -n "${KAGGLE_ID[$ds]:-}" ]] || { echo "$ds : pas de version Kaggle" >&2; return 1; }
+  check "$ds" > /dev/null && { echo "$ds : déjà prêt"; return 0; }
+  command -v kaggle > /dev/null \
+    || { echo "CLI kaggle absente : pip install kaggle (jeton : ~/.kaggle/kaggle.json)" >&2; return 1; }
+  kaggle datasets download "${KAGGLE_ID[$ds]}" -p "$DATA_DIR/${KAGGLE_DIR[$ds]}" --unzip
+}
+
 link() {  # cible lien : lien relatif, seulement si la cible existe et que le lien manque
   local target=$1 name=$2
   [[ -e "$DATA_DIR/$name" || ! -e "$(dirname "$DATA_DIR/$name")/$target" ]] && return 0
@@ -72,11 +133,13 @@ link() {  # cible lien : lien relatif, seulement si la cible existe et que le li
 # arborescences attendues sans rien déplacer.
 kaggle() {
   link CrowdHuman/CrowdHuman crowdhuman
+  link CrowdHuman crowdhuman  # archive à un seul niveau
   if [[ -d "$DATA_DIR/VisDrone Dataset" ]]; then
     mkdir -p "$DATA_DIR/visdrone"
     for s in train val test-dev; do
       link "../VisDrone Dataset/VisDrone2019-DET-$s/VisDrone2019-DET-$s" \
         "visdrone/VisDrone2019-DET-$s"
+      link "../VisDrone Dataset/VisDrone2019-DET-$s" "visdrone/VisDrone2019-DET-$s"
     done
   fi
   if [[ -d "$DATA_DIR/ExDark Dataset" ]]; then
@@ -99,7 +162,34 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,13p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,19p' "$0"; exit 1; }
+case "$1" in
+ready)
+  shift
+  for ds in "$@"; do known "$ds"; check "$ds" || exit 1; done
+  exit 0
+  ;;
+pack)
+  shift
+  for ds in "$@"; do known "$ds"; pack "$ds"; done
+  exit 0
+  ;;
+unpack)
+  [[ $# -ge 3 ]] || { echo "usage : $0 unpack <dossier> <jeu>…" >&2; exit 1; }
+  src=$2; shift 2
+  status=0
+  for ds in "$@"; do known "$ds"; unpack "$src" "$ds" || status=1; done
+  exit $status
+  ;;
+kaggle-download)
+  shift
+  for ds in "$@"; do known "$ds"; kaggle_download "$ds"; done
+  kaggle
+  status=0
+  for ds in "$@"; do check "$ds" || { echo "  ${HOWTO[$ds]}"; status=1; }; done
+  exit $status
+  ;;
+esac
 status=0
 for ds in "$@"; do
   case "$ds" in

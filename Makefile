@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -41,6 +41,8 @@ help:
 	@echo "ci-model    export synthétique → model/ (sans poids Darknet ni VOC, T10.13)"
 	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
 	@echo "figures     figures M13 dont les données sont présentes → results/figures/, results/figures.md"
+	@echo "notebooks   notebooks Jupyter de M14 → notebooks/<jeu>/, notebooks/README.md"
+	@echo "notebooks-smoke  exécution de fumée des notebooks dont les données sont là (T14.9, entraînements compris)"
 	@echo "test-durations  suite pytest complète (slow compris, palier N) → build/figures/pytest.xml (T13.30)"
 
 test: test-py test-cpp
@@ -54,6 +56,7 @@ ci-model:
 ci: export YOLO_REQUIRE_MODEL = 1
 ci:
 	$(MAKE) lint
+	python -m tools.notebooks --check
 	$(MAKE) test-cpp
 	$(MAKE) golden-check
 	$(MAKE) csim-gcc
@@ -92,6 +95,15 @@ roofline:
 # sautées avec un message) et la galerie results/figures.md.
 figures:
 	python -m tools.figures all
+
+# M14 : notebooks versionnés sans sorties, régénérés depuis le registre (make ci : --check).
+notebooks:
+	python -m tools.notebooks all
+
+# T14.9 : chaque notebook dont les données sont présentes, SUBSET = 4, ITERS = 2, BATCH = 2 ;
+# copies exécutées dans build/notebooks/smoke/.
+notebooks-smoke:
+	cd python && python -m pytest -q -m slow tests/test_notebooks.py
 
 # T13.30 : durées des tests pour figures/projet/tests.png. Toute la suite, slow compris
 # (palier N) ; le rapport JUnit donne le temps de chaque test.

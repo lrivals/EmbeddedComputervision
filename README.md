@@ -23,7 +23,7 @@ Détails : [docs/architecture.md](docs/architecture.md) · conventions :
 
 ## Plan de travail
 
-Le travail est découpé en jalons M0 à M13 dans [docs/tasks/](docs/tasks/README.md). Chaque
+Le travail est découpé en jalons M0 à M14 dans [docs/tasks/](docs/tasks/README.md). Chaque
 tâche indique la section de la spec, ses dépendances, ses livrables et un critère
 d'acceptation mesurable.
 
@@ -42,6 +42,9 @@ d'acceptation mesurable.
   (architecture des modèles et de l'accélérateur, résultats, suivi du projet,
   réimplémentation de zéro expliquée par ses formules, réseaux couche par couche) ;
   galerie dans [results/figures.md](results/figures.md).
+- **[M14](docs/tasks/M14-notebooks.md)** : notebooks Jupyter d'inférence et d'entraînement,
+  un par modèle × jeu, générés par `make notebooks` et exécutables en local comme sur Colab
+  (GPU) ; index dans [notebooks/README.md](notebooks/README.md).
 
 ## Arborescence
 
@@ -55,6 +58,7 @@ d'acceptation mesurable.
 | `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
 | `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
 | `model/` | modèles exportés (non versionnés) |
+| `notebooks/` | notebooks Jupyter de M14, versionnés sans sorties (générés par `tools/notebooks/`) |
 | `results/` | `benchmarks.csv` des mesures (format du §10.4), protocole, rapports mAP, roofline, rapport HLS, rapport comparatif (`rapport.md`) |
 | `data/`, `weights/` | jeux de données et poids (non versionnés) |
 
@@ -77,10 +81,13 @@ make bench-report                   # results/benchmarks.csv, results/mesures.md
 make ci-model ci                    # CI (T10.13) : export synthétique, sans VOC ni poids Darknet
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 make figures                        # figures M13 → results/figures/, galerie results/figures.md
+make notebooks                      # notebooks M14 → notebooks/<jeu>/, index notebooks/README.md
+make notebooks-smoke                # fumée des notebooks dont les données sont là (T14.9)
 make test-durations                 # suite complète (slow compris) : durées des tests pour la figure T13.30
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
 tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)
 tools/get_datasets.sh kaggle        # relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
+tools/get_datasets.sh pack exdark   # data_archives/exdark.tar, à copier sur Drive pour Colab (M14)
 tools/m11.sh coco-float             # profils de M11 (liste : tools/m11.sh)
 ```

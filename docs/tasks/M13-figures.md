@@ -111,7 +111,7 @@ restent des données à produire :
   |---|---|
   | `tools/train.py` | courbes dans `<out>/figures/`, à chaque `--save-every` et en fin de run |
   | `tools/eval_quant.py` | AP par classe et sensibilité `fq:<i>` à côté du JSON |
-  | `tools/eval_voc.py` | courbes PR dans `build/figures/eval/<run>/` |
+  | `tools/eval_voc.py` | courbes PR dans `build/figures/eval/<run>/` (`<out>/figures/` avec `--out`) |
   | `tools/map_stades.py` | `--json` puis la figure T13.13 |
   | `tools/perf_model.py` | cascade, cycles et roofline par couche dans `build/perf/figures/` |
   | `tools/m12.sh` | résumé des mAP et courbes du profil dans `build/m12/<profil>/figures/` |

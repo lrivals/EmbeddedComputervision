@@ -163,9 +163,12 @@ def main():
         sys.path.insert(0, str(ROOT))
         from tools.figures.auto import after_run
 
+        # --out donné (notebooks M14) : courbes à côté des détections, <out>/figures/.
         det_dir = args.dets or out
-        after_run("eval-voc", det_dir, out=ROOT / "build" / "figures" / "eval" / det_dir.name,
-                  dets=dets, samples=samples, names=view.names, title=title)
+        fig_dir = (args.out / "figures" if args.out
+                   else ROOT / "build" / "figures" / "eval" / det_dir.name)
+        after_run("eval-voc", det_dir, out=fig_dir, dets=dets, samples=samples,
+                  names=view.names, title=title)
 
 
 if __name__ == "__main__":

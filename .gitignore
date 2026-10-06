@@ -1,6 +1,7 @@
 # Données et poids (volumineux)
 data/*
 !data/.gitkeep
+data_archives/
 weights/*
 !weights/.gitkeep
 model/*
