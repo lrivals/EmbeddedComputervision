@@ -66,6 +66,13 @@ entraînement (« Reste » de chaque tâche).
   lue sur le disque à la génération : après `make figures`, lancer `make notebooks`
   (sinon `--check` signale la visionneuse). Les PNG de `build/` (non versionnés)
   s'affichent par la dernière cellule, avec un noyau local.
+- **Analyse des balayages** : `notebooks/analyse_balayages.ipynb`, hors registre, générée
+  avec l'index (`gabarits.analysis`). Compare les balayages lot × sous-ensemble de tous
+  les jeux en relisant les sorties versionnées des `_sweep` et `_infer` : ni GPU ni
+  données. Lecture et statistiques dans `tools/notebooks/balayages.py` (CLI
+  `python -m tools.notebooks.balayages --runs`), figures dans `tools/figures/balayages.py`
+  (`python -m tools.figures balayages`). Versionnée exécutée ; après un nouveau balayage,
+  la relancer en entier.
 - **Résultats d'exécution** : `build/notebooks/<jeu>/<modèle>/` (checkpoints, JSON des mAP,
   figures). Un notebook n'écrit **jamais** dans `results/`.
 
@@ -394,7 +401,14 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - `DRIVE_DIR` (défaut `colab.DRIVE_DIR`) ;
   - `colab.restore_outputs` avant l'affinage, puis `colab.sync_outputs` toutes les 10 min
     et en fin de cellule, interruption comprise ;
-  - cellule de vitesse : s/image d'après `loss.csv`.
+  - cellule de vitesse : s/image d'après `loss.csv` ;
+  - collecte en fin de commande : `commandes.run` appelle `colab.autosync` après chaque
+    `tools/train.py`, `eval_voc.py` ou `eval_quant.py` réussi (ou interrompu) ; sur
+    Colab avec Drive monté, `summary.json` du dossier de `--out` et de `--markdown`
+    (`runs.write_summary` : `run.json`, perte et composantes finales, durée, mAP et AP par
+    classe) puis copie dans `<DRIVE_DIR>/runs/`. Couvre les évaluations des `_sweep` et
+    les `_infer`, que la copie périodique ne voyait pas ; aucune cellule modifiée.
+    `EMBEDDEDCV_AUTOSYNC=0` la coupe. Sur le PC : `make harvest` (rclone sans poids) ;
 - **Reste** : la reprise kitti sur Colab, et le gain GPU mesuré, à renvoyer à T12.11-e.
 
 ## D. Balayages et choix du run

@@ -179,6 +179,13 @@ def show(cmd):
     return "$ " + shlex.join(cmd)
 
 
+def _autosync(cmd):
+    """Sorties de `cmd` sur le Drive dès sa fin (Colab seulement, `colab.autosync`)."""
+    from tools.notebooks import colab
+
+    colab.autosync(cmd)
+
+
 def run(cmd, log=None, check=True):
     """Lance `cmd` depuis la racine du dépôt (le `python` du noyau), relaie sa sortie ligne à
     ligne et rend son code de retour. Ctrl-C / interruption du noyau : SIGINT au processus,
@@ -200,11 +207,14 @@ def run(cmd, log=None, check=True):
         proc.send_signal(signal.SIGINT)
         proc.wait()
         print(f"interrompu après {time.time() - t0:.0f} s ; reprise : relancer la cellule")
+        _autosync(cmd)  # checkpoint de l'interruption
         raise
     finally:
         if f:
             f.close()
     print(f"  ({time.time() - t0:.0f} s)")
+    if not proc.returncode:
+        _autosync(cmd)
     if check and proc.returncode:
         raise subprocess.CalledProcessError(proc.returncode, shlex.join(cmd))
     return proc.returncode

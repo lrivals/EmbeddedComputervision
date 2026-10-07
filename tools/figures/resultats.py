@@ -1353,6 +1353,18 @@ def _subset_style(s):
                                     fill=False))
 
 
+def _grid(plt, n, height, per_row=3):
+    """Panneaux d'une figure par jeu : une ligne jusqu'à 4 jeux, sinon `per_row` par ligne ;
+    rend (figure, axes utilisés), les cases vides masquées."""
+    cols = n if n <= 4 else per_row
+    rows = -(-n // cols)
+    fig, axes = plt.subplots(rows, cols, figsize=(st.FULL, height * rows), squeeze=False)
+    flat = list(axes.flat)
+    for ax in flat[n:]:
+        ax.set_visible(False)
+    return fig, flat[:n]
+
+
 def plot_balayage_map(data, out_dir, name="balayage_map"):
     """mAP par lot, une barre par sous-ensemble, un panneau par jeu ; meilleur run marqué."""
     plt = st.plt()
@@ -1380,15 +1392,18 @@ def plot_balayage_map(data, out_dir, name="balayage_map"):
                 ax.text(xb, r["map"] + top * 0.02, f"{r['map']:.2f}{star}".replace(".", ","),
                         ha="center", va="bottom", fontsize=7, color=st.INK,
                         fontweight="bold" if r is best else "normal")
-        ax.set_xticks(x, [f"lot {b}" for b in batches])
+        ax.set_xticks(x, [str(b) for b in batches])
+        ax.set_xlabel("lot")
         ax.set_axisbelow(True)
         ax.set_ylim(0, top * 1.18)
         ax.set_ylabel("mAP (%)")
-        ax.set_title(f"{ds} — meilleur : {best['run']}")
+        ax.set_title(f"{ds}\nmeilleur : {best['run']}", fontsize=9)
         ax.grid(axis="x", visible=False)
-    axes[0][0].legend(loc="upper left")
-    st.note(axes[0][-1], "50 images, palier R (non publiable)")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.07))
     fig.tight_layout()
+    fig.text(0.99, -0.02, "50 images, palier R (non publiable)", ha="right", va="top",
+             fontsize=7, color=st.MUTED)
     return st.save(fig, out_dir, name)
 
 
@@ -1407,8 +1422,8 @@ def plot_balayage_perte(data, out_dir, name="balayage_perte"):
     """Perte finale face à la mAP : une perte basse sur 500 images ne fait pas une bonne mAP."""
     plt = st.plt()
     sets = [k for k, v in data.items() if v["sweep"]]
-    fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 3.4), squeeze=False)
-    for ax, ds in zip(axes[0], sets):
+    fig, flat = _grid(plt, len(sets), 3.4)
+    for ax, ds in zip(flat, sets):
         runs = data[ds]["sweep"]
         for s in sorted({r["subset"] for r in runs}, key=lambda s: (s == 0, s)):
             sty = _subset_style(s)
@@ -1419,12 +1434,14 @@ def plot_balayage_perte(data, out_dir, name="balayage_perte"):
             for r in pts:
                 ax.annotate(r["run"], (r["loss"], r["map"]), xytext=_label_offset(r, runs),
                             textcoords="offset points", fontsize=7, color=st.INK2)
-        ax.set_xlabel("perte finale (600 itérations)")
+        ax.set_xlabel("perte finale")
         ax.set_ylabel("mAP (%)")
         ax.set_title(ds)
         ax.margins(x=0.18, y=0.15)
-    axes[0][0].legend(loc="lower left")
-    st.note(axes[0][-1], "50 images, palier R")
+    handles, labels = flat[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.04))
+    fig.text(0.99, 0.0, "perte finale après 600 itérations ; 50 images, palier R", ha="right",
+             va="top", fontsize=7, color=st.MUTED)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -1433,8 +1450,8 @@ def plot_balayage_modeles(data, out_dir, name="balayage_modeles"):
     """mAP des poids publiés (hors domaine pour VisDrone) face au meilleur run affiné."""
     plt = st.plt()
     sets = [k for k, v in data.items() if v["infer"]]
-    fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 2.6), squeeze=False)
-    for ax, ds in zip(axes[0], sets):
+    fig, flat = _grid(plt, len(sets), 2.6)
+    for ax, ds in zip(flat, sets):
         rows = data[ds]["infer"][::-1]
         top = max(r["map"] for r in rows)
         y = np.arange(len(rows))

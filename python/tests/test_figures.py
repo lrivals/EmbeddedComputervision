@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import tools.figures as F  # noqa: E402
-from tools.figures import auto, maths, materiel, modeles, projet, resultats, reseaux  # noqa: E402,F401
+from tools.figures import auto, balayages, maths, materiel, modeles, projet, resultats, reseaux  # noqa: E402,F401
 from tools.figures.__main__ import gallery  # noqa: E402
 
 RNG = np.random.default_rng(0)
@@ -42,7 +42,7 @@ def test_registry_is_consistent():
 def test_all_skips_cleanly_without_data(tmp_path, monkeypatch):
     """`make figures` sans données : chaque figure est sautée, aucune exception. Les planches
     de la section F (`maths`) n'ont pas de donnée d'entrée (jouets) : elles sont produites."""
-    for mod in (resultats, modeles, projet, materiel, reseaux, maths):
+    for mod in (resultats, modeles, projet, materiel, reseaux, maths, balayages):
         monkeypatch.setattr(mod, "ROOT", tmp_path)
     monkeypatch.setattr(resultats, "DEVKIT", tmp_path / "VOCdevkit")
     monkeypatch.setattr(modeles, "DEVKIT", tmp_path / "VOCdevkit")

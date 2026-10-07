@@ -22,7 +22,15 @@ Constat de départ ([resultats-balayages.md](resultats-balayages.md), palier R,
   AP50 au plus 2,9 (`b8-sall`, `b16-sall`) ; le classement des autres jeux ne s'y
   retrouve pas. Les poids COCO hors domaine font mieux sans affinage : AP 3,7, AP50 9,9
   (Tiny-YOLOv2 VOC : 2,3 et 8,3), sur 50 images (rév. `1723925`, `29a058a`).
-- ExDark et CrowdHuman n'ont pas été lancés.
+- **ExDark** (rév. `35e949b`) : meilleur run `b32-sall`, mAP 13,29 (6,4 époques sur
+  3 000 images) ; au-dessus de Tiny-YOLOv2 VOC hors domaine (11,84, 11 classes), sous les
+  poids COCO (24,61, 12 classes).
+- **CrowdHuman** (rév. `35e949b`) : meilleur run `b16-sall`, mAP 35,87, devant `b32-sall`
+  (30,61, écart dans le bruit) ; le plus près des poids COCO (38,37 ; Tiny-YOLOv2 VOC
+  26,29). Une seule classe, ancres k-means bien plus petites que celles de Darknet.
+- Sur les six jeux, `b32-sall` fait en moyenne 91 % du meilleur run de chaque jeu, et
+  tout le split bat 500 images dans 15 cas sur 18
+  ([analyse_balayages](../../notebooks/analyse_balayages.ipynb)).
 
 Coûts mesurés sur Colab : entraînement GPU ≈ 0,033 s/image (624 s pour 600 itérations
 au lot 32, soit ≈ 1 s/itération) ; évaluation sur CPU ≈ 0,27 s/image, soit ≈ 22 min pour
@@ -50,6 +58,13 @@ KITTI val (1 496 images).
   split complet (palier N) peut aller dans `results/` (règles de
   [M12](M12-profils-pc.md#règles)).
 - Un écart entre deux runs ne compte que s'il dépasse le bruit mesuré en T15.2.
+- **Récolte** : sur Colab, chaque `tools/train.py` et `tools/eval_voc.py` lancé par un
+  notebook écrit son `summary.json` et part sur le Drive dès sa fin (`colab.autosync`,
+  [colab-vscode.md](colab-vscode.md#coupure-de-session)) ; en fin de session, rien n'est
+  perdu au-delà de la commande en cours. Sur le PC, `make harvest` rapatrie journaux,
+  résumés, tables et figures dans `build/notebooks/` (sans poids), puis
+  `python -m tools.notebooks.balayages --runs` refait la synthèse ; ensuite seulement,
+  reporter les chiffres ici et dans [resultats-balayages.md](resultats-balayages.md).
 - Les notebooks restent versionnés sans sorties ([M14](M14-notebooks.md#règles)) ; un
   changement de paramètre par défaut passe par `tools/notebooks/gabarits.py` et
   `make notebooks`.
@@ -246,7 +261,19 @@ au balayage, split complet ensuite).
 
   | jeu | modèle | classes évaluées | mAP (50 images) | mAP (complet) |
   |---|---|---|---|---|
-  | à remplir | | | | |
+  | ExDark | `tiny-yolov3-coco` | 12 | 24,61 | |
+  | ExDark | `tiny-yolov2-voc` | 11 | 11,84 | |
+  | ExDark | `tiny-yolov3-exdark` `b32-sall` | 12 | 13,29 | |
+  | CrowdHuman | `tiny-yolov3-coco` | 1 | 38,37 | |
+  | CrowdHuman | `tiny-yolov2-voc` | 1 | 26,29 | |
+  | CrowdHuman | `tiny-yolov3-crowdhuman` `b32-sall` | 1 | 30,61 | |
+  | CrowdHuman | `tiny-yolov3-crowdhuman` `b16-sall` | 1 | 35,87 (balayage) | |
+
+  Balayages et inférences faits sur 50 images (rév. `35e949b`, détail :
+  [resultats-balayages.md](resultats-balayages.md#exdark)) ; ExDark : affinage
+  utile face à VOC, pas face à COCO. Restent le split complet, l'inférence de
+  `b16-sall` (`COMPARE = True`) et, pour CrowdHuman, le rappel de
+  `person` et les débordements de la NMS.
 
 ## Hors périmètre
 

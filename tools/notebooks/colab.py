@@ -149,3 +149,47 @@ def restore_outputs(src="build/notebooks", drive_dir=DRIVE_DIR):
         shutil.copytree(saved, ROOT / src, dirs_exist_ok=True)
         print(f"{saved} → {src}")
     return saved.is_dir()
+
+
+# Commandes dont les sorties partent sur le Drive dès leur fin (T14.8) : `--out` et
+# `--markdown` (dossier parent) sous build/.
+AUTOSYNC_TOOLS = ("tools/train.py", "tools/eval_voc.py", "tools/eval_quant.py")
+
+
+def _drive_ready(drive_dir=DRIVE_DIR):
+    return in_colab() and Path(drive_dir).is_dir()
+
+
+def autosync(cmd, drive_dir=DRIVE_DIR):
+    """Après une commande de `AUTOSYNC_TOOLS` sur Colab, Drive monté : `summary.json` des
+    dossiers de sortie (`runs.write_summary`), puis copie dans `<drive_dir>/runs/`. Rend
+    les dossiers copiés. Hors Colab, sans Drive, ou `EMBEDDEDCV_AUTOSYNC=0` : rien. Une
+    erreur est affichée, jamais levée : la collecte ne casse pas une cellule.
+
+    Appelée par `commandes.run` : chaque run d'un balayage et chaque évaluation (`_sweep`,
+    `_infer`, `_train`) sont sur le Drive dès leur fin, sans attendre la copie périodique
+    de la cellule d'entraînement (10 min), qui ne couvre ni les évaluations ni `_infer`."""
+    if os.environ.get("EMBEDDEDCV_AUTOSYNC", "1") == "0" or not _drive_ready(drive_dir):
+        return []
+    if len(cmd) < 2 or cmd[1] not in AUTOSYNC_TOOLS:
+        return []
+    dirs = []
+    for opt in ("--out", "--markdown"):
+        if opt in cmd[:-1]:
+            p = Path(cmd[cmd.index(opt) + 1])
+            d = p.parent if p.suffix else p
+            if d.parts[:1] == ("build",) and d not in dirs:
+                dirs.append(d)
+    done = []
+    for d in dirs:
+        try:
+            from tools.notebooks import runs
+
+            runs.write_summary(d)
+            if (ROOT / d).is_dir():
+                sync_outputs(d.as_posix(), drive_dir)
+                done.append(d)
+        except Exception as e:  # noqa: BLE001  (collecte au mieux)
+            print(f"autosync {d} : {e.__class__.__name__}: {e}")
+    return done
+

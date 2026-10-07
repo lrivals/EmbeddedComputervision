@@ -85,11 +85,27 @@ Ordre conseillé, un notebook à la fois par runtime :
 
 ## Coupure de session
 
-Les sorties sont copiées dans `MyDrive/EmbeddedCV/runs/build/notebooks/<jeu>/<modèle>/`
-toutes les 10 min et en fin de cellule. Après une coupure : reconnecter un kernel Colab
-et relancer « Run All ». `colab.restore_outputs` recopie le dossier, l'entraînement
-reprend au dernier checkpoint (`--resume`), et `_sweep` saute les runs finis
-(`SKIP_DONE`). La reprise exacte suppose le même backend (T12.11).
+Ce qui part sur le Drive (`MyDrive/EmbeddedCV/runs/build/notebooks/<jeu>/<modèle>/`), et
+quand :
+
+| Quoi | Quand | Par |
+|---|---|---|
+| tout `OUT` (checkpoints, `loss.csv`, `log.txt`…) | toutes les 10 min pendant la cellule d'entraînement, et à sa fin (interruption comprise) | fil de la cellule, `colab.sync_outputs` |
+| dossier d'un run (`runs/<run>/` ou la racine de `_train`) + `summary.json` | dès la fin de chaque `tools/train.py`, ou à son interruption | `colab.autosync`, appelé par `commandes.run` |
+| dossier d'une évaluation (`map_float*.md`, `dets*/`, PR) + `summary.json` | dès la fin de chaque `tools/eval_voc.py` / `eval_quant.py`, balayages **et** `_infer` | idem |
+
+`summary.json` (`runs.write_summary`) résume le dossier sans le notebook : `run.json`,
+itérations faites, perte et composantes moyennes des 50 dernières itérations, durée (somme
+de `seconds` de `loss.csv`), s/image, mAP et AP par classe de chaque `map_float*.md`. Une
+session coupée ne perd donc que la commande en cours depuis sa dernière copie (au plus
+10 min d'entraînement), jamais une évaluation finie ; les chiffres restent sur le Drive
+même si les sorties du notebook ne sont pas enregistrées. `EMBEDDEDCV_AUTOSYNC=0` coupe la copie à la fin de chaque commande.
+
+Après une coupure : reconnecter un kernel Colab et relancer « Run All ».
+`colab.restore_outputs` recopie le dossier, l'entraînement reprend au dernier checkpoint
+(`--resume`), et `_sweep` saute les runs finis (`SKIP_DONE`) ; leur journal n'est alors
+plus dans les sorties du notebook, mais dans `loss.csv` sur le Drive (voir « Récupérer »).
+La reprise exacte suppose le même backend (T12.11).
 
 ## Suivre depuis le PC
 
@@ -103,6 +119,20 @@ Un run est fini quand son `final.weights` existe. Le `loss.csv` sur Drive date a
 la dernière copie (10 min).
 
 ## Récupérer et comparer
+
+Récolte en fin de session, sur le PC (rclone configuré, [donnees-drive.md](donnees-drive.md)) :
+
+```bash
+make harvest   # RUNS_REMOTE=gdrive:EmbeddedCV/runs/build/notebooks par défaut
+```
+
+`make harvest` copie dans `build/notebooks/` les `summary.json`, `run.json`, `loss.csv`,
+`log.txt`, tables `map_float*.md` et figures PNG de tous les jeux, sans poids ni
+checkpoints (quelques Mo), puis affiche la synthèse des balayages
+(`python -m tools.notebooks.balayages --runs`). Le notebook d'analyse
+([analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb)) reprend ces journaux
+pour les runs absents des sorties de leur notebook. Pour évaluer en local, il faut aussi
+les poids :
 
 ```bash
 rclone copy gdrive:EmbeddedCV/runs/build/notebooks/kitti build/notebooks/kitti

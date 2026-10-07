@@ -6,6 +6,8 @@ Palier (règles de M12) : premier passage (`SUBSET = 50`) / passage complet (`SU
 
 Affichage seul : [figures_live.ipynb](figures_live.ipynb) montre les figures (M13, runs) et les les range par famille, avec leur contexte.
 
+Analyse : [analyse_balayages.ipynb](analyse_balayages.ipynb) compare les balayages lot × sous-ensemble de tous les jeux (relit les `_sweep` exécutés, sans GPU ni données).
+
 | Jeu | Modèle | Rôle | Palier | Prérequis | Colab |
 |---|---|---|---|---|---|
 | voc | [tiny-yolov2-voc](voc/tiny-yolov2-voc_infer.ipynb) | inférence | R / N | données : `data/VOCdevkit/VOC2007/ImageSets/Main/test.txt` (tools/get_voc.sh)<br>poids : `weights/yolov2-tiny-voc.weights` (tools/get_weights.sh) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main/notebooks/voc/tiny-yolov2-voc_infer.ipynb) |

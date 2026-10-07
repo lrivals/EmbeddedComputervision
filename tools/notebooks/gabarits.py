@@ -790,7 +790,9 @@ def _figure_cells():
         for prefix, name in EXTRA_PREFIXES.items():
             if p not in owner and p.stem.startswith(prefix):
                 owner[p] = name
-    link = lambda p: f"![{p.stem}](../{p.relative_to(ROOT).as_posix()})"
+
+    def link(p):
+        return f"![{p.stem}](../{p.relative_to(ROOT).as_posix()})"
 
     cells = []
     for fam, title in FAMILY_TITLES.items():
@@ -887,3 +889,183 @@ def viewer():
                 display(Image(data=p.read_bytes(), format="png", width=WIDTH))
         """),
     ])
+
+
+# ------------------------------------------------- analyse transversale des balayages
+
+ANALYSIS = "analyse_balayages.ipynb"  # hors registre modèle × jeu × rôle, comme VIEWER
+
+# (clé de tools.figures.balayages.PLOTS, titre, ce que montre la figure et comment la lire)
+ANALYSIS_SECTIONS = [
+    ("grilles", "1. Grille lot × sous-ensemble, jeu par jeu",
+     "Chaque case est un run : son score, puis ce score en pourcentage du meilleur run du "
+     "jeu (★). La couleur suit ce pourcentage, sur la même échelle pour tous les jeux : on "
+     "compare la *forme* des grilles malgré des mAP qui vont de 2 à 36. Une colonne « tout » "
+     "plus foncée que la colonne « 500 im. » veut dire que voir tout le split paie ; une "
+     "ligne « lot 32 » plus foncée, qu'un grand lot paie."),
+    ("classements", "2. Les jeux classent-ils les runs de la même façon ?",
+     "À gauche, le rang de chaque run dans chaque jeu (1 en haut) : une ligne plate en haut "
+     "est un run toujours bon. Couleur : le lot (clair 8, foncé 32) ; trait plein : tout le "
+     "split, tirets : 500 images. À droite, la corrélation de rangs de Spearman entre les "
+     "classements de deux jeux : 1, même ordre ; 0, aucun lien. Avec 6 runs, il faut "
+     "|ρ| ≥ 0,83 pour conclure à 5 % ; les mAP sur 50 images sont bruitées (règle M12)."),
+    ("effets", "3. Effets principaux : sous-ensemble et lot",
+     "À gauche, chaque flèche va du run à 500 images (creux) au run sur tout le split "
+     "(plein), à lot égal : une flèche vers la droite est un gain. À droite, le score "
+     "relatif par lot, un point par jeu, et la moyenne sur les jeux (losanges). À 600 "
+     "itérations, le lot fixe aussi le nombre d'images vues : lot et volume de données ne "
+     "se séparent pas dans cette grille."),
+    ("epoques", "4. Époques vues : voir plus d'images ou revoir les mêmes ?",
+     "L'axe horizontal compte les passages sur les données d'entraînement "
+     "(lot × itérations / images, échelle log). Les runs sur tout le split (pleins) restent "
+     "sous quelques époques ; ceux à 500 images (creux, zone grisée) revoient 10 à 38 fois "
+     "les mêmes images. Si le score montait avec les époques seules, les deux nuages "
+     "se prolongeraient ; un décrochage dans la zone grisée signe le surapprentissage."),
+    ("perte", "5. Perte finale face au score",
+     "Un panneau par jeu (échelles propres). ρ est la corrélation de rangs entre perte "
+     "finale et score : négative, la perte basse va avec le bon score ; proche de zéro ou "
+     "positive, la perte ne prédit pas la mAP. Les runs à 500 images (creux) ont souvent "
+     "les pertes les plus basses : ils ajustent un petit jeu, sans généraliser."),
+    ("courbes", "6. Courbes de perte",
+     "Perte d'entraînement lissée, une ligne par jeu (rangées) et par sous-ensemble "
+     "(colonnes), une couleur par lot. La zone grisée est le burn-in : le taux "
+     "d'apprentissage y monte de 0 à sa valeur, sur 500 des 600 itérations. Un run "
+     "entraîné lors d'une session précédente n'a pas de journal dans le notebook : il est "
+     "relu dans `build/notebooks/<jeu>/<modèle>/runs/<run>/loss.csv` après `make harvest` "
+     "(récolte du Drive), sinon marqué « sans journal »."),
+    ("composantes", "7. De quoi est faite la perte finale ?",
+     "Part de chaque terme de la perte YOLO dans les 50 dernières itérations journalisées : "
+     "coord (position et taille des boîtes), obj (confiance sur les objets), noobj "
+     "(confiance sur le fond), cls (classes). Le chiffre à droite est la perte totale. Une "
+     "part obj dominante dit que le réseau sait mal où sont les objets ; une part cls, "
+     "qu'il les trouve mais les nomme mal."),
+    ("classes", "8. AP par classe",
+     "AP@0,5 de chaque classe pour chaque run (runs triés du meilleur au moins bon). Les "
+     "cases grises sont des classes sans instance dans les 50 images évaluées : leur AP "
+     "n'existe pas, ce n'est pas un zéro. L'échelle de couleur est en racine carrée, pour "
+     "distinguer les AP de 1 à 10. Une ligne pâle sur toute sa longueur est une classe "
+     "qu'aucune configuration n'apprend en 600 itérations."),
+    ("publies", "9. Affinage face aux poids publiés",
+     "Meilleur run affiné, et les poids Darknet publiés (Tiny-YOLOv3 COCO, Tiny-YOLOv2 VOC) "
+     "lancés hors domaine sur les mêmes 50 images, chaque jeu à son échelle. Les poids "
+     "publiés ne sont évalués que sur les classes qui ont un équivalent dans leurs classes "
+     "(« n cl. », `MAPPINGS`) : leur score ne se compare au run affiné qu'à titre "
+     "indicatif. Un run affiné sous les poids publiés dit qu'il manque des itérations."),
+    ("cout", "10. Coût d'un run",
+     "Durée d'un run de 600 itérations sur le GPU Colab face à son score relatif. La durée "
+     "suit le lot (images traitées), pas le sous-ensemble. Durée : celle de la cellule, ou "
+     "la somme de la colonne `seconds` de `loss.csv` pour un run complété depuis `build/`."),
+]
+
+
+def analysis():
+    """Notebook d'analyse des balayages : relit les `_sweep` et `_infer` exécutés (sorties
+    versionnées), sans GPU ni données ; tout calcul est dans `tools.notebooks.balayages`,
+    tout tracé dans `tools.figures.balayages`."""
+    from tools.notebooks.matrice import NOTEBOOKS
+
+    sweeps = [nb for nb in NOTEBOOKS.values() if nb.role == "sweep"]
+    links = ", ".join(f"[{nb.dataset}]({nb.path.as_posix()})" for nb in sweeps)
+    cells = [
+        md(f"""\
+        # Analyse des balayages lot × sous-ensemble, tous jeux
+
+        Les notebooks `<modèle>_sweep` entraînent six runs par jeu (lots 8, 16 et 32 ×
+        500 premières images ou tout le split, 600 itérations, init COCO) et les comparent
+        jeu par jeu. Ce notebook les compare **entre jeux** : quelle configuration gagne,
+        de façon constante ou non, et pourquoi (images vues, surapprentissage, dynamique et
+        composantes de la perte, classes apprises), puis l'écart aux poids publiés.
+
+        **Source.** Les sorties versionnées des balayages ({links}) et des inférences des
+        poids publiés (`tiny-yolov3-coco_infer`, `tiny-yolov2-voc_infer`), relues par
+        `tools/notebooks/balayages.py` ; les figures viennent de
+        `tools/figures/balayages.py`. Rien n'est recalculé ni saisi à la main : un
+        balayage relancé et versionné se retrouve ici après `Run All`. Ni GPU ni données.
+        Les runs sans journal dans leur notebook (session Colab précédente) sont complétés
+        par leur `loss.csv` sous `build/notebooks/`, rapatrié du Drive par `make harvest`.
+
+        **Prudence.** Palier R : scores sur les **50 premières images** d'évaluation, non
+        publiables (règles de M12) ; une classe à une ou deux instances y saute de 0 à
+        100. **Score** = mAP@0,5 du jeu : mAP 11 points, sauf FLIR (métrique COCO) dont on
+        prend l'AP50 ; **score relatif** = score / meilleur run du jeu. Contexte et tables :
+        [resultats-balayages.md](../docs/tasks/resultats-balayages.md).
+
+        Généré par `python -m tools.notebooks` : modifier
+        `tools/notebooks/gabarits.py:analysis`, pas ce fichier.
+        """),
+        md("## Paramètres"),
+        code("""\
+        DATASETS = None  # jeux analysés (ex. ['voc', 'kitti']) ; None : tous les balayages exécutés
+        OUT      = 'build/notebooks/balayages'  # PNG et données (relatif à la racine du dépôt)
+        SMOOTH   = 25  # lissage des courbes de perte (itérations)
+        """, tags=("parameters",)),
+        md("## Environnement"),
+        code("""\
+        import os
+        import sys
+        from pathlib import Path
+
+        from IPython.display import Image, Markdown, display
+
+        CANDIDATES = (Path.cwd(), *Path.cwd().parents, Path("/content/EmbeddedComputervision"))
+        ROOT = next((d for d in CANDIDATES if (d / "tools" / "notebooks").is_dir()), None)
+        if ROOT is None:
+            raise SystemExit(f"dépôt introuvable depuis {Path.cwd()}")
+        os.chdir(ROOT)
+        sys.path[:0] = [str(ROOT), str(ROOT / "python")]
+
+        from tools.figures import balayages as FB
+        from tools.notebooks import balayages as B
+
+        data, pending = B.load_all(datasets=DATASETS)
+        if not data:
+            raise SystemExit("aucun balayage exécuté dans notebooks/*/*_sweep.ipynb")
+        OBS = B.observations(data)
+
+
+        def show(paths):
+            for p in paths:
+                display(Image(data=Path(p).read_bytes(), format="png"))
+
+
+        print(f"dépôt : {ROOT}")
+        for d in data.values():
+            print(f"  {d['label']:10s} {len(d['runs'])} runs, {d['metric']}, révision {d['rev']}, "
+                  f"{d['notebook']}")
+        for ds, p in pending.items():
+            print(f"  {ds:10s} pas encore exécuté ({p})")
+        """),
+        md("""\
+        ## Vue d'ensemble
+
+        Un jeu par ligne : meilleur et pire run, rapport entre les deux, plage des pertes
+        finales et meilleur poids publié. Puis tous les runs, du meilleur au moins bon
+        dans chaque jeu.
+        """),
+        code("""\
+        display(Markdown(B.summary_table(data)))
+        display(Markdown(B.runs_table(data)))
+        """),
+    ]
+    for key, title, text in ANALYSIS_SECTIONS:
+        call = (f"FB.PLOTS[{key!r}](data, OUT, window=SMOOTH)" if key == "courbes"
+                else f"FB.PLOTS[{key!r}](data, OUT)")
+        cells += [md(f"## {title}\n\n{text}"),
+                  code(f"""\
+                  show({call})
+                  display(Markdown("**Constat.** " + OBS[{key!r}]))
+                  """)]
+    cells += [
+        md("""\
+        ## Conclusions
+
+        Calculées sur les balayages chargés ; elles se mettent à jour avec eux.
+        """),
+        code("""\
+        display(Markdown(B.conclusions(data, pending)))
+        print("commande équivalente :")
+        print(f"  python -m tools.notebooks.balayages --runs --json {OUT}/balayages.json")
+        print(f"  python -m tools.figures balayages  # PNG dans docs/tasks/figures/resultats/")
+        """),
+    ]
+    return notebook(cells)

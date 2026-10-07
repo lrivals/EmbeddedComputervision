@@ -151,6 +151,14 @@ Balayages lot × sous-ensemble, un panneau par jeu : mAP par lot, perte finale f
 - Source : `docs/tasks/resultats-balayages.md (tables des notebooks _sweep et _infer)`
 - Sous-ensemble d'images : sortie dans `docs/tasks/figures/resultats/`, non publiée dans `results/` (règle M12).
 
+### T13.53 — `balayages`
+
+Analyse transversale des balayages lot × sous-ensemble : grilles, classements, effets du lot et du sous-ensemble, époques, perte, courbes, composantes, AP par classe, poids publiés et coût. 50 images, palier R.
+
+- Commande : `python -m tools.figures balayages`
+- Source : `sorties des notebooks notebooks/*/*_sweep.ipynb et *_infer.ipynb`
+- Sous-ensemble d'images : sortie dans `docs/tasks/figures/resultats/`, non publiée dans `results/` (règle M12).
+
 ## Modèles (B)
 
 ### T13.2 — `profil_couches`

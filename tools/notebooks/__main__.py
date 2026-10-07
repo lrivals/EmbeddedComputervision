@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 from tools.notebooks import NB_DIR, ROLES, ROOT
-from tools.notebooks.gabarits import COLAB, ROLE_TITLES, SUBSET_FIRST, VIEWER, dumps, render, viewer
+from tools.notebooks.gabarits import (ANALYSIS, COLAB, ROLE_TITLES, SUBSET_FIRST, VIEWER,
+                                      analysis, dumps, render, viewer)
 from tools.notebooks.matrice import NOTEBOOKS, how_to_get, palier_of, prerequis
 from tools.notebooks.commandes import M11_TRAIN
 
@@ -49,6 +50,8 @@ def index():
              f"complet (`SUBSET = 0`, ou `ITERS = {M11_TRAIN['iters']}` à l'entraînement).", "",
              f"Affichage seul : [{VIEWER}]({VIEWER}) montre les figures (M13, runs) et les "
              "les range par famille, avec leur contexte.", "",
+             f"Analyse : [{ANALYSIS}]({ANALYSIS}) compare les balayages lot × sous-ensemble "
+             "de tous les jeux (relit les `_sweep` exécutés, sans GPU ni données).", "",
              "| Jeu | Modèle | Rôle | Palier | Prérequis | Colab |", "|---|---|---|---|---|---|"]
     for nb in NOTEBOOKS.values():
         pal = _palier(nb)
@@ -65,6 +68,7 @@ def generate(nbs, out_dir=NB_DIR):
     """{chemin: texte} des notebooks `nbs` et de l'index."""
     files = {Path(out_dir) / nb.path: dumps(render(nb)) for nb in nbs}
     files[Path(out_dir) / VIEWER] = dumps(viewer())
+    files[Path(out_dir) / ANALYSIS] = dumps(analysis())
     files[Path(out_dir) / "README.md"] = index()
     return files
 
@@ -172,7 +176,7 @@ def main(argv=None):
         elif st != "à jour":
             p.write_text(text)
             print(f"  écrit  {_rel(p)}" + (f" ({st})" if st.startswith("exécuté") else ""))
-    print(f"{len(files) - 2} notebooks + {VIEWER}, index {_rel(args.out / 'README.md')}")
+    print(f"{len(files) - 3} notebooks + {VIEWER}, {ANALYSIS}, index {_rel(args.out / 'README.md')}")
     return 0
 
 

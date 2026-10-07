@@ -1,10 +1,10 @@
-# Résultats des balayages et inférences (VOC, VisDrone, KITTI, FLIR)
+# Résultats des balayages et inférences (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman)
 
 Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
-`notebooks/voc/`, `notebooks/visdrone/`, `notebooks/kitti/` et `notebooks/flir/`, sur un runtime
+`notebooks/<jeu>/` (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman), sur un runtime
 Colab à GPU ([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI :
 `9a76534` ; balayage FLIR : `4e47dbc` ; inférences FLIR : `1723925` pour les poids publiés,
-`29a058a` pour le run affiné). Les runs sont dans
+`29a058a` pour le run affiné ; balayages et inférences ExDark et CrowdHuman : `35e949b`). Les runs sont dans
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
@@ -17,9 +17,16 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 | VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
 | KITTI | [tiny-yolov3-kitti_sweep](../../notebooks/kitti/tiny-yolov3-kitti_sweep.ipynb) | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
 | FLIR | [tiny-yolov3-flir_sweep](../../notebooks/flir/tiny-yolov3-flir_sweep.ipynb) | [tiny-yolov3-flir](../../notebooks/flir/tiny-yolov3-flir_infer.ipynb), [tiny-yolov3-coco](../../notebooks/flir/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/flir/tiny-yolov2-voc_infer.ipynb) |
+| ExDark | [tiny-yolov3-exdark_sweep](../../notebooks/exdark/tiny-yolov3-exdark_sweep.ipynb) | [tiny-yolov3-exdark](../../notebooks/exdark/tiny-yolov3-exdark_infer.ipynb), [tiny-yolov3-coco](../../notebooks/exdark/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/exdark/tiny-yolov2-voc_infer.ipynb) |
+| CrowdHuman | [tiny-yolov3-crowdhuman_sweep](../../notebooks/crowdhuman/tiny-yolov3-crowdhuman_sweep.ipynb) | [tiny-yolov3-crowdhuman](../../notebooks/crowdhuman/tiny-yolov3-crowdhuman_infer.ipynb), [tiny-yolov3-coco](../../notebooks/crowdhuman/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/crowdhuman/tiny-yolov2-voc_infer.ipynb) |
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
-réécrit les PNG de [figures/resultats/](figures/resultats/). Toutes les figures du dépôt
+réécrit les PNG de [figures/resultats/](figures/resultats/). L'analyse transversale des six jeux (
+grilles, classements, effets du lot et du sous-ensemble, époques, courbes et composantes
+de la perte, AP par classe, poids publiés, coût) est dans
+[notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb) : elle relit
+directement les sorties des notebooks `_sweep` et `_infer` (`tools/notebooks/balayages.py`,
+figures `python -m tools.figures balayages`). Toutes les figures du dépôt
 s'affichent dans [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb), sans
 rien exécuter.
 
@@ -43,7 +50,14 @@ split complet ([results/map_float.md](../../results/map_float.md)).
 ![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
 
 Chaque panneau a sa propre échelle : VOC plafonne à 36,27, VisDrone à 2,24, KITTI à 2,38,
-FLIR à 0,7 (AP@[.5:.95], qui ne se compare pas aux AP 11 points des autres jeux).
+FLIR à 0,7 (AP@[.5:.95], qui ne se compare pas aux AP 11 points des autres jeux), ExDark à
+13,29 et CrowdHuman à 35,87.
+
+Comparaison entre jeux (score relatif au meilleur run de chaque jeu, classements,
+effets du lot et du sous-ensemble) :
+[notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb).
+
+![Grilles lot × sous-ensemble, score relatif](figures/resultats/balayages_grilles.png)
 
 ## VOC
 
@@ -183,11 +197,83 @@ reconstruite depuis la table d'ancres du run (`env.restore_cfg`, runtime Colab n
 `build/m11/cfg/`) : même cfg qu'à l'entraînement. Les deux runs en tête du balayage
 (`b8-sall`, `b16-sall`) ne sont pas évalués ici (`RUN = 'b8-sall'` ou `COMPARE = True`).
 
+## ExDark
+
+### Balayage `tiny-yolov3-exdark` (cfg `build/m11/cfg/tiny-yolov3-exdark.cfg`, 12 classes, 3 000 images)
+
+| run | lot | images | époques | perte finale | mAP (50 images) |
+|---|---|---|---|---|---|
+| **b32-sall** | 32 | tout | 6,40 | 21,25 | **13,29** |
+| b32-s500 | 32 | 500 | 38,40 | 13,13 | 9,26 |
+| b8-sall | 8 | tout | 1,60 | 28,09 | 7,86 |
+| b16-sall | 16 | tout | 3,20 | 24,04 | 7,06 |
+| b16-s500 | 16 | 500 | 19,20 | 15,23 | 6,68 |
+| b8-s500 | 8 | 500 | 9,60 | 18,11 | 2,75 |
+
+Images de nuit et en basse lumière, split d'entraînement petit (3 000 images) : à lot 32,
+600 itérations font déjà 6,4 époques. `b32-sall` est en tête, comme sur VOC, VisDrone et
+KITTI, avec 4 points d'avance sur `b32-s500`. Les ancres k-means ne gagnent presque rien
+sur celles de Darknet (IoU moyenne 0,615 contre 0,609). AP de
+`b32-sall` : Boat 55,3, Bus 36,4, People 23,7, Bicycle 19,6, Chair 18,5, Car 5,7 ; Bottle,
+Cat, Cup, Dog et Table à 0. Durée : 427 s pour `b32-sall`.
+
+### Inférence sur les mêmes 50 images
+
+| modèle | poids | classes évaluées | mAP |
+|---|---|---|---|
+| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 12 | **24,61** |
+| `tiny-yolov3-exdark` | run `b32-sall` | 12 | 13,29 |
+| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 11 (sans cup) | 11,84 |
+
+Correspondances (`MAPPINGS`) : People → person, Table → diningtable, les autres classes
+sous leur nom ; Cup n'existe pas dans VOC. Le run affiné dépasse Tiny-YOLOv2 VOC mais reste sous les
+poids COCO, qui voient bien les personnes (51,4) et les vélos (40,2) dans le noir. Le
+notebook d'inférence retrouve exactement la mesure du balayage (13,29).
+
+## CrowdHuman
+
+### Balayage `tiny-yolov3-crowdhuman` (cfg `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`, 1 classe, 15 000 images)
+
+| run | lot | images | époques | perte finale | mAP (50 images) |
+|---|---|---|---|---|---|
+| **b16-sall** | 16 | tout | 0,64 | 54,77 | **35,87** |
+| b32-sall | 32 | tout | 1,28 | 53,17 | 30,61 |
+| b16-s500 | 16 | 500 | 19,20 | 49,17 | 27,81 |
+| b32-s500 | 32 | 500 | 38,40 | 44,79 | 27,44 |
+| b8-s500 | 8 | 500 | 9,60 | 52,35 | 27,06 |
+| b8-sall | 8 | tout | 0,32 | 67,22 | 17,67 |
+
+Une seule classe (`person`), des foules denses : le seul jeu où l'affiné approche les
+poids publiés. `b16-sall` passe devant `b32-sall` (5 points, dans le bruit à 50 images) ;
+les trois runs à 500 images se tiennent en 0,8 point ; `b8-sall` (0,32 époque) est
+dernier, comme `b8-sall` sur VOC (burn-in sur 500 des 600 itérations, LR qui n'atteint sa
+valeur qu'à la fin). Les ancres k-means sont bien plus petites que celles de Darknet
+(`6,16 … 136,227` contre `10,14 … 344,319`) et les couvrent mieux (IoU moyenne 0,68 contre
+0,53) : des personnes nombreuses et petites. Durée : 444 s pour `b32-sall`.
+
+### Inférence sur les mêmes 50 images
+
+| modèle | poids | classes évaluées | mAP |
+|---|---|---|---|
+| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 1 (person) | **38,37** |
+| `tiny-yolov3-crowdhuman` | run `b32-sall` | 1 | 30,61 |
+| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 1 (person) | 26,29 |
+
+Le notebook d'inférence prend le run le plus récent (`RUN = None`), ici `b32-sall`, et
+retrouve exactement la mesure du balayage (30,61). Le meilleur run du balayage,
+`b16-sall` (35,87), est à 2,5 points des poids COCO et 9,6 au-dessus de Tiny-YOLOv2 VOC ;
+il n'est pas évalué ici (`RUN = 'b16-sall'` ou `COMPARE = True`).
+Reste la question propre au jeu ([T11.6](M11-jeux-de-donnees.md)) : rappel de `person` et
+débordement des 256 emplacements de la NMS sur les images les plus denses.
+
 ## Meilleurs paramètres
 
-**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur VOC, VisDrone et KITTI.
+**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur VOC, VisDrone, KITTI et
+ExDark ; deuxième sur CrowdHuman, à 5 points de `b16-sall` (dans le bruit à 50 images).
 FLIR ne départage aucun run, et tous restent sous les poids COCO hors domaine (voir plus
-haut). C'est le
+haut). Sur les six jeux, `b32-sall` fait en moyenne 91 % du meilleur run de chaque jeu ;
+tout le split bat 500 images dans 15 cas sur 18 (jeu × lot)
+([analyse_balayages](../../notebooks/analyse_balayages.ipynb)). C'est le
 run par défaut des notebooks d'inférence (`RUN = None` prend le plus récent, ici
 `b32-sall`).
 
@@ -210,7 +296,7 @@ Ce que montre la grille :
   (11,95) mais une mAP de 24,01, contre 36,27 pour `b32-sall` (écart de 12 points à lot
   32, de 9 points à lot 16). Seul le lot 8 fait exception, voir le point suivant.
 - **Un grand lot.** À 600 itérations, le lot fixe le nombre d'images vues. `b8-sall`
-  (0,29 époque) est le pire run VOC : le burn-in occupe 500 des 600 itérations, le LR
+  (0,29 époque) est le pire run VOC, et `b8-sall` (0,32 époque) le pire de CrowdHuman : le burn-in occupe 500 des 600 itérations, le LR
   n'atteint sa valeur qu'à la fin et le gradient d'un lot de 8 est bruité.
 - **Écarts faibles entre les deux meilleurs.** `b32-sall` et `b16-sall` (1,6 point sur
   VOC, 0,15 sur KITTI) ne se départagent pas sur 50 images ; sur VisDrone, tous les runs
@@ -227,9 +313,9 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
 
 - **Entraînement trop court.** L'affinage de 600 itérations part des poids COCO, qui
   font 68,45 sur VOC avec la table de correspondance, et tombe à 36,27 : les têtes à
-  20 classes repartent de zéro et n'ont vu qu'une époque. Sur VisDrone (petits objets
-  nombreux) et KITTI (images écrasées), le run affiné reste même sous les poids publiés
-  hors domaine.
+  20 classes repartent de zéro et n'ont vu qu'une époque. Sur les six jeux, le meilleur
+  run affiné reste sous les poids COCO hors domaine ; CrowdHuman en est le plus près
+  (35,87 contre 38,37, une seule classe), ExDark à mi-chemin (13,29 contre 24,61).
 - **Pistes**, dans l'ordre :
   1. allonger `ITERS` sur la configuration retenue (lot 32, tout le split ; palier N) ;
      l'exemple de `tools/train.py` pour VOC est à 20 000 itérations ;
@@ -244,3 +330,16 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
   domaine (AP 3,7, AP50 9,9), qui gardent la L00 RGB d'origine. Avant un run long,
   comparer à 3 canaux (`CHANNELS = None`), pour savoir si la L00 sommée sur un canal
   coûte la différence ([M15, T15.13](M15-campagne-entrainement.md)).
+- ExDark et CrowdHuman : split complet (palier N) et, pour CrowdHuman, l'inférence de
+  `b16-sall` (`COMPARE = True` dans `tiny-yolov3-crowdhuman_infer`)
+  ([M15, T15.14](M15-campagne-entrainement.md)).
+
+## Récolte des runs
+
+Depuis la révision qui suit `35e949b`, chaque commande `tools/train.py` ou
+`tools/eval_voc.py` lancée par un notebook sur Colab écrit un `summary.json` dans son
+dossier de sortie et le copie sur le Drive dès sa fin (`colab.autosync`), évaluations et
+notebooks `_infer` compris. Sur le PC, `make harvest` rapatrie journaux, résumés, tables
+et figures (sans poids) dans `build/notebooks/` ; le notebook d'analyse y reprend les runs
+sans journal dans leur notebook (VisDrone : 4 runs d'une session précédente). Détail :
+[colab-vscode.md](colab-vscode.md#coupure-de-session).

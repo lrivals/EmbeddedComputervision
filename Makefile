@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -42,6 +42,7 @@ help:
 	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
 	@echo "figures     figures M13 dont les données sont présentes → results/figures/, results/figures.md"
 	@echo "notebooks   notebooks Jupyter de M14 → notebooks/<jeu>/, notebooks/README.md"
+	@echo "harvest     runs Colab du Drive → build/notebooks/ (json, csv, md, png ; sans poids), puis synthèse des balayages"
 	@echo "notebooks-smoke  exécution de fumée des notebooks dont les données sont là (T14.9, entraînements compris)"
 	@echo "test-durations  suite pytest complète (slow compris, palier N) → build/figures/pytest.xml (T13.30)"
 
@@ -100,6 +101,15 @@ figures:
 # gardée avec ses sorties, une exécution partielle ou en erreur est refusée (make ci : --check).
 notebooks:
 	python -m tools.notebooks all
+
+# T14.8 : récolte sur le PC des sorties copiées sur le Drive par les notebooks Colab
+# (colab.autosync, sync_outputs) : résumés, journaux, tables et figures, sans poids ni
+# checkpoints. RUNS_REMOTE : remote rclone de <DRIVE_DIR>/runs/build/notebooks.
+RUNS_REMOTE ?= gdrive:EmbeddedCV/runs/build/notebooks
+harvest:
+	rclone copy $(RUNS_REMOTE) build/notebooks --include '*.json' --include '*.csv' \
+		--include '*.md' --include '*.png' --include 'log.txt'
+	python -m tools.notebooks.balayages --runs
 
 # T14.9 : chaque notebook dont les données sont présentes, SUBSET = 4, ITERS = 2, BATCH = 2 ;
 # copies exécutées dans build/notebooks/smoke/.

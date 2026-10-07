@@ -172,3 +172,105 @@ def table(rows):
     lines = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     lines += ["| " + " | ".join(fmt(r[c]) for c in cols) + " |" for r in rows]
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------- résumés (T14.8)
+
+def parse_eval(text):
+    """Bloc de `tools/eval_voc.py` → {metric, map, ap, ap50, coco, classes, classes50,
+    ms_image} ; AP de classe None si la classe n'a aucune instance (-100 de COCO)."""
+    out = {"metric": "coco" if "métrique COCO" in text else "voc", "map": None, "ap": None,
+           "ap50": None, "coco": {}, "classes": {}, "classes50": {}, "ms_image": None}
+    m = re.search(r"\((\d+) ms/image\)", text)
+    if m:
+        out["ms_image"] = float(m.group(1))
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith("| ") or i + 2 >= len(lines) or not lines[i + 1].startswith("|---"):
+            continue
+        head = [c.strip() for c in line.strip().strip("|").split("|")]
+        if head[:2] == ["AP", "AP50"] and not out["coco"]:  # résumé COCO
+            vals = [float(c) for c in lines[i + 2].strip().strip("|").split("|")]
+            out["coco"] = dict(zip(head, vals))
+        elif head[0] == "Classe" and not out["classes"]:
+            for row in lines[i + 2:]:
+                if not row.startswith("|"):
+                    break
+                cells = [c.strip() for c in row.strip().strip("|").split("|")]
+                if cells[0] == "**mAP**":
+                    out["map"] = float(cells[1].strip("*"))
+                    continue
+                vals = [float(v) for v in cells[1:]]
+                vals = [None if v < 0 else v for v in vals]
+                out["classes"][cells[0]] = vals[0]
+                if len(vals) > 1:
+                    out["classes50"][cells[0]] = vals[1]
+    if out["metric"] == "coco" and out["coco"]:
+        out["ap"], out["ap50"] = out["coco"]["AP"], out["coco"]["AP50"]
+        out["map"] = out["ap50"]
+    if out["metric"] == "voc":
+        out["ap50"] = out["map"]
+    return out
+
+
+LOSS_PARTS = ("coord", "obj", "noobj", "cls")
+
+
+def summarize(run_dir, n=50):
+    """Résumé d'un dossier de run ou d'évaluation, lisible sans le notebook : `run.json`,
+    journal `loss.csv` (itérations, perte et composantes moyennes des `n` dernières, durée,
+    s/image) et chaque `map_float_*.md` (mAP, AP par classe). Clés absentes si la source
+    manque."""
+    d = ROOT / run_dir
+    out = {"dir": _rel(d)}
+    meta = _meta(d)
+    if meta:
+        out["meta"] = meta
+    rows = _loss_rows(d)
+    if rows:
+        tail = rows[-n:]
+        mean = lambda k: sum(float(r[k]) for r in tail) / len(tail)  # noqa: E731
+        seconds = sum(float(r["seconds"]) for r in rows)
+        out["train"] = {"iters": int(float(rows[-1]["it"])), "final_loss": mean("loss"),
+                        "final_parts": {k: mean(k) for k in LOSS_PARTS if k in rows[0]},
+                        "seconds": seconds,
+                        "s_per_image": s_per_image(d, meta.get("batch"), n)}
+    evals = {}
+    for md in sorted(d.glob("map_float*.md")):
+        ev = parse_eval(md.read_text())
+        if ev["map"] is not None:
+            evals[md.stem] = ev
+    if evals:
+        out["eval"] = evals
+    return out
+
+
+def write_summary(run_dir):
+    """`summary.json` du dossier (voir `summarize`) ; rend son chemin, ou None s'il n'y a
+    rien à résumer."""
+    s = summarize(run_dir)
+    if len(s) == 1:  # seulement "dir"
+        return None
+    p = ROOT / run_dir / "summary.json"
+    p.write_text(json.dumps(s, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    return p
+
+
+def write_summaries(model_dir):
+    """`summary.json` de chaque run (`runs/*`, run `train` à la racine) et évaluation
+    (`eval/*`) de `model_dir`, et `<model_dir>/summary.json` qui les rassemble."""
+    root = ROOT / model_dir
+    dirs = [root] + sorted(p for sub in ("runs", "eval") for p in (root / sub).glob("*")
+                           if p.is_dir())
+    items = {}
+    for d in dirs:
+        s = summarize(d)
+        if len(s) > 1:
+            items[_rel(d)] = s
+            if d != root:
+                (d / "summary.json").write_text(
+                    json.dumps(s, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    p = root / "summary.json"
+    if items:
+        p.write_text(json.dumps(items, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+    return p if items else None

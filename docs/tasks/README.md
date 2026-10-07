@@ -26,6 +26,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M14](M14-notebooks.md) | Notebooks (optionnel) | `make notebooks` génère un notebook d'inférence, d'entraînement et de balayage (lot × sous-ensemble) par modèle × jeu, exécutable en local et sur Colab |
 | [M15](M15-campagne-entrainement.md) | Campagne d'entraînement (optionnel) | mAP sur split complet des modèles affinés, jeu par jeu (VOC, VisDrone, puis KITTI, FLIR, ExDark, CrowdHuman) |
 | [M16](M16-presentation-jeux.md) | Présentation des jeux (optionnel) | `make notebooks` génère un notebook de présentation et d'analyse statistique par jeu (classes, tailles de boîtes, densité, ancres, images) ; synthèse dans [stats-jeux.md](stats-jeux.md) |
+| [M17](M17-article.md) | Article (optionnel) | `make article` régénère les chiffres, tables, figures et l'état des jalons d'un article de type papier ([docs/article/](../article/)) ; `--check` dans `make ci` |
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
@@ -56,6 +57,9 @@ graph LR
   M14 --> M15[M15]
   M14 --> M16[M16]
   M16 -.-> M15
+  M8 --> M17[M17]
+  M13 -.-> M17
+  M15 -.-> M17
 ```
 
 - **Raccourci T1.9 → M3** : avec les poids Darknet pré-entraînés, la mAP de référence est
@@ -104,3 +108,4 @@ reporter ici l'avancement par jalon.
 | M14 | 12 | 5 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
 | M15 | 14 | 0 |
 | M16 | 19 | 0 |
+| M17 | 21 | 0 |
