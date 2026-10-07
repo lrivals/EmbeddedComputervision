@@ -247,3 +247,44 @@ def test_complete_from_build(tmp_path):
     assert len(r["curve"]["loss"]) == 60 and r["duration_s"] == 120.0
     assert r["final_loss"] == 12.0  # perte de la table gardée
     assert r["full_log"] and r["from_build"]
+
+
+def test_graines_et_split_complet(tmp_path):
+    """T15.1 / T15.2 : runs `-gN` hors de la grille, scores du split complet (summary.json
+    rapatrié, sinon table `éval. = tout` du notebook _infer), bruit par case."""
+    assert B._name("b32-sall") == (32, 0, 0) and B._name("b8-s500-g2") == (8, 500, 2)
+    assert B._name("train") is None
+    root = _sweep_dir(tmp_path / "nb")
+    nb = root / "voc" / "m_sweep.ipynb"
+    d = json.loads(nb.read_text())
+    d["cells"][-1]["outputs"][0]["text"][0] += (
+        _train("b32-sall-g1", 32, 0, 1000, 400) + _eval_voc("b32-sall-g1", {"cat": 40.0, "dog": 30.0}))
+    nb.write_text(json.dumps(d))
+    build = tmp_path / "build"
+    ev = build / "voc" / "m" / "eval"
+    for name, m in (("b32-sall", 30.0), ("b32-sall-g1", 34.0)):
+        (ev / name).mkdir(parents=True)
+        (ev / name / "summary.json").write_text(json.dumps(
+            {"eval": {"map_float_sall": {"map": m}, "map_float_s50": {"map": 1.0}}}))
+    table = ("| run | lot | images | graine | itérations | backend | perte finale | mAP | "
+             "s/image | éval. |\n|---|---|---|---|---|---|---|---|---|---|\n"
+             "| b32-sall | 32 | tout | 0 | 20 | gpu | 9.00 | 99.00 | 0.03 | tout |\n"
+             "| b8-sall | 8 | tout | 0 | 20 | gpu | 12.00 | 20.00 | 0.03 | tout |\n"
+             "| b8-s500 | 8 | 500 | 0 | 20 | gpu | 8.00 | 10.00 | 0.03 | 50 |\n")
+    _notebook(root / "voc" / "m_infer.ipynb", [table])
+    data, _ = B.load_all(root, build=build)
+    voc = data["voc"]
+    assert [r["run"] for r in voc["runs"]] == ["b8-s500", "b8-sall", "b32-sall"]
+    assert [r["run"] for r in voc["seeds"]] == ["b32-sall-g1"]
+    full = {r["run"]: r["map_full"] for r in voc["runs"] + voc["seeds"]}
+    # summary.json d'abord (30 et non 99), table éval. = tout ensuite, 50 images ignoré
+    assert full == {"b8-s500": None, "b8-sall": 20.0, "b32-sall": 30.0, "b32-sall-g1": 34.0}
+    assert voc["best"] == "b32-sall"  # la graine 1 n'entre pas dans la grille
+    (row,) = voc["noise"]
+    assert (row["batch"], row["subset"], row["seeds"]) == (32, 0, [0, 1])
+    assert row["map_full"]["mean"] == pytest.approx(32.0)
+    assert row["map_full"]["std"] == pytest.approx(np.std([30, 34], ddof=1))
+    assert row["map"]["mean"] == pytest.approx(37.5)  # balayage : 40 (table) et 35
+    assert "b32-sall" in B.full_table(data) and "32,00 ± 2,83" in B.noise_table(data)
+    assert data["flir"]["noise"] == [] and B.noise_table({"flir": data["flir"]}) == ""
+    json.loads(B.to_json(data))

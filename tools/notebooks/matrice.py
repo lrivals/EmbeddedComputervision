@@ -174,8 +174,9 @@ def how_to_get(kind, nb):
     return f"notebooks/{nb.dataset}/{nb.model}_train.ipynb (préparation)"
 
 
-# Secondes par image d'entraînement à 416 × 416 (M12, paliers de coût) ; GPU : T12.11-e.
-S_PER_IMAGE = {"cpu": 0.45}
+# Secondes par image d'entraînement à 416 × 416 (M12, paliers de coût) ; GPU : Colab,
+# 624 s pour 600 itérations au lot 32 (M15, T15.3).
+S_PER_IMAGE = {"cpu": 0.45, "gpu": 0.033}
 
 
 def estimate(iters, batch, device, loss_csv=None):

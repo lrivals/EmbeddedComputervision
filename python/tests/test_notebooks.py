@@ -338,7 +338,7 @@ def test_sweep_ne_change_que_lot_et_sous_ensemble():
     src = re.sub(r"\s+", " ", "\n".join(_code(render(nb))))
     assert ("C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS, batch=b, "
             "lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE, subset=s, save_every=SAVE_EVERY, "
-            "workers=WORKERS, device=DEVICE, data_root=DATA_ROOT)") in src
+            "workers=WORKERS, device=DEVICE, data_root=DATA_ROOT, seed=g)") in src
     p = _params(render(nb))
     t = _params(render(NOTEBOOKS["kitti/tiny-yolov3-kitti_train"]), ITERS=p["ITERS"], BATCH=8)
     d = f"{nb.train_dir}/runs/{runs.run_name(8, 500)}"
@@ -349,7 +349,58 @@ def test_sweep_ne_change_que_lot_et_sous_ensemble():
     want = _train(t, d)
     assert _opts(got)[1] == {**_opts(want)[1], "--subset": 500.0}
     assert d.endswith("/runs/b8-s500") and runs.run_name(16, 0) == "b16-sall"
-    assert p["BATCHES"] and 0 in p["TRAIN_SUBSETS"]
+    assert p["BATCHES"] and 0 in p["TRAIN_SUBSETS"] and p["SEEDS"] == [0]
+
+
+def test_graine_du_balayage():
+    """T15.2 : graine 0 = commande et nom d'aujourd'hui ; autre graine : --seed et suffixe."""
+    base = C.cmd_train("m.cfg", "build/r", "kitti", batch=32)
+    assert C.cmd_train("m.cfg", "build/r", "kitti", batch=32, seed=0) == base
+    assert "--seed" not in base
+    got = C.cmd_train("m.cfg", "build/r", "kitti", batch=32, seed=2)
+    assert got[got.index("--seed") + 1] == "2" and [a for a in got if a not in ("--seed", "2")] == base
+    assert runs.run_name(32, 0) == "b32-sall" and runs.run_name(32, 0, 0) == "b32-sall"
+    assert runs.run_name(32, 0, 1) == "b32-sall-g1" and runs.run_name(8, 500, 2) == "b8-s500-g2"
+
+
+def test_infer_affine_partage_le_cache_de_comparaison():
+    """T15.1 : le run choisi s'évalue dans RUNS_DIR/eval/<run>/, comme COMPARE et _sweep."""
+    src = "\n".join(_code(render(NOTEBOOKS["voc/tiny-yolov3-voc_infer"])))
+    assert 'EVAL_DIR = Path(RUNS_DIR, "eval", CHOSEN.name)' in src
+    assert "runs.evaluate(CHOSEN," in src
+    assert "CHOSEN = None" in src  # WEIGHTS donné : évaluation directe, comme avant
+    sweep = "\n".join(_code(render(NOTEBOOKS["voc/tiny-yolov3-voc_sweep"])))
+    assert 'out_dir=f"{OUT}/eval/{r.name}"' in sweep
+    publie = "\n".join(_code(render(NOTEBOOKS["voc/tiny-yolov3-coco_infer"])))
+    assert "CHOSEN" not in publie and 'out=f"{OUT}/dets"' in publie
+
+
+def test_archive_garde_une_execution_apres_changement_de_gabarit(tmp_path, capsys):
+    """Un notebook exécuté et figé par --archive reste admis quand le gabarit change ; une
+    retouche le fait refuser ; --force le régénère et retire l'archive."""
+    assert main(["all", "--out", str(tmp_path)]) == 0
+    p = tmp_path / "voc" / "tiny-yolov2-voc_infer.ipynb"
+    _execute(p, error=False, partial=False)
+    assert main(["voc/tiny-yolov2-voc_infer", "--archive", "--out", str(tmp_path)]) == 0
+    assert "voc/tiny-yolov2-voc_infer.ipynb" in json.loads((tmp_path / "archives.json").read_text())
+    nb = json.loads(p.read_text())  # gabarit qui change : cellule de code du générateur
+    cell = next(c for c in nb["cells"] if c["cell_type"] == "code")
+    cell["source"].append("# ligne d'un gabarit antérieur\n")
+    archived = json.dumps(nb, indent=1, ensure_ascii=False) + "\n"
+    p.write_text(archived)
+    assert main(["--check", "--out", str(tmp_path)]) == 1  # empreinte changée : refusé
+    assert main(["voc/tiny-yolov2-voc_infer", "--archive", "--out", str(tmp_path)]) == 1
+    capsys.readouterr()
+    from tools.notebooks.__main__ import digest
+    (tmp_path / "archives.json").write_text(json.dumps(
+        {"voc/tiny-yolov2-voc_infer.ipynb": digest(archived)}))
+    assert main(["--check", "--out", str(tmp_path)]) == 0
+    assert "1 archivés" in capsys.readouterr().out
+    main(["all", "--out", str(tmp_path)])
+    assert p.read_text() == archived  # gardé
+    main(["voc/tiny-yolov2-voc_infer", "--force", "--out", str(tmp_path)])
+    assert p.read_text() != archived and not (tmp_path / "archives.json").exists()
+    assert main(["--check", "--out", str(tmp_path)]) == 0
 
 
 def _fake_run(root, rel, mtime, **meta):
@@ -399,6 +450,20 @@ def test_read_map_des_tables_eval_voc(tmp_path, monkeypatch):
     (tmp_path / "coco.md").write_text(ev.coco_table(res, "t", ["a", "b"]))
     assert runs.read_map("coco.md") == 10.0
     assert runs.read_map("absent.md") is None
+
+
+def test_evaluate_reprend_le_cache_ancien(tmp_path, monkeypatch):
+    """Un run déjà évalué dans runs/<run>/ (balayages d'avant eval/<run>/) n'est pas
+    réévalué : sa table est recopiée dans eval/<run>/."""
+    monkeypatch.setattr(runs, "ROOT", tmp_path)
+    d = tmp_path / "m" / "runs" / "b8-s500"
+    d.mkdir(parents=True)
+    (d / "map_float_s50.md").write_text("| Classe | AP |\n|---|---|\n| **mAP** | **12.50** |\n")
+    run = runs.Run("b8-s500", "m/runs/b8-s500", "m/runs/b8-s500/final.weights")
+    monkeypatch.setattr(C, "run", lambda *a, **k: pytest.fail("réévalué"))
+    row = runs.evaluate(run, "m.cfg", "voc", "stretch", 50, out_dir="m/eval/b8-s500")
+    assert row["mAP"] == 12.5
+    assert (tmp_path / "m" / "eval" / "b8-s500" / "map_float_s50.md").exists()
 
 
 @pytest.mark.parametrize("profile,over,lowbit", [("qat", M12_QAT, "w4a4"),

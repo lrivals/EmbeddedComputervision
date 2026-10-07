@@ -24,8 +24,9 @@ SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
 REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True, "JOBS": 16}}
-# Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu).
-SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "iters": 600}
+# Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu),
+# graine 0 (autres graines : bruit d'un run, T15.2).
+SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "seeds": [0], "iters": 600}
 
 # Paramètres des profils M12 pour le notebook voc/tiny-yolov3-voc_train (T14.7).
 M12_QAT = {"NET": "tiny-yolov2-voc", "INIT": "weights/yolov2-tiny-voc.weights",
@@ -185,6 +186,7 @@ def params(nb):
             p += [("BATCHES", SWEEP["batches"], "tailles de lot essayées"),
                   ("TRAIN_SUBSETS", SWEEP["subsets"],
                    "images d'entraînement (n premières) ; 0 : tout le split"),
+                  ("SEEDS", SWEEP["seeds"], "graines (train.py --seed) ; T15.2 : [1, 2]"),
                   ("ITERS", SWEEP["iters"], "itérations par run (palier N dès 600)"),
                   ("SKIP_DONE", True, "saute les runs qui ont déjà final.weights")]
         else:
@@ -230,6 +232,7 @@ def environment(nb):
             colab.restore_outputs(RUNS_DIR, DRIVE_DIR)
         RUNS = runs.find_runs(RUNS_DIR)
         print(f"runs de {{RUNS_DIR}} :\\n{{runs.listing(RUNS)}}")
+        CHOSEN = None
         if WEIGHTS is None:
             CHOSEN = runs.pick(RUNS_DIR, RUN, hint={needs[2]})
             WEIGHTS, OUT = CHOSEN.weights, f"{{OUT}}/{{CHOSEN.name}}"
@@ -375,20 +378,38 @@ def infer_body(nb):
             print(f"classes évaluées ({len(view.names)}) : {', '.join(view.names)}")
             print(f"classes du modèle ignorées : {len(names) - len(view.names)}")
             """)]
+    evaluate = """
+        map_float = Path(OUT) / "map_float.md"
+        map_float.unlink(missing_ok=True)
+        C.run(C.cmd_eval_voc(NET, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                             DATA_ROOT, out=f"{OUT}/dets", markdown=map_float))"""
+    pr = 'Path(OUT, "dets", "figures")'
+    if nb.finetuned:  # run choisi : même cache que la comparaison, évalué une fois (T15.1)
+        evaluate = """
+        if CHOSEN is not None:
+            EVAL_DIR = Path(RUNS_DIR, "eval", CHOSEN.name)
+            runs.evaluate(CHOSEN, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                          DATA_ROOT, out_dir=EVAL_DIR)
+            map_float = EVAL_DIR / f"map_float_s{SUBSET or 'all'}.md"
+            dets = EVAL_DIR / f"dets_s{SUBSET or 'all'}"
+        else:""" + textwrap.indent(textwrap.dedent(evaluate), " " * 12) + """
+            dets = Path(OUT, "dets")"""
+        pr = 'Path(dets, "figures")'
     cells += [md("""
         ## mAP flottante (T14.3)
 
         `tools/eval_voc.py`, métrique du jeu (`Dataset.metric` ; COCO et FLIR : AP@[.5:.95]
         et AP50). Courbes PR du mode automatique de M13 (métrique VOC).
-        """), code("""
+        """ + ("""
+        Le run choisi est évalué dans `RUNS_DIR/eval/<run>/`, comme par la comparaison
+        plus bas, qui réutilise ce résultat : une mAP déjà calculée pour ce `SUBSET` n'est
+        pas recalculée.
+        """ if nb.finetuned else "")), code("""
         print(f"{SUBSET or 'toutes les'} images : palier "
-              f"{palier(SUBSET or SPLIT_IMAGES.get(DATASET))} (règles de M12)")
-        map_float = Path(OUT) / "map_float.md"
-        map_float.unlink(missing_ok=True)
-        C.run(C.cmd_eval_voc(NET, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
-                             DATA_ROOT, out=f"{OUT}/dets", markdown=map_float))
+              f"{palier(SUBSET or SPLIT_IMAGES.get(DATASET))} (règles de M12)")"""
+        + evaluate + """
         display(Markdown(map_float.read_text()))
-        for png in sorted(Path(OUT, "dets", "figures").glob("pr*.png")):
+        for png in sorted(""" + pr + """.glob("pr*.png")):
             display(Image.open(png))
         """)]
     if nb.finetuned:
@@ -646,9 +667,12 @@ def sweep_body(nb):
     return [*_prep_preview_cells(), md("""
         ## Plan du balayage (T14.10)
 
-        Un run par case de la grille `BATCHES × TRAIN_SUBSETS`, tous les autres paramètres
-        égaux (ceux de `tools/m11.sh <jeu>-train`, `ITERS` à part). `TRAIN_SUBSETS` prend les
-        n premières images du split d'entraînement (`train.py --subset`), 0 tout le split.
+        Un run par case de la grille `BATCHES × TRAIN_SUBSETS × SEEDS`, tous les autres
+        paramètres égaux (ceux de `tools/m11.sh <jeu>-train`, `ITERS` à part).
+        `TRAIN_SUBSETS` prend les n premières images du split d'entraînement
+        (`train.py --subset`), 0 tout le split. Une graine non nulle (`train.py --seed` :
+        têtes, tirage des lots, multiscale) suffixe le run (`b32-sall-g1`) ; la graine 0
+        garde le nom court.
         À itérations égales, un lot plus grand voit plus d'images : la colonne « époques »
         le montre. Le taux d'apprentissage n'est pas ajusté au lot.
         """), code("""
@@ -656,10 +680,11 @@ def sweep_body(nb):
 
         from tools.notebooks import colab, runs
 
-        PLAN = [(b, s, runs.run_name(b, s)) for b in BATCHES for s in TRAIN_SUBSETS]
+        PLAN = [(b, s, g, runs.run_name(b, s, g)) for b in BATCHES for s in TRAIN_SUBSETS
+                for g in SEEDS]
         rows = ["| run | lot | images | époques | durée estimée |", "|---|---|---|---|---|"]
         total = 0
-        for b, s, name in PLAN:
+        for b, s, g, name in PLAN:
             n = min(s, len(samples)) if s else len(samples)
             sec = estimate(ITERS, b, DEVICE)
             total += sec or 0
@@ -693,18 +718,18 @@ def sweep_body(nb):
         if SYNC:
             threading.Thread(target=sync_loop, daemon=True).start()
         try:
-            for b, s, name in PLAN:
+            for b, s, g, name in PLAN:
                 run_dir = Path(OUT) / "runs" / name
                 if SKIP_DONE and (run_dir / "final.weights").exists():
                     print(f"{name} : déjà entraîné, sauté")
                     continue
                 resume = (run_dir / "checkpoint.npz").exists()
-                runs.write_meta(run_dir, batch=b, subset=s, iters=ITERS, lr=LR, device=DEVICE,
-                                net=NET, dataset=DATASET, rev=TRACE["rev"])
+                runs.write_meta(run_dir, batch=b, subset=s, seed=g, iters=ITERS, lr=LR,
+                                device=DEVICE, net=NET, dataset=DATASET, rev=TRACE["rev"])
                 C.run(C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS,
                                   batch=b, lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE,
                                   subset=s, save_every=SAVE_EVERY, workers=WORKERS,
-                                  device=DEVICE, data_root=DATA_ROOT),
+                                  device=DEVICE, data_root=DATA_ROOT, seed=g),
                       log=run_dir / "log.txt")
         finally:
             stop.set()
@@ -714,6 +739,7 @@ def sweep_body(nb):
         ## Comparaison
 
         mAP flottante de chaque run sur les mêmes `SUBSET` images (`tools/eval_voc.py`,
+        dans `OUT/eval/<run>/`, cache partagé avec la comparaison des notebooks `_infer` :
         réutilisée si déjà calculée), perte finale et vitesse ; courbes de perte superposées
         (`tools.figures.resultats.plot_training`, M13). Les notebooks d'inférence
         `<modèle>_infer` lisent ces runs (`RUN`, `COMPARE`).
@@ -721,11 +747,12 @@ def sweep_body(nb):
         from tools.figures import MissingSource
         from tools.figures import resultats as FR
 
-        RESULTS = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE, DATA_ROOT)
+        RESULTS = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE, DATA_ROOT,
+                                 out_dir=f"{OUT}/eval/{r.name}")
                    for r in runs.find_runs(OUT) if r.name != runs.TRAIN]
         display(Markdown(runs.table(RESULTS)))
         curves = []
-        for b, s, name in PLAN:
+        for b, s, g, name in PLAN:
             try:
                 curves.append(FR.load_training(Path(OUT) / "runs" / name))
             except MissingSource:

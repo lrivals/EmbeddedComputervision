@@ -110,9 +110,12 @@ def _segments(text, tool):
 # --------------------------------------------------------------------------- balayage
 
 def _name(name):
-    """« b16-s500 » → (16, 500) ; « b32-sall » → (32, 0)."""
-    m = re.fullmatch(r"b(\d+)-s(\d+|all)", name)
-    return (int(m.group(1)), 0 if m.group(2) == "all" else int(m.group(2))) if m else None
+    """« b16-s500 » → (16, 500, 0) ; « b32-sall » → (32, 0, 0) ; graine en suffixe (T15.2) :
+    « b32-sall-g1 » → (32, 0, 1)."""
+    m = re.fullmatch(r"b(\d+)-s(\d+|all)(?:-g(\d+))?", name)
+    if not m:
+        return None
+    return int(m.group(1)), 0 if m.group(2) == "all" else int(m.group(2)), int(m.group(3) or 0)
 
 
 def _parse_train(cmd, body):
@@ -154,7 +157,8 @@ def parse_sweep(path):
     """Notebook de balayage exécuté → {dataset, net, metric, n_train, rev, runs: [...]}, runs
     dans l'ordre du plan (lot, puis 500 images avant tout le split). Un run entraîné dans
     une session précédente (« déjà entraîné, sauté ») n'a ni courbe ni durée : sa perte
-    finale et sa mAP viennent de la table comparative."""
+    finale et sa mAP viennent de la table comparative. Les runs d'une graine non nulle
+    (T15.2) vont dans `seeds`, hors des statistiques de la grille."""
     path = Path(path)
     cells = _cells(path)
     text = "\n".join(t for _, t, _ in cells)
@@ -162,8 +166,9 @@ def parse_sweep(path):
     runs = {}
 
     def get(name):
-        b, s = _name(name)
-        return runs.setdefault(name, {"run": name, "batch": b, "subset": s, "iters": iters,
+        b, s, g = _name(name)
+        return runs.setdefault(name, {"run": name, "batch": b, "subset": s, "seed": g,
+                                      "iters": iters,
                                       "images": None, "duration_s": None, "curve": None,
                                       "resumed": False, "map": None})
 
@@ -190,14 +195,16 @@ def parse_sweep(path):
         n = r["subset"] or n_train
         r["images"] = r["images"] or (min(r["subset"], n_train or r["subset"]) if r["subset"] else n_train)
         r["epochs"] = r["iters"] * r["batch"] / n if n and r["iters"] else None
-    order = sorted(runs.values(), key=lambda r: (r["batch"], r["subset"] == 0, r["subset"]))
+    order = sorted(runs.values(), key=lambda r: (r["batch"], r["subset"] == 0, r["subset"],
+                                                 r["seed"]))
     metric = next((r["metric"] for r in order if "metric" in r), None)
     m = re.search(r"révision (\w+)", text)
     return {"dataset": path.parent.name, "label": LABELS.get(path.parent.name, path.parent.name),
             "net": _param(cells, "NET"), "notebook": _rel(path),
             "metric": metric, "n_train": n_train, "iters": iters,
             "burn_in": _param(cells, "BURN_IN"), "rev": m.group(1) if m else None,
-            "runs": order}
+            "runs": [r for r in order if not r["seed"]],
+            "seeds": [r for r in order if r["seed"]]}
 
 
 def parse_baselines(dataset, nb_dir=NB_DIR):
@@ -219,6 +226,49 @@ def parse_baselines(dataset, nb_dir=NB_DIR):
         ev["n_classes"] = len(ev["classes"])
         ev["present"] = sum(v is not None for v in ev["classes"].values())
         out[model] = ev
+    return out
+
+
+def parse_full(dataset, model, metric=None, nb_dir=NB_DIR, build=None):
+    """{run: score} sur le split complet (T15.1). Source : `summary.json` des évaluations
+    rapatriées par `make harvest` (`build/notebooks/<jeu>/<modèle>/eval/<run>/`, clé
+    `map_float_sall`), sinon table de comparaison du notebook `<modèle>_infer` exécuté avec
+    `SUBSET = 0` (colonne « éval. » = « tout » ; métrique VOC seulement : pour COCO la
+    table donne l'AP@[.5:.95], pas l'AP50 du score commun)."""
+    out = {}
+    base = Path(build) if build else ROOT / "build" / "notebooks"
+    for p in sorted((base / dataset / model / "eval").glob("*/summary.json")):
+        try:
+            ev = json.loads(p.read_text()).get("eval", {}).get("map_float_sall") or {}
+        except (OSError, ValueError):
+            continue
+        if ev.get("map") is not None:
+            out[p.parent.name] = float(ev["map"])
+    p = Path(nb_dir) / dataset / f"{model}_infer.ipynb"
+    if metric != "coco" and p.exists() and _executed(p):
+        text = "\n".join(t for _, t, _ in _cells(p))
+        for name, row in _comparison(text).items():
+            if row.get("éval.") == "tout" and _num(row.get("mAP")) is not None:
+                out.setdefault(name, _num(row["mAP"]))
+    return out
+
+
+def noise(d, keys=("map_full", "map")):
+    """Bruit d'un run (T15.2) : par case (lot, sous-ensemble) entraînée avec plusieurs
+    graines, moyenne et écart-type (ddof = 1) de chaque score de `keys` disponible."""
+    groups = {}
+    for r in d["runs"] + d.get("seeds", []):
+        groups.setdefault((r["batch"], r["subset"]), []).append(r)
+    out = []
+    for (b, s), rs in sorted(groups.items()):
+        if len(rs) < 2:
+            continue
+        row = {"batch": b, "subset": s, "seeds": sorted(r["seed"] for r in rs)}
+        for k in keys:
+            v = [r[k] for r in rs if r.get(k) is not None]
+            row[k] = ({"n": len(v), "mean": float(np.mean(v)), "std": float(np.std(v, ddof=1))}
+                      if len(v) >= 2 else None)
+        out.append(row)
     return out
 
 
@@ -276,6 +326,11 @@ def load_all(nb_dir=NB_DIR, datasets=None, build=None):
         d = parse_sweep(p)
         d["completed"] = complete_from_build(d, build)
         d["baselines"] = parse_baselines(ds, nb_dir)
+        model = Path(d["notebook"]).stem.removesuffix("_sweep")
+        full = parse_full(ds, model, d["metric"], nb_dir, build)
+        for r in d["runs"] + d["seeds"]:
+            r["map_full"] = full.get(r["run"])
+        d["noise"] = noise(d)
         data[ds] = _finish(d)
     return data, pending
 
@@ -384,6 +439,47 @@ def runs_table(data):
                          f"{_f(r.get('map'))} | {_f(r['rel'])} | {_f(r.get('rank'), 1)} | "
                          f"{_f(r['duration_s'] / 60 if r['duration_s'] else None, 1)} |")
     return "\n".join(lines)
+
+
+def full_table(data):
+    """Table Markdown du split complet (T15.1) : score sur `SUBSET` images (balayage) et sur
+    tout le split, rang sur chacun ; Spearman des deux classements par jeu. Vide si aucun
+    jeu n'a de score sur le split complet."""
+    lines = ["| jeu | run | lot | images | score (balayage) | rang | score (split complet) | "
+             "rang |", "|---|---|---|---|---|---|---|---|"]
+    rhos = []
+    for d in data.values():
+        rs = [r for r in d["runs"] if r.get("map_full") is not None]
+        if not rs:
+            continue
+        rank_full = dict(zip((r["run"] for r in rs), _ranks([-r["map_full"] for r in rs])))
+        for r in sorted(rs, key=lambda r: -r["map_full"]):
+            lines.append(f"| {d['label']} | {r['run']} | {r['batch']} | {r['subset'] or 'tout'} | "
+                         f"{_f(r.get('map'))} | {_f(r.get('rank'), 1)} | **{_f(r['map_full'])}** | "
+                         f"{_f(float(rank_full[r['run']]), 1)} |")
+        both = [r for r in rs if r.get("map") is not None]
+        if len(both) >= 3:
+            rho = spearman([r["map"] for r in both], [r["map_full"] for r in both])
+            rhos.append(f"{d['label']} ρ = {_f(rho)} ({len(both)} runs)")
+    if len(lines) == 2:
+        return ""
+    return "\n".join(lines) + ("\n\nClassement balayage / split complet : " + " ; ".join(rhos)
+                               + "." if rhos else "")
+
+
+def noise_table(data):
+    """Table Markdown du bruit d'un run (T15.2), vide sans case à plusieurs graines."""
+    def ms(v):
+        return f"{_f(v['mean'])} ± {_f(v['std'])} (n = {v['n']})" if v else "—"
+
+    lines = ["| jeu | lot | images | graines | score (split complet) | score (balayage) |",
+             "|---|---|---|---|---|---|"]
+    for d in data.values():
+        for row in d.get("noise", []):
+            lines.append(f"| {d['label']} | {row['batch']} | {row['subset'] or 'tout'} | "
+                         f"{', '.join(map(str, row['seeds']))} | {ms(row['map_full'])} | "
+                         f"{ms(row['map'])} |")
+    return "\n".join(lines) if len(lines) > 2 else ""
 
 
 def observations(data):
@@ -548,6 +644,10 @@ def main(argv=None):
     if args.runs:
         print()
         print(runs_table(data))
+    for title, table in (("Split complet (T15.1)", full_table(data)),
+                         ("Bruit d'un run (T15.2)", noise_table(data))):
+        if table:
+            print(f"\n{title}\n\n{table}")
     print()
     print(conclusions(data, pending))
     if args.json:

@@ -96,6 +96,13 @@ mesure sur Colab ou l'exécution des notebooks `_train` (« Reste » de chaque t
   refuse et `make notebooks` la remplace par le notebook vide. Une exécution complète est
   gardée par `make notebooks` tant que le gabarit ne change pas ; une cellule ajoutée ou
   retouchée à la main est refusée dans les deux cas.
+- **Archives** : avant un changement de gabarit, `python -m tools.notebooks <cibles>
+  --archive` fige les exécutions complètes et à jour (empreinte sans sorties dans
+  `notebooks/archives.json`). Une archive reste gardée par `make notebooks` et admise par
+  `--check` (« archivé ») tant que son empreinte ne change pas ; une retouche la fait
+  refuser. `--force` régénère la cible depuis le gabarit courant et retire l'archive.
+  Sert aux sorties que lit `tools/notebooks/balayages.py` (12 notebooks `_sweep` et
+  `_infer` affinés archivés pour M15).
 - **Structure fixe** de chaque notebook, dans cet ordre :
   1. titre, rôle, palier de coût M12, liens vers la tâche M11/M2/M9 concernée ;
   2. **cellule de paramètres** (tag `parameters`, compatible papermill sans l'exiger) :

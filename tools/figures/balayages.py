@@ -138,7 +138,7 @@ def plot_classements(data, out_dir, name="balayages_classements"):
     x = np.arange(len(sets))
     ranks = np.array([B._ranks(-row) for row in m])  # 1 : meilleur
     for k, n in enumerate(names):
-        b, s = B._name(n)
+        b, s, _ = B._name(n)
         c = _batch_color(b)
         ys = ranks[:, k]
         ax.plot(x, ys, color=c, lw=2, ls="-" if s == 0 else "--", zorder=2)

@@ -1,6 +1,9 @@
-"""python -m tools.notebooks <nom|jeu|rôle|all> … ; --list ; --check (make ci)."""
+"""python -m tools.notebooks <nom|jeu|rôle|all> … ; --list ; --check (make ci) ;
+--archive <cibles> (fige des exécutions avant un changement de gabarit) ; --force."""
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -111,12 +114,39 @@ def executed_ok(text):
     return None
 
 
-def state(path, text):
-    """État d'un fichier face au texte généré : à jour | exécuté | <raison de l'écart>.
+ARCHIVES = "archives.json"  # sous le dossier des notebooks : {chemin relatif: empreinte}
+
+
+def digest(text):
+    """Empreinte du notebook sans sorties (`strip_outputs`) : une retouche la change."""
+    nb = strip_outputs(text)
+    return hashlib.sha256(json.dumps(nb, sort_keys=True).encode()).hexdigest()
+
+
+def load_archives(out_dir):
+    try:
+        return json.loads((Path(out_dir) / ARCHIVES).read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_archives(out_dir, archives):
+    p = Path(out_dir) / ARCHIVES
+    if archives:
+        p.write_text(json.dumps(dict(sorted(archives.items())), indent=1) + "\n")
+    else:
+        p.unlink(missing_ok=True)
+
+
+def state(path, text, archives=None, key=None):
+    """État d'un fichier face au texte généré : à jour | exécuté | archivé | <raison de
+    l'écart>.
 
     Règle M14 : un notebook versionné est soit sans sorties et identique au générateur,
     soit **entièrement exécuté sans erreur** avec les cellules du générateur (sorties
-    visibles sur GitHub). Une exécution partielle ou en erreur ne se versionne pas."""
+    visibles sur GitHub). Une exécution partielle ou en erreur ne se versionne pas.
+    Exception : une exécution complète figée par `--archive` (`archives.json`, clé `key`)
+    reste admise après un changement de gabarit tant que son empreinte ne change pas."""
     if not path.exists():
         return "absent"
     cur = path.read_text()
@@ -129,9 +159,11 @@ def state(path, text):
         mine = strip_outputs(cur)
     except (ValueError, KeyError):
         return "JSON illisible"
-    if mine != gen:
-        return "diffère du générateur"
     why = executed_ok(cur)
+    if mine != gen:
+        if not why and key and (archives or {}).get(key) == digest(cur):
+            return "archivé"
+        return "diffère du générateur"
     return f"exécuté, refusé : {why}" if why else "exécuté"
 
 
@@ -147,8 +179,17 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true",
                     help="échoue si un notebook versionné diffère du générateur (sorties "
                     "admises si l'exécution est complète et sans erreur)")
+    ap.add_argument("--archive", action="store_true",
+                    help="fige les cibles exécutées sans erreur (archives.json) : gardées et "
+                    "admises par --check après un changement de gabarit")
+    ap.add_argument("--force", action="store_true",
+                    help="réécrit les cibles même exécutées ou archivées (archive retirée)")
     ap.add_argument("--out", type=Path, default=NB_DIR, help="dossier des notebooks")
     args = ap.parse_args(argv)
+    archives = load_archives(args.out)
+
+    def rel(p):  # clé d'archives.json
+        return Path(p).relative_to(args.out).as_posix()
 
     if args.list:
         for key, nb in NOTEBOOKS.items():
@@ -156,9 +197,10 @@ def main(argv=None):
         return 0
     if args.check:
         files = generate(NOTEBOOKS.values(), args.out)
-        states = {p: state(p, text) for p, text in files.items()}
-        bad = [p for p, st in states.items() if st not in ("à jour", "exécuté")]
+        states = {p: state(p, text, archives, rel(p)) for p, text in files.items()}
+        bad = [p for p, st in states.items() if st not in ("à jour", "exécuté", "archivé")]
         run = [p for p, st in states.items() if st == "exécuté"]
+        kept = [p for p, st in states.items() if st == "archivé"]
         known = set(files)
         extra = [p for p in Path(args.out).rglob("*.ipynb") if p not in known
                  and ".ipynb_checkpoints" not in p.parts]
@@ -169,19 +211,47 @@ def main(argv=None):
         if bad or extra:
             print("régénérer : make notebooks")
             return 1
-        print(f"{len(files)} fichiers à jour, dont {len(run)} notebooks exécutés sans erreur")
+        msg = f"{len(files)} fichiers à jour, dont {len(run)} notebooks exécutés sans erreur"
+        if kept:
+            msg += f" et {len(kept)} archivés (gabarit antérieur, --force pour régénérer)"
+        print(msg)
         return 0
     if not args.targets:
         ap.error("préciser un notebook, un jeu, un rôle ou all (voir --list)")
-    files = generate(select(args.targets), args.out)
+    nbs = select(args.targets)
+    if args.archive:
+        files = generate(nbs, args.out)
+        bad = 0
+        for nb in nbs:
+            p = Path(args.out) / nb.path
+            st = state(p, files[p], archives, rel(p))
+            if st in ("exécuté", "archivé"):
+                archives[rel(p)] = digest(p.read_text())
+                print(f"  archivé  {_rel(p)}")
+            else:
+                bad += 1
+                print(f"  refusé   {_rel(p)} ({st}) : seule une exécution complète à jour "
+                      "s'archive")
+        save_archives(args.out, archives)
+        return 1 if bad else 0
+    files = generate(nbs, args.out)
+    targets = {Path(args.out) / nb.path for nb in nbs}
     for p, text in files.items():
         p.parent.mkdir(parents=True, exist_ok=True)
-        st = state(p, text)
+        st = state(p, text, archives, rel(p))
+        if args.force and p in targets and st in ("exécuté", "archivé"):
+            st = f"forcé, {st}"
         if st == "exécuté":  # exécution complète gardée (règle M14)
             print(f"  gardé  {_rel(p)} (exécuté sans erreur)")
+        elif st == "archivé":
+            print(f"  gardé  {_rel(p)} (archivé, gabarit antérieur ; --force pour régénérer)")
         elif st != "à jour":
             p.write_text(text)
-            print(f"  écrit  {_rel(p)}" + (f" ({st})" if st.startswith("exécuté") else ""))
+            print(f"  écrit  {_rel(p)}" + (f" ({st})" if st.startswith(("exécuté", "forcé"))
+                                            else ""))
+        if st != "archivé":
+            archives.pop(rel(p), None)  # à jour ou réécrit : l'archive ne sert plus
+    save_archives(args.out, archives)
     print(f"{len(files) - 3} notebooks + {VIEWER}, {ANALYSIS}, index {_rel(args.out / 'README.md')}")
     return 0
 

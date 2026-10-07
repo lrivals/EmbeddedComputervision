@@ -1,0 +1,10 @@
+{
+ "crowdhuman/tiny-yolov3-crowdhuman_infer.ipynb": "e1e4156baa6dd0601b68b78c99ebe86d5102256422f174ef1158b3e8ca39242f",
+ "crowdhuman/tiny-yolov3-crowdhuman_sweep.ipynb": "ff190a92d34bc4056ef90347ab1d33128b4471124680c2684e45fddc43f5b3e4",
+ "exdark/tiny-yolov3-exdark_infer.ipynb": "bf39293abd677f3828d4540fbd29cf819f7a5675cc94c9f8d599fe7873d4f735",
+ "exdark/tiny-yolov3-exdark_sweep.ipynb": "32c05f38761ab8c46c52045853a285c20baaf539433f625148a3794d51270583",
+ "flir/tiny-yolov3-flir_infer.ipynb": "3de62d9f50b9649ebe5ffc5629b98786373d03e2be3d494ad4f8bd31c91bc56c",
+ "flir/tiny-yolov3-flir_sweep.ipynb": "0c6078487999f8d075fccb6ae9b1475286b72b8dfe4a41e902c8b08efed4af6c",
+ "kitti/tiny-yolov3-kitti_sweep.ipynb": "aa557a08f537fc1a5c08bb42a83bffdd904e379372e22f375686fe7a4ea228a1",
+ "visdrone/tiny-yolov3-visdrone_sweep.ipynb": "4362770dbaf18ad56294adec3114bdc55e5d7cebab93250978e4abc2c7a65c99"
+}

@@ -37,7 +37,7 @@ au lot 32, soit ≈ 1 s/itération) ; évaluation sur CPU ≈ 0,27 s/image, soit
 VOC2007 test (4 952 images), ≈ 2,5 min pour VisDrone val (548 images) et ≈ 7 min pour
 KITTI val (1 496 images).
 
-**État** : 0 tâche faite sur 14.
+**État** : 1 tâche faite sur 14 (T15.3) ; T15.1 et T15.2 prêtes à lancer sur Colab.
 
 ## Conventions communes
 
@@ -81,6 +81,22 @@ KITTI val (1 496 images).
 - **Notes** : notebooks `_infer` de `tiny-yolov3-voc`, `tiny-yolov3-visdrone` et
   `tiny-yolov3-kitti` avec `COMPARE = True`, `SUBSET = 0`. Compter ≈ 2 h 15 pour VOC
   (6 × 22 min), ≈ 15 min pour VisDrone, ≈ 40 min pour KITTI.
+- **Préparé** :
+  - le run choisi (`RUN`) s'évalue dans `RUNS_DIR/eval/<run>/`, le cache de `COMPARE` et
+    du `_sweep` : il n'est plus évalué deux fois ;
+  - chaque évaluation va sur le Drive dès sa fin (`colab.autosync`) : après une coupure,
+    relancer le notebook ne refait que les runs manquants ;
+  - lecture : `make harvest` puis `python -m tools.notebooks.balayages` affiche la table
+    « Split complet (T15.1) » (score 50 images et split complet, rangs, Spearman des deux
+    classements) depuis `build/notebooks/<jeu>/<modèle>/eval/<run>/summary.json`, ou à
+    défaut la table `éval. = tout` du notebook `_infer` versionné.
+- **Procédure Colab** (notebooks archivés : les régénérer d'abord,
+  `python -m tools.notebooks <jeu>/tiny-yolov3-<jeu>_infer --force`) :
+  1. `visdrone/tiny-yolov3-visdrone_infer`, puis `kitti/tiny-yolov3-kitti_infer` :
+     `SUBSET = 0`, `COMPARE = True`, `INT8 = False`, `DRIVE_DIR` réglé ;
+  2. `voc/tiny-yolov3-voc_infer`, mêmes réglages, **après** le balayage de T15.2 : une
+     seule passe évalue les 6 runs de la grille et les 4 runs des graines
+     (≈ 3 h 40 sur CPU, reprise automatique ; plusieurs sessions possibles).
 
 ### [ ] T15.2 — Bruit d'un run
 - **Spec** : §7 · **Dépend de** : T15.1 · **Taille** : S
@@ -89,8 +105,18 @@ KITTI val (1 496 images).
   `--seed 2`, évalués sur le split complet ; écart-type rapporté
 - **Notes** : ≈ 40 min de GPU pour les 4 runs. Le résultat sert de seuil de
   significativité pour toutes les comparaisons de M15.
+- **Préparé** : paramètre `SEEDS` du `_sweep` (`[0]` par défaut) ; une graine non nulle
+  passe `--seed` à `train.py` (têtes réinitialisées, tirage des lots, multiscale) et
+  suffixe le run (`b32-sall-g1`), la graine 0 garde le nom court. `balayages.py` met ces
+  runs à part (`seeds`, hors des statistiques de la grille) et affiche « Bruit d'un run
+  (T15.2) » : moyenne ± écart-type (ddof = 1) par case, split complet et 50 images.
+- **Procédure Colab** : `python -m tools.notebooks voc/tiny-yolov3-voc_sweep --force`,
+  puis `voc/tiny-yolov3-voc_sweep` avec `BATCHES = [16, 32]`, `TRAIN_SUBSETS = [0]`,
+  `SEEDS = [1, 2]`, `SUBSET = 50` (4 runs ≈ 40 min de GPU ; la comparaison à 50 images
+  réévalue aussi les 6 runs existants, quelques minutes) ; ensuite l'étape 2 de T15.1.
+  Le notebook réexécuté remplace l'archive : sa table liste les 10 runs.
 
-### [ ] T15.3 — Durée GPU dans le plan du balayage
+### [x] T15.3 — Durée GPU dans le plan du balayage
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** : `S_PER_IMAGE["gpu"]` dans `tools/notebooks/matrice.py` (≈ 0,033 s)
 - **Acceptation** : la table du plan de `_sweep` affiche une durée en GPU au lieu de

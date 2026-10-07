@@ -76,7 +76,7 @@ def init_args(init, init_net=None):
 def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False, qat="",
               qat_steps=None, admm=None, admm_rho=None, admm_growth=None, admm_every=None,
               iters=4000, batch=16, lr=1e-3, burn_in=500, multiscale=True, size=None,
-              subset=0, save_every=None, workers=4, device="cpu", data_root=None):
+              subset=0, save_every=None, workers=4, device="cpu", data_root=None, seed=0):
     """`tools/train.py`. Ordre des options : celui de m11.sh (`train`) ; QAT et ADMM à la
     place de `--dataset`, comme m12.sh (`qat`, `admm`). `--dataset voc` (défaut) est omis."""
     cmd = ["python", "tools/train.py", "--net", str(net)]
@@ -98,6 +98,7 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
     _opt(cmd, "--size", _size(size))
     _opt(cmd, "--subset", subset or None)
     _opt(cmd, "--save-every", save_every)
+    _opt(cmd, "--seed", seed or None)  # 0 : défaut de train.py, omis (T15.2)
     cmd += ["--workers", str(workers), "--device", device]
     _opt(cmd, "--data-root", data_root)
     return cmd + ["--out", str(out)]

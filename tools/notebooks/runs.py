@@ -32,9 +32,10 @@ class Run:
     mtime: float = 0.0
 
 
-def run_name(batch, subset):
-    """Nom d'une case du balayage : b16-sall (tout le jeu), b8-s500 (500 images)."""
-    return f"b{batch}-s{subset or 'all'}"
+def run_name(batch, subset, seed=0):
+    """Nom d'une case du balayage : b16-sall (tout le jeu), b8-s500 (500 images) ; graine
+    non nulle en suffixe (T15.2) : b32-sall-g1."""
+    return f"b{batch}-s{subset or 'all'}" + (f"-g{seed}" if seed else "")
 
 
 def _rel(p):
@@ -141,6 +142,10 @@ def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=No
 
     out = Path(out_dir or run.dir)
     md = out / f"map_float_s{subset or 'all'}.md"
+    old = Path(run.dir) / md.name  # cache d'avant eval/<run>/ (balayages de M14)
+    if read_map(md) is None and old != md and read_map(old) is not None:
+        (ROOT / out).mkdir(parents=True, exist_ok=True)
+        (ROOT / md).write_text((ROOT / old).read_text())
     if read_map(md) is None:
         (ROOT / md).unlink(missing_ok=True)
         C.run(C.cmd_eval_voc(net, run.weights, dataset, resize, subset, metric, split, size,
@@ -152,7 +157,7 @@ def row(run, map_, subset=None):
     m = run.meta
     batch = m.get("batch")
     return {"run": run.name, "lot": batch, "images": m.get("subset", "") or "tout",
-            "itérations": m.get("iters", ""), "backend": m.get("device", ""),
+            "graine": m.get("seed", 0), "itérations": m.get("iters", ""), "backend": m.get("device", ""),
             "perte finale": last_loss(run.dir), "mAP": map_,
             "s/image": s_per_image(run.dir, batch), "éval.": subset or "tout"}
 
