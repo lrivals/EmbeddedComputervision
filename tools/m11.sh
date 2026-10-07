@@ -23,7 +23,9 @@
 # et visdrone-size : tiny-yolov3, défaut, ou tiny-yolov2), N (images de crowdhuman-cycles,
 # défaut 200), SIZE (entrée LxH non carrée des profils -prep et -train, ex. 640x192 pour
 # KITTI, T11.4 ; défaut : 416 × 416), CH (canaux d'entrée, 1 pour FLIR, T11.7 ; défaut 3).
-# SIZE et CH s'ajoutent au nom de la cfg et du dossier d'affinage.
+# SIZE et CH s'ajoutent au nom de la cfg et du dossier d'affinage. Profils -train (M15) :
+# RESIZE_TRAIN (stretch : géométrie de l'éval, VisDrone), CROP (découpes N×N px de l'image
+# d'origine) et STEPS / SCALES (paliers du LR, ex. 4800,5400 et 0.1,0.1) ; défaut : rien.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -94,6 +96,8 @@ esac
 # Variante d'entrée : suffixe des cfg et dossiers (-640x192, -c1), options de make_cfg.
 VAR=${SIZE:+-$SIZE}${CH:+-c$CH}
 CFG_OPTS=(${SIZE:+--size "$SIZE"} ${CH:+--channels "$CH"})
+TRAIN_OPTS=(${STEPS:+--steps "$STEPS"} ${SCALES:+--scales "$SCALES"}
+  ${RESIZE_TRAIN:+--resize "$RESIZE_TRAIN"} ${CROP:+--crop "$CROP"})
 
 # Dossier d'affinage : build/m11/<jeu>/train (Tiny-YOLOv3), train-tiny-yolov2 sinon ; suffixe
 # de la variante d'entrée.
@@ -125,7 +129,8 @@ train() {  # jeu : affinage (couches de forme différente, les têtes, réinitia
   local resume=()
   [[ -f $d/checkpoint.npz ]] && resume=(--resume)
   step python tools/train.py --net "$cfg" --dataset "$ds" "${INIT[@]}" "${resume[@]}" \
-    --iters "$ITERS" --batch "$BATCH" --lr 1e-3 --burn-in 500 --multiscale --workers 4 \
+    --iters "$ITERS" --batch "$BATCH" --lr 1e-3 --burn-in 500 "${TRAIN_OPTS[@]}" \
+    --multiscale --workers 4 \
     --device "$DEVICE" --out "$d"
   step python tools/eval_voc.py --net "$cfg" --weights "$d/final.weights" --dataset "$ds" \
     --resize stretch --subset "$SUBSET"

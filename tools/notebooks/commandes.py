@@ -77,9 +77,11 @@ def init_args(init, init_net=None):
 def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False, qat="",
               qat_steps=None, admm=None, admm_rho=None, admm_growth=None, admm_every=None,
               iters=4000, batch=16, lr=1e-3, burn_in=500, multiscale=True, size=None,
-              subset=0, save_every=None, workers=4, device="cpu", data_root=None, seed=0):
+              subset=0, save_every=None, workers=4, device="cpu", data_root=None, seed=0,
+              resize="letterbox", crop=0, steps="", scales=""):
     """`tools/train.py`. Ordre des options : celui de m11.sh (`train`) ; QAT et ADMM à la
-    place de `--dataset`, comme m12.sh (`qat`, `admm`). `--dataset voc` (défaut) est omis."""
+    place de `--dataset`, comme m12.sh (`qat`, `admm`). `--dataset voc` (défaut) est omis,
+    comme les défauts de train.py `resize` (letterbox), `crop`, `steps` et `scales` (M15)."""
     cmd = ["python", "tools/train.py", "--net", str(net)]
     if dataset != "voc":
         cmd += ["--dataset", dataset]
@@ -95,6 +97,10 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
         _opt(cmd, "--admm-every", admm_every)
     cmd += ["--iters", str(iters), "--batch", str(batch), "--lr", f"{lr:g}",
             "--burn-in", str(burn_in)]
+    _opt(cmd, "--steps", steps)
+    _opt(cmd, "--scales", scales)
+    _opt(cmd, "--resize", None if resize in (None, "letterbox") else resize)
+    _opt(cmd, "--crop", crop or None)
     _opt(cmd, "--multiscale", bool(multiscale))
     _opt(cmd, "--size", _size(size))
     _opt(cmd, "--subset", subset or None)
@@ -127,9 +133,11 @@ def auto_jobs(jobs=None):
 
 
 def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric=None,
-                 split=None, size=None, data_root=None, out=None, markdown=None, jobs=1):
+                 split=None, size=None, data_root=None, out=None, markdown=None, jobs=1,
+                 tiles=0, overlap=None):
     """`tools/eval_voc.py` (fin du profil `<jeu>-train`) ; sorties du notebook à la fin.
-    `jobs` None : `auto_jobs` ; plus de 1 : `--jobs` (inférence répartie sur des processus)."""
+    `jobs` None : `auto_jobs` ; plus de 1 : `--jobs` (inférence répartie sur des processus).
+    `tiles` > 0 : inférence par tuiles de `tiles` px (`overlap` : recouvrement, M15)."""
     jobs = auto_jobs(jobs)
     cmd = ["python", "tools/eval_voc.py", "--net", str(net), "--weights", str(weights),
            "--dataset", dataset, "--resize", resize, "--subset", str(subset)]
@@ -137,6 +145,9 @@ def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric
     _opt(cmd, "--split", split)
     _opt(cmd, "--size", _size(size))
     _opt(cmd, "--data-root", data_root)
+    if tiles:
+        _opt(cmd, "--tiles", tiles)
+        _opt(cmd, "--overlap", overlap)
     _opt(cmd, "--out", out)
     _opt(cmd, "--markdown", markdown)
     return _opt(cmd, "--jobs", jobs if jobs > 1 else None)

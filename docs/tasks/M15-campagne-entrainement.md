@@ -11,7 +11,8 @@ Constat de départ ([resultats-balayages.md](resultats-balayages.md), palier R,
   départ font 68,45 sur les mêmes images : 600 itérations (1,16 époque) ne suffisent pas à
   réapprendre les têtes réinitialisées.
 - **VisDrone** : meilleur run `b32-sall`, mAP 2,24 ; pertes de 186 à 252, aucun run n'a
-  convergé ; seule `car` décolle (AP 17,4).
+  convergé ; seule `car` décolle (AP 17,4). Sur le split complet (T15.1), `b16-sall` passe
+  devant (2,61) et `b32-sall` tombe à 1,37.
 - **KITTI** : meilleur run `b32-sall`, mAP 2,38, en 416×416 `stretch` ; seule `Car`
   décolle (AP 16,8), loin des poids COCO hors domaine (20,55 sur 4 classes, car 49,7).
 - Le classement repose sur 50 images : l'écart entre les deux meilleurs runs VOC
@@ -37,7 +38,8 @@ au lot 32, soit ≈ 1 s/itération) ; évaluation sur CPU ≈ 0,27 s/image, soit
 VOC2007 test (4 952 images), ≈ 2,5 min pour VisDrone val (548 images) et ≈ 7 min pour
 KITTI val (1 496 images).
 
-**État** : 1 tâche faite sur 14 (T15.3) ; T15.1 et T15.2 prêtes à lancer sur Colab.
+**État** : 1 tâche faite sur 16 (T15.3) ; T15.1 et T15.2 prêtes à lancer sur Colab ;
+VisDrone (T15.8, T15.10, T15.15, T15.16) : outillage prêt, runs à lancer.
 
 ## Conventions communes
 
@@ -176,8 +178,14 @@ KITTI val (1 496 images).
 - **Spec** : §7.1 · **Dépend de** : T15.1 · **Taille** : M
 - **Livrables** : run `long` dans `build/notebooks/visdrone/tiny-yolov3-visdrone/`
 - **Acceptation** : mAP sur visdrone val complet ; perte finale nettement sous 186
-- **Notes** : même schéma que T15.4 (6 000 itérations ≈ 30 époques, ≈ 1 h 45 de GPU).
-  Comparer l'AP de `car` à celle des poids COCO hors domaine (21,5 sur 50 images).
+- **Notes** : même schéma que T15.4 (6 000 itérations ≈ 15 époques à lot 16, ≈ 1 h 45 de
+  GPU). Comparer l'AP de `car` à celle des poids COCO hors domaine (21,5 sur 50 images).
+  Les runs du balayage (600 itérations, burn-in 500) n'ont presque pas tourné au LR
+  nominal : 5/6 du run en montée.
+- **Préparé** : notebook `visdrone/tiny-yolov3-visdrone_train` réglé pour ce run
+  (`gabarits.VISDRONE_TRAIN` : `ITERS = 6000`, `STEPS = '4800,5400'`,
+  `SCALES = '0.1,0.1'`, `RESIZE_TRAIN = 'stretch'`, T15.15) ; `OUT` à régler sur
+  `…/tiny-yolov3-visdrone/runs/long-416` pour que `_infer` le trouve.
 
 ### [ ] T15.9 — Entrée 608 et 832
 - **Spec** : §3, §10.2 · **Dépend de** : T15.8 · **Taille** : L
@@ -197,8 +205,13 @@ KITTI val (1 496 images).
   VisDrone et exclues de l'évaluation
 - **Acceptation** : une détection dont le centre tombe dans une région ignorée n'est
   comptée ni vraie ni fausse (test) ; mAP avant / après sur le run retenu
-- **Notes** : « Reste » de T11.5. Aujourd'hui, ces détections comptent comme fausses
-  alarmes et sous-estiment la mAP.
+- **Notes** : « Reste » de T11.5. Jusqu'ici, ces détections comptaient comme fausses
+  alarmes et sous-estimaient la mAP.
+- **Fait (code)** : `load_visdrone` garde les régions en `ignore_xyxy` (par image, hors
+  objets : l'entraînement ne les voit pas) ; `yolo.infer.metrics.eval_class(ignore=)` et
+  `evaluate(use_ignore=True)` ; `tools/eval_voc.py --no-ignore` pour la mAP « avant ».
+  Tests : `test_metrics.py`, `test_datasets.py::test_visdrone`. Reste la mAP avant / après
+  sur le run retenu (Colab). Les mAP VisDrone d'avant cette révision sont « avant ».
 
 ### [ ] T15.11 — Une tête ou deux
 - **Spec** : §3 · **Dépend de** : T15.8 · **Taille** : M
@@ -206,6 +219,41 @@ KITTI val (1 496 images).
   visdrone-prep | visdrone-train`, init VOC hors tête)
 - **Acceptation** : AP par taille d'objet de Tiny-YOLOv2 (13×13) face à Tiny-YOLOv3
   (13×13 et 26×26), même nombre d'itérations
+
+### [ ] T15.15 — Même géométrie à l'entraînement et à l'éval
+- **Spec** : §1, §7.1 · **Dépend de** : — · **Taille** : S
+- **Livrables** : `train.py --resize stretch` ; mAP de `b32-sall` en letterbox
+- **Acceptation** : mAP de `b16-sall` et `b32-sall` (entraînés en letterbox) sur val
+  complet en `RESIZE = 'letterbox'` face à `stretch` (2,61 et 1,37) ; le run long (T15.8) s'entraîne dans la
+  géométrie de l'éval
+- **Notes** : l'augmentation était toujours en letterbox, l'éval de M11 en stretch. Sur
+  VisDrone (1400×1050, 1360×765…), un objet est à l'éval 1,3 à 1,8 fois plus haut qu'à
+  l'entraînement. En stretch, 29 % des objets font moins de 8 px de haut, contre 52,6 %
+  en letterbox ([stats](../../build/notebooks/visdrone/stats/stats.md)).
+- **Fait (code)** : `yolo.data.letterbox.resize_params`, `augment(..., mode=)`,
+  `VOCDataset(resize=)`, `train.py --resize`, `kmeans_anchors.py --resize` ;
+  `RESIZE_TRAIN` du notebook `_train` VisDrone, `RESIZE_TRAIN` de `tools/m11.sh`. Les
+  caches d'éval ont un nom par géométrie (`runs.eval_paths` : `map_float_sall_letterbox.md`).
+  Les ancres de la cfg restent celles du letterbox (même cfg pour tous les runs).
+- **Procédure Colab** : `visdrone/tiny-yolov3-visdrone_infer` avec `SUBSET = 0`,
+  `RESIZE = 'letterbox'`, `COMPARE = True` (les 6 runs, ≈ 15 min CPU).
+
+### [ ] T15.16 — Tuiles à 416
+- **Spec** : §3 · **Dépend de** : T15.8 · **Taille** : M
+- **Livrables** : run `long-416-crop640` ; mAP par tuiles ; ms/image
+- **Acceptation** : à itérations égales, mAP sur val complet de `long-416` (image entière),
+  `long-416-crop640` (tuiles de 640 px) et `long-608` (T15.9), avec AP petits objets
+  (`--metric coco`) et temps CPU par image
+- **Notes** : réseau inchangé (416, compatible avec l'accélérateur). À l'entraînement, une
+  découpe 640×640 de l'image d'origine (`train.py --crop 640`) : côté médian vu par le
+  réseau ≈ 17 px au lieu de 7 à 9. À l'inférence, grille de tuiles de 640 px (recouvrement
+  0,2) plus l'image entière, NMS par classe sur le tout : ≈ 7 passes pour 1360×765.
+- **Fait (code)** : `yolo.data.augment.random_crop` (boîte gardée si ≥ 50 % de son aire
+  reste), `VOCDataset(crop=)`, `train.py --crop`, `yolo.infer.tiles`,
+  `eval_voc.py --tiles N --overlap --no-full` ; `CROP` du notebook `_train`, `TILES` et
+  `OVERLAP` du notebook `_infer` VisDrone. Tests : `test_tiles.py`.
+- **Procédure Colab** : `_train` avec `CROP = 640`, `OUT = …/runs/long-416-crop640` ;
+  puis `_infer` avec `RUN = 'long-416-crop640'`, `TILES = 640`.
 
 ## D. Autres jeux (en attente de résultats)
 
@@ -323,6 +371,8 @@ graph LR
   T151 --> T158[T15.8] --> T159[T15.9]
   T158 --> T1511[T15.11]
   T1510[T15.10] -.-> T158
+  T1515[T15.15] --> T158
+  T158 --> T1516[T15.16]
   T153[T15.3]
   T1512[T15.12]
   T1513[T15.13]

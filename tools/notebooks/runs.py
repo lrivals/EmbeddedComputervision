@@ -134,23 +134,37 @@ def s_per_image(run_dir, batch, n=50):
     return sum(float(r["seconds"]) for r in rows) / len(rows) / batch if rows and batch else None
 
 
+def eval_paths(out_dir, subset, resize="stretch", tiles=0):
+    """(table, dossier des détections) d'une évaluation dans `out_dir` : `map_float_s50.md`,
+    `dets_s50` en stretch sans tuiles (noms de M14), suffixés sinon (`_letterbox`,
+    `_tiles640`) pour ne pas mélanger les caches."""
+    tag = f"s{subset or 'all'}" + ("" if resize == "stretch" else f"_{resize}") + (
+        f"_tiles{tiles}" if tiles else "")
+    out = Path(out_dir)
+    return out / f"map_float_{tag}.md", out / f"dets_{tag}"
+
+
 def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=None,
-             data_root=None, out_dir=None, jobs=1):
+             data_root=None, out_dir=None, jobs=1, tiles=0, overlap=None):
     """mAP flottante du run par `tools/eval_voc.py`, réutilisée si déjà calculée pour ce
-    `subset` ; rend la ligne de la table comparative."""
+    `subset` (et ce `resize`, ces `tiles`) ; rend la ligne de la table comparative.
+    La cfg est celle du run (`net` de son `run.json`) quand elle existe : un run à une autre
+    entrée (608, M15) s'évalue avec la sienne ; `net` sinon."""
     from tools.notebooks import commandes as C
 
-    out = Path(out_dir or run.dir)
-    md = out / f"map_float_s{subset or 'all'}.md"
+    own = run.meta.get("net")
+    if own and str(own).endswith(".cfg") and (ROOT / own).exists():
+        net = own
+    md, dets = eval_paths(out_dir or run.dir, subset, resize, tiles)
     old = Path(run.dir) / md.name  # cache d'avant eval/<run>/ (balayages de M14)
     if read_map(md) is None and old != md and read_map(old) is not None:
-        (ROOT / out).mkdir(parents=True, exist_ok=True)
+        (ROOT / md.parent).mkdir(parents=True, exist_ok=True)
         (ROOT / md).write_text((ROOT / old).read_text())
     if read_map(md) is None:
         (ROOT / md).unlink(missing_ok=True)
         C.run(C.cmd_eval_voc(net, run.weights, dataset, resize, subset, metric, split, size,
-                             data_root, out=out / f"dets_s{subset or 'all'}", markdown=md,
-                             jobs=jobs))
+                             data_root, out=dets, markdown=md, jobs=jobs, tiles=tiles,
+                             overlap=overlap))
     return row(run, read_map(md), subset)
 
 
@@ -158,7 +172,10 @@ def row(run, map_, subset=None):
     m = run.meta
     batch = m.get("batch")
     return {"run": run.name, "lot": batch, "images": m.get("subset", "") or "tout",
-            "graine": m.get("seed", 0), "itérations": m.get("iters", ""), "backend": m.get("device", ""),
+            "graine": m.get("seed", 0), "itérations": m.get("iters", ""),
+            "géométrie": m.get("resize", "letterbox") + (f" crop {m['crop']}" if m.get("crop")
+                                                         else ""),
+            "backend": m.get("device", ""),
             "perte finale": last_loss(run.dir), "mAP": map_,
             "s/image": s_per_image(run.dir, batch), "éval.": subset or "tout"}
 

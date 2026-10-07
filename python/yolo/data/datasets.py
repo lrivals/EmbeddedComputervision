@@ -8,7 +8,9 @@ bool. Le format COCO ajoute `area` (aire de la segmentation) et `crowd` (`iscrow
 par la métrique COCO (`yolo.infer.coco_eval`).
 
 Les régions sans classe (`DontCare` de KITTI, régions ignorées et « others » de VisDrone)
-sont retirées : la mAP VOC ne sait les ignorer que classe par classe. Les objets à ignorer
+sont retirées des objets. Les régions ignorées de VisDrone (catégorie 0) restent dans
+`ignore_xyxy` (k, 4), par image : l'évaluation VOC n'y compte pas les détections non
+appariées (`yolo.infer.metrics.eval_class`, T15.10). Les objets à ignorer
 d'une classe connue (`iscrowd`, `mask` et `ignore` de CrowdHuman) restent, en `difficult`.
 
 Correspondances (`MAPPINGS`) : `{classe du jeu: classe du modèle}`, explicites, pour évaluer
@@ -145,11 +147,12 @@ def parse_kitti(text):
     return boxes, labels
 
 
-def parse_visdrone(text):
+def parse_visdrone(text, with_ignore=False):
     """annotations/*.txt (`x,y,w,h,score,catégorie,troncature,occlusion`) → (coins, labels).
-    Catégorie 0 (région ignorée) et 11 (« others ») retirées.
+    Catégorie 0 (région ignorée) et 11 (« others ») retirées des objets ; `with_ignore` rend
+    aussi les coins des régions ignorées (catégorie 0), pour l'évaluation (T15.10).
     """
-    boxes, labels = [], []
+    boxes, labels, ignore = [], [], []
     for line in text.splitlines():
         f = [v for v in line.strip().split(",") if v != ""]
         if len(f) < 6:
@@ -159,7 +162,9 @@ def parse_visdrone(text):
         if 1 <= cat <= 10:
             boxes.append([x, y, x + w, y + h])
             labels.append(cat - 1)
-    return boxes, labels
+        elif cat == 0:
+            ignore.append([x, y, x + w, y + h])
+    return (boxes, labels, ignore) if with_ignore else (boxes, labels)
 
 
 def parse_crowdhuman(line, box="fbox"):
@@ -249,9 +254,13 @@ def load_visdrone(root, split):
     out = []
     for ann in sorted((d / "annotations").glob("*.txt")):
         image = d / "images" / f"{ann.stem}.jpg"
-        boxes, labels = parse_visdrone(ann.read_text())
-        out.append(make_sample(ann.stem, image, *_image_size(image), boxes, labels,
-                               np.zeros(len(labels), bool)))
+        boxes, labels, ignore = parse_visdrone(ann.read_text(), with_ignore=True)
+        s = make_sample(ann.stem, image, *_image_size(image), boxes, labels,
+                        np.zeros(len(labels), bool))
+        # Régions ignorées, par image (hors PER_OBJECT) : coins pixels VOC comme `xyxy`.
+        r = np.asarray(ignore, dtype=np.float64).reshape(-1, 4)
+        s["ignore_xyxy"] = np.stack([r[:, 0] + 1, r[:, 1] + 1, r[:, 2], r[:, 3]], axis=1)
+        out.append(s)
     return out
 
 

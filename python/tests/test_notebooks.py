@@ -318,6 +318,7 @@ def test_kitti_identique_a_m11():
             '"$cfg"': p["NET"], '"$d/final.weights"': f"{d}/final.weights", '"$d"': d,
             '"$NET-voc"': "tiny-yolov3-voc", '"${SIZE:-416}"': "416", '"$ITERS"': "4000",
             '"$BATCH"': "16", '"$DEVICE"': p["DEVICE"], '"$SUBSET"': "0",
+            '"${TRAIN_OPTS[@]}"': "",
             '"$M11/cfg/$NET-$ds$VAR.cfg"': "build/m11/cfg/tiny-yolov3-kitti.cfg"}
     want = (_steps(_block("m11.sh", "\nprep() {", "\n}\n"), subs)
             + _steps(_block("m11.sh", "\ntrain() {", "\n}\n"), subs))
@@ -585,3 +586,46 @@ def test_fumee(key):
                         str(copy)], cwd=copy.parent, capture_output=True, text=True,
                        env={**os.environ, "PYTHONPATH": str(ROOT)})
     assert r.returncode == 0, r.stderr[-4000:]
+
+
+def test_options_visdrone_m15():
+    """M15 : géométrie, découpes et paliers du LR de train.py ; tuiles de eval_voc.py.
+    Défauts omis (commandes des autres jeux inchangées)."""
+    base = C.cmd_train("m.cfg", "build/r", "visdrone")
+    assert C.cmd_train("m.cfg", "build/r", "visdrone", resize="letterbox", crop=0) == base
+    got = _opts(C.cmd_train("m.cfg", "build/r", "visdrone", resize="stretch", crop=640,
+                            steps="4800,5400", scales="0.1,0.1"))[1]
+    assert {k: got[k] for k in ("--resize", "--crop", "--steps", "--scales")} == {
+        "--resize": "stretch", "--crop": 640.0, "--steps": "4800,5400", "--scales": "0.1,0.1"}
+    ev = C.cmd_eval_voc("m.cfg", "w.weights", "visdrone", subset=0)
+    assert C.cmd_eval_voc("m.cfg", "w.weights", "visdrone", subset=0, tiles=0,
+                          overlap=0.2) == ev
+    tiled = _opts(C.cmd_eval_voc("m.cfg", "w.weights", "visdrone", subset=0, tiles=640,
+                                 overlap=0.2))[1]
+    assert tiled["--tiles"] == 640.0 and tiled["--overlap"] == 0.2
+
+
+def test_caches_par_geometrie():
+    """Une éval en letterbox ou par tuiles ne relit pas le cache stretch (noms de M14)."""
+    assert runs.eval_paths("e", 50) == (Path("e/map_float_s50.md"), Path("e/dets_s50"))
+    assert runs.eval_paths("e", 0, "letterbox")[0] == Path("e/map_float_sall_letterbox.md")
+    assert runs.eval_paths("e", 0, "stretch", 640)[1] == Path("e/dets_sall_tiles640")
+
+
+def test_notebooks_visdrone_m15():
+    """Seuls les notebooks VisDrone affinés reçoivent les options de M15."""
+    p = _params(render(NOTEBOOKS["visdrone/tiny-yolov3-visdrone_train"]))
+    assert (p["RESIZE_TRAIN"], p["CROP"], p["ITERS"], p["STEPS"]) == ("stretch", 0, 6000,
+                                                                       "4800,5400")
+    src = re.sub(r"\s+", " ", "\n".join(_code(render(
+        NOTEBOOKS["visdrone/tiny-yolov3-visdrone_train"]))))
+    assert ("DEVICE, DATA_ROOT, resize=RESIZE_TRAIN, crop=CROP, steps=STEPS, "
+            "scales=SCALES)") in src
+    assert "VOCDataset(samples[:SHOW], train=True, channels=channels, resize=RESIZE_TRAIN" in src
+    assert "jobs=JOBS, tiles=CROP))" in src
+    inf = _params(render(NOTEBOOKS["visdrone/tiny-yolov3-visdrone_infer"]))
+    assert inf["TILES"] == 0 and inf["OVERLAP"] == 0.2
+    for key in ("kitti/tiny-yolov3-kitti_train", "kitti/tiny-yolov3-kitti_infer",
+                "visdrone/tiny-yolov3-visdrone_sweep", "visdrone/tiny-yolov3-coco_infer"):
+        code = "\n".join(_code(render(NOTEBOOKS[key])))
+        assert "TILES" not in code and "RESIZE_TRAIN" not in code, key

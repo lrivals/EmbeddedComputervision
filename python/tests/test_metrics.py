@@ -134,3 +134,28 @@ def test_voc_pixels_roundtrip():
     xyxy = np.array([[1, 1, 100, 50], [11, 6, 30, 25]], dtype=float)
     back = to_voc_pixels(xyxy_to_cxcywh(xyxy, 100, 50), 100, 50)
     np.testing.assert_allclose(back, xyxy, atol=1e-12)
+
+
+def test_ignore_regions_neither_tp_nor_fp():
+    # T15.10 : une détection non appariée centrée dans une région ignorée ne compte pas.
+    gts = {"a": (np.array([[1, 1, 10, 10]]), np.array([False]))}
+    dets = (["a", "a"], [0.9, 0.8], [[50, 50, 60, 60], [1, 1, 10, 10]])
+    _, prec, ap = eval_class(*dets, gts)
+    assert ap < 0.99 and prec[-1] == 0.5
+    rec, prec, ap = eval_class(*dets, gts, ignore={"a": np.array([[45, 45, 70, 70]])})
+    assert ap == pytest.approx(1.0) and prec[-1] == 1.0 and rec[-1] == 1.0
+    # image sans vérité de la classe : même règle
+    rec, prec, _ = eval_class(["b"], [0.9], [[50, 50, 60, 60]], gts,
+                              ignore={"b": np.array([[45, 45, 70, 70]])})
+    assert prec[-1] == 0.0 and rec[-1] == 0.0
+
+
+def test_evaluate_reads_ignore_regions():
+    ann = {"id": "a", "xyxy": np.array([[1.0, 1, 10, 10]]), "labels": np.array([0]),
+           "difficult": np.array([False]), "ignore_xyxy": np.array([[45.0, 45, 70, 70]])}
+    dets = {0: (["a", "a"], np.array([0.9, 0.8]), np.array([[50.0, 50, 60, 60],
+                                                             [1, 1, 10, 10]]))}
+    aps, _ = evaluate(dets, [ann], 1)
+    assert aps[0] == pytest.approx(1.0)
+    aps, _ = evaluate(dets, [ann], 1, use_ignore=False)
+    assert aps[0] < 0.99

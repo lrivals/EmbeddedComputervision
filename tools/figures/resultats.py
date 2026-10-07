@@ -198,16 +198,17 @@ def load_pr(det_dir, samples, names=None):
 def pr_curves(dets, samples, names):
     """{classe: (rappel, précision, AP VOC07)} par `yolo.infer.metrics.eval_class` ;
     `dets` : {c: (ids, scores, coins pixels)}, images hors de `samples` ignorées."""
-    from yolo.infer.metrics import class_gts, eval_class
+    from yolo.infer.metrics import class_gts, eval_class, ignore_regions
 
     ids = {s["id"] for s in samples}
     out = {}
+    ignore = ignore_regions(samples)
     for c, cls in enumerate(names):
         img, sc, bx = dets.get(c, ([], np.zeros(0), np.zeros((0, 4))))
         sc, bx = np.asarray(sc), np.asarray(bx).reshape(-1, 4)
         keep = [i for i, k in enumerate(img) if k in ids]
         rec, prec, ap = eval_class([img[i] for i in keep], sc[keep], bx[keep],
-                                   class_gts(samples, c), use_07=True)
+                                   class_gts(samples, c), use_07=True, ignore=ignore)
         out[cls] = (rec, prec, ap)
     return out
 

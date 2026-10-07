@@ -123,6 +123,9 @@ def test_visdrone(tmp_path):
     assert s["labels"].tolist() == [D.VISDRONE_CLASSES.index("car"),
                                     D.VISDRONE_CLASSES.index("pedestrian")]
     np.testing.assert_allclose(s["xyxy"][0], [11, 6, 30, 25])
+    # T15.10 : la région ignorée reste, par image, en coins pixels VOC
+    np.testing.assert_allclose(s["ignore_xyxy"], [[51, 51, 60, 60]])
+    assert D.parse_visdrone("50,50,10,10,0,0,0,0\n") == ([], [])
 
 
 def test_crowdhuman(tmp_path):

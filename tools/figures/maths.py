@@ -59,6 +59,7 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "infer/metrics": ("mAP VOC", "devkit VOC MATLAB", "test_metrics.py", "T13.41"),
     "infer/nms": ("NMS", "torchvision.ops.nms", "test_nms.py", "T13.41"),
     "infer/pipeline": ("prétraitement", "cv2", "test_pipeline.py", "T13.42"),
+    "infer/tiles": ("inférence par tuiles", "SAHI", "test_tiles.py", ""),
     "io/darknet_weights": ("format .weights", "darknet", "test_darknet_weights.py", "T13.47"),
     "io/export": ("export de l'arène", "onnx, Vitis AI", "test_export.py", "T13.47"),
     "layers/activations": ("activations", "torch.nn.LeakyReLU", "test_activations.py", "T13.34"),

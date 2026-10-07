@@ -107,6 +107,36 @@ bird 50,6, person 47,2 ; bottle et sofa 0, boat 1,8, cow 2,1, pottedplant 1,3.
 Seule la classe `car` décolle (AP 17,4 pour b32-sall) ; van 2,0, truck 1,7, les autres
 sous 0,5. Pertes de 186 à 252 : aucun run n'a convergé.
 
+### Split complet (T15.1, 548 images, Colab du 2026-10-06, rév. `17b4a47`)
+
+| run | mAP (50 images) | mAP (split complet) |
+|---|---|---|
+| **b16-sall** | 1,15 | **2,61** |
+| b8-sall | 1,24 | 1,70 |
+| b16-s500 | 1,35 | 1,46 |
+| b32-sall | 2,24 | 1,37 |
+| b32-s500 | 0,78 | 1,12 |
+| b8-s500 | 0,56 | 0,59 |
+
+Le classement à 50 images ne tient pas : `b32-sall` passe de 1er à 4e, `b16-sall` de 4e
+à 1er. Tous les écarts restent sous 1,5 point, au niveau du bruit attendu pour des runs
+non convergés. Pour `b32-sall`, `car` tombe à 10,0 et les autres classes restent sous 1.
+Ces mAP comptent encore les détections des régions ignorées comme fausses (avant T15.10).
+
+### Diagnostic et suite (M15, T15.8, T15.10, T15.15, T15.16)
+
+- **Redimensionnement différent** : l'entraînement était en letterbox, l'éval en
+  stretch ; à l'éval, les objets sont 1,3 à 1,8 fois plus hauts → `train.py --resize`.
+- **Runs trop courts** : 600 itérations dont 500 de montée du LR → run long de 6 000
+  itérations.
+- **Objets minuscules** : 97 % sous 32² px à 416, 52,6 % sous 8 px de haut en letterbox,
+  32 % des cibles perdues par collision ([stats](../../notebooks/visdrone/visdrone_stats.ipynb))
+  → tuiles à 416 (`--crop`, `--tiles`) face à une entrée 608.
+- **Régions ignorées** comptées comme fausses détections → exclues de la mAP par défaut
+  (`eval_voc.py --no-ignore` pour l'ancien calcul).
+
+Procédure dans [M15](M15-campagne-entrainement.md#c-visdrone).
+
 ### Inférence hors domaine (T11.2) sur les mêmes 50 images
 
 | modèle | classes évaluées | mAP |

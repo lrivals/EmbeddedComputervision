@@ -41,10 +41,23 @@ def _overlaps(bb, gt):
     return inter / union
 
 
-def eval_class(image_ids, scores, boxes, gts, iou_thr=0.5, use_07=True):
+def in_regions(bb, regions):
+    """Le centre de la détection `bb` (4,) tombe-t-il dans une des `regions` (k, 4) ?"""
+    if regions is None or len(regions) == 0:
+        return False
+    r = np.asarray(regions, dtype=np.float64).reshape(-1, 4)
+    cx, cy = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
+    return bool(((r[:, 0] <= cx) & (cx <= r[:, 2]) & (r[:, 1] <= cy) & (cy <= r[:, 3])).any())
+
+
+def eval_class(image_ids, scores, boxes, gts, iou_thr=0.5, use_07=True, ignore=None):
     """Une classe. `image_ids` (n,), `scores` (n,), `boxes` (n, 4) coins pixels VOC ;
     `gts` : {image_id: (coins (k, 4), difficult (k,))}. Rend `rec`, `prec`, `ap`.
+
+    `ignore` : {image_id: coins (k, 4)} des régions ignorées (VisDrone, catégorie 0) ; une
+    détection non appariée dont le centre y tombe n'est ni TP ni FP (T15.10).
     """
+    ignore = ignore or {}
     npos = sum(int((~np.asarray(d, bool)).sum()) for _, d in gts.values())
     used = {k: np.zeros(len(d), dtype=bool) for k, (_, d) in gts.items()}
     order = np.argsort(-np.asarray(scores, dtype=np.float64), kind="stable")
@@ -55,7 +68,7 @@ def eval_class(image_ids, scores, boxes, gts, iou_thr=0.5, use_07=True):
         gt, difficult = gts.get(image_ids[k], (np.zeros((0, 4)), np.zeros(0, bool)))
         gt = np.asarray(gt, dtype=np.float64).reshape(-1, 4)
         if len(gt) == 0:
-            fp[d] = 1
+            fp[d] = not in_regions(boxes[k], ignore.get(image_ids[k]))
             continue
         ov = _overlaps(boxes[k], gt)
         j = int(np.argmax(ov))
@@ -68,7 +81,7 @@ def eval_class(image_ids, scores, boxes, gts, iou_thr=0.5, use_07=True):
                 tp[d] = 1
                 used[image_ids[k]][j] = True
         else:
-            fp[d] = 1
+            fp[d] = not in_regions(boxes[k], ignore.get(image_ids[k]))
     tp, fp = np.cumsum(tp), np.cumsum(fp)
     rec = tp / max(npos, 1)
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
@@ -81,14 +94,23 @@ def class_gts(annotations, c):
             for a in annotations}
 
 
+def ignore_regions(annotations):
+    """{id: coins (k, 4)} des régions ignorées (`ignore_xyxy` des échantillons VisDrone)."""
+    return {a["id"]: a["ignore_xyxy"] for a in annotations
+            if len(a.get("ignore_xyxy", ()))}
+
+
 def evaluate(detections, annotations, num_classes, iou_thr=0.5, use_07=True,
-             with_recall=False):
+             with_recall=False, use_ignore=True):
     """`detections` : {c: (image_ids, scores, coins)} ; `annotations` : sortie de
     `yolo.data.voc.load_split` (ou `yolo.data.datasets.load`). Rend (AP par classe (C,), mAP),
-    plus le rappel final par classe (C,) avec `with_recall` (T11.6).
+    plus le rappel final par classe (C,) avec `with_recall` (T11.6). `use_ignore` : les
+    régions ignorées des échantillons (VisDrone) s'appliquent (`eval_class`).
     """
     empty = ([], np.zeros(0), np.zeros((0, 4)))
-    res = [eval_class(*detections.get(c, empty), class_gts(annotations, c), iou_thr, use_07)
+    ignore = ignore_regions(annotations) if use_ignore else None
+    res = [eval_class(*detections.get(c, empty), class_gts(annotations, c), iou_thr, use_07,
+                      ignore)
            for c in range(num_classes)]
     aps = np.array([r[2] for r in res])
     if with_recall:

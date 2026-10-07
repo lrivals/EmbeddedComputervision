@@ -12,7 +12,7 @@ Entrée à un canal (T11.7) : pas de teinte ni de saturation, l'exposition seule
 
 import numpy as np
 
-from yolo.data.letterbox import GRAY, as_hw, image_mode, letterbox_params, to_array
+from yolo.data.letterbox import GRAY, as_hw, image_mode, resize_params, to_array
 
 
 def random_params(rng, jitter=0.2, hsv=1.5, flip=True):
@@ -34,10 +34,13 @@ def _rand_factor(rng, f):
     return float(np.exp(rng.uniform(-np.log(f), np.log(f))))
 
 
-def affine(width, height, size, params):
-    """Matrice 2×3 `M` : (x, y) pixels d'origine → (u, v) pixels de l'entrée `size`."""
+def affine(width, height, size, params, mode="letterbox"):
+    """Matrice 2×3 `M` : (x, y) pixels d'origine → (u, v) pixels de l'entrée `size`.
+
+    `mode` : `letterbox` (rapport d'aspect conservé) ou `stretch` (image étirée à l'entrée,
+    le prétraitement de `eval_voc.py --resize stretch`)."""
     sh, sw = as_hw(size)
-    nw, nh, dx, dy = letterbox_params(width, height, size)
+    nw, nh, dx, dy = resize_params(width, height, size, mode)
     r = params["scale"]
     cx, cy = sw / 2, sh / 2
     tx, ty = np.asarray(params["shift"]) * (sw, sh)
@@ -125,10 +128,35 @@ def adjust_hsv(img, sat, val):
     return hsv_to_rgb(hsv).astype(np.float32)
 
 
-def augment(img, boxes, labels, size, params, channels=3):
+def random_crop(img, boxes, labels, crop, rng, min_visible=0.5):
+    """Découpe aléatoire `crop` × `crop` px (bornée à l'image) de l'image PIL `img`.
+
+    Boîtes normalisées (origine) → normalisées dans la découpe, rognées ; une boîte dont moins
+    de `min_visible` de l'aire reste dans la découpe est retirée. Rend (image, boîtes, labels).
+    """
+    w, h = img.width, img.height
+    cw, ch = min(int(crop), w), min(int(crop), h)
+    x0 = int(rng.integers(0, w - cw + 1))
+    y0 = int(rng.integers(0, h - ch + 1))
+    b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+    x1 = (b[:, 0] - b[:, 2] / 2) * w - x0
+    x2 = (b[:, 0] + b[:, 2] / 2) * w - x0
+    y1 = (b[:, 1] - b[:, 3] / 2) * h - y0
+    y2 = (b[:, 1] + b[:, 3] / 2) * h - y0
+    cx1, cx2 = np.clip(x1, 0, cw), np.clip(x2, 0, cw)
+    cy1, cy2 = np.clip(y1, 0, ch), np.clip(y2, 0, ch)
+    area = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
+    kept = np.maximum(cx2 - cx1, 0) * np.maximum(cy2 - cy1, 0)
+    keep = (area > 0) & (kept >= min_visible * area)
+    out = np.stack([(cx1 + cx2) / 2 / cw, (cy1 + cy2) / 2 / ch, (cx2 - cx1) / cw,
+                    (cy2 - cy1) / ch], axis=1)
+    return img.crop((x0, y0, x0 + cw, y0 + ch)), out[keep], np.asarray(labels)[keep]
+
+
+def augment(img, boxes, labels, size, params, channels=3, mode="letterbox"):
     """Image PIL et boîtes normalisées (origine) → (HWC float32, boîtes, labels) à l'entrée
-    `size` (S ou (H, W)), à `channels` canaux."""
-    m = affine(img.width, img.height, size, params)
+    `size` (S ou (H, W)), à `channels` canaux, en `letterbox` ou `stretch`."""
+    m = affine(img.width, img.height, size, params, mode)
     out = warp_image(img, size, m, channels)
     out = adjust_hsv(out, params["sat"], params["val"])
     b, keep = transform_boxes(boxes, img.width, img.height, size, m)

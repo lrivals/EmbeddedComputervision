@@ -28,14 +28,20 @@ from yolo.models.tiny_yolo import load_cfg  # noqa: E402
 SIZE = 416
 
 
-def dataset_wh(samples, size=SIZE):
-    """(n, 2) largeurs et hauteurs en pixels de l'image letterbox `size` (S ou (H, W))."""
+def dataset_wh(samples, size=SIZE, mode="letterbox", crop=0):
+    """(n, 2) largeurs et hauteurs en pixels de l'image letterbox (ou étirée) `size` (S ou
+    (H, W)). `crop` > 0 : image d'origine ramenée à une découpe `crop` × `crop` (tuiles)."""
     sh, sw = as_hw(size)
     wh = []
     for s in samples:
         b = s["boxes"][~s["difficult"]]
         if len(b):
-            wh.append(boxes_to_letterbox(b, s["width"], s["height"], size)[:, 2:] * (sw, sh))
+            w, h = s["width"], s["height"]
+            if crop:
+                cw, ch = min(crop, w), min(crop, h)
+                b = b * (w / cw, h / ch, w / cw, h / ch)
+                w, h = cw, ch
+            wh.append(boxes_to_letterbox(b, w, h, size, mode)[:, 2:] * (sw, sh))
     return np.concatenate(wh)
 
 
@@ -47,6 +53,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     datasets.add_args(ap, "split(s) ; défaut : split d'entraînement du jeu")
     ap.add_argument("--size", type=parse_size, default=SIZE, help="S ou LxH (ex. 640x192)")
+    ap.add_argument("--resize", choices=("letterbox", "stretch"), default="letterbox",
+                    help="géométrie de l'entrée, celle de l'entraînement")
+    ap.add_argument("--crop", type=int, default=0,
+                    help="tuiles N×N px de l'image d'origine (train.py --crop)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, default=None,
                     help="défaut results/anchors.md (VOC), results/anchors_<jeu>.md")
@@ -55,12 +65,16 @@ def main():
     out = args.out or ROOT / "results" / (
         "anchors.md" if args.dataset == "voc" else f"anchors_{args.dataset}.md")
 
-    wh = dataset_wh(datasets.load_args(args, "train"), args.size)
+    wh = dataset_wh(datasets.load_args(args, "train"), args.size, args.resize, args.crop)
     where = ("VOC2007 + VOC2012 trainval" if split == "2007:trainval,2012:trainval"
              else f"{args.dataset} {split}")
     opt = "" if args.dataset == "voc" else f" --dataset {args.dataset}"
     if args.size != SIZE:
         opt += f" --size {size_label(args.size).replace('×', 'x')}"
+    if args.resize != "letterbox":
+        opt += f" --resize {args.resize}"
+    if args.crop:
+        opt += f" --crop {args.crop}"
     darknet = {5: np.array(load_cfg("tiny-yolov2-voc")["anchors"]),
                6: np.array(load_cfg("tiny-yolov3-voc")["anchors"])}
     rows = []
@@ -75,7 +89,8 @@ def main():
         "",
         f"`python tools/kmeans_anchors.py{opt} --seed {args.seed}` — {len(wh)} boîtes "
         "non-difficult "
-        f"de {where}, en pixels de l'image letterbox {size_label(args.size)} ; distance "
+        f"de {where}, en pixels de l'image {args.resize} {size_label(args.size)}"
+        + (f" (tuiles {args.crop} px)" if args.crop else "") + " ; distance "
         "1 − IoU (§5.2), initialisation k-means++.",
         "",
         f"| k | k-means (w,h px à {size_label(args.size)}) | IoU moyenne | Darknet "

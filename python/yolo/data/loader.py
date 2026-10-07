@@ -14,19 +14,24 @@ from collections import deque
 
 import numpy as np
 
-from yolo.data.augment import IDENTITY, augment, random_params
+from yolo.data.augment import IDENTITY, augment, random_crop, random_params
 
 
 class VOCDataset:
     """`samples` : sortie de `yolo.data.voc.load_split`.
 
     Les objets `difficult` sont retirés à l'entraînement (convention Darknet, hors base).
+    `resize` : `letterbox` ou `stretch` (celui de l'éval du jeu). `crop` > 0 : à
+    l'entraînement, découpe aléatoire `crop` × `crop` px de l'image d'origine avant
+    l'augmentation (tuiles, objets vus à une résolution plus proche de l'origine).
     """
 
     def __init__(self, samples, train=True, keep_difficult=False, jitter=0.2, hsv=1.5,
-                 flip=True, channels=3):
+                 flip=True, channels=3, resize="letterbox", crop=0):
         self.samples = samples
         self.channels = channels
+        self.resize = resize
+        self.crop = crop
         self.train = train
         self.keep_difficult = keep_difficult
         self.aug = {"jitter": jitter, "hsv": hsv, "flip": flip}
@@ -40,9 +45,12 @@ class VOCDataset:
         s = self.samples[index]
         keep = np.ones(len(s["labels"]), bool) if self.keep_difficult else ~s["difficult"]
         params = random_params(rng, **self.aug) if self.train else IDENTITY
+        boxes, labels = s["boxes"][keep], s["labels"][keep]
         with Image.open(s["image"]) as img:
-            out, boxes, labels = augment(img, s["boxes"][keep], s["labels"][keep], size, params,
-                                         self.channels)
+            if self.crop and self.train:
+                img, boxes, labels = random_crop(img, boxes, labels, self.crop, rng)
+            out, boxes, labels = augment(img, boxes, labels, size, params, self.channels,
+                                         self.resize)
         return np.ascontiguousarray(out.transpose(2, 0, 1)), boxes, labels
 
 

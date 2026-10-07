@@ -97,6 +97,10 @@ def main():
     ap.add_argument("--scales", default="", help="ex. 0.1,0.1")
     ap.add_argument("--size", type=parse_size, default=None,
                     help="S ou LxH (entrée non carrée) ; défaut : entrée de la cfg")
+    ap.add_argument("--resize", choices=("letterbox", "stretch"), default="letterbox",
+                    help="géométrie de l'entrée, celle de l'éval (VisDrone : stretch)")
+    ap.add_argument("--crop", type=int, default=0,
+                    help="découpe aléatoire N×N px de l'image d'origine avant l'augmentation")
     ap.add_argument("--multiscale", action="store_true", help="§2.2 : 320-608 tous les 10 lots")
     ap.add_argument("--ignore-thresh", type=float, default=0.5)
     ap.add_argument("--workers", type=int, default=4)
@@ -174,7 +178,8 @@ def main():
     samples = datasets.remap(samples, datasets.class_lut(args.dataset, net.net["classes"]))
     if args.subset:
         samples = samples[:args.subset]
-    loader = DataLoader(VOCDataset(samples, channels=net.net["input"][0]), args.batch,
+    loader = DataLoader(VOCDataset(samples, channels=net.net["input"][0], resize=args.resize,
+                                   crop=args.crop), args.batch,
                         workers=args.workers, seed=args.seed)
     print(f"{len(samples)} images, {len(loader)} lots par époque")
 

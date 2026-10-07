@@ -24,6 +24,10 @@ SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
 REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True}}
+# Run long VisDrone (M15, T15.8) : géométrie de l'éval (stretch) à l'entraînement, 6 000
+# itérations (≈ 15 époques à lot 16), LR ÷ 10 à 80 % et 90 %.
+VISDRONE_TRAIN = {"ITERS": 6000, "STEPS": "4800,5400", "SCALES": "0.1,0.1",
+                  "RESIZE_TRAIN": "stretch"}
 # Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu),
 # graine 0 (autres graines : bruit d'un run, T15.2).
 SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "seeds": [0], "iters": 600}
@@ -140,6 +144,73 @@ def header(nb):
 
 # ---------------------------------------------------------------------- paramètres
 
+VISDRONE_NOTE = textwrap.dedent("""
+
+    ### Runs longs VisDrone (M15)
+
+    Un run par dossier : régler `OUT` sur `RUNS_DIR/runs/<nom>` pour que le notebook
+    `_infer` le trouve (`RUN = '<nom>'`, `COMPARE`), par exemple :
+
+    | run | réglages |
+    |---|---|
+    | `long-416` | défauts : `RESIZE_TRAIN = 'stretch'`, `CROP = 0` |
+    | `long-416-crop640` | `CROP = 640` ; à évaluer avec `TILES = 640` dans `_infer` |
+    | `long-608` | `SIZE = '608'` et `NET` = cfg à 608 (`tools/m11.sh visdrone-prep` avec `SIZE=608`) |
+
+    `RESIZE_TRAIN = 'stretch'` aligne l'entraînement sur l'éval (`RESIZE`) : en letterbox,
+    les objets sont 1,3 à 1,8 fois moins hauts qu'à l'éval. Les ancres de la cfg restent
+    celles du letterbox : tous les runs s'évaluent avec la même cfg.
+    """)
+
+
+def _tiled(nb):
+    """Notebooks à options de géométrie et de tuiles (M15) : VisDrone affiné seulement ; les
+    autres gardent leurs cellules telles quelles."""
+    return nb.dataset == "visdrone" and (nb.role == "train"
+                                         or (nb.role == "infer" and nb.finetuned))
+
+
+def _tiles_args(nb, src):
+    """Arguments `tiles` et `overlap` des évaluations (`@TILES@`) des notebooks `_tiled`."""
+    return src.replace("@TILES@", ",\n" + " " * 38 + "tiles=TILES, overlap=OVERLAP"
+                       if _tiled(nb) else "")
+
+
+# Retouches des cellules du notebook _train VisDrone (M15) : géométrie d'entraînement,
+# découpes, paliers du LR ; évaluation finale par tuiles si CROP. Textes après dedent.
+TRAIN_RETOUCHES = (
+    ("train=True, channels=channels)",
+     "train=True, channels=channels,\n" + " " * 21 + "resize=RESIZE_TRAIN, crop=CROP)"),
+    ('admm=bool(ADMM), rev=TRACE["rev"])',
+     "admm=bool(ADMM), resize=RESIZE_TRAIN,\n" + " " * 16 + 'crop=CROP, rev=TRACE["rev"])'),
+    ("WORKERS, DEVICE, DATA_ROOT),",
+     "WORKERS, DEVICE, DATA_ROOT,\n" + " " * 22
+     + "resize=RESIZE_TRAIN, crop=CROP, steps=STEPS, scales=SCALES),"),
+    ("markdown=result,\n" + " " * 25 + "jobs=JOBS))",
+     "markdown=result,\n" + " " * 25 + "jobs=JOBS, tiles=CROP))"),
+)
+
+
+def _retouch(cells, nb):
+    """Cellules de `train_body` avec `TRAIN_RETOUCHES` pour les notebooks `_tiled`."""
+    if not _tiled(nb):
+        return cells
+    done = set()
+    for c in cells:
+        if c["cell_type"] != "code":
+            continue
+        src = "".join(c["source"])
+        for old, new in TRAIN_RETOUCHES:
+            if old in src:
+                src = src.replace(old, new)
+                done.add(old)
+        c["source"] = _lines(src)
+    missing = [old for old, _ in TRAIN_RETOUCHES if old not in done]
+    if missing:
+        raise ValueError(f"retouches sans cible dans {nb.path} : {missing}")
+    return cells
+
+
 def _assign(pairs):
     width = max(len(k) for k, _, _ in pairs)
     return "\n".join(f"{k:{width}s} = {v!r}" + (f"  # {c}" if c else "") for k, v, c in pairs)
@@ -171,6 +242,10 @@ def params(nb):
         p += [("RUNS_DIR", nb.train_dir, "runs des notebooks _train et _sweep"),
               ("RUN", None, "None : le plus récent ; ex. 'train', 'b16-sall', 'b8-s500'"),
               ("COMPARE", False, "évalue tous les runs et les compare (T14.11)")]
+        if _tiled(nb):
+            p += [("TILES", 0, "tuiles N px de l'image d'origine (runs à CROP = N) ; "
+                   "0 : image entière"),
+                  ("OVERLAP", 0.2, "recouvrement des tuiles")]
     if nb.role == "infer":
         p += [("INT8", False, "volet entier : calibration et mAP INT8 (T14.4)"),
               ("CALIB_IMAGES", 500, "images de calibration (split calib du jeu)"),
@@ -192,6 +267,13 @@ def params(nb):
         else:
             p += [("ITERS", M11_TRAIN["iters"], "itérations (palier N au-delà de 600)"),
                   ("BATCH", M11_TRAIN["batch"], None)]
+        if nb.role == "train" and _tiled(nb):
+            p += [("RESIZE_TRAIN", "letterbox", "letterbox | stretch : géométrie à "
+                   "l'entraînement (stretch : celle de l'éval, RESIZE)"),
+                  ("CROP", 0, "découpes N×N px de l'image d'origine (tuiles) ; 0 : image "
+                   "entière"),
+                  ("STEPS", "", "itérations où le LR baisse (ex. '4800,5400')"),
+                  ("SCALES", "", "facteurs du LR à STEPS (ex. '0.1,0.1')")]
         p += [("LR", M11_TRAIN["lr"], None),
               ("BURN_IN", M11_TRAIN["burn_in"], None),
               ("MULTISCALE", M11_TRAIN["multiscale"], "320-608 tous les 10 lots"),
@@ -214,6 +296,8 @@ def params(nb):
           ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
           ("REV", REV, "Colab : révision")]
     ref = REFERENCE.get(nb.path.as_posix(), {})
+    if nb.role == "train" and _tiled(nb):
+        ref = {**VISDRONE_TRAIN, **ref}
     p = [(k, ref.get(k, v), c) for k, v, c in p]
     return [md("## Paramètres"), code(_assign(p), tags=("parameters",))]
 
@@ -385,7 +469,22 @@ def infer_body(nb):
         C.run(C.cmd_eval_voc(NET, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
                              DATA_ROOT, out=f"{OUT}/dets", markdown=map_float, jobs=JOBS))"""
     pr = 'Path(OUT, "dets", "figures")'
-    if nb.finetuned:  # run choisi : même cache que la comparaison, évalué une fois (T15.1)
+    if nb.finetuned and _tiled(nb):  # VisDrone (M15) : tuiles, caches par géométrie
+        evaluate = """
+        if CHOSEN is not None:
+            EVAL_DIR = Path(RUNS_DIR, "eval", CHOSEN.name)
+            runs.evaluate(CHOSEN, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                          DATA_ROOT, out_dir=EVAL_DIR, jobs=JOBS, tiles=TILES, overlap=OVERLAP)
+            map_float, dets = runs.eval_paths(EVAL_DIR, SUBSET, RESIZE, TILES)
+        else:
+            map_float = Path(OUT) / "map_float.md"
+            map_float.unlink(missing_ok=True)
+            C.run(C.cmd_eval_voc(NET, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                                 DATA_ROOT, out=f"{OUT}/dets", markdown=map_float, jobs=JOBS,
+                                 tiles=TILES, overlap=OVERLAP))
+            dets = Path(OUT, "dets")"""
+        pr = 'Path(dets, "figures")'
+    elif nb.finetuned:  # run choisi : même cache que la comparaison, évalué une fois (T15.1)
         evaluate = """
         if CHOSEN is not None:
             EVAL_DIR = Path(RUNS_DIR, "eval", CHOSEN.name)
@@ -421,16 +520,16 @@ def infer_body(nb):
             balayage `_sweep`) est évalué sur les mêmes `SUBSET` images ; une mAP déjà
             calculée pour ce `SUBSET` est réutilisée. Le run évalué plus haut se choisit par
             `RUN`.
-            """), code("""
+            """), code(_tiles_args(nb, """
             if COMPARE:
                 rows = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
-                                      DATA_ROOT, out_dir=f"{RUNS_DIR}/eval/{r.name}", jobs=JOBS)
+                                      DATA_ROOT, out_dir=f"{RUNS_DIR}/eval/{r.name}", jobs=JOBS@TILES@)
                         for r in RUNS]
                 display(Markdown(runs.table(rows)))
             else:
                 print("COMPARE = False : comparaison sautée ; runs trouvés :")
                 print(runs.listing(RUNS))
-            """)]
+            """))]
     cells += [md("""
         ## Volet entier (T14.4)
 
@@ -572,8 +671,8 @@ def train_body(nb):
         (`colab.sync_outputs`), puis restauré en début de session (`colab.restore_outputs`) :
         une session coupée reprend au dernier checkpoint copié, sur le même backend
         (T12.11, T14.8).
-        """) + variants
-    return [*_prep_preview_cells(), md(affinage), code("""
+        """) + variants + (VISDRONE_NOTE if _tiled(nb) else "")
+    return _retouch([*_prep_preview_cells(), md(affinage), code("""
         import threading
 
         from tools.notebooks import colab, runs
@@ -662,7 +761,7 @@ def train_body(nb):
         print("commandes équivalentes :")
         for c in C.HISTORY:
             print("  " + c)
-        """)]
+        """)], nb)
 
 
 def sweep_body(nb):

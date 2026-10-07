@@ -18,6 +18,10 @@ courbe précision/rappel ; le 0,25 de la démo couperait les rappels élevés.
 
 `--jobs N` (N > 1) : N processus, un thread BLAS chacun, qui traitent les mêmes lots que le
 chemin série, dans le même ordre (machines à beaucoup de cœurs, runtime TPU de Colab).
+
+`--tiles N` (VisDrone, M15) : inférence par tuiles N × N px de l'image d'origine, recouvrement
+`--overlap`, plus l'image entière sauf `--no-full` ; NMS par classe sur le tout
+(`yolo.infer.tiles`). À associer à un réseau entraîné avec `train.py --crop N`.
 """
 
 import argparse
@@ -39,6 +43,7 @@ from yolo.infer.metrics import (evaluate, read_detections, to_voc_pixels,  # noq
                                 write_detections)
 from yolo.infer.nms import IOU_THR  # noqa: E402
 from yolo.infer.pipeline import INTERPS, MODES, detect, preprocess  # noqa: E402
+from yolo.infer.tiles import merge, tile_grid, tile_to_image  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import build, load_cfg  # noqa: E402
 
@@ -46,9 +51,40 @@ from yolo.models.tiny_yolo import build, load_cfg  # noqa: E402
 def _load(task):
     from PIL import Image
 
-    path, size, mode, interp, channels = task
+    path, size, mode, interp, channels = task[:5]
+    if len(task) > 5:
+        return _load_tiles(task)
     with Image.open(path) as img:
         return preprocess(img, size, mode, interp, channels)
+
+
+def _load_tiles(task):
+    """Tuiles d'une image (+ l'image entière) : (entrées (n, C, H, W), tuiles, (w, h))."""
+    from PIL import Image
+
+    path, size, mode, interp, channels, (tile, overlap, full) = task
+    with Image.open(path) as img:
+        img.load()
+        w, h = img.size
+        grid = tile_grid(w, h, tile, overlap) + ([(0, 0, w, h)] if full else [])
+        xs = [preprocess(img.crop((x0, y0, x0 + tw, y0 + th)), size, mode, interp, channels)[0]
+              for x0, y0, tw, th in grid]
+    return np.stack(xs), grid, (w, h)
+
+
+def _detect_tiles(net, item, mode, conf, iou):
+    """Détections d'une image tuilée, normalisées dans l'image d'origine, après fusion."""
+    x, grid, (w, h) = item
+    dets = detect(net, x, [(tw, th) for _, _, tw, th in grid], mode, conf, iou)
+    return merge([(tile_to_image(b, g, w, h), s, c) for (b, s, c), g in zip(dets, grid)], iou)
+
+
+def _detect_items(net, items, mode, conf, iou, tiled):
+    """Détections (boîtes normalisées d'origine, scores, labels) des images chargées."""
+    if tiled:
+        return [_detect_tiles(net, item, mode, conf, iou) for item in items]
+    x = np.stack([x for x, _ in items])
+    return detect(net, x, [wh for _, wh in items], mode, conf, iou)
 
 
 _W = {}  # réseau de chaque processus de --jobs
@@ -71,8 +107,7 @@ def _batch(task):
         raise _W["error"]
     loads, mode, sizes = task
     items = [_load(t) for t in loads]
-    x = np.stack([x for x, _ in items])
-    dets = detect(_W["net"], x, [wh for _, wh in items], mode, _W["conf"], _W["iou"])
+    dets = _detect_items(_W["net"], items, mode, _W["conf"], _W["iou"], len(loads[0]) > 5)
     return [(to_voc_pixels(boxes, w, h), scores, labels)
             for (boxes, scores, labels), (w, h) in zip(dets, sizes)]
 
@@ -83,8 +118,7 @@ def _serial(net, samples, tasks, mode, conf, iou, batch, workers):
         for start in range(0, len(samples), batch):
             chunk = samples[start:start + batch]
             items = [next(it) for _ in chunk]
-            x = np.stack([x for x, _ in items])
-            dets = detect(net, x, [wh for _, wh in items], mode, conf, iou)
+            dets = _detect_items(net, items, mode, conf, iou, len(tasks[0]) > 5)
             yield chunk, [(to_voc_pixels(boxes, s["width"], s["height"]), scores, labels)
                           for s, (boxes, scores, labels) in zip(chunk, dets)]
 
@@ -102,13 +136,15 @@ def _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs, blas_
 
 
 def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers, jobs=1,
-                  name=None, weights=None, blas_threads=1):
+                  name=None, weights=None, blas_threads=1, tiling=None):
     """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle.
     `jobs` > 1 : lots répartis sur `jobs` processus (réseau `name` + `weights` rechargé dans
-    chacun) ; mêmes lots, même ordre que le chemin série."""
+    chacun) ; mêmes lots, même ordre que le chemin série. `tiling` : (tuile px, recouvrement,
+    image entière en plus) pour l'inférence par tuiles, None sinon."""
     per_class = {c: ([], [], []) for c in range(net.net["classes"])}
     channels = net.net["input"][0]
-    tasks = [(s["image"], size, mode, interp, channels) for s in samples]
+    extra = (tuple(tiling),) if tiling else ()
+    tasks = [(s["image"], size, mode, interp, channels) + extra for s in samples]
     t0 = time.time()
     if jobs > 1:
         chunks = _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs,
@@ -162,6 +198,11 @@ def main():
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="letterbox")
     ap.add_argument("--interp", choices=INTERPS, default="pil")
+    ap.add_argument("--tiles", type=int, default=0,
+                    help="inférence par tuiles N×N px de l'image d'origine (0 : image entière)")
+    ap.add_argument("--overlap", type=float, default=0.2, help="recouvrement des tuiles")
+    ap.add_argument("--no-full", action="store_true",
+                    help="tuiles seules, sans la passe sur l'image entière")
     ap.add_argument("--conf", type=float, default=0.005)
     ap.add_argument("--iou", type=float, default=IOU_THR, help="seuil de la NMS")
     ap.add_argument("--batch", type=int, default=8)
@@ -170,6 +211,8 @@ def main():
                     help="processus d'inférence (1 : un seul, BLAS multithread)")
     ap.add_argument("--blas-threads", type=int, default=1, help="threads BLAS par processus de --jobs")
     ap.add_argument("--area", action="store_true", help="AP par aire (VOC2010+) au lieu de 11 pts")
+    ap.add_argument("--no-ignore", action="store_true",
+                    help="régions ignorées de VisDrone non appliquées (détections comptées FP)")
     ap.add_argument("--out", type=Path, default=None, help="dossier des détections écrites")
     ap.add_argument("--markdown", type=Path, default=None, help="ajoute la table à ce fichier")
     ap.add_argument("--no-figures", action="store_true",
@@ -197,9 +240,11 @@ def main():
         args.size = input_size(net.net, args.size)
         dets = run_inference(net, samples, args.size, args.resize, args.interp, args.conf,
                              args.iou, args.batch, args.workers, args.jobs, args.net,
-                             args.weights, args.blas_threads)
+                             args.weights, args.blas_threads,
+                             (args.tiles, args.overlap, not args.no_full) if args.tiles else None)
         dets = datasets.remap_detections(dets, view.det_lut)
-        run = f"{args.net}-{args.resize}" + ("-darknet" if args.interp == "darknet" else "")
+        run = (f"{args.net}-{args.resize}" + ("-darknet" if args.interp == "darknet" else "")
+               + (f"-tiles{args.tiles}" if args.tiles else ""))
         tag = datasets.tag(args.dataset, split)
         out = args.out or ROOT / "build" / "eval" / (f"{run}-{tag}" if tag else run)
         write_detections(dets, view.names, out)
@@ -207,13 +252,19 @@ def main():
         title = (f"{args.net} ({args.weights.name}), {where}, {len(samples)} images, "
                  f"{size_label(args.size)} {args.resize} ({args.interp}), conf {args.conf}, "
                  f"NMS {args.iou}")
+        if args.tiles:
+            title += (f", tuiles {args.tiles} px (recouvrement {args.overlap:g}"
+                      + (", sans l'image entière)" if args.no_full else ", + image entière)"))
 
     if metric == "coco":
         res = coco_eval.evaluate(dets, samples, len(view.names))
         text = coco_table(res, title + ", métrique COCO (101 points)", view.names)
     else:
-        aps, m = evaluate(dets, samples, len(view.names), use_07=not args.area)
+        aps, m = evaluate(dets, samples, len(view.names), use_07=not args.area,
+                          use_ignore=not args.no_ignore)
         title += ", AP " + ("aire" if args.area else "11 points")
+        if any(len(s.get("ignore_xyxy", ())) for s in samples):
+            title += ", régions ignorées " + ("comptées FP" if args.no_ignore else "exclues")
         text = table(aps, m, title, view.names)
     print(text)
     if args.markdown:

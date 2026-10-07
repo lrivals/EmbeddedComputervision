@@ -67,6 +67,16 @@ def letterbox_params(width, height, size):
     return nw, nh, (sw - nw) // 2, (sh - nh) // 2
 
 
+def resize_params(width, height, size, mode="letterbox"):
+    """`letterbox_params`, ou en `stretch` l'image étirée à toute l'entrée (sans bandes)."""
+    if mode == "stretch":
+        sh, sw = as_hw(size)
+        return sw, sh, 0, 0
+    if mode != "letterbox":
+        raise ValueError(f"prétraitement inconnu : {mode!r}")
+    return letterbox_params(width, height, size)
+
+
 def letterbox_image(img, size, channels=3):
     """`img` : image PIL ou tableau (H, W, 3) uint8. Rend (H, W, C) float32 dans [0, 1] et les
     paramètres de `letterbox_params`.
@@ -84,10 +94,11 @@ def letterbox_image(img, size, channels=3):
     return out, (nw, nh, dx, dy)
 
 
-def boxes_to_letterbox(boxes, width, height, size):
-    """Boîtes normalisées dans l'image d'origine → normalisées dans l'image letterbox."""
+def boxes_to_letterbox(boxes, width, height, size, mode="letterbox"):
+    """Boîtes normalisées dans l'image d'origine → normalisées dans l'image letterbox (ou
+    étirée, `mode="stretch"`)."""
     sh, sw = as_hw(size)
-    nw, nh, dx, dy = letterbox_params(width, height, size)
+    nw, nh, dx, dy = resize_params(width, height, size, mode)
     b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4).copy()
     b[:, 0] = (b[:, 0] * nw + dx) / sw
     b[:, 1] = (b[:, 1] * nh + dy) / sh

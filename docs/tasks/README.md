@@ -106,6 +106,6 @@ reporter ici l'avancement par jalon.
 | M11 | 8 (+ renvoi T11.8) | 0 |
 | M13 | 54 | 54 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
 | M14 | 12 | 5 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
-| M15 | 14 | 1 (T15.3 ; T15.1 et T15.2 prêtes pour Colab) |
+| M15 | 16 | 1 (T15.3 ; T15.1 et T15.2 prêtes pour Colab ; VisDrone T15.8, T15.10, T15.15, T15.16 : outillage prêt) |
 | M16 | 19 | 17 (T16.13 COCO et T16.14 KITTI : données absentes du PC) |
 | M17 | 21 | 0 |
