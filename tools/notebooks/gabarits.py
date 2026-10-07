@@ -23,7 +23,7 @@ ROLE_TITLES = {"infer": "inférence", "train": "entraînement",
 SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
-REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True}}
+REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True, "JOBS": 16}}
 # Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu).
 SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "iters": 600}
 

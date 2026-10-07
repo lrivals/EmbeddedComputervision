@@ -18,7 +18,7 @@ les images, les courbes et les tables, et garde la trace des paramètres. Comme 
 de [M13](M13-figures.md), il **appelle le code du dépôt** (`python/yolo/` et les `main()`
 de `tools/`), jamais une réécriture.
 
-**État** (2026-10-07) : 6 tâches faites sur 12 (T14.0, T14.1, T14.2, T14.7, T14.10,
+**État** (2026-10-07) : 8 tâches faites sur 12 (T14.0 à T14.4, T14.7, T14.10,
 T14.11). Les notebooks `_infer` et `_sweep` des six jeux (VOC, VisDrone, KITTI, FLIR,
 ExDark, CrowdHuman) ont tourné sur Colab GPU au palier R et sont versionnés avec leurs
 sorties ([resultats-balayages.md](resultats-balayages.md)). Les 6 autres tâches sont
@@ -27,8 +27,6 @@ mesure sur Colab ou l'exécution des notebooks `_train` (« Reste » de chaque t
 
 | tâche | reste à faire |
 |---|---|
-| T14.3 | `voc/tiny-yolov2-voc_infer` avec `SUBSET = 0` : **56,30** attendu (palier N, ≈ 40 min) |
-| T14.4 | même notebook avec `INT8 = True`, `SUBSET = 0` : **55,66** attendu (palier N) |
 | T14.5 | mAP hors domaine des notebooks contre `tools/m11.sh hors-domaine`, mêmes paramètres |
 | T14.6 | exécuter au moins un notebook `_train` de bout en bout (kitti d'abord) |
 | T14.8 | reprise d'un affinage kitti après coupure Colab ; gain GPU (s/image, lot maximal) vers T12.11-e |
@@ -288,7 +286,7 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
 
 ## B. Inférence
 
-### [ ] T14.3 — Gabarit `infer` : détection et mAP flottante
+### [x] T14.3 — Gabarit `infer` : détection et mAP flottante
 - **Spec** : §8 · **Dépend de** : T14.1, T14.2, T3.4 · **Taille** : M
 - **Livrables** : gabarit `infer` dans `gabarits.py`.
 - **Contenu** :
@@ -312,9 +310,11 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - fumée de `voc/tiny-yolov2-voc_infer` avec `SUBSET = 4` ;
   - tous les `_infer` exécutés sur Colab avec `SUBSET = 50` (palier R), sauf
     `coco/tiny-yolov3-coco_infer` (COCO absent) : Tiny-YOLOv2 VOC y fait 63,51.
-- **Reste** : la référence 56,30 avec `SUBSET = 0` (palier N, environ 40 min), non lancée.
+- **Validé** (2026-10-07, Colab CPU, révision `214f269`) : `voc/tiny-yolov2-voc_infer`,
+  réglé sur le split complet par `gabarits.REFERENCE` (`SUBSET = 0`, `INT8 = True`,
+  `JOBS = 16`), redonne **56,30** sur 4 952 images (906 s, 181 ms/image).
 
-### [ ] T14.4 — Volet entier : calibration et mAP INT8
+### [x] T14.4 — Volet entier : calibration et mAP INT8
 - **Spec** : §9 · **Dépend de** : T14.3, T4.5 · **Taille** : M
 - **Livrables** : section « entier » du gabarit `infer`, activée par `INT8 = True`.
 - **Contenu** :
@@ -332,7 +332,9 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - table des écarts par classe, figures du mode automatique, `act_hist.py` si
     `ACT_HIST = True` ;
   - fumée sur VOC (8 images de calibration, 4 évaluées).
-- **Reste** : 55,66 avec `SUBSET = 0` (palier N), non lancé.
+- **Validé** (même passage) : calibration 500 images trainval (93 s), puis `eval_quant.py
+  --variants float,int --jobs 16` (337 s, 66 ms/image) : flottant **56,30**, entier
+  **55,66**, écart −0,64 point, identique à `results/map_int8.md`.
 
 ### [ ] T14.5 — Inférence hors domaine (T11.2)
 - **Spec** : §8.3 · **Dépend de** : T14.3 · **Taille** : S

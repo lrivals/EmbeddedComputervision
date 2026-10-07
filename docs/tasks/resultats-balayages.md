@@ -45,6 +45,12 @@ classe peut n'avoir qu'une ou deux instances : son AP saute entre 0 et 100. Ordr
 grandeur du biais : Tiny-YOLOv2 VOC fait 63,51 sur ces 50 images contre **56,30** sur le
 split complet ([results/map_float.md](../../results/map_float.md)).
 
+Le notebook [voc/tiny-yolov2-voc_infer](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb)
+est désormais réglé sur le split complet (`SUBSET = 0`, `INT8 = True`, T14.3 et T14.4) :
+il a redonné 56,30 (flottant) et 55,66 (entier) sur Colab le 2026-10-07, mais ses sorties
+n'ont pas été conservées ; il est versionné sans sorties jusqu'au prochain passage. Le
+63,51 ci-dessous vient du premier passage (révision `1a967f4`).
+
 ## Vue d'ensemble
 
 ![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
