@@ -1,0 +1,948 @@
+{
+ "_rev": {
+  "rev": "1808467-dirty",
+  "date": "2026-10-07"
+ },
+ "balayage.crowdhuman.meilleur.map": {
+  "value": 35.87,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayage.exdark.meilleur.map": {
+  "value": 13.29,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayage.flir.meilleur.map": {
+  "value": 0.7,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayage.kitti.meilleur.map": {
+  "value": 2.38,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayage.visdrone.meilleur.map": {
+  "value": 2.24,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayage.voc.meilleur.map": {
+  "value": 36.27,
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "balayages.meilleurs": {
+  "value": {
+   "header": [
+    "Dataset",
+    "Training images",
+    "Best run",
+    "Batch",
+    "Training subset",
+    "Metric",
+    "Score (50 images)",
+    "Status"
+   ],
+   "rows": [
+    [
+     "VOC",
+     16551,
+     "`b32-sall`",
+     32,
+     "all",
+     "mAP, 11 points",
+     36.27,
+     "tier-R"
+    ],
+    [
+     "VisDrone",
+     6471,
+     "`b32-sall`",
+     32,
+     "all",
+     "mAP, 11 points",
+     2.24,
+     "tier-R"
+    ],
+    [
+     "KITTI",
+     5985,
+     "`b32-sall`",
+     32,
+     "all",
+     "mAP, 11 points",
+     2.38,
+     "tier-R"
+    ],
+    [
+     "FLIR",
+     10742,
+     "`b8-sall`",
+     8,
+     "all",
+     "AP@[.5:.95] (COCO)",
+     0.7,
+     "tier-R"
+    ],
+    [
+     "ExDark",
+     3000,
+     "`b32-sall`",
+     32,
+     "all",
+     "mAP, 11 points",
+     13.29,
+     "tier-R"
+    ],
+    [
+     "CrowdHuman",
+     15000,
+     "`b16-sall`",
+     16,
+     "all",
+     "mAP, 11 points",
+     35.87,
+     "tier-R"
+    ]
+   ],
+   "nd": [
+    null,
+    0,
+    null,
+    0,
+    null,
+    null,
+    2,
+    null
+   ]
+  },
+  "status": "tier-R",
+  "source": "docs/tasks/resultats-balayages.md",
+  "command": "make harvest",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "benchmarks": {
+  "value": {
+   "header": [
+    "Work",
+    "Model",
+    "FPGA",
+    "Format",
+    "img/s",
+    "ms",
+    "GOPS",
+    "W",
+    "Status"
+   ],
+   "rows": [
+    [
+     "2023-zhai",
+     "YOLOv3-tiny pruned, 1 module",
+     "Zynq XC7Z035",
+     "INT16",
+     "91.65",
+     "—",
+     "67.91",
+     "12.51",
+     "published"
+    ],
+    [
+     "2023-zhai",
+     "YOLOv3-tiny pruned, 2 modules",
+     "Zynq XC7Z035",
+     "INT16",
+     "168.72",
+     "—",
+     "124.01",
+     "15.18",
+     "published"
+    ],
+    [
+     "2024-zhang",
+     "YOLOv2-Tiny 416, batch 1",
+     "Kintex-7 325T",
+     "INT8",
+     "—",
+     "14.49",
+     "406",
+     "12.3",
+     "published"
+    ],
+    [
+     "2024-zhang",
+     "YOLOv3-Tiny 416, batch 1",
+     "Kintex-7 325T",
+     "INT8",
+     "—",
+     "15.2",
+     "401",
+     "12.3",
+     "published"
+    ],
+    [
+     "2023-montgomerie-corcoran",
+     "YOLOv3-Tiny 416",
+     "VCU110",
+     "W8A16",
+     "—",
+     "—",
+     "418.9",
+     "15.4",
+     "published"
+    ],
+    [
+     "2019-ding",
+     "Tiny-YOLOv2, ADMM heterogeneous",
+     "Virtex-7 690T",
+     "FFT + powers of 2",
+     "314.2",
+     "—",
+     "—",
+     "21",
+     "published"
+    ],
+    [
+     "2026-fata",
+     "YOLOv3-tiny pruned at 70 % (DPU Vitis AI)",
+     "Kria KV260 (DPU)",
+     "INT8 QAT",
+     "24.3",
+     "—",
+     "60.18",
+     "2.13",
+     "published"
+    ],
+    [
+     "2025-kim",
+     "YOLOv2 full (prototype)",
+     "Zybo Z7-20",
+     "INT16",
+     "0.083",
+     "12,000",
+     "—",
+     "—",
+     "published"
+    ],
+    [
+     "this work (C-sim projection)",
+     "Tiny-YOLOv2 VOC 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "26.87",
+     "37.2",
+     "187.3",
+     "—",
+     "projection"
+    ],
+    [
+     "this work (C-sim projection)",
+     "Tiny-YOLOv3 COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "27.72",
+     "36.1",
+     "154.3",
+     "—",
+     "projection"
+    ]
+   ]
+  },
+  "status": "published",
+  "source": "results/benchmarks.csv",
+  "command": "make bench-report",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats": {
+  "value": {
+   "header": [
+    "Weights / activations",
+    "Method",
+    "mAP",
+    "Gap to INT8"
+   ],
+   "rows": [
+    [
+     "INT8 per channel (reference)",
+     "PTQ",
+     55.66,
+     null
+    ],
+    [
+     "uniform6 (±31)",
+     "PTQ",
+     54.35,
+     -1.31
+    ],
+    [
+     "mixed6 (powers of 2)",
+     "PTQ, direct projection",
+     52.46,
+     -3.2
+    ],
+    [
+     "mixed6",
+     "ADMM, 600 iterations, then projection",
+     43.07,
+     -12.59
+    ],
+    [
+     "w4a4",
+     "PTQ (power-of-2 steps)",
+     17.06,
+     -38.6
+    ],
+    [
+     "w4a4",
+     "QAT, 600 iterations",
+     36.38,
+     -19.28
+    ],
+    [
+     "INT8 + hardware post-processing",
+     "unsorted NMS, Q4 boxes",
+     55.56,
+     -0.1
+    ]
+   ],
+   "nd": [
+    null,
+    null,
+    2,
+    2
+   ],
+   "sign": [
+    false,
+    false,
+    false,
+    true
+   ]
+  },
+  "status": "measured",
+  "source": "results/req_yolo.md, quant_4bits.md, postproc_hw.md",
+  "command": "python tools/eval_quant.py --variants …",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.admm": {
+  "value": 43.07,
+  "status": "measured",
+  "source": "results/req_yolo.md",
+  "command": "python tools/train.py --admm",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.hwpp": {
+  "value": 55.56,
+  "status": "measured",
+  "source": "results/postproc_hw.md",
+  "command": "python tools/eval_quant.py --variants int,int-hwpp",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.mixed6": {
+  "value": 52.46,
+  "status": "measured",
+  "source": "results/req_yolo.md",
+  "command": "python tools/eval_quant.py",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.uniform6": {
+  "value": 54.35,
+  "status": "measured",
+  "source": "results/req_yolo.md",
+  "command": "python tools/eval_quant.py",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.w4a4.ptq": {
+  "value": 17.06,
+  "status": "measured",
+  "source": "results/quant_4bits.md",
+  "command": "python tools/quant_lowbit.py",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.formats.w4a4.qat": {
+  "value": 36.38,
+  "status": "measured",
+  "source": "results/quant_4bits.md",
+  "command": "python tools/train.py --qat w4a4",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.stades": {
+  "value": {
+   "header": [
+    "Stage",
+    "mAP",
+    "Equality with the integer model",
+    "Status"
+   ],
+   "rows": [
+    [
+     "Float (fused BN, NumPy float32)",
+     56.3,
+     "—",
+     "measured"
+    ],
+    [
+     "Integer, Python (`IntNetwork`, bit-exact)",
+     55.66,
+     "reference",
+     "measured"
+    ],
+    [
+     "FPGA, C-sim (ARM driver, sim backend, PC)",
+     55.66,
+     "4,952 / 4,952 identical images",
+     "csim"
+    ],
+    [
+     "FPGA, KV260 (uio backend)",
+     null,
+     "to be measured",
+     "—"
+    ]
+   ],
+   "nd": [
+    null,
+    2,
+    null,
+    null
+   ]
+  },
+  "status": "measured",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.csim": {
+  "value": 55.66,
+  "status": "csim",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.darknet": {
+  "value": 57.1,
+  "status": "published",
+  "source": "results/map_float.md",
+  "command": "make eval-float",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.drop": {
+  "value": -0.64,
+  "status": "measured",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "nd": 2,
+  "sign": true,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.float": {
+  "value": 56.3,
+  "status": "measured",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.float.table": {
+  "value": {
+   "header": [
+    "Preprocessing",
+    "Interpolation",
+    "mAP"
+   ],
+   "rows": [
+    [
+     "direct resize (`stretch`)",
+     "Pillow bilinear",
+     56.3
+    ],
+    [
+     "direct resize (`stretch`)",
+     "Darknet (`resize_image`)",
+     56.32
+    ],
+    [
+     "letterbox",
+     "Pillow bilinear",
+     54.18
+    ],
+    [
+     "letterbox",
+     "Darknet (`resize_image`)",
+     53.98
+    ]
+   ],
+   "nd": [
+    null,
+    null,
+    2
+   ]
+  },
+  "status": "measured",
+  "source": "results/map_float.md",
+  "command": "python tools/eval_voc.py --resize stretch|letterbox [--interp darknet]",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.identical": {
+  "value": 4952,
+  "status": "csim",
+  "source": "results/map_stades.md",
+  "command": "make bench-sim map-stades",
+  "nd": 0,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.images": {
+  "value": 4952,
+  "status": "measured",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "nd": 0,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.int8": {
+  "value": 55.66,
+  "status": "measured",
+  "source": "results/map_stades.md",
+  "command": "make m8-int bench-sim map-stades",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "map.voc.int8.table": {
+  "value": {
+   "header": [
+    "Preprocessing",
+    "Float (fused BN)",
+    "Integer INT8",
+    "Gap"
+   ],
+   "rows": [
+    [
+     "stretch (`make eval-float`)",
+     56.3,
+     55.66,
+     -0.64
+    ],
+    [
+     "letterbox (the training one)",
+     54.18,
+     53.68,
+     -0.5
+    ]
+   ],
+   "nd": [
+    null,
+    2,
+    2,
+    2
+   ],
+   "sign": [
+    false,
+    false,
+    false,
+    true
+   ]
+  },
+  "status": "measured",
+  "source": "results/map_int8.md",
+  "command": "make eval-int",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "model.v2.gmacs": {
+  "value": 3.49,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "model.v2.mparams": {
+  "value": 15.86,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "model.v3.gmacs": {
+  "value": 2.74,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "model.v3.mparams": {
+  "value": 8.71,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.cascade": {
+  "value": {
+   "header": [
+    "Kernel configuration (Tiny-YOLOv2)",
+    "Mcycles",
+    "ms",
+    "img/s",
+    "GOPS",
+    "MAC efficiency (%)"
+   ],
+   "rows": [
+    [
+     "M6: ports 8 bits",
+     41.3,
+     206.5,
+     4.8,
+     33.8,
+     11.0
+    ],
+    [
+     "valid channels only (trim)",
+     32.67,
+     163.3,
+     6.1,
+     42.7,
+     13.9
+    ],
+    [
+     "ports 64 bits",
+     12.27,
+     61.3,
+     16.3,
+     113.6,
+     37.0
+    ],
+    [
+     "ports 128 bits + trim",
+     12.13,
+     60.6,
+     16.5,
+     115.0,
+     37.4
+    ],
+    [
+     "ports 64 bits + trim + requantization ×8 (+28 DSP)",
+     9.29,
+     46.4,
+     21.5,
+     150.1,
+     48.9
+    ],
+    [
+     "... + L00 folding",
+     8.38,
+     41.9,
+     23.9,
+     166.4,
+     54.2
+    ],
+    [
+     "... + 14×14 tiles for pooled convs (M10 kernel)",
+     7.44,
+     37.2,
+     26.9,
+     187.3,
+     61.0
+    ],
+    [
+     "compute bound of M6 (free loads)",
+     8.23,
+     41.1,
+     24.3,
+     169.5,
+     55.2
+    ],
+    [
+     "compute bound of the M10 kernel",
+     6.32,
+     31.6,
+     31.7,
+     220.7,
+     71.8
+    ],
+    [
+     "KV260 roofline point (roofline.md)",
+     null,
+     31.9,
+     31.3,
+     218.5,
+     null
+    ],
+    [
+     "ideal (MACs / 768, efficiency 100 %)",
+     4.54,
+     22.7,
+     44.1,
+     307.2,
+     100
+    ]
+   ],
+   "nd": [
+    null,
+    2,
+    1,
+    1,
+    1,
+    1
+   ],
+   "status": "projection"
+  },
+  "status": "projection",
+  "source": "results/rapport.md",
+  "command": "make perf-model",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260": {
+  "value": {
+   "header": [
+    "Network",
+    "GMAC",
+    "Mcycles",
+    "ms",
+    "img/s",
+    "GOPS",
+    "MAC efficiency (%)",
+    "Status"
+   ],
+   "rows": [
+    [
+     "`tiny-yolov2-voc`",
+     3.486,
+     7.44,
+     37.2,
+     26.87,
+     187.3,
+     61.0,
+     "projection"
+    ],
+    [
+     "`tiny-yolov3-coco`",
+     2.782,
+     7.21,
+     36.1,
+     27.72,
+     154.3,
+     50.2,
+     "projection"
+    ]
+   ],
+   "nd": [
+    null,
+    3,
+    2,
+    1,
+    1,
+    1,
+    1,
+    null
+   ]
+  },
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make bench-report",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.bound.ms": {
+  "value": 31.6,
+  "status": "projection",
+  "source": "results/rapport.md",
+  "command": "make perf-model",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.m6.ms": {
+  "value": 206.5,
+  "status": "projection",
+  "source": "results/rapport.md",
+  "command": "make perf-model",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.roofline.ms": {
+  "value": 31.9,
+  "status": "projection",
+  "source": "results/rapport.md",
+  "command": "make roofline",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.v2.eff": {
+  "value": 61.0,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.v2.fps": {
+  "value": 26.87,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.v2.gops": {
+  "value": 187.3,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.v2.ms": {
+  "value": 37.2,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "perf.kv260.v3.ms": {
+  "value": 36.1,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "quant.sensitive.gap": {
+  "value": -0.61,
+  "status": "tier-R",
+  "source": "results/map_int8.md",
+  "command": "python tools/eval_quant.py (fake-quant sweep)",
+  "nd": 2,
+  "sign": true,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "quant.sensitive.layer": {
+  "value": "L10",
+  "status": "tier-R",
+  "source": "results/map_int8.md",
+  "command": "python tools/eval_quant.py (fake-quant sweep)",
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "stream.w4.fps": {
+  "value": 64.2,
+  "status": "estimate",
+  "source": "results/streaming.md",
+  "command": "python tools/stream_model.py",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "stream.w8.dsp": {
+  "value": 968,
+  "status": "estimate",
+  "source": "results/streaming.md",
+  "command": "python tools/stream_model.py",
+  "nd": 0,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "stream.w8.fps": {
+  "value": 32.1,
+  "status": "estimate",
+  "source": "results/streaming.md",
+  "command": "python tools/stream_model.py",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "stream.w8.latency": {
+  "value": 85.2,
+  "status": "estimate",
+  "source": "results/streaming.md",
+  "command": "python tools/stream_model.py",
+  "nd": 1,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "verif.dumps": {
+  "value": 6,
+  "status": "measured",
+  "source": "Makefile (DUMP_IMAGES × QNETS)",
+  "command": "make golden-check",
+  "nd": 0,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ },
+ "verif.hwpp.cases": {
+  "value": 1014,
+  "status": "csim",
+  "source": "results/postproc_hw.md",
+  "command": "make csim-gcc",
+  "nd": 0,
+  "rev": "1808467",
+  "date": "2026-10-07"
+ }
+}

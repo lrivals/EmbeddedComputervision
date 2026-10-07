@@ -32,7 +32,29 @@ Comme en [M14](M14-notebooks.md) et [M16](M16-presentation-jeux.md), l'article n
 **aucun calcul propre** : tout nombre vient d'un outil du dépôt et se régénère en ligne de
 commande.
 
-**État** : 0 tâche faite sur 21.
+**État** : 17 tâches faites sur 21 (T17.0 à T17.16) ; T17.17 à T17.20 restent.
+
+**Done (2026-10-07), in English.** Following the M19 rule (everything new is written in
+English from 2026-10-07), the article, its generated text and the messages of
+`tools/article.py` are in English, with English number formatting (decimal point, comma
+thousands separator, minus sign −). Differences from the plan below:
+- statuses are named `measured`, `csim`, `projection`, `estimate`, `tier-R`, `published`
+  (for `mesure`, `csim`, `projection`, `estimation`, `palier-R`, `publie`); the mark is a
+  superscript (`<sup>proj.</sup>`), none for `measured`;
+- `collect` reads the published tables of `results/` (and `build/m8/<net>/map_stades.json`
+  when present); performance comes from `results/mesures.md` and `rapport.md`, which
+  `make perf-model bench-report` write, and sweeps from
+  [resultats-balayages.md](resultats-balayages.md), which `make harvest` refreshes;
+- the result sections checked for stray numbers are the abstract and §4 to §10; a decimal
+  inside code, maths, a citation or a link is ignored;
+- the `rev` block shows the revision stored in `chiffres.json` (`_rev`), stamped by
+  `render` only when the article changes, so `--check` does not depend on the current
+  commit; `list:status` lists the keys still `projection`, `estimate`, `tier-R` or `csim`;
+- figure captions come from `tools/figures` and stay in French until M19 translates them;
+  the sweep figures (`balayage`, `balayages`) are not in `results/figures/` yet and are not
+  cited;
+- `make article-pdf` writes `build/article/article.html`, and the PDF only when a LaTeX
+  engine is installed.
 
 ## Conventions communes
 
@@ -168,7 +190,7 @@ aussi à savoir **quelle section relire** quand un jalon avance.
 
 ## A. Infrastructure
 
-### [ ] T17.0 — Squelette de l'article
+### [x] T17.0 — Squelette de l'article
 - **Spec** : — · **Dépend de** : — · **Taille** : S
 - **Livrables** : `docs/article/article.md` (titre, auteurs, sections du plan, un bloc
   vide par bloc prévu, annexe « journal des versions ») ; `docs/article/refs.md` ;
@@ -176,7 +198,7 @@ aussi à savoir **quelle section relire** quand un jalon avance.
 - **Acceptation** : le squelette se lit en Markdown (GitHub et VS Code) ; chaque section
   du plan y est, avec ses blocs balisés et une ligne « à rédiger ».
 
-### [ ] T17.1 — Moteur de blocs `tools/article.py`
+### [x] T17.1 — Moteur de blocs `tools/article.py`
 - **Spec** : — · **Dépend de** : T17.0 · **Taille** : M
 - **Livrables** : `tools/article.py` (`parse`, `render`, `main`) ;
   `python/tests/test_article.py`.
@@ -194,7 +216,7 @@ aussi à savoir **quelle section relire** quand un jalon avance.
   - aucune dépendance hors bibliothèque standard.
 - **Notes** : reprendre le schéma `--check` de `tools/notebooks/__main__.py`.
 
-### [ ] T17.2 — Collecte des chiffres (`collect`)
+### [x] T17.2 — Collecte des chiffres (`collect`)
 - **Spec** : — · **Dépend de** : T17.1 · **Taille** : M
 - **Livrables** : registre `CLES` et lecteurs dans `tools/article.py` ; premier
   `docs/article/chiffres.json`.
@@ -216,7 +238,7 @@ aussi à savoir **quelle section relire** quand un jalon avance.
     rafraîchies, sans échouer ;
   - test : une source modifiée change la valeur et la révision de sa seule clé.
 
-### [ ] T17.3 — Blocs `fig`, `etat` et `rev`
+### [x] T17.3 — Blocs `fig`, `etat` et `rev`
 - **Spec** : — · **Dépend de** : T17.1 · **Taille** : S
 - **Livrables** : rendu des trois types dans `tools/article.py`.
 - **Acceptation** :
@@ -227,7 +249,7 @@ aussi à savoir **quelle section relire** quand un jalon avance.
     [README.md](README.md), variantes `etat` (complète) et `etat:resume` (une phrase) ;
   - `rev` : révision courte et date, suffixe `+modifs` si l'arbre de travail est sale.
 
-### [ ] T17.4 — Cibles `make` et CI
+### [x] T17.4 — Cibles `make` et CI
 - **Spec** : — · **Dépend de** : T17.2, T17.3 · **Taille** : S
 - **Livrables** : cibles `article` et `article-pdf` du `Makefile` ; `--check` ajouté à
   `ci` ; ligne dans `make help`.
@@ -246,69 +268,69 @@ Acceptation commune des tâches de rédaction :
   « hors base » comme dans la spécification ;
 - `--check` passe ; l'état de la section passe à « brouillon » dans la table **Sections**.
 
-### [ ] T17.5 — §0 Résumé
+### [x] T17.5 — §0 Résumé
 - **Dépend de** : T17.6-T17.16 · **Taille** : S
 - **Notes** : écrit en dernier ; 200 mots ; chaque chiffre avec son statut.
 
-### [ ] T17.6 — §1 Introduction et contributions
+### [x] T17.6 — §1 Introduction et contributions
 - **Dépend de** : T17.0 · **Taille** : S
 - **Notes** : contributions candidates : chaîne complète sans bibliothèque
   d'apprentissage ; bit-exact du flottant NumPy au noyau HLS (4 952 images identiques) ;
   moteur unique paramétré pour v2 et v3 ; comparaison de formats (INT8, puissances de 2,
   4 bits) sur le même modèle ; outillage reproductible (profils, figures, notebooks).
 
-### [ ] T17.7 — §2 Travaux liés
+### [x] T17.7 — §2 Travaux liés
 - **Dépend de** : T17.2 · **Taille** : M
 - **Notes** : s'appuyer sur §10.4 de la spécification et sur la colonne « ce qui empêche
   la comparaison directe » de [rapport.md](../../results/rapport.md).
 
-### [ ] T17.8 — §3 Réseaux et briques NumPy
+### [x] T17.8 — §3 Réseaux et briques NumPy
 - **Dépend de** : T17.3 · **Taille** : M
 - **Notes** : Tiny-YOLOv2/v3 couche par couche (spec §3), passes avant et arrière, gradcheck
   ([M1](M1-briques-numpy.md)), perte et entraînement ([M2](M2-cibles-perte-entrainement.md)).
 
-### [ ] T17.9 — §4 Inférence et évaluation
+### [x] T17.9 — §4 Inférence et évaluation
 - **Dépend de** : T17.2 · **Taille** : S
 - **Notes** : effet du prétraitement (stretch, letterbox, interpolation Darknet) sur la
   mAP de référence ([M3](M3-inference-evaluation.md)).
 
-### [ ] T17.10 — §5 Quantification INT8
+### [x] T17.10 — §5 Quantification INT8
 - **Dépend de** : T17.2 · **Taille** : M
 - **Notes** : fusion BN, calibration, M0/décalage, leaky 13/128, LUT des têtes ; écart
   sous 1 point, QAT non nécessaire ([M4](M4-quantification.md)).
 
-### [ ] T17.11 — §6 Golden C++ et chaîne de vérification
+### [x] T17.11 — §6 Golden C++ et chaîne de vérification
 - **Dépend de** : T17.3 · **Taille** : S
 - **Notes** : comment l'égalité est vérifiée à chaque passage ([M5](M5-golden-cpp.md),
   `make golden-check`).
 
-### [ ] T17.12 — §7 Accélérateur HLS et intégration SoC
+### [x] T17.12 — §7 Accélérateur HLS et intégration SoC
 - **Dépend de** : T17.3 · **Taille** : L
 - **Notes** : choix de la carte ([ADR 0003](../adr/0003-choix-carte.md)), roofline,
   tuilage, moteur unique, carte de registres, driver ARM ([M6](M6-accelerateur-hls.md),
   [M7](M7-integration-soc.md)) ; cascade d'optimisations de [M10](M10-ameliorations.md).
 
-### [ ] T17.13 — §8 Résultats
+### [x] T17.13 — §8 Résultats
 - **Dépend de** : T17.2 · **Taille** : M
 - **Notes** : la section la plus exposée aux mises à jour : les phrases ne reprennent
   aucun chiffre, elles commentent les tables. Prévoir les deux formulations (avant et
   après mesure carte) dans T17.19.
 
-### [ ] T17.14 — §9 Extensions
+### [x] T17.14 — §9 Extensions
 - **Dépend de** : T17.2 · **Taille** : M
 - **Notes** : post-traitement matériel ([M9.1](M9.1-postproc-materiel.md)), REQ-YOLO et
   ADMM non convergé ([M9.2](M9.2-req-yolo.md)), 4 bits ([M9.3](M9.3-quant-4bits.md)),
   streaming en estimation ([M9.4](M9.4-streaming.md)). Les résultats négatifs ou partiels
   sont rapportés comme tels.
 
-### [ ] T17.15 — §10 Au-delà de VOC
+### [x] T17.15 — §10 Au-delà de VOC
 - **Dépend de** : T17.2 · **Taille** : M
 - **Notes** : jeux de [M11](M11-jeux-de-donnees.md), balayages et inférences de
   [M15](M15-campagne-entrainement.md) ([resultats-balayages.md](resultats-balayages.md)),
   statistiques de [M16](M16-presentation-jeux.md) quand elles existeront. Section la plus
   susceptible de grandir : une sous-section par jeu, dans l'ordre de M15.
 
-### [ ] T17.16 — §11 Limites et §12 Reproductibilité
+### [x] T17.16 — §11 Limites et §12 Reproductibilité
 - **Dépend de** : T17.3 · **Taille** : S
 - **Notes** : §11 liste générée des clés encore `projection`, `estimation` ou `palier-R` ;
   §12 : commandes `make`, profils R/M/N ([M12](M12-profils-pc.md)), notebooks
@@ -320,6 +342,9 @@ Acceptation commune des tâches de rédaction :
   spécification, une seule définition par sigle, figures appelées dans le texte).
 - **Acceptation** : chaque citation `[chunk_id]` passe `bin/pdb verify` ; toutes les
   sections à l'état « relu ».
+- **Reste** : `refs.md` is complete (§12 of the specification); the citations still have
+  to pass `bin/pdb verify` (tool of the base, outside the repository) and the sections a
+  full proofreading.
 
 ## C. Maintenance
 
@@ -329,6 +354,8 @@ Acceptation commune des tâches de rédaction :
   chaque jalon** appliquée une fois de bout en bout.
 - **Acceptation** : un jalon qui avance (par exemple une ligne de M15) se répercute dans
   l'article par `make article` et une relecture de la seule section concernée.
+- **Reste** : the v0 entry of the version log is written; the update procedure has not
+  yet been applied to a milestone that moved.
 
 ### [ ] T17.19 — Bascule « projection → mesure » (carte)
 - **Dépend de** : T7.4, T8.1-T8.3 sur carte · **Taille** : M
@@ -349,16 +376,16 @@ Acceptation commune des tâches de rédaction :
 
 | § | Section | État |
 |---|---|---|
-| 0 | Résumé | à rédiger |
-| 1 | Introduction et contributions | à rédiger |
-| 2 | Travaux liés | à rédiger |
-| 3 | Réseaux et briques NumPy | à rédiger |
-| 4 | Inférence et évaluation | à rédiger |
-| 5 | Quantification INT8 | à rédiger |
-| 6 | Golden C++ et chaîne de vérification | à rédiger |
-| 7 | Accélérateur HLS et intégration SoC | à rédiger |
-| 8 | Résultats | à rédiger |
-| 9 | Extensions | à rédiger |
-| 10 | Au-delà de VOC | à rédiger |
-| 11 | Limites et travaux futurs | à rédiger |
-| 12 | Reproductibilité | à rédiger |
+| 0 | Résumé | brouillon |
+| 1 | Introduction et contributions | brouillon |
+| 2 | Travaux liés | brouillon |
+| 3 | Réseaux et briques NumPy | brouillon |
+| 4 | Inférence et évaluation | brouillon |
+| 5 | Quantification INT8 | brouillon |
+| 6 | Golden C++ et chaîne de vérification | brouillon |
+| 7 | Accélérateur HLS et intégration SoC | brouillon |
+| 8 | Résultats | brouillon |
+| 9 | Extensions | brouillon |
+| 10 | Au-delà de VOC | brouillon |
+| 11 | Limites et travaux futurs | brouillon |
+| 12 | Reproductibilité | brouillon |
