@@ -53,8 +53,9 @@ thousands separator, minus sign −). Differences from the plan below:
 - figure captions come from `tools/figures` and stay in French until M19 translates them;
   the sweep figures (`balayage`, `balayages`) are not in `results/figures/` yet and are not
   cited;
-- `make article-pdf` writes `build/article/article.html`, and the PDF only when a LaTeX
-  engine is installed.
+- `make article-pdf` writes `build/article/article.html` and `article.pdf` (pandoc with a
+  LaTeX engine, or else the HTML printed by headless Chromium) and copies the PDF to
+  `docs/article/article.pdf`, the one exported file kept in git.
 
 ## Conventions communes
 

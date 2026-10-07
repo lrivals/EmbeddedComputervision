@@ -854,25 +854,70 @@ def render_file(article=ARTICLE, data_path=DATA, root=ROOT, figures=None, suivi_
     return False
 
 
-def export(article=ARTICLE, out=BUILD):
-    """pandoc → out/article.html, and out/article.pdf if a LaTeX engine is present."""
+PDF_CSS = """
+body { font-family: "DejaVu Serif", Georgia, serif; font-size: 10.5pt; line-height: 1.4;
+       max-width: none; margin: 0; padding: 0; }
+h1 { font-size: 17pt; } h2 { font-size: 13pt; margin-top: 1.4em; }
+img { max-width: 100%; max-height: 22cm; display: block; margin: 0.6em auto; }
+table { border-collapse: collapse; font-size: 8.5pt; margin: 0.6em 0; }
+th, td { border: 1px solid #999; padding: 2px 5px; }
+code { font-size: 9pt; } blockquote { color: #444; border-left: 3px solid #ccc;
+       margin-left: 0; padding-left: 0.8em; }
+@page { size: A4; margin: 18mm 16mm; }
+"""
+VERSIONED_PDF = ARTICLE.with_suffix(".pdf")
+
+
+def _chromium():
+    """Chromium on PATH, or the one of Playwright (PLAYWRIGHT_BROWSERS_PATH)."""
+    found = next((shutil.which(b) for b in ("chromium", "chromium-browser", "google-chrome")
+                  if shutil.which(b)), None)
+    pw = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if found is None and pw:
+        found = next((str(c) for c in sorted(Path(pw).glob("chromium-*/chrome-linux*/chrome"))),
+                     None)
+    return found
+
+
+def export(article=ARTICLE, out=BUILD, versioned=VERSIONED_PDF):
+    """pandoc → out/article.html, then out/article.pdf with a LaTeX engine, or else by
+    printing the HTML with headless Chromium; the PDF is copied to `versioned`
+    (docs/article/article.pdf, the export kept in git; build/ is not versioned)."""
     if not shutil.which("pandoc"):
         print("pandoc not installed: no export (apt install pandoc)")
         return 0
+    out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    base = ["pandoc", Path(article).name, "--from", "gfm", "--resource-path", "."]
-    html = out.resolve() / "article.html"
-    subprocess.run(base + ["--standalone", "--metadata", "title=Article", "-o", str(html)],
-                   cwd=Path(article).parent, check=True)
+    # Block markers removed: at the start of a line pandoc reads them as HTML blocks and
+    # cuts the paragraph around an inline number.
+    src = out / "article.md"
+    src.write_text(re.sub(r"<!-- (article:[a-z]+(?::\S+?)?|/article|python -m tools\.figures \S+) -->",
+                          "", Path(article).read_text()))
+    adir = str(Path(article).resolve().parent)
+    base = ["pandoc", str(src), "--from", "gfm", "--resource-path", adir]
+    css = out / "article.css"
+    css.write_text(PDF_CSS)
+    html = out / "article.html"
+    title = Path(article).read_text().splitlines()[0].lstrip("# ").strip()
+    subprocess.run(base + ["--standalone", "--metadata", f"pagetitle={title}", "--css",
+                           str(css), "-o", str(html)], cwd=adir, check=True)
     print(f"→ {_rel(html)}")
+    pdf = out / "article.pdf"
     engine = next((e for e in ("xelatex", "lualatex", "pdflatex") if shutil.which(e)), None)
-    if engine is None:
-        print("no LaTeX engine (xelatex, lualatex, pdflatex): PDF skipped")
+    if engine:
+        subprocess.run(base + ["--pdf-engine", engine, "-o", str(pdf)], cwd=adir, check=True)
+    elif _chromium():
+        subprocess.run([_chromium(), "--headless", "--no-sandbox", "--disable-gpu",
+                        "--no-pdf-header-footer", "--allow-file-access-from-files",
+                        f"--print-to-pdf={pdf}", html.as_uri()],
+                       check=True, capture_output=True)
+    else:
+        print("no LaTeX engine (xelatex, lualatex, pdflatex) nor Chromium: PDF skipped")
         return 0
-    pdf = out.resolve() / "article.pdf"
-    subprocess.run(base + ["--pdf-engine", engine, "-o", str(pdf)], cwd=Path(article).parent,
-                   check=True)
     print(f"→ {_rel(pdf)}")
+    if versioned:
+        shutil.copyfile(pdf, versioned)
+        print(f"→ {_rel(versioned)}")
     return 0
 
 
