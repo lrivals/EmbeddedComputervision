@@ -42,8 +42,8 @@ help:
 	@echo "ci          lint, golden, C-sim, sw, perf-model, pytest ; export obligatoire (T10.13-14)"
 	@echo "figures     figures M13 dont les données sont présentes → results/figures/, results/figures.md"
 	@echo "notebooks   notebooks Jupyter de M14 → notebooks/<jeu>/, notebooks/README.md"
-	@echo "article     M17 article: collect numbers → docs/article/chiffres.json, render docs/article/article.md"
-	@echo "article-pdf article, then pandoc → build/article/article.html (+ .pdf with a LaTeX engine)"
+	@echo "article     M17 article: collect numbers → docs/article/chiffres.json, render docs/article/generated.tex"
+	@echo "article-pdf article, then xelatex + bibtex → build/article/, copied to docs/article/article.pdf"
 	@echo "harvest     runs Colab du Drive → build/notebooks/ (json, csv, md, png ; sans poids), puis synthèse des balayages"
 	@echo "notebooks-smoke  exécution de fumée des notebooks dont les données sont là (T14.9, entraînements compris)"
 	@echo "test-durations  suite pytest complète (slow compris, palier N) → build/figures/pytest.xml (T13.30)"
@@ -105,7 +105,8 @@ figures:
 notebooks:
 	python -m tools.notebooks all
 
-# M17: article numbers and blocks (collect, then render); make ci runs --check.
+# M17: article numbers and macros (collect, then render generated.tex); make ci runs --check.
+# article-pdf needs TeX Live: texlive-xetex texlive-latex-recommended texlive-latex-extra.
 article:
 	python -m tools.article all
 

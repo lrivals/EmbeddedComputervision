@@ -34,6 +34,16 @@ commande.
 
 **État** : 17 tâches faites sur 21 (T17.0 à T17.16) ; T17.17 à T17.20 restent.
 
+**LaTeX (2026-10-07).** The source is now `docs/article/article.tex`, compiled by xelatex
+and bibtex (`make article-pdf`) into `docs/article/article.pdf`. LaTeX comments run to the
+end of the line, so the inline blocks below are replaced by macros: the hand-written
+`article.tex` uses `\chiffre{<key>}`, `\articletable{<key>}`, `\articlefig{<name>[/<file>]}`,
+`\articleetat`, `\articleetatresume`, `\articlestatuslist` and `\articlerev`, all defined
+in `docs/article/generated.tex`, which `render` rewrites and `--check` compares (it never
+needs LaTeX). References are in `docs/article/refs.bib` (§12 of the specification), cited
+with their chunk, `\cite[\#013.1]{2024-zhang}`; `refs.md` and `article.md` are gone.
+Tables and figures are numbered and referenced by LaTeX (`\ref{tab:…}`, `\ref{fig:<name>}`).
+
 **Done (2026-10-07), in English.** Following the M19 rule (everything new is written in
 English from 2026-10-07), the article, its generated text and the messages of
 `tools/article.py` are in English, with English number formatting (decimal point, comma
@@ -53,9 +63,8 @@ thousands separator, minus sign −). Differences from the plan below:
 - figure captions come from `tools/figures` and stay in French until M19 translates them;
   the sweep figures (`balayage`, `balayages`) are not in `results/figures/` yet and are not
   cited;
-- `make article-pdf` writes `build/article/article.html` and `article.pdf` (pandoc with a
-  LaTeX engine, or else the HTML printed by headless Chromium) and copies the PDF to
-  `docs/article/article.pdf`, the one exported file kept in git.
+- `make article-pdf` compiles `build/article/article.pdf` (latexmk -xelatex) and copies it
+  to `docs/article/article.pdf`, the one exported file kept in git.
 
 ## Conventions communes
 

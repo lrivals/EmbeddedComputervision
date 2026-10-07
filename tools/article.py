@@ -1,23 +1,27 @@
-"""Paper-style article of the project (M17, docs/tasks/M17-article.md): generated blocks.
+"""Paper-style article of the project in LaTeX (M17, docs/tasks/M17-article.md).
 
     python -m tools.article all        # collect then render (make article)
     python -m tools.article collect    # sources → docs/article/chiffres.json
-    python -m tools.article render     # chiffres.json + figure registry → article.md blocks
-    python -m tools.article --check    # make ci: blocks up to date, keys, figures, numbers
-    python -m tools.article pdf        # all, then pandoc → build/article/ (make article-pdf)
+    python -m tools.article render     # chiffres.json + figure registry → generated.tex
+    python -m tools.article --check    # make ci: generated.tex up to date, keys, figures
+    python -m tools.article pdf        # all, then xelatex → docs/article/article.pdf
 
-A block sits between two HTML comments, invisible once rendered:
+The hand-written source `docs/article/article.tex` holds the narrative only. Every
+number, table, figure and the milestone status come from macros defined in
+`docs/article/generated.tex`, a file rewritten by `render` and never edited by hand:
 
-    <!-- article:n:map.voc.int8 -->55.66<!-- /article -->
-    <!-- article:table:map.stades --> … <!-- /article -->
-    <!-- article:fig:graphe/graphe_tiny-yolov2-voc --> … <!-- /article -->
+    \\chiffre{map.voc.int8}                     55.66, with a status superscript
+    \\articletable{map.stades}                   a booktabs table from chiffres.json
+    \\articlefig{graphe/graphe_tiny-yolov2-voc}  a figure of the tools/figures registry
+    \\articleetat, \\articleetatresume            Suivi table of docs/tasks/README.md
+    \\articlestatuslist, \\articlerev              pending keys, revision of the last render
 
-Its content is rewritten by `render` and never edited by hand; everything outside blocks
-(the narrative) is left byte for byte. `collect` reads each key of the `CLES` registry from
-its source (JSON of `build/`, Markdown or CSV of `results/`); when a source is missing the
-value already in `chiffres.json` is kept and reported, so the article renders anywhere
-(CI, Colab, a machine without `build/`). Standard library only (ADR 0001); the figure
-registry `tools.figures` is imported lazily and never loads matplotlib.
+`collect` reads each key of the `CLES` registry from its source (JSON of `build/`,
+Markdown or CSV of `results/`); when a source is missing the value already in
+`chiffres.json` is kept and reported, so the article renders anywhere (CI, Colab, a
+machine without `build/`). `render` and `--check` need no LaTeX. Standard library only
+(ADR 0001); the figure registry `tools.figures` is imported lazily and never loads
+matplotlib.
 """
 
 import argparse
@@ -34,88 +38,53 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTICLE = ROOT / "docs" / "article" / "article.md"
+ARTICLE = ROOT / "docs" / "article" / "article.tex"
+GENERATED = ROOT / "docs" / "article" / "generated.tex"
 DATA = ROOT / "docs" / "article" / "chiffres.json"
 SUIVI = ROOT / "docs" / "tasks" / "README.md"
 BUILD = ROOT / "build" / "article"
 
-INLINE = ("n", "rev")  # rendered on one line; `etat:resume` too
-TYPES = ("n", "table", "fig", "etat", "rev", "list")
-
 # Status of a number (M17, "Statut de chaque chiffre"); `measured` carries no mark.
 STATUSES = {"measured": "", "csim": "C-sim", "projection": "proj.", "estimate": "est.",
             "tier-R": "tier R", "published": "pub."}
-PENDING = ("projection", "estimate", "tier-R", "csim")  # listed in §11 (list:status)
+PENDING = ("projection", "estimate", "tier-R", "csim")  # \articlestatuslist (§11)
 
-# Sections whose narrative may not quote a decimal number outside a block, and the
-# constants of the network or of the protocol that may appear there.
-RESULT_SECTIONS = re.compile(r"^## (Abstract|(4|5|6|7|8|9|10)\.)")
+# Sections whose prose may not quote a decimal number outside a macro (the abstract and
+# sections 4 to 10), and the constants of the network or of the protocol allowed there.
+RESULT_SECTIONS = range(4, 11)
 WHITELIST = {"0.1", "0.45", "0.005", "0.5", "0.25", "0.3", "1.0"}
 
-OPEN = re.compile(r"<!-- article:([a-z]+)(?::(\S+?))? -->")
-CLOSE = re.compile(r"<!-- /article -->")
+USES = re.compile(r"\\(chiffre|articletable|articlefig)\{([^}]*)\}|\\(articleetat(?:resume)?)\b")
 
 
 class ArticleError(Exception):
-    """Malformed article (block not closed, nested, unknown type…)."""
+    """Malformed article (unknown key or figure, figure not published…)."""
 
 
 class MissingSource(Exception):
     """Source of a key absent: the value of chiffres.json is kept."""
 
 
-# --------------------------------------------------------------------------- blocks
-
-@dataclass
-class Block:
-    type: str
-    key: str
-    start: int      # offset of the opening comment
-    body: int       # offset of the content
-    end: int        # offset of the closing comment
-    line: int       # line of the opening comment (1-based)
-
-    @property
-    def content(self):
-        return self._text[self.body:self.end]
-
-    @property
-    def tag(self):
-        return f"{self.type}:{self.key}" if self.key else self.type
-
+# ------------------------------------------------------------------------ article.tex
 
 def _line(text, pos):
     return text.count("\n", 0, pos) + 1
 
 
-def parse(text):
-    """Blocks of `text`, in order. Unknown type, nested, unclosed or orphan close → error."""
-    tokens = sorted([(m.start(), "open", m) for m in OPEN.finditer(text)]
-                    + [(m.start(), "close", m) for m in CLOSE.finditer(text)],
-                    key=lambda t: t[0])
-    blocks, cur = [], None
-    for pos, kind, m in tokens:
-        if kind == "open":
-            if cur is not None:
-                raise ArticleError(f"line {_line(text, pos)}: block opened inside the block "
-                                   f"of line {_line(text, cur.start())}")
-            if m.group(1) not in TYPES:
-                raise ArticleError(f"line {_line(text, pos)}: unknown block type "
-                                   f"'{m.group(1)}' (known: {', '.join(TYPES)})")
-            cur = m
-        else:
-            if cur is None:
-                raise ArticleError(f"line {_line(text, pos)}: <!-- /article --> without an "
-                                   "opening block")
-            b = Block(cur.group(1), cur.group(2) or "", cur.start(), cur.end(), pos,
-                      _line(text, cur.start()))
-            b._text = text
-            blocks.append(b)
-            cur = None
-    if cur is not None:
-        raise ArticleError(f"line {_line(text, cur.start())}: block "
-                           f"'{cur.group(1)}:{cur.group(2) or ''}' is never closed")
-    return blocks
+def uncomment(tex):
+    """`tex` without its % comments (line breaks kept)."""
+    return re.sub(r"(?<!\\)%.*", "", tex)
+
+
+def scan(tex):
+    """[(line, kind, key)] of the macros of `tex` that take generated content, with kind
+    chiffre | articletable | articlefig | articleetat | articleetatresume."""
+    tex = uncomment(tex)
+    out = []
+    for m in USES.finditer(tex):
+        kind, key = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), "")
+        out.append((_line(tex, m.start()), kind, key))
+    return out
 
 
 # ----------------------------------------------------------------------- formatting
@@ -134,31 +103,74 @@ def fmt(v, nd=None, sign=False):
     return ("+" + s) if sign and v > 0 else s
 
 
+_ESC = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
+        "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}",
+        "^": r"\textasciicircum{}"}
+# Characters missing from Latin Modern, typeset in maths.
+_MATH = {"→": r"$\to$", "←": r"$\leftarrow$", "↔": r"$\leftrightarrow$",
+         "≈": r"$\approx$", "≤": r"$\le$", "≥": r"$\ge$", "≠": r"$\ne$", "∈": r"$\in$",
+         "ω": r"$\omega$", "σ": r"$\sigma$", "δ": r"$\delta$", "ρ": r"$\rho$",
+         "α": r"$\alpha$", "θ": r"$\theta$", "μ": r"$\mu$", "ⁿ": r"$^n$", "²": r"$^2$",
+         "³": r"$^3$", "√": r"$\surd$", "·": r"$\cdot$", "✓": r"$\checkmark$"}
+
+
+def latex(s):
+    """Plain text (Markdown `code` spans allowed) → LaTeX."""
+    def esc(t):
+        return "".join(_ESC.get(c) or _MATH.get(c) or c for c in t)
+    parts = str(s).replace("**", "").split("`")
+    return "".join(rf"\texttt{{{esc(p)}}}" if i % 2 else esc(p) for i, p in enumerate(parts))
+
+
 def mark(status):
     m = STATUSES.get(status, status)
-    return f"<sup>{m}</sup>" if m else ""
+    return rf"\textsuperscript{{{m}}}" if m else ""
 
 
 def render_n(entry):
-    return fmt(entry["value"], entry.get("nd"), entry.get("sign", False)) + mark(entry["status"])
+    return latex(fmt(entry["value"], entry.get("nd"), entry.get("sign", False))) + \
+        mark(entry["status"])
+
+
+def _numeric(col):
+    return all(c is None or not isinstance(c, str) or c in ("—", "") for c in col)
+
+
+def _head(h, numeric):
+    """Bold header; a numeric column's header is split on two lines so that it does not
+    widen the column (text columns wrap by themselves)."""
+    words = h.split(" ")
+    if not numeric or len(words) < 2:
+        return rf"\textbf{{{latex(h)}}}"
+    cut = min(range(1, len(words)), key=lambda i: abs(len(" ".join(words[:i])) - len(h) / 2))
+    lines = (latex(" ".join(words[:cut])), latex(" ".join(words[cut:])))
+    return rf"\textbf{{\begin{{tabular}}[b]{{@{{}}r@{{}}}}{lines[0]}\\{lines[1]}\end{{tabular}}}}"
 
 
 def render_table(entry):
+    """booktabs tabularx: numeric columns right-aligned, text columns wrap."""
     v = entry["value"]
-    nds = v.get("nd") or [None] * len(v["header"])
-    signs = v.get("sign") or [False] * len(v["header"])
-    lines = ["| " + " | ".join(v["header"]) + " |", "|" + "---|" * len(v["header"])]
+    n = len(v["header"])
+    nds = v.get("nd") or [None] * n
+    signs = v.get("sign") or [False] * n
+    cols = list(zip(*v["rows"])) if v["rows"] else [()] * n
+    spec = "".join("r" if _numeric(c) else ">{\\raggedright\\arraybackslash}X" for c in cols)
+    lines = [r"\setlength{\tabcolsep}{4pt}",
+             rf"\begin{{tabularx}}{{\linewidth}}{{@{{}}{spec}@{{}}}}", r"\toprule",
+             " & ".join(_head(h, _numeric(c)) for h, c in zip(v["header"], cols)) + r" \\",
+             r"\midrule"]
     for row in v["rows"]:
-        cells = [fmt(c, nd, s) if not isinstance(c, str) else c
-                 for c, nd, s in zip(row, nds, signs)]
-        lines.append("| " + " | ".join(c.replace("|", "\\|") for c in cells) + " |")
+        cells = [latex(fmt(c, nd, s)) for c, nd, s in zip(row, nds, signs)]
+        lines.append(" & ".join(cells) + r" \\")
+    lines += [r"\bottomrule", r"\end{tabularx}"]
     if "status" in v:
-        lines += ["", f"*Status of every number of this table: {v['status']}.*"]
+        lines.append(rf"\par\smallskip{{\footnotesize\emph{{Status of every number of this "
+                     rf"table: {latex(v['status'])}.}}}}")
     return "\n".join(lines)
 
 
 def figure_of(key, figures, root=ROOT):
-    """(Figure, png path) of `fig:<name>` or `fig:<name>/<file>`; error if unpublished."""
+    """(Figure, png path) of `<name>` or `<name>/<file>`; error if unpublished."""
     name, _, stem = key.partition("/")
     if name not in figures:
         raise ArticleError(f"figure '{name}' absent from the registry (tools/figures)")
@@ -168,16 +180,26 @@ def figure_of(key, figures, root=ROOT):
                            "(subset of images, M12 rule)")
     png = Path(root) / "results" / "figures" / f.family / f"{stem or name}.png"
     if not png.exists():
-        raise ArticleError(f"figure '{key}': {png.relative_to(root)} absent "
+        raise ArticleError(f"figure '{key}': {_relto(png, root)} absent "
                            f"(regenerate: {f.command})")
     return f, png
 
 
-def render_fig(key, figures, number, article, root=ROOT):
+def _relto(p, root):
+    p = Path(p)
+    return str(p.relative_to(root)) if p.is_relative_to(root) else str(p)
+
+
+def render_fig(key, figures, article, root=ROOT):
     f, png = figure_of(key, figures, root)
     rel = os.path.relpath(png, Path(article).parent).replace(os.sep, "/")
-    return (f"![{png.stem}]({rel})\n\n"
-            f"*Figure {number} (`{f.name}`): {f.caption}* <!-- {f.command} -->")
+    return "\n".join([
+        r"\begin{figure}[htbp]", r"\centering",
+        rf"\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{{{rel}}}",
+        rf"\caption{{{latex(f.caption)} (\texttt{{{latex(f.name)}}})}}",
+        rf"\label{{fig:{key}}}",
+        f"% {f.command}",
+        r"\end{figure}"])
 
 
 def suivi(path=SUIVI):
@@ -195,36 +217,38 @@ def suivi(path=SUIVI):
     return rows
 
 
-def render_etat(key, path=SUIVI):
+def render_etat(resume, path=SUIVI):
     rows = suivi(path)
     total, done = sum(r[1] for r in rows), sum(r[2] for r in rows)
     full = sum(r[1] == r[2] for r in rows)
-    if key == "resume":
+    if resume:
         return (f"{done} of {total} tasks done across {len(rows)} milestones, "
                 f"{full} milestones complete")
-    if key:
-        raise ArticleError(f"unknown variant etat:{key} (etat or etat:resume)")
-    lines = ["| Milestone | Tasks | Done | Progress |", "|---|---|---|---|"]
-    lines += [f"| {m} | {t} | {d} | {round(100 * d / t)} % |" for m, t, d in rows]
-    lines.append(f"| **Total** | **{total}** | **{done}** | **{round(100 * done / total)} %** |")
+    lines = [r"\begin{tabular}{@{}lrrr@{}}", r"\toprule",
+             r"\textbf{Milestone} & \textbf{Tasks} & \textbf{Done} & \textbf{Progress} \\",
+             r"\midrule"]
+    lines += [rf"{m} & {t} & {d} & {round(100 * d / t)}\,\% \\" for m, t, d in rows]
+    total_row = (rf"\textbf{{Total}} & \textbf{{{total}}} & \textbf{{{done}}} & "
+                 rf"\textbf{{{round(100 * done / total)}\,\%}} \\")
+    lines += [r"\midrule", total_row, r"\bottomrule", r"\end{tabular}"]
     return "\n".join(lines)
 
 
-def render_list(key, data):
-    if key != "status":
-        raise ArticleError(f"unknown variant list:{key} (list:status)")
+def render_list(data):
     lines = []
     for st in PENDING:
         keys = [k for k, e in sorted(data.items()) if not k.startswith("_")
                 and e.get("status") == st]
         if keys:
-            lines.append(f"- **{st}** ({len(keys)}): " + ", ".join(f"`{k}`" for k in keys))
-    return "\n".join(lines) or "- none"
+            lines.append(rf"\item \textbf{{{latex(st)}}} ({len(keys)}): "
+                         + ", ".join(rf"\texttt{{{latex(k)}}}" for k in keys))
+    return "\n".join([r"{\raggedright", r"\begin{itemize}", *(lines or [r"\item none"]),
+                      r"\end{itemize}\par}"])
 
 
 def render_rev(data):
     r = data.get("_rev")
-    return f"rev. `{r['rev']}`, {r['date']}" if r else "rev. —"
+    return rf"rev.~\texttt{{{latex(r['rev'])}}}, {r['date']}" if r else "rev.~—"
 
 
 def _figures():
@@ -234,60 +258,82 @@ def _figures():
     return FIGURES
 
 
-def render(text, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI):
-    """`text` with every block rewritten from `data`; the rest is left byte for byte."""
+def _def(kind, key, body):
+    return rf"\expandafter\def\csname art{kind}:{key}\endcsname{{%" + "\n" + body + "}"
+
+
+HEADER = r"""% Generated by `python -m tools.article render` (make article): do not edit by hand.
+% Numbers: docs/article/chiffres.json; figures: tools/figures; status: docs/tasks/README.md.
+\newcommand\artget[2]{\ifcsname art#1:#2\endcsname\csname art#1:#2\endcsname
+  \else\PackageError{article}{unknown #1 key '#2' (make article)}{}\fi}
+\newcommand\chiffre[1]{\artget{n}{#1}}
+\newcommand\articletable[1]{\artget{table}{#1}}
+\newcommand\articlefig[1]{\artget{fig}{#1}}
+"""
+
+
+def render(tex, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI):
+    """Text of generated.tex for the article `tex`: every key of `data` (numbers and
+    tables), the figures cited by `tex`, the milestone status and the revision."""
     figures = _figures() if figures is None else figures
-    out, pos, n_fig = [], 0, 0
-    for b in parse(text):
-        if b.type == "n":
-            content = render_n(_entry(data, b))
-        elif b.type == "table":
-            content = render_table(_entry(data, b))
-        elif b.type == "fig":
-            n_fig += 1
-            content = render_fig(b.key, figures, n_fig, article, root)
-        elif b.type == "etat":
-            content = render_etat(b.key, suivi_path)
-        elif b.type == "list":
-            content = render_list(b.key, data)
-        else:
-            content = render_rev(data)
-        inline = b.type in INLINE or (b.type == "etat" and b.key == "resume")
-        out += [text[pos:b.body], content if inline else f"\n{content}\n"]
-        pos = b.end
-    out.append(text[pos:])
-    return "".join(out)
-
-
-def _entry(data, b):
-    if b.key not in data:
-        raise ArticleError(f"line {b.line}: key '{b.key}' absent from chiffres.json "
-                           "(add it to CLES, then make article)")
-    return data[b.key]
+    uses = scan(tex)
+    for line, kind, key in uses:
+        if kind in ("chiffre", "articletable") and key not in data:
+            raise ArticleError(f"line {line}: key '{key}' absent from chiffres.json "
+                               "(add it to CLES, then make article)")
+        if kind == "chiffre" and isinstance(data[key]["value"], dict):
+            raise ArticleError(f"line {line}: '{key}' is a table (\\articletable)")
+        if kind == "articletable" and not isinstance(data[key]["value"], dict):
+            raise ArticleError(f"line {line}: '{key}' is a number (\\chiffre)")
+    out = [HEADER, "% ---- numbers"]
+    keys = [k for k in sorted(data) if not k.startswith("_")]
+    for k in keys:
+        e = data[k]
+        if not isinstance(e["value"], dict):
+            out.append(_def("n", k, render_n(e)) + f"  % {e['status']}, {e.get('source', '')}")
+    out.append("% ---- tables")
+    out += [_def("table", k, render_table(data[k])) for k in keys
+            if isinstance(data[k]["value"], dict)]
+    out.append("% ---- figures cited by article.tex")
+    figs = dict.fromkeys(key for line, kind, key in uses if kind == "articlefig")
+    for key in figs:
+        line = next(ln for ln, kind, k in uses if kind == "articlefig" and k == key)
+        try:
+            out.append(_def("fig", key, render_fig(key, figures, article, root)))
+        except ArticleError as e:
+            raise ArticleError(f"line {line}: {e}") from None
+    out += ["% ---- milestones, pending keys, revision",
+            r"\newcommand\articleetat{%" + "\n" + render_etat(False, suivi_path) + "}",
+            rf"\newcommand\articleetatresume{{{render_etat(True, suivi_path)}}}",
+            r"\newcommand\articlestatuslist{%" + "\n" + render_list(data) + "}",
+            rf"\newcommand\articlerev{{{render_rev(data)}}}", ""]
+    return "\n".join(out)
 
 
 # --------------------------------------------------------------------------- checks
 
 _STRIP = [re.compile(p, re.DOTALL) for p in (
-    r"<!--.*?-->", r"`[^`]*`", r"\$[^$]*\$", r"\]\([^)]*\)", r"\[[^\]]*#[^\]]*\]",
-    r"https?://\S+")]
+    r"\$[^$]*\$", r"\\\(.*?\\\)",
+    (r"\\(?:texttt|ref|label|cite|citep|citet|url|href|chiffre|articletable|articlefig|"
+     r"includegraphics|eqref)\*?(?:\[[^\]]*\])*\{[^}]*\}"),
+    r"\\[A-Za-z]+")]
 _DECIMAL = re.compile(r"(?<![\w#§.\-/])\d+\.\d+(?![\w.])")
 
 
-def stray_numbers(text):
-    """[(line, number)] of decimal numbers outside blocks in the result sections."""
-    masked = list(text)
-    for b in parse(text):
-        for i in range(b.body, b.end):
-            if masked[i] != "\n":
-                masked[i] = " "
-    found, checked = [], False
-    lines = "".join(masked).split("\n")
-    for i, line in enumerate(lines, 1):
-        if line.startswith("## "):
-            checked = bool(RESULT_SECTIONS.match(line))
-            continue
-        if not checked:
+def stray_numbers(tex):
+    """[(line, number)] of decimal numbers written by hand in the abstract and in
+    sections 4 to 10."""
+    found, section, abstract = [], 0, False
+    for i, line in enumerate(uncomment(tex).split("\n"), 1):
+        if re.search(r"\\section\{", line):
+            section += 1
+        if r"\begin{abstract}" in line:
+            abstract = True
+        if r"\end{abstract}" in line:
+            abstract = False
+        if r"\appendix" in line or r"\bibliography" in line:
+            section = 99
+        if not (abstract or section in RESULT_SECTIONS):
             continue
         for rx in _STRIP:
             line = rx.sub(" ", line)
@@ -295,32 +341,23 @@ def stray_numbers(text):
     return found
 
 
-def check(text, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI):
+def check(tex, generated, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI):
     """Problems as strings (empty list: the article is up to date)."""
     try:
-        blocks = parse(text)
+        want = render(tex, data, figures, article, root, suivi_path)
     except ArticleError as e:
         return [str(e)]
-    figures = _figures() if figures is None else figures
-    problems, n_fig = [], 0
-    for b in blocks:
-        try:
-            if b.type == "fig":
-                n_fig += 1
-            single = text[b.start:b.end + len("<!-- /article -->")]
-            want = render(single, data, figures, article, root, suivi_path)
-            if b.type == "fig":  # numbering depends on the position in the article
-                want = re.sub(r"\*Figure 1 ", f"*Figure {n_fig} ", want, count=1)
-            if want != single:
-                found = b.content.strip().splitlines() or [""]
-                exp = want[b.body - b.start:].removesuffix("<!-- /article -->").strip()
-                problems.append(f"line {b.line}: {b.tag}: block differs from render; "
-                                f"expected '{(exp.splitlines() or [''])[0][:70]}', "
-                                f"found '{found[0][:70]}'")
-        except ArticleError as e:
-            problems.append(f"line {b.line}: {b.tag}: {e}")
-    problems += [f"line {i}: number {n} outside a block in a result section"
-                 for i, n in stray_numbers(text)]
+    problems = []
+    if generated != want:
+        old, new = (generated or "").splitlines(), want.splitlines()
+        i = next((i for i, (a, b) in enumerate(zip(old, new)) if a != b),
+                 min(len(old), len(new)))
+        exp = new[i] if i < len(new) else "(end of file)"
+        got = old[i] if i < len(old) else "(end of file)"
+        problems.append(f"generated.tex differs from render at line {i + 1}: "
+                        f"expected '{exp[:80]}', found '{got[:80]}'")
+    problems += [f"line {i}: number {n} written by hand in a result section (use \\chiffre)"
+                 for i, n in stray_numbers(tex)]
     return problems
 
 
@@ -838,82 +875,56 @@ def collect(data, root=ROOT, keys=None, rev=None, date=None):
     return changed, stale
 
 
-def render_file(article=ARTICLE, data_path=DATA, root=ROOT, figures=None, suivi_path=SUIVI,
-                force_rev=False):
-    """Rewrite the blocks of `article`; the stored revision changes only with the content."""
+def render_file(article=ARTICLE, generated=GENERATED, data_path=DATA, root=ROOT, figures=None,
+                suivi_path=SUIVI):
+    """Rewrite generated.tex; the stored revision changes only with its content."""
     data = load(data_path)
-    text = Path(article).read_text()
-    new = render(text, data, figures, article, root, suivi_path)
-    if new != text or force_rev or "_rev" not in data:
+    tex = Path(article).read_text()
+    old = Path(generated).read_text() if Path(generated).exists() else None
+    new = render(tex, data, figures, article, root, suivi_path)
+    if new != old or "_rev" not in data:
         data["_rev"] = {"rev": git_rev(root), "date": today()}
         save(data, data_path)
-        new = render(text, data, figures, article, root, suivi_path)
-    if new != text:
-        Path(article).write_text(new)
+        new = render(tex, data, figures, article, root, suivi_path)
+    if new != old:
+        Path(generated).write_text(new)
         return True
     return False
 
 
-PDF_CSS = """
-body { font-family: "DejaVu Serif", Georgia, serif; font-size: 10.5pt; line-height: 1.4;
-       max-width: none; margin: 0; padding: 0; }
-h1 { font-size: 17pt; } h2 { font-size: 13pt; margin-top: 1.4em; }
-img { max-width: 100%; max-height: 22cm; display: block; margin: 0.6em auto; }
-table { border-collapse: collapse; font-size: 8.5pt; margin: 0.6em 0; }
-th, td { border: 1px solid #999; padding: 2px 5px; }
-code { font-size: 9pt; } blockquote { color: #444; border-left: 3px solid #ccc;
-       margin-left: 0; padding-left: 0.8em; }
-@page { size: A4; margin: 18mm 16mm; }
-"""
 VERSIONED_PDF = ARTICLE.with_suffix(".pdf")
 
 
-def _chromium():
-    """Chromium on PATH, or the one of Playwright (PLAYWRIGHT_BROWSERS_PATH)."""
-    found = next((shutil.which(b) for b in ("chromium", "chromium-browser", "google-chrome")
-                  if shutil.which(b)), None)
-    pw = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
-    if found is None and pw:
-        found = next((str(c) for c in sorted(Path(pw).glob("chromium-*/chrome-linux*/chrome"))),
-                     None)
-    return found
-
-
 def export(article=ARTICLE, out=BUILD, versioned=VERSIONED_PDF):
-    """pandoc → out/article.html, then out/article.pdf with a LaTeX engine, or else by
-    printing the HTML with headless Chromium; the PDF is copied to `versioned`
+    """xelatex (with bibtex) → out/article.pdf, copied to `versioned`
     (docs/article/article.pdf, the export kept in git; build/ is not versioned)."""
-    if not shutil.which("pandoc"):
-        print("pandoc not installed: no export (apt install pandoc)")
+    if not shutil.which("xelatex"):
+        print("xelatex not installed: no PDF (apt install texlive-xetex "
+              "texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended)")
         return 0
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    # Block markers removed: at the start of a line pandoc reads them as HTML blocks and
-    # cuts the paragraph around an inline number.
-    src = out / "article.md"
-    src.write_text(re.sub(r"<!-- (article:[a-z]+(?::\S+?)?|/article|python -m tools\.figures \S+) -->",
-                          "", Path(article).read_text()))
-    adir = str(Path(article).resolve().parent)
-    base = ["pandoc", str(src), "--from", "gfm", "--resource-path", adir]
-    css = out / "article.css"
-    css.write_text(PDF_CSS)
-    html = out / "article.html"
-    title = Path(article).read_text().splitlines()[0].lstrip("# ").strip()
-    subprocess.run(base + ["--standalone", "--metadata", f"pagetitle={title}", "--css",
-                           str(css), "-o", str(html)], cwd=adir, check=True)
-    print(f"→ {_rel(html)}")
-    pdf = out / "article.pdf"
-    engine = next((e for e in ("xelatex", "lualatex", "pdflatex") if shutil.which(e)), None)
-    if engine:
-        subprocess.run(base + ["--pdf-engine", engine, "-o", str(pdf)], cwd=adir, check=True)
-    elif _chromium():
-        subprocess.run([_chromium(), "--headless", "--no-sandbox", "--disable-gpu",
-                        "--no-pdf-header-footer", "--allow-file-access-from-files",
-                        f"--print-to-pdf={pdf}", html.as_uri()],
-                       check=True, capture_output=True)
-    else:
-        print("no LaTeX engine (xelatex, lualatex, pdflatex) nor Chromium: PDF skipped")
-        return 0
+    src = Path(article).resolve()
+    tex = ["xelatex", "-interaction=nonstopmode", "-halt-on-error", f"-output-directory={out}",
+           src.name]
+    env = dict(os.environ, BIBINPUTS=f"{src.parent}{os.pathsep}",
+               TEXINPUTS=f"{src.parent}{os.pathsep}")
+    try:
+        if shutil.which("latexmk"):
+            subprocess.run(["latexmk", "-xelatex", "-interaction=nonstopmode", "-halt-on-error",
+                            f"-outdir={out}", src.name], cwd=src.parent, env=env, check=True,
+                           capture_output=True, text=True)
+        else:
+            for cmd in (tex, ["bibtex", src.stem], tex, tex):
+                subprocess.run(cmd, cwd=out if cmd[0] == "bibtex" else src.parent, env=env,
+                               check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        log = out / f"{src.stem}.log"
+        tail = log.read_text(errors="replace").splitlines()[-25:] if log.exists() else []
+        print("\n".join(tail) or e.stdout[-3000:])
+        print(f"LaTeX failed (log: {_rel(log)})")
+        return 1
+    pdf = out / f"{src.stem}.pdf"
     print(f"→ {_rel(pdf)}")
     if versioned:
         shutil.copyfile(pdf, versioned)
@@ -926,19 +937,23 @@ def main(argv=None):
         "\n\n")[0])
     ap.add_argument("action", nargs="?", choices=("collect", "render", "all", "pdf"))
     ap.add_argument("--check", action="store_true",
-                    help="fail if a block differs from render, a key or a figure is missing, "
-                    "or a result section quotes a number outside a block")
+                    help="fail if generated.tex differs from render, a key or a figure is "
+                    "missing, or a result section quotes a number by hand")
     ap.add_argument("--article", type=Path, default=ARTICLE)
+    ap.add_argument("--generated", type=Path, default=GENERATED)
     ap.add_argument("--data", type=Path, default=DATA)
     args = ap.parse_args(argv)
     if args.check:
-        problems = check(args.article.read_text(), load(args.data), article=args.article)
+        gen = args.generated.read_text() if args.generated.exists() else ""
+        tex = args.article.read_text()
+        problems = check(tex, gen, load(args.data), article=args.article)
         for p in problems:
             print(f"{_rel(args.article)}: {p}")
         if problems:
             print("regenerate: make article")
             return 1
-        print(f"{_rel(args.article)}: {len(parse(args.article.read_text()))} blocks up to date")
+        print(f"{_rel(args.generated)}: up to date ({len(scan(tex))} uses in "
+              f"{_rel(args.article)})")
         return 0
     if args.action is None:
         ap.error("collect, render, all, pdf or --check")
@@ -951,11 +966,11 @@ def main(argv=None):
             print(f"  not refreshed  {k} ({why}; value of {_rel(args.data)} kept)")
     if args.action in ("render", "all", "pdf"):
         try:
-            done = render_file(args.article, args.data)
+            done = render_file(args.article, args.generated, args.data)
         except ArticleError as e:
             print(f"{_rel(args.article)}: {e}")
             return 1
-        print(f"→ {_rel(args.article)}" + ("" if done else " (unchanged)"))
+        print(f"→ {_rel(args.generated)}" + ("" if done else " (unchanged)"))
     if args.action == "pdf":
         return export(args.article)
     return 0
