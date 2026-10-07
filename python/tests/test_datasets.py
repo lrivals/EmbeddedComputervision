@@ -188,6 +188,62 @@ def test_flir(tmp_path):
     assert s["image"] == d / "data" / "a.jpg"
 
 
+
+def test_auair(tmp_path):
+    ann = {"annotations": [
+        {"image_name": "frame_20190905091750_x_0000001.jpg", "image_width:": 1920.0,
+         "image_height": 1080.0,
+         "bbox": [{"top": 5, "left": 10, "height": 20, "width": 30, "class": 1}]},
+        {"image_name": "frame_20190829091111_xx_0000002.jpg", "image_width:": 1920.0,
+         "image_height": 1080.0, "bbox": []}]}
+    (tmp_path / "annotations.json").write_text(json.dumps(ann))
+    (s,) = D.load("auair", tmp_path, "train")
+    _check(s)
+    assert s["id"] == "frame_20190905091750_x_0000001"
+    assert s["labels"].tolist() == [D.AUAIR_CLASSES.index("Car")]
+    np.testing.assert_allclose(s["xyxy"][0], [11, 6, 40, 25])
+    (v,) = D.load("auair", tmp_path, "val")  # vidéo de AUAIR_VAL, nom en `_xx_`
+    assert len(v["labels"]) == 0 and v["width"] == 1920
+
+
+def test_yolo_txt_and_hituav(tmp_path):
+    _image(tmp_path / "images" / "test" / "1_60_30_0_00001.jpg", 640, 512)
+    lab = tmp_path / "labels" / "test"
+    lab.mkdir(parents=True)
+    (lab / "1_60_30_0_00001.txt").write_text("0 0.5 0.5 0.25 0.5\n4 0.1 0.1 0.1 0.1\n")
+    (s,) = D.load("hituav", tmp_path, "test")
+    _check(s)
+    assert s["labels"].tolist() == [0]  # DontCare (4) retiré
+    np.testing.assert_allclose(s["xyxy"][0], [241, 129, 400, 384])
+
+
+def test_dronevehicle(tmp_path):
+    _image(tmp_path / "test" / "images" / "00001.jpg", 640, 512)
+    (tmp_path / "test" / "labels").mkdir(parents=True)
+    (tmp_path / "test" / "labels" / "00001.txt").write_text("1 0.5 0.5 0.5 0.5\n")
+    (s,) = D.load("dronevehicle", tmp_path)  # split par défaut : test
+    _check(s)
+    assert s["labels"].tolist() == [D.DRONEVEHICLE_CLASSES.index("large-vehicle")]
+
+
+def test_uavdt(tmp_path):
+    rec = [{"image": "images/test/M0203_img000001.jpg", "width": 1024, "height": 540,
+            "boxes": [[10, 5, 30, 25]], "labels": ["bus"]}]
+    (tmp_path / "annotations_test.json").write_text(json.dumps(rec))
+    (s,) = D.load("uavdt", tmp_path)
+    _check(s)
+    assert s["id"] == "M0203_img000001"
+    assert s["labels"].tolist() == [D.UAVDT_CLASSES.index("bus")]
+    assert s["image"] == tmp_path / "images" / "test" / "M0203_img000001.jpg"
+
+
+@pytest.mark.parametrize("ds", ["auair", "dronevehicle", "hituav", "uavdt"])
+def test_m18_mappings(ds):
+    for n in (20, 80):
+        view = D.eval_view(ds, n)
+        assert "car" in view.names
+
+
 def test_voc_wrapper(tmp_path):
     base = tmp_path / "VOC2007"
     for sub in ("Annotations", "ImageSets/Main"):

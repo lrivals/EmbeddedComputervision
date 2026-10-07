@@ -950,6 +950,45 @@ QUESTIONS = {
                       f"{d['over']['1024']} ; difficult (mask, ignore) "
                       f"{100 * c['difficult'] / max(c['objects'], 1):.1f} % des boîtes")
         """),
+    # Jeux drone et thermiques de M18 (docs/tasks/M18-jeux-drone.md#questions-par-jeu).
+    "auair": ("Que reste-t-il des objets d'une trame 1920×1080 réduite à 416, classe par "
+              "classe ?", "T18.1", """
+        g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
+        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+                                                           for k, v in g["fit_cell"].items()))
+        print(f"hauteur < 8 px : {100 * g['h_under']['8']:.1f} %")
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
+    "dronevehicle": ("Véhicules par image face aux 256 emplacements, et leur taille à 416.",
+                     "T18.2", """
+        g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
+        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+                                                           for k, v in g["fit_cell"].items()))
+        for name, a in DS._parts(STATS):
+            d, c = a.get("densite"), a.get("comptes")
+            if d and c:
+                print(f"{name:12s} : {c['images']} images, > 256 objets {d['over']['256']}")
+        """),
+    "hituav": ("Distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00.",
+               "T18.3", """
+        px = DS.whole(STATS).get("images", {}).get("pixels")
+        if px:
+            lv = px["levels"]
+            print(f"{px['images']} images, {px['channels']} canal(aux) ; niveaux 8 bits occupés "
+                  f"{lv['8bit']} (99 % des pixels sur {lv['8bit_99']}) → {lv['int8']} niveaux "
+                  f"INT8 à l'échelle d'entrée {lv['input_scale']:.5f} (1/127, yolo.quant)")
+        else:
+            print("SAMPLE = 0 : pas de lecture de pixels")
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
+    "uavdt": ("`letterbox` ou `stretch` pour du 1024×540 : combien d'objets passent sous 8 px "
+              "de haut ?", "T18.4", """
+        g = DS.whole(STATS)["geometrie"]
+        for mode in ("letterbox", "stretch"):
+            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]} : hauteur < 8 px "
+                  f"{100 * g[mode]['h_under']['8']:.1f} %, < 16 px {100 * g[mode]['h_under']['16']:.1f} %")
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
 }
 
 

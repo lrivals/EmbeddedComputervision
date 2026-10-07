@@ -12,7 +12,8 @@
 #   exdark                         T11.3  calibration ExDark, histogrammes L00-L04
 #   crowdhuman                     T11.6  NMS sans tri et capacité de sélection, scènes denses
 #   crowdhuman-cycles              T11.6  cycles de yolo_post par image en C-sim (N images)
-#   <jeu>-prep (kitti, visdrone, flir, exdark, crowdhuman)    ancres k-means et cfg d'affinage
+#   <jeu>-prep (kitti, visdrone, flir, exdark, crowdhuman, auair, dronevehicle, hituav, uavdt)
+#                                  ancres k-means et cfg d'affinage (M18 : CH=1 pour hituav)
 #   <jeu>-train (mêmes jeux)       affinage (long : plusieurs heures à jours)
 #   visdrone-size                  T11.5  entrée 416 / 608 / 832 des poids affinés
 #
@@ -22,7 +23,7 @@
 # ITERS (affinages, défaut 4000), BATCH (défaut 16), NET (réseau des profils -prep, -train
 # et visdrone-size : tiny-yolov3, défaut, ou tiny-yolov2), N (images de crowdhuman-cycles,
 # défaut 200), SIZE (entrée LxH non carrée des profils -prep et -train, ex. 640x192 pour
-# KITTI, T11.4 ; défaut : 416 × 416), CH (canaux d'entrée, 1 pour FLIR, T11.7 ; défaut 3).
+# KITTI, T11.4 ; défaut : 416 × 416), CH (canaux d'entrée, 1 pour FLIR et HIT-UAV ; défaut 3).
 # SIZE et CH s'ajoutent au nom de la cfg et du dossier d'affinage. Profils -train (M15) :
 # RESIZE_TRAIN (stretch : géométrie de l'éval, VisDrone), CROP (découpes N×N px de l'image
 # d'origine) et STEPS / SCALES (paliers du LR, ex. 4800,5400 et 0.1,0.1) ; défaut : rien.
@@ -240,10 +241,12 @@ crowdhuman-cycles)  # T11.6 : cycles de yolo_post par image (C-sim), N images (d
   done
   ;;
 # ------------------------------------------------- T11.4, T11.5, T11.7 préparation, affinage
-kitti-prep | visdrone-prep | flir-prep | exdark-prep | crowdhuman-prep)
+kitti-prep | visdrone-prep | flir-prep | exdark-prep | crowdhuman-prep | auair-prep | \
+  dronevehicle-prep | hituav-prep | uavdt-prep)
   prep "${profile%-prep}"
   ;;
-kitti-train | visdrone-train | flir-train | exdark-train | crowdhuman-train)
+kitti-train | visdrone-train | flir-train | exdark-train | crowdhuman-train | auair-train | \
+  dronevehicle-train | hituav-train | uavdt-train)
   train "${profile%-train}"
   ;;
 visdrone-size)  # T11.5 : entrée plus grande, mêmes poids ; AP par taille (métrique COCO)
@@ -256,7 +259,7 @@ visdrone-size)  # T11.5 : entrée plus grande, mêmes poids ; AP par taille (mé
   done
   ;;
 *)
-  sed -n '2,26p' "$0"
+  sed -n '2,29p' "$0"
   exit 1
   ;;
 esac

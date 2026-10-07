@@ -27,6 +27,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M15](M15-campagne-entrainement.md) | Campagne d'entraînement (optionnel) | mAP sur split complet des modèles affinés, jeu par jeu (VOC, VisDrone, puis KITTI, FLIR, ExDark, CrowdHuman) |
 | [M16](M16-presentation-jeux.md) | Présentation des jeux (optionnel) | `make notebooks` génère un notebook de présentation et d'analyse statistique par jeu (classes, tailles de boîtes, densité, ancres, images) ; synthèse dans [stats-jeux.md](stats-jeux.md) |
 | [M17](M17-article.md) | Article (optionnel) | `make article` régénère les chiffres, tables, figures et l'état des jalons d'un article de type papier ([docs/article/](../article/)) ; `--check` dans `make ci` |
+| [M18](M18-jeux-drone.md) | Jeux drone et thermiques (optionnel) | AU-AIR, DroneVehicle, HIT-UAV et UAVDT prétraités, chargés et dotés de leurs notebooks (stats, hors domaine, affinage) |
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
@@ -60,6 +61,9 @@ graph LR
   M8 --> M17[M17]
   M13 -.-> M17
   M15 -.-> M17
+  M11 --> M18[M18]
+  M16 --> M18
+  M18 -.-> M15
 ```
 
 - **Raccourci T1.9 → M3** : avec les poids Darknet pré-entraînés, la mAP de référence est
@@ -109,3 +113,4 @@ reporter ici l'avancement par jalon.
 | M15 | 16 | 1 (T15.3 ; T15.1 et T15.2 prêtes pour Colab ; VisDrone T15.8, T15.10, T15.15, T15.16 : outillage prêt) |
 | M16 | 19 | 17 (T16.13 COCO et T16.14 KITTI : données absentes du PC) |
 | M17 | 21 | 0 |
+| M18 | 11 | 8 (données prêtes, chargeurs, 24 notebooks générés ; restent stats exécutés, Drive, affinages) |

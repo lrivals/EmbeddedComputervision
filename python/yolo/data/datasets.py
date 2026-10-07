@@ -54,6 +54,11 @@ EXDARK_CLASSES = ("Bicycle", "Boat", "Bottle", "Bus", "Car", "Cat", "Chair", "Cu
 # FLIR ADAS v2 : catégories du jeu thermique présentes en val (à vérifier au téléchargement).
 FLIR_CLASSES = ("person", "bike", "car", "motor", "bus", "train", "truck", "light",
                 "hydrant", "sign", "dog", "skateboard", "stroller", "scooter", "other vehicle")
+# Jeux drone et thermiques (M18, docs/tasks/M18-jeux-drone.md).
+AUAIR_CLASSES = ("Human", "Car", "Truck", "Van", "Motorbike", "Bicycle", "Bus", "Trailer")
+DRONEVEHICLE_CLASSES = ("small-vehicle", "large-vehicle")
+HITUAV_CLASSES = ("Person", "Car", "Bicycle", "OtherVehicle")  # DontCare (4) retiré
+UAVDT_CLASSES = ("car", "truck", "bus")
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
 PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd")
@@ -193,6 +198,25 @@ def parse_bbgt(text):
     return boxes, labels
 
 
+def parse_yolo_txt(text, width, height, n_classes, drop=()):
+    """Étiquettes YOLO (`classe cx cy w h` normalisés) → (coins continus en pixels, labels).
+    Les classes de `drop` (DontCare de HIT-UAV) et celles hors `n_classes` sont retirées.
+    """
+    boxes, labels = [], []
+    for line in text.splitlines():
+        f = line.split()
+        if len(f) < 5:
+            continue
+        c = int(f[0])
+        if c in drop or c >= n_classes:
+            continue
+        cx, cy, w, h = (float(v) for v in f[1:5])
+        boxes.append([(cx - w / 2) * width, (cy - h / 2) * height,
+                      (cx + w / 2) * width, (cy + h / 2) * height])
+        labels.append(c)
+    return boxes, labels
+
+
 # ---------------------------------------------------------------------------- chargeurs
 
 def _splits(load):
@@ -305,6 +329,75 @@ def load_exdark(root, split):
     return out
 
 
+# AU-AIR n'a pas de découpage officiel : val = 3 vidéos entières (≈ 15 % des images), pour
+# qu'aucune trame de val n'ait sa voisine en train.
+AUAIR_VAL = ("frame_20190829091111", "frame_20190905111947", "frame_20190905143505")
+
+
+def auair_sequence(image_name):
+    """Vidéo d'une trame : `frame_<date>_x_<n>.jpg` (ou `_xx_`) → `frame_<date>`."""
+    return "_".join(image_name.split("_")[:2])
+
+
+def load_auair(root, split):
+    """`root/annotations.json` (liste `annotations`, boîtes top/left/width/height en pixels),
+    images dans `root/images/` ; split `train` ou `val` (`AUAIR_VAL`), `all` : tout.
+    """
+    if split not in ("train", "val", "all"):
+        raise ValueError(f"split AU-AIR inconnu : {split}")
+    data = json.loads((root / "annotations.json").read_text())
+    out = []
+    for a in sorted(data["annotations"], key=lambda a: a["image_name"]):
+        name = a["image_name"]
+        in_val = auair_sequence(name) in AUAIR_VAL
+        if split != "all" and in_val != (split == "val"):
+            continue
+        w = a.get("image_width", a.get("image_width:"))  # clé « image_width: » (sic)
+        h = a["image_height"]
+        boxes = [[b["left"], b["top"], b["left"] + b["width"], b["top"] + b["height"]]
+                 for b in a["bbox"]]
+        labels = [b["class"] for b in a["bbox"]]
+        out.append(make_sample(Path(name).stem, root / "images" / name, w, h, boxes, labels,
+                               np.zeros(len(labels), bool)))
+    return out
+
+
+def _load_yolo_dir(images, labels, classes, drop=()):
+    out = []
+    for image in sorted(p for p in images.iterdir() if p.is_file()):
+        w, h = _image_size(image)
+        ann = labels / f"{image.stem}.txt"
+        text = ann.read_text() if ann.exists() else ""
+        boxes, lab = parse_yolo_txt(text, w, h, len(classes) + len(drop), drop)
+        out.append(make_sample(image.stem, image, w, h, boxes, lab,
+                               np.zeros(len(lab), bool)))
+    return out
+
+
+def load_dronevehicle(root, split):
+    """Sortie de `tools/prep_datasets.py dronevehicle` : `root/<split>/{images,labels}`,
+    cadre blanc recadré, boîtes orientées ramenées à leur boîte englobante."""
+    return _load_yolo_dir(root / split / "images", root / split / "labels",
+                          DRONEVEHICLE_CLASSES)
+
+
+def load_hituav(root, split):
+    """`root/{images,labels}/<split>/` (YOLO txt), images thermiques à un canal."""
+    return _load_yolo_dir(root / "images" / split, root / "labels" / split, HITUAV_CLASSES,
+                          drop=(4,))
+
+
+def load_uavdt(root, split):
+    """Sortie de `tools/prep_datasets.py uavdt` : `root/annotations_<split>.json` (séquences
+    M du benchmark DET seules), chemins d'images relatifs à `root`."""
+    out = []
+    for a in json.loads((root / f"annotations_{split}.json").read_text()):
+        labels = [UAVDT_CLASSES.index(c) for c in a["labels"]]
+        out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
+                               a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
+    return out
+
+
 @dataclass(frozen=True)
 class Dataset:
     classes: tuple
@@ -331,6 +424,12 @@ DATASETS = {
                       "train"),
     "flir": Dataset(FLIR_CLASSES, _splits(load_flir), "flir", "val", "train", "train",
                     metric="coco"),
+    "auair": Dataset(AUAIR_CLASSES, _splits(load_auair), "auair", "val", "train", "train"),
+    "dronevehicle": Dataset(DRONEVEHICLE_CLASSES, _splits(load_dronevehicle), "dronevehicle",
+                            "test", "train", "train"),
+    "hituav": Dataset(HITUAV_CLASSES, _splits(load_hituav), "hituav", "test", "train",
+                      "train"),
+    "uavdt": Dataset(UAVDT_CLASSES, _splits(load_uavdt), "uavdt", "test", "train", "train"),
 }
 
 
@@ -369,6 +468,20 @@ MAPPINGS = {
                        "motor": "motorbike", "bus": "bus", "train": "train", "truck": "truck",
                        "light": "traffic light", "hydrant": "fire hydrant", "dog": "dog",
                        "skateboard": "skateboard"},
+    # Van compté en car (comme KITTI et VisDrone) ; Trailer sans équivalent.
+    ("auair", "voc"): {"Human": "person", "Car": "car", "Van": "car", "Motorbike": "motorbike",
+                       "Bicycle": "bicycle", "Bus": "bus"},
+    ("auair", "coco"): {"Human": "person", "Car": "car", "Van": "car", "Truck": "truck",
+                        "Motorbike": "motorbike", "Bicycle": "bicycle", "Bus": "bus"},
+    # small-vehicle : voitures et vans ; large-vehicle confond bus, camions et fourgons :
+    # compté en truck pour COCO (le bus y est faux), sans équivalent VOC.
+    ("dronevehicle", "voc"): {"small-vehicle": "car"},
+    ("dronevehicle", "coco"): {"small-vehicle": "car", "large-vehicle": "truck"},
+    # OtherVehicle (tout véhicule hors voiture et vélo) sans équivalent.
+    ("hituav", "voc"): {"Person": "person", "Car": "car", "Bicycle": "bicycle"},
+    ("hituav", "coco"): {"Person": "person", "Car": "car", "Bicycle": "bicycle"},
+    ("uavdt", "voc"): {"car": "car", "bus": "bus"},
+    ("uavdt", "coco"): {"car": "car", "truck": "truck", "bus": "bus"},
 }
 
 FAMILIES = {"voc": VOC_CLASSES, "coco": COCO_CLASSES}

@@ -28,6 +28,9 @@ non commerciale suffit pour ce projet, qui ne publie pas de poids.
 | CrowdHuman | 15 000 + 4 370 (train + val) | 1 (personne) | variable | recherche | NMS dense, 256 emplacements, débordements | T11.6 |
 | FLIR ADAS v2 (thermique) | 10 742 + 1 144 (train + val) | 15 retenues | 640×512 | recherche | entrée à 1 canal, L00 | T11.7 |
 
+Quatre jeux vus de drone (AU-AIR, DroneVehicle, HIT-UAV thermique, UAVDT) suivent le même
+schéma ; leurs prétraitements et leurs tâches sont dans [M18](M18-jeux-drone.md).
+
 Le coût CPU vient du rythme mesuré en T2.7, ≈ 0,45 s/image à 416 en entraînement. Une
 époque sur 7 000 images prend donc ≈ 1 h. Une évaluation en inférence seule coûte bien
 moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) prend

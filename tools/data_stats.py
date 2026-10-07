@@ -178,6 +178,67 @@ FICHES = {
         "notes": ["catégories hors `FLIR_CLASSES` ignorées par `parse_coco`",
                   "images 8 bits du jeu ; analyse 16 bits hors périmètre"],
     },
+    # Jeux drone et thermiques de M18 (docs/tasks/M18-jeux-drone.md).
+    "auair": {
+        "name": "AU-AIR",
+        "source": "https://bozcani.github.io/auairdataset",
+        "version": "2019 (annotations.json, 8 vidéos) ; découpage maison par vidéo",
+        "license": "CC BY-NC-SA 2.0 (champ `licenses` du JSON)",
+        "sensor": "drone Parrot Bebop 2, caméra couleur, Aarhus (Danemark), vues obliques "
+                  "et verticales, altitude et attitude par trame",
+        "resolution": "1920×1080",
+        "classes": D.AUAIR_CLASSES,
+        "official": {"train": (27880, None), "val": (4943, None)},
+        "objects": "32 823 trames annotées, 132 031 boîtes (8 classes)",
+        "notes": ["pas de découpage officiel : val = 3 vidéos entières (`AUAIR_VAL`)",
+                  "clé `image_width:` (sic) et noms `_xx_` du JSON tolérés",
+                  "boîtes vides après rognage retirées (54)"],
+    },
+    "dronevehicle": {
+        "name": "DroneVehicle (RGB)",
+        "source": "https://github.com/VisDrone/DroneVehicle",
+        "version": "version YOLO-OBB de Roboflow (M. Mandal), re-découpée depuis le train "
+                   "d'origine ; tools/prep_datasets.py dronevehicle",
+        "license": "CC BY-NC-SA 4.0",
+        "sensor": "drone, caméra couleur (la moitié infrarouge du jeu d'origine est absente), "
+                  "jour et nuit",
+        "resolution": "640×512 (840×712 avec le cadre blanc d'origine)",
+        "classes": D.DRONEVEHICLE_CLASSES,
+        "official": {"train": (12118, 193940), "val": (2599, 42220), "test": (2608, 41918)},
+        "objects": "boîtes orientées ramenées à leur boîte englobante",
+        "notes": ["cadre blanc de 100 px recadré par `prep_datasets.py`",
+                  "small-vehicle : voiture et van ; large-vehicle : bus, camion, fourgon"],
+    },
+    "hituav": {
+        "name": "HIT-UAV (infrarouge thermique)",
+        "source": "https://github.com/suojiashun/HIT-UAV-Infrared-Thermal-Dataset",
+        "version": "2022, version YOLO (train, val, test)",
+        "license": "à vérifier (page du jeu)",
+        "sensor": "caméra thermique sur drone, 60 à 130 m d'altitude, jour et nuit, 8 bits, "
+                  "un canal",
+        "resolution": "640×512",
+        "classes": D.HITUAV_CLASSES,
+        "official": {"train": (2008, 17518), "val": (287, 2453), "test": (571, 4780)},
+        "objects": "4 classes ; DontCare retiré",
+        "notes": ["`DontCare` (classe 4) retiré par le chargeur",
+                  "nom de fichier : `<période>_<altitude>_<angle>_…` (jour ou nuit, altitude 60 à "
+                  "130 m, angle 30 à 90°)"],
+    },
+    "uavdt": {
+        "name": "UAVDT-DET",
+        "source": "https://sites.google.com/view/grli-uavdt",
+        "version": "export Supervisely de DatasetNinja ; séquences M seules "
+                   "(tools/prep_datasets.py uavdt)",
+        "license": "recherche seulement",
+        "sensor": "drone, caméra couleur, scènes urbaines, altitudes et météo variées "
+                  "(tags jour, nuit, brouillard)",
+        "resolution": "1024×540",
+        "classes": D.UAVDT_CLASSES,
+        "official": {"train": (24143, 422911), "test": (16592, 375884)},
+        "objects": "30 séquences en train, 20 en test, trames consécutives",
+        "notes": ["séquences S du test (suivi d'un objet) écartées par `prep_datasets.py`",
+                  "régions ignorées du jeu d'origine absentes de l'export"],
+    },
 }
 
 
@@ -546,7 +607,8 @@ def _corners(s):
 
 def raw_annotations(dataset, root, samples, splits):
     """{id: (coins bruts (n, 4), {région retirée: nombre})} relus dans les fichiers du jeu,
-    par les `parse_*` des chargeurs ; None pour un jeu sans retrait (VOC, COCO, FLIR)."""
+    par les `parse_*` des chargeurs ; None pour un jeu sans retrait (VOC, COCO, FLIR,
+    DroneVehicle et UAVDT, déjà prétraités par tools/prep_datasets.py)."""
     root = Path(root) if root is not None else None
     out = {}
     if dataset == "kitti":
@@ -577,6 +639,21 @@ def raw_annotations(dataset, root, samples, splits):
             other = Counter(g.get("tag") for g in d.get("gtboxes", [])
                             if g.get("tag") not in ("person", "mask"))
             out[s["id"]] = (boxes, dict(other))
+    elif dataset == "auair":
+        data = json.loads((root / "annotations.json").read_text())
+        by_id = {Path(a["image_name"]).stem: a for a in data["annotations"]}
+        for s in samples:
+            b = by_id[s["id"]]["bbox"]
+            out[s["id"]] = ([[x["left"], x["top"], x["left"] + x["width"],
+                              x["top"] + x["height"]] for x in b], {})
+    elif dataset == "hituav":
+        for s in samples:
+            img = Path(s["image"])
+            ann = img.parents[2] / "labels" / img.parent.name / f"{img.stem}.txt"
+            text = ann.read_text() if ann.exists() else ""
+            boxes, _ = D.parse_yolo_txt(text, s["width"], s["height"], 5, drop=(4,))
+            dc = sum(1 for line in text.splitlines() if line.split()[:1] == ["4"])
+            out[s["id"]] = (boxes, {"DontCare": dc})
     elif dataset == "exdark":
         anns = {p.name.lower(): p for p in (root / "ExDark_Annno").rglob("*.txt")}
         for s in samples:
