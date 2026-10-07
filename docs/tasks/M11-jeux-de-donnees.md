@@ -118,7 +118,9 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
     `results/calibration_<net>-exdark.md` ;
   - `tools/act_hist.py` : histogrammes de |x|/s de L00 à L04, part écrêtée et niveaux
     int8 utilisés, par jeu ;
-  - profil `tools/m11.sh exdark`.
+  - profil `tools/m11.sh exdark` ;
+  - affinage optionnel : profils `exdark-prep` et `exdark-train` (split `train` de
+    `imageclasslist.txt`), notebooks `tiny-yolov3-exdark_{train,sweep,infer}` (T15.14).
 - **Reste** : téléchargement manuel d'ExDark, mesures.
 
 ### [ ] T11.4 — KITTI 2D (automobile, entrée non carrée)
@@ -217,6 +219,9 @@ moins cher. Pour comparaison, le stade FPGA de M8 en C-sim (`make bench-sim`) pr
   colonnes `overflow`, `post_cycles`, `nms_cycles`, `candidates` et `survivors`. Les cycles
   viennent de l'estimation C-sim sur le backend sim. Le profil `crowdhuman-cycles`
   (`N` images, 200 par défaut) enchaîne `make_inputs` et `bench_sim.sh`.
+  Affinage optionnel (classe unique `person`) : profils `crowdhuman-prep` et
+  `crowdhuman-train` (`annotation_train.odgt` et images de train dans `Images/`),
+  notebooks `tiny-yolov3-crowdhuman_{train,sweep,infer}` (T15.14).
 - **Reste** : les mesures (CrowdHuman est en place, version Kaggle).
 
 ### [ ] T11.7 — FLIR ADAS (thermique, un canal)

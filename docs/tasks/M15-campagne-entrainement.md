@@ -224,8 +224,9 @@ au balayage, split complet ensuite).
     ([T11.3](M11-jeux-de-donnees.md)) ;
   - CrowdHuman : AP et rappel de `person`, débordements de la NMS
     ([T11.6](M11-jeux-de-donnees.md), profil `tools/m11.sh crowdhuman`).
-- **Notes** : pas de notebook d'entraînement pour ces jeux ; un affinage ExDark
-  demanderait de l'ajouter au registre (`tools/notebooks/matrice.py`).
+- **Notes** : affinage possible par `notebooks/<jeu>/tiny-yolov3-<jeu>_train.ipynb` et
+  `_sweep.ipynb` (ExDark et CrowdHuman dans `TRAINABLE`, `tools/notebooks/matrice.py`) ;
+  poids affinés évalués par `tiny-yolov3-<jeu>_infer.ipynb`.
 
   | jeu | modèle | classes évaluées | mAP (50 images) | mAP (complet) |
   |---|---|---|---|---|

@@ -6,7 +6,7 @@
 - Inférence, poids affinés : `tiny-yolov3-<jeu>` pour chaque jeu de `TRAINABLE`, avec les
   poids `final.weights` du notebook d'entraînement correspondant.
 - Entraînement : `TRAINABLE`, seule liste écrite à la main (COCO train2017 est trop grand en
-  NumPy ; ExDark et CrowdHuman ne sont pas affinés, T11.3, T11.6) : un notebook `train`
+  NumPy ; ExDark et CrowdHuman ajoutés pour T15.14) : un notebook `train`
   (affinage unique de tools/m11.sh) et un notebook `sweep` (balayage lot × sous-ensemble,
   T14.10) par jeu. L'inférence affinée lit l'un ou l'autre de leurs runs (`runs.py`).
 
@@ -19,7 +19,7 @@ from tools.notebooks.commandes import cfg_path
 from yolo.data.datasets import DATASETS, FAMILIES, MAPPINGS
 from yolo.models.tiny_yolo import PRETRAINED, load_cfg
 
-TRAINABLE = ("voc", "kitti", "visdrone", "flir")
+TRAINABLE = ("voc", "kitti", "visdrone", "flir", "exdark", "crowdhuman")
 
 # Entrée des cfg d'affinage (options SIZE et CH de tools/m11.sh) : FLIR thermique à un canal.
 TRAIN_INPUT = {"flir": {"channels": 1}}
@@ -45,7 +45,8 @@ REGISTRATION = ("visdrone", "crowdhuman", "exdark", "flir")
 TASKS = {("voc", "infer"): ("T3.4", "T4.5", "T11.0"), ("coco", "infer"): ("T11.1",),
          ("hors-domaine", "infer"): ("T11.2",), ("voc", "train"): ("T2.9", "T9.2", "T9.3"),
          ("kitti", "train"): ("T11.4",), ("visdrone", "train"): ("T11.5",),
-         ("flir", "train"): ("T11.7",), ("exdark", "infer"): ("T11.3",),
+         ("flir", "train"): ("T11.7",), ("exdark", "train"): ("T11.3", "T15.14"),
+         ("crowdhuman", "train"): ("T11.6", "T15.14"), ("exdark", "infer"): ("T11.3",),
          ("crowdhuman", "infer"): ("T11.6",), ("sweep", "sweep"): ("T14.10",)}
 
 

@@ -174,9 +174,10 @@ def test_matrice():
             "voc/tiny-yolov3-voc_infer", "voc/tiny-yolov3-voc_train",
             "coco/tiny-yolov3-coco_infer", "kitti/tiny-yolov3-kitti_train",
             "visdrone/tiny-yolov3-visdrone_infer", "flir/tiny-yolov3-flir_train",
-            "exdark/tiny-yolov2-voc_infer", "crowdhuman/tiny-yolov3-coco_infer"} <= keys
+            "exdark/tiny-yolov2-voc_infer", "crowdhuman/tiny-yolov3-coco_infer",
+            "exdark/tiny-yolov3-exdark_sweep", "crowdhuman/tiny-yolov3-crowdhuman_infer"} <= keys
     assert "coco/tiny-yolov2-voc_infer" not in keys
-    assert not any(k.startswith(("coco/", "exdark/", "crowdhuman/")) and k.endswith("_train")
+    assert not any(k.startswith("coco/") and k.endswith("_train")
                    for k in keys)
     for ds in DATASETS:
         assert any(nb.dataset == ds and nb.role == "infer" for nb in NOTEBOOKS.values()), ds

@@ -12,8 +12,8 @@
 #   exdark                         T11.3  calibration ExDark, histogrammes L00-L04
 #   crowdhuman                     T11.6  NMS sans tri et capacité de sélection, scènes denses
 #   crowdhuman-cycles              T11.6  cycles de yolo_post par image en C-sim (N images)
-#   kitti-prep | visdrone-prep | flir-prep    ancres k-means et cfg d'affinage
-#   kitti-train | visdrone-train | flir-train   affinage (long : plusieurs heures à jours)
+#   <jeu>-prep (kitti, visdrone, flir, exdark, crowdhuman)    ancres k-means et cfg d'affinage
+#   <jeu>-train (mêmes jeux)       affinage (long : plusieurs heures à jours)
 #   visdrone-size                  T11.5  entrée 416 / 608 / 832 des poids affinés
 #
 # Sorties dans build/m11/<profil>/ (journal log.txt, JSON des mAP) ; rien n'est écrit dans
@@ -235,10 +235,10 @@ crowdhuman-cycles)  # T11.6 : cycles de yolo_post par image (C-sim), N images (d
   done
   ;;
 # ------------------------------------------------- T11.4, T11.5, T11.7 préparation, affinage
-kitti-prep | visdrone-prep | flir-prep)
+kitti-prep | visdrone-prep | flir-prep | exdark-prep | crowdhuman-prep)
   prep "${profile%-prep}"
   ;;
-kitti-train | visdrone-train | flir-train)
+kitti-train | visdrone-train | flir-train | exdark-train | crowdhuman-train)
   train "${profile%-train}"
   ;;
 visdrone-size)  # T11.5 : entrée plus grande, mêmes poids ; AP par taille (métrique COCO)

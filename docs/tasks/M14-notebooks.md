@@ -117,8 +117,8 @@ d'inférence hors domaine sans toucher au générateur.
 | kitti | `tiny-yolov2-voc`, `tiny-yolov3-coco` (hors domaine), `tiny-yolov3-kitti` | `tiny-yolov3-kitti` | T11.2, T11.4 |
 | visdrone | idem, `tiny-yolov3-visdrone` | `tiny-yolov3-visdrone` | T11.2, T11.5 |
 | flir | idem, `tiny-yolov3-flir` | `tiny-yolov3-flir` | T11.7 |
-| exdark | `tiny-yolov2-voc`, `tiny-yolov3-coco` (hors domaine) | — (à ajouter si T11.3 affine) | T11.2, T11.3 |
-| crowdhuman | `tiny-yolov2-voc`, `tiny-yolov3-coco` | — | T11.6 |
+| exdark | `tiny-yolov2-voc`, `tiny-yolov3-coco` (hors domaine), `tiny-yolov3-exdark` | `tiny-yolov3-exdark` | T11.2, T11.3, T15.14 |
+| crowdhuman | `tiny-yolov2-voc`, `tiny-yolov3-coco`, `tiny-yolov3-crowdhuman` | `tiny-yolov3-crowdhuman` | T11.6, T15.14 |
 
 Les modèles `tiny-yolov3-<jeu>` sont les cfg produits par `tools/make_cfg.py`
 (`build/m11/cfg/tiny-yolov3-<jeu>.cfg`). Chaque jeu de la colonne Entraînement a aussi un
@@ -256,7 +256,7 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
 - **Notes** : le palier vient de la taille du split et du rôle (règles de M12) ; il n'est
   pas recopié à la main.
 - **Fait** :
-  - `matrice.py` construit 17 notebooks d'inférence et 4 d'entraînement depuis
+  - `matrice.py` construit 19 notebooks d'inférence, 6 d'entraînement et 6 de balayage depuis
     `PRETRAINED`, `CFG_FILES`, `DATASETS` et `MAPPINGS`, avec `TRAINABLE` comme seule liste
     écrite à la main ;
   - le palier vient de `palier()` (règles de M12 : R jusqu'à 100 images, M jusqu'à 500
@@ -401,7 +401,8 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
 
 ### [x] T14.10 — Notebook `_sweep` : grille lot × sous-ensemble d'entraînement
 - **Spec** : §7 · **Dépend de** : T14.6 · **Taille** : M
-- **Livrables** : `notebooks/<jeu>/<modèle>_sweep.ipynb` pour voc, kitti, visdrone et flir ;
+- **Livrables** : `notebooks/<jeu>/<modèle>_sweep.ipynb` pour voc, kitti, visdrone, flir,
+  exdark et crowdhuman ;
   `tools/notebooks/runs.py`.
 - **Contenu** :
   - paramètres `BATCHES` (défaut `[8, 16, 32]`), `TRAIN_SUBSETS` (défaut `[500, 0]`, où 0
