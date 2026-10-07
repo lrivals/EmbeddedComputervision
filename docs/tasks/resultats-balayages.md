@@ -3,7 +3,8 @@
 Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
 `notebooks/voc/`, `notebooks/visdrone/`, `notebooks/kitti/` et `notebooks/flir/`, sur un runtime
 Colab à GPU ([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI :
-`9a76534` ; balayage FLIR : `4e47dbc`). Les runs sont dans
+`9a76534` ; balayage FLIR : `4e47dbc` ; inférences FLIR : `1723925` pour les poids publiés,
+`29a058a` pour le run affiné). Les runs sont dans
 `build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
 [donnees-drive.md](donnees-drive.md)).
 
@@ -15,7 +16,7 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 | VOC | [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb) | [tiny-yolov3-voc](../../notebooks/voc/tiny-yolov3-voc_infer.ipynb), [tiny-yolov3-coco](../../notebooks/voc/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb) |
 | VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
 | KITTI | [tiny-yolov3-kitti_sweep](../../notebooks/kitti/tiny-yolov3-kitti_sweep.ipynb) | [tiny-yolov3-kitti](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb), [tiny-yolov3-coco](../../notebooks/kitti/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/kitti/tiny-yolov2-voc_infer.ipynb) |
-| FLIR | [tiny-yolov3-flir_sweep](../../notebooks/flir/tiny-yolov3-flir_sweep.ipynb) | non lancée |
+| FLIR | [tiny-yolov3-flir_sweep](../../notebooks/flir/tiny-yolov3-flir_sweep.ipynb) | [tiny-yolov3-flir](../../notebooks/flir/tiny-yolov3-flir_infer.ipynb), [tiny-yolov3-coco](../../notebooks/flir/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/flir/tiny-yolov2-voc_infer.ipynb) |
 
 Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
 réécrit les PNG de [figures/resultats/](figures/resultats/). Toutes les figures du dépôt
@@ -159,10 +160,34 @@ sur les canaux RGB. Le réseau voit pourtant des images thermiques, loin du doma
 et 600 itérations (moins de deux époques) ne suffisent pas à l'y adapter. Durée : ≈ 10 min par run de lot 32 (577 s pour b32-sall), comme sur
 les autres jeux.
 
+### Inférence sur les mêmes 50 images
+
+| modèle | classes évaluées | mAP AP@[.5:.95] | AP50 |
+|---|---|---|---|
+| `tiny-yolov3-coco` | 11 (dont 5 présentes : person, bicycle, car, traffic light, fire hydrant) | **3,7** | 9,9 |
+| `tiny-yolov2-voc` | 7 (dont 3 présentes : person, bicycle, car) | 2,3 | 8,3 |
+| `tiny-yolov3-flir` `b32-sall` | 15 (dont 8 présentes) | 0,4 | 1,7 |
+
+Les poids publiés tournent en RGB sur l'image thermique (trois fois le même canal) ; le
+run affiné prend un canal. Correspondances (`MAPPINGS`) : bike → bicycle, motor →
+motorbike, light → traffic light et hydrant → fire hydrant (COCO seulement) ; sign,
+stroller, scooter et other vehicle ignorés. Par classe, en AP50 : bicycle 23,1 pour COCO
+et 22,7 pour Tiny-YOLOv2 VOC ; car 12,7 pour COCO, 1,9 pour VOC, 1,6 pour le run affiné ;
+person 7,6 pour COCO, 0,2 pour VOC, 8,1 pour le run affiné, sa seule classe au niveau
+des poids publiés. Les poids publiés ne détectent bien que les grands objets (APl 49,0
+pour COCO, 11,9 pour VOC, 5,5 pour le run affiné).
+
+Le notebook d'inférence prend le run le plus récent (`RUN = None`), ici `b32-sall`, et
+retrouve exactement la mesure du balayage (0,4 et 1,7). La cfg à un canal a été
+reconstruite depuis la table d'ancres du run (`env.restore_cfg`, runtime Colab neuf sans
+`build/m11/cfg/`) : même cfg qu'à l'entraînement. Les deux runs en tête du balayage
+(`b8-sall`, `b16-sall`) ne sont pas évalués ici (`RUN = 'b8-sall'` ou `COMPARE = True`).
+
 ## Meilleurs paramètres
 
 **Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur VOC, VisDrone et KITTI.
-FLIR ne départage aucun run (voir plus haut). C'est le
+FLIR ne départage aucun run, et tous restent sous les poids COCO hors domaine (voir plus
+haut). C'est le
 run par défaut des notebooks d'inférence (`RUN = None` prend le plus récent, ici
 `b32-sall`).
 
@@ -215,6 +240,7 @@ Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
 - **Confirmer le classement** sur le split complet : notebook `_infer` avec
   `COMPARE = True` et `SUBSET = 0` (palier N), puis volet entier (`INT8 = True`, T14.4)
   sur le run retenu.
-- FLIR : le balayage a tourné mais n'apprend pas (AP50 ≤ 2,9). Avant un run long, comparer
-  à 3 canaux (`CHANNELS = None`) et mesurer les poids COCO hors
-  domaine (`tiny-yolov3-coco_infer`), comme pour les autres jeux ([M15, T15.13](M15-campagne-entrainement.md)).
+- FLIR : le balayage a tourné mais n'apprend pas (AP50 ≤ 2,9), loin des poids COCO hors
+  domaine (AP 3,7, AP50 9,9), qui gardent la L00 RGB d'origine. Avant un run long,
+  comparer à 3 canaux (`CHANNELS = None`), pour savoir si la L00 sommée sur un canal
+  coûte la différence ([M15, T15.13](M15-campagne-entrainement.md)).

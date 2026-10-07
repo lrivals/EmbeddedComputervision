@@ -20,7 +20,8 @@ Constat de départ ([resultats-balayages.md](resultats-balayages.md), palier R,
   itérations) et taille d'entrée sont fixes.
 - **FLIR** (1 canal, rév. `4e47dbc`) : aucun run n'apprend, AP@[.5:.95] au plus 0,7 et
   AP50 au plus 2,9 (`b8-sall`, `b16-sall`) ; le classement des autres jeux ne s'y
-  retrouve pas.
+  retrouve pas. Les poids COCO hors domaine font mieux sans affinage : AP 3,7, AP50 9,9
+  (Tiny-YOLOv2 VOC : 2,3 et 8,3), sur 50 images (rév. `1723925`, `29a058a`).
 - ExDark et CrowdHuman n'ont pas été lancés.
 
 Coûts mesurés sur Colab : entraînement GPU ≈ 0,033 s/image (624 s pour 600 itérations
@@ -212,8 +213,23 @@ au balayage, split complet ensuite).
   | b8-s500 | 8 | 500 | 1 | 0,3 | 1,3 | |
   | à remplir (3 canaux) | | | 3 | | | |
 
-  Balayage à un canal fait (rév. `4e47dbc`) ; FLIR est sur le Drive. Restent les poids COCO
-  hors domaine, la comparaison à 3 canaux et les runs longs.
+  Poids publiés hors domaine, sur les mêmes 50 images (classes communes seulement,
+  `MAPPINGS`) :
+
+  | modèle | classes évaluées | AP (50 images) | AP50 (50 images) | AP (complet) |
+  |---|---|---|---|---|
+  | `tiny-yolov3-coco` | 11 | 3,7 | 9,9 | |
+  | `tiny-yolov2-voc` | 7 | 2,3 | 8,3 | |
+  | `tiny-yolov3-flir` `b32-sall` | 15 | 0,4 | 1,7 | |
+
+  Balayage à un canal fait (rév. `4e47dbc`) ; inférences faites (rév. `1723925` pour les
+  poids publiés, `29a058a` pour le run affiné). Sur un runtime Colab neuf, la cfg à un canal
+  est reconstruite depuis la table d'ancres du run (`env.restore_cfg`) : l'inférence
+  retrouve la mesure du balayage. Le run affiné reste sous les poids publiés ; seule sa
+  classe person (AP50 8,1) atteint COCO (7,6). Détail :
+  [resultats-balayages.md](resultats-balayages.md#flir). Restent la comparaison à
+  3 canaux, l'inférence des runs `b8-sall` et `b16-sall` (`COMPARE = True`) et les runs
+  longs.
 
 ### [ ] T15.14 — ExDark et CrowdHuman
 - **Spec** : §8 · **Dépend de** : T11.3, T11.6 · **Taille** : M
