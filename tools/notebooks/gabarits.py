@@ -23,7 +23,7 @@ ROLE_TITLES = {"infer": "inférence", "train": "entraînement",
 SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
-REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True, "JOBS": 16}}
+REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True}}
 # Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu),
 # graine 0 (autres graines : bruit d'un run, T15.2).
 SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "seeds": [0], "iters": 600}
@@ -207,7 +207,8 @@ def params(nb):
     p += [("DRIVE_DIR", DRIVE_DIR, "Colab : archives data/<jeu>.tar"
            + (", sorties et reprise dans runs/" if nb.trains else "")
            + " ; None : pas de Drive"),
-          ("JOBS", 4, "processus des évaluations"),
+          ("JOBS", None, "processus des évaluations ; None : un par cœur CPU, plafonné "
+           "par la mémoire (runtime TPU de Colab : des dizaines)"),
           ("SHOW", 6, "images affichées"),
           ("OUT", nb.out_dir, "sorties du notebook"),
           ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
@@ -382,14 +383,14 @@ def infer_body(nb):
         map_float = Path(OUT) / "map_float.md"
         map_float.unlink(missing_ok=True)
         C.run(C.cmd_eval_voc(NET, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
-                             DATA_ROOT, out=f"{OUT}/dets", markdown=map_float))"""
+                             DATA_ROOT, out=f"{OUT}/dets", markdown=map_float, jobs=JOBS))"""
     pr = 'Path(OUT, "dets", "figures")'
     if nb.finetuned:  # run choisi : même cache que la comparaison, évalué une fois (T15.1)
         evaluate = """
         if CHOSEN is not None:
             EVAL_DIR = Path(RUNS_DIR, "eval", CHOSEN.name)
             runs.evaluate(CHOSEN, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
-                          DATA_ROOT, out_dir=EVAL_DIR)
+                          DATA_ROOT, out_dir=EVAL_DIR, jobs=JOBS)
             map_float = EVAL_DIR / f"map_float_s{SUBSET or 'all'}.md"
             dets = EVAL_DIR / f"dets_s{SUBSET or 'all'}"
         else:""" + textwrap.indent(textwrap.dedent(evaluate), " " * 12) + """
@@ -423,7 +424,7 @@ def infer_body(nb):
             """), code("""
             if COMPARE:
                 rows = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
-                                      DATA_ROOT, out_dir=f"{RUNS_DIR}/eval/{r.name}")
+                                      DATA_ROOT, out_dir=f"{RUNS_DIR}/eval/{r.name}", jobs=JOBS)
                         for r in RUNS]
                 display(Markdown(runs.table(rows)))
             else:
@@ -639,7 +640,8 @@ def train_body(nb):
             result = RUN / "map_float.md"
             result.unlink(missing_ok=True)
             C.run(C.cmd_eval_voc(NET, RUN / "final.weights", DATASET, RESIZE, SUBSET, METRIC,
-                                 SPLIT, SIZE, DATA_ROOT, out=RUN / "dets", markdown=result))
+                                 SPLIT, SIZE, DATA_ROOT, out=RUN / "dets", markdown=result,
+                                 jobs=JOBS))
             display(Markdown(result.read_text()))
         """), md("""
         ## Vitesse du backend (T12.11-e)
@@ -748,7 +750,7 @@ def sweep_body(nb):
         from tools.figures import resultats as FR
 
         RESULTS = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE, DATA_ROOT,
-                                 out_dir=f"{OUT}/eval/{r.name}")
+                                 out_dir=f"{OUT}/eval/{r.name}", jobs=JOBS)
                    for r in runs.find_runs(OUT) if r.name != runs.TRAIN]
         display(Markdown(runs.table(RESULTS)))
         curves = []

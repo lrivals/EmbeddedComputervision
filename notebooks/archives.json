@@ -1,10 +1,21 @@
 {
+ "crowdhuman/tiny-yolov2-voc_infer.ipynb": "aa9dde5ae38b5ee219220e8a70287c1b0c009b83abbf004ef23c71d5e2f51389",
+ "crowdhuman/tiny-yolov3-coco_infer.ipynb": "6e5fe47257f1ebfae928b2ef1c8f2d9d615daa0e02f6141d6accfe9b0fefadc3",
  "crowdhuman/tiny-yolov3-crowdhuman_infer.ipynb": "e1e4156baa6dd0601b68b78c99ebe86d5102256422f174ef1158b3e8ca39242f",
  "crowdhuman/tiny-yolov3-crowdhuman_sweep.ipynb": "ff190a92d34bc4056ef90347ab1d33128b4471124680c2684e45fddc43f5b3e4",
+ "exdark/tiny-yolov2-voc_infer.ipynb": "f7f2a5856291689b46e4e261f8ce52e8fc459ae033fd828297f4067c8f2bc6cc",
+ "exdark/tiny-yolov3-coco_infer.ipynb": "2ea0ebc3cf1792de416eafafc4ddafdccc536d1645f94cf3ec8fea3a17c67f35",
  "exdark/tiny-yolov3-exdark_infer.ipynb": "bf39293abd677f3828d4540fbd29cf819f7a5675cc94c9f8d599fe7873d4f735",
  "exdark/tiny-yolov3-exdark_sweep.ipynb": "32c05f38761ab8c46c52045853a285c20baaf539433f625148a3794d51270583",
+ "flir/tiny-yolov2-voc_infer.ipynb": "d2ce515f18ba6ff58a8b72a625e44fec889b67b4ed978eb23a0ac902338525b8",
+ "flir/tiny-yolov3-coco_infer.ipynb": "8a9ccdd7f6665c93c9c304fe5f8c0f7ce78cfa96bb34de90323ac1d84aa80ece",
  "flir/tiny-yolov3-flir_infer.ipynb": "3de62d9f50b9649ebe5ffc5629b98786373d03e2be3d494ad4f8bd31c91bc56c",
  "flir/tiny-yolov3-flir_sweep.ipynb": "0c6078487999f8d075fccb6ae9b1475286b72b8dfe4a41e902c8b08efed4af6c",
+ "kitti/tiny-yolov2-voc_infer.ipynb": "873b483d94187555f5316796b7ff12fc441886fd319cc0d300b539c830e61999",
+ "kitti/tiny-yolov3-coco_infer.ipynb": "3921e27fb82d3e7d76a16de29ba3148c5ff5b8aec8996c2a20ba94bf23caefd9",
  "kitti/tiny-yolov3-kitti_sweep.ipynb": "aa557a08f537fc1a5c08bb42a83bffdd904e379372e22f375686fe7a4ea228a1",
- "visdrone/tiny-yolov3-visdrone_sweep.ipynb": "4362770dbaf18ad56294adec3114bdc55e5d7cebab93250978e4abc2c7a65c99"
+ "visdrone/tiny-yolov2-voc_infer.ipynb": "745fcc4a8d7f4b914bf799e67e0ded872533026acd2ea406ff3c205f50ef537c",
+ "visdrone/tiny-yolov3-coco_infer.ipynb": "0b49d81925414aa36cf25b16445751321713e545eaf970c145f75e0c6414cb1f",
+ "visdrone/tiny-yolov3-visdrone_sweep.ipynb": "4362770dbaf18ad56294adec3114bdc55e5d7cebab93250978e4abc2c7a65c99",
+ "voc/tiny-yolov3-coco_infer.ipynb": "35e994effd95f48acf4f996c9aec6fc6a60b6660deb8753202d1d54a0e54f9b7"
 }

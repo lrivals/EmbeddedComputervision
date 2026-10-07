@@ -452,6 +452,19 @@ def test_read_map_des_tables_eval_voc(tmp_path, monkeypatch):
     assert runs.read_map("absent.md") is None
 
 
+def test_jobs_des_evaluations():
+    """JOBS = None : un processus par cœur, plafonné par la mémoire ; eval_voc.py ne reçoit
+    --jobs qu'au-delà de 1 (commandes de m11.sh inchangées)."""
+    assert C.auto_jobs(3) == 3 and C.auto_jobs(None) >= 1
+    base = C.cmd_eval_voc("m.cfg", "w.weights", "kitti", subset=50)
+    assert "--jobs" not in base and C.cmd_eval_voc("m.cfg", "w.weights", "kitti", subset=50,
+                                                   jobs=1) == base
+    got = C.cmd_eval_voc("m.cfg", "w.weights", "kitti", subset=50, jobs=8)
+    assert got == base + ["--jobs", "8"]
+    src = "\n".join(_code(render(NOTEBOOKS["voc/tiny-yolov3-voc_infer"])))
+    assert src.count("jobs=JOBS") == 3 and _params(render(NOTEBOOKS["voc/tiny-yolov3-voc_infer"]))["JOBS"] is None
+
+
 def test_evaluate_reprend_le_cache_ancien(tmp_path, monkeypatch):
     """Un run déjà évalué dans runs/<run>/ (balayages d'avant eval/<run>/) n'est pas
     réévalué : sa table est recopiée dans eval/<run>/."""
@@ -475,7 +488,7 @@ def test_qat_admm_identiques_a_m12(profile, over, lowbit):
     subs = {'"$NET"': p["NET"], '"$INIT"': p["INIT"], '"$DEVICE"': p["DEVICE"], '"$d"': d,
             '"$d/checkpoint.npz"': f"{d}/checkpoint.npz", '"$d/model"': f"{d}/model",
             '"$d/map.json"': f"{d}/map.json", '"$d/plan_mixed6.json"': f"{d}/plan_mixed6.json",
-            '"$JOBS"': str(p["JOBS"]), '"$SUBSET"': str(p["SUBSET"]),
+            '"$JOBS"': str(C.auto_jobs(p["JOBS"])), '"$SUBSET"': str(p["SUBSET"]),
             '"${steps[@]}"': f"--qat-steps {p['QAT_STEPS']}", '"$lr"': "1e-4",
             '"$batch"': "8", '"$iters"': "600", '"$1"': "1e-3", '"$2"': "1.3", '"$3"': "50",
             '"$4"': "600"}

@@ -8,6 +8,7 @@ une interruption du noyau arrête le sous-processus, et le dernier checkpoint re
 Pas de dépendance hors bibliothèque standard : ce module est importé par les notebooks.
 """
 
+import os
 import shlex
 import signal
 import subprocess
@@ -104,9 +105,32 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
     return cmd + ["--out", str(out)]
 
 
+# Mémoire d'un processus d'évaluation (réseau, lot de 8 images en float32, im2col), large.
+JOB_MEMORY = 1.5e9
+
+
+def auto_jobs(jobs=None):
+    """`JOBS` des notebooks : le nombre donné, ou None → un processus par cœur CPU
+    disponible, plafonné par la mémoire (`JOB_MEMORY` chacun). Colab : 2 sur le runtime
+    CPU, des dizaines sur un runtime TPU (le TPU ne sert pas, l'évaluation est en NumPy)."""
+    if jobs:
+        return int(jobs)
+    try:
+        n = len(os.sched_getaffinity(0))
+    except AttributeError:
+        n = os.cpu_count() or 1
+    try:
+        mem = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError, AttributeError):
+        return n
+    return max(1, min(n, int(mem // JOB_MEMORY)))
+
+
 def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric=None,
-                 split=None, size=None, data_root=None, out=None, markdown=None):
-    """`tools/eval_voc.py` (fin du profil `<jeu>-train`) ; sorties du notebook à la fin."""
+                 split=None, size=None, data_root=None, out=None, markdown=None, jobs=1):
+    """`tools/eval_voc.py` (fin du profil `<jeu>-train`) ; sorties du notebook à la fin.
+    `jobs` None : `auto_jobs` ; plus de 1 : `--jobs` (inférence répartie sur des processus)."""
+    jobs = auto_jobs(jobs)
     cmd = ["python", "tools/eval_voc.py", "--net", str(net), "--weights", str(weights),
            "--dataset", dataset, "--resize", resize, "--subset", str(subset)]
     _opt(cmd, "--metric", metric)
@@ -114,7 +138,8 @@ def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric
     _opt(cmd, "--size", _size(size))
     _opt(cmd, "--data-root", data_root)
     _opt(cmd, "--out", out)
-    return _opt(cmd, "--markdown", markdown)
+    _opt(cmd, "--markdown", markdown)
+    return _opt(cmd, "--jobs", jobs if jobs > 1 else None)
 
 
 def cmd_calibrate(net, weights, dataset, out, markdown, images=500, split=None,
@@ -130,9 +155,10 @@ def cmd_calibrate(net, weights, dataset, out, markdown, images=500, split=None,
 def cmd_eval_quant(net, out, variants="float,int", subset=0, jobs=16, dataset="voc",
                    weights=None, calib=None, model_dir=None, metric=None, split=None,
                    size=None, data_root=None):
-    """`tools/eval_quant.py` comme `evalq` de m11.sh et m12.sh (stretch, 1 fil BLAS)."""
+    """`tools/eval_quant.py` comme `evalq` de m11.sh et m12.sh (stretch, 1 fil BLAS) ;
+    `jobs` None : `auto_jobs`."""
     cmd = ["python", "tools/eval_quant.py", "--net", str(net), "--resize", "stretch",
-           "--jobs", str(jobs), "--blas-threads", "1", "--subset", str(subset),
+           "--jobs", str(auto_jobs(jobs)), "--blas-threads", "1", "--subset", str(subset),
            "--out", str(out), "--variants", variants]
     if dataset != "voc":
         cmd += ["--dataset", dataset]

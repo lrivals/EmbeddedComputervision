@@ -92,6 +92,10 @@ KITTI val (1 496 images).
     défaut la table `éval. = tout` du notebook `_infer` versionné.
 - **Procédure Colab** (notebooks archivés : les régénérer d'abord,
   `python -m tools.notebooks <jeu>/tiny-yolov3-<jeu>_infer --force`) :
+  0. runtime **TPU** conseillé pour les `_infer` : le TPU ne sert pas (évaluation en
+     NumPy), mais la VM a des dizaines de cœurs CPU ; `JOBS = None` (défaut) lance un
+     processus `eval_voc.py --jobs` par cœur, plafonné par la mémoire (1,5 Go chacun, estimation large non mesurée).
+     Mesure locale, 24 images : 168 → 86 ms/image de 1 à 3 processus, mAP identique ;
   1. `visdrone/tiny-yolov3-visdrone_infer`, puis `kitti/tiny-yolov3-kitti_infer` :
      `SUBSET = 0`, `COMPARE = True`, `INT8 = False`, `DRIVE_DIR` réglé ;
   2. `voc/tiny-yolov3-voc_infer`, mêmes réglages, **après** le balayage de T15.2 : une

@@ -15,10 +15,14 @@ Hors VOC, seules les classes communes au jeu et au modèle sont évaluées
 
 Seuil de confiance bas (0,005, comme `darknet detector valid`) : la mAP intègre toute la
 courbe précision/rappel ; le 0,25 de la démo couperait les rappels élevés.
+
+`--jobs N` (N > 1) : N processus, un thread BLAS chacun, qui traitent les mêmes lots que le
+chemin série, dans le même ordre (machines à beaucoup de cœurs, runtime TPU de Colab).
 """
 
 import argparse
 import multiprocessing as mp
+import os
 import sys
 import time
 from pathlib import Path
@@ -47,12 +51,33 @@ def _load(task):
         return preprocess(img, size, mode, interp, channels)
 
 
-def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers):
-    """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle."""
-    per_class = {c: ([], [], []) for c in range(net.net["classes"])}
-    channels = net.net["input"][0]
-    tasks = [(s["image"], size, mode, interp, channels) for s in samples]
-    t0 = time.time()
+_W = {}  # réseau de chaque processus de --jobs
+
+
+def _init(name, weights, conf, iou):
+    # Une exception dans l'initialiseur ferait relancer les fils sans fin : on la garde
+    # pour la relever dans la première tâche (comme eval_quant.py).
+    try:
+        net = build(name)
+        load_darknet_weights(net, weights)
+        _W.update(net=net, conf=conf, iou=iou)
+    except Exception as exc:  # noqa: BLE001
+        _W["error"] = exc
+
+
+def _batch(task):
+    """Un lot dans un processus de --jobs : chargement, détection, boîtes en pixels VOC."""
+    if "error" in _W:
+        raise _W["error"]
+    loads, mode, sizes = task
+    items = [_load(t) for t in loads]
+    x = np.stack([x for x, _ in items])
+    dets = detect(_W["net"], x, [wh for _, wh in items], mode, _W["conf"], _W["iou"])
+    return [(to_voc_pixels(boxes, w, h), scores, labels)
+            for (boxes, scores, labels), (w, h) in zip(dets, sizes)]
+
+
+def _serial(net, samples, tasks, mode, conf, iou, batch, workers):
     with mp.Pool(workers) as pool:
         it = pool.imap(_load, tasks, chunksize=4)
         for start in range(0, len(samples), batch):
@@ -60,17 +85,48 @@ def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers):
             items = [next(it) for _ in chunk]
             x = np.stack([x for x, _ in items])
             dets = detect(net, x, [wh for _, wh in items], mode, conf, iou)
-            for s, (boxes, scores, labels) in zip(chunk, dets):
-                px = to_voc_pixels(boxes, s["width"], s["height"])
-                for b, sc, c in zip(px, scores, labels):
-                    per_class[c][0].append(s["id"])
-                    per_class[c][1].append(sc)
-                    per_class[c][2].append(b)
-            done = start + len(chunk)
-            if done % (batch * 25) == 0 or done == len(samples):
-                el = time.time() - t0
-                print(f"{done}/{len(samples)} images  {el:6.0f} s  "
-                      f"({el / done * 1000:.0f} ms/image)", flush=True)
+            yield chunk, [(to_voc_pixels(boxes, s["width"], s["height"]), scores, labels)
+                          for s, (boxes, scores, labels) in zip(chunk, dets)]
+
+
+def _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs, blas_threads):
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", str(blas_threads))
+    os.environ.setdefault("OMP_NUM_THREADS", str(blas_threads))
+    ctx = mp.get_context("spawn")  # les variables d'environnement BLAS valent pour les fils
+    starts = range(0, len(samples), batch)
+    work = [(tasks[i:i + batch], mode, [(s["width"], s["height"]) for s in samples[i:i + batch]])
+            for i in starts]
+    with ctx.Pool(jobs, initializer=_init, initargs=(name, weights, conf, iou)) as pool:
+        for i, res in zip(starts, pool.imap(_batch, work)):
+            yield samples[i:i + batch], res
+
+
+def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers, jobs=1,
+                  name=None, weights=None, blas_threads=1):
+    """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle.
+    `jobs` > 1 : lots répartis sur `jobs` processus (réseau `name` + `weights` rechargé dans
+    chacun) ; mêmes lots, même ordre que le chemin série."""
+    per_class = {c: ([], [], []) for c in range(net.net["classes"])}
+    channels = net.net["input"][0]
+    tasks = [(s["image"], size, mode, interp, channels) for s in samples]
+    t0 = time.time()
+    if jobs > 1:
+        chunks = _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs,
+                           blas_threads)
+    else:
+        chunks = _serial(net, samples, tasks, mode, conf, iou, batch, workers)
+    done = 0
+    for chunk, res in chunks:
+        for s, (px, scores, labels) in zip(chunk, res):
+            for b, sc, c in zip(px, scores, labels):
+                per_class[c][0].append(s["id"])
+                per_class[c][1].append(sc)
+                per_class[c][2].append(b)
+        done += len(chunk)
+        if done % (batch * 25) == 0 or done == len(samples):
+            el = time.time() - t0
+            print(f"{done}/{len(samples)} images  {el:6.0f} s  "
+                  f"({el / done * 1000:.0f} ms/image)", flush=True)
     return {c: (v[0], np.array(v[1]), np.array(v[2]).reshape(-1, 4))
             for c, v in per_class.items()}
 
@@ -110,6 +166,9 @@ def main():
     ap.add_argument("--iou", type=float, default=IOU_THR, help="seuil de la NMS")
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="processus d'inférence (1 : un seul, BLAS multithread)")
+    ap.add_argument("--blas-threads", type=int, default=1, help="threads BLAS par processus de --jobs")
     ap.add_argument("--area", action="store_true", help="AP par aire (VOC2010+) au lieu de 11 pts")
     ap.add_argument("--out", type=Path, default=None, help="dossier des détections écrites")
     ap.add_argument("--markdown", type=Path, default=None, help="ajoute la table à ce fichier")
@@ -137,7 +196,8 @@ def main():
         load_darknet_weights(net, args.weights)
         args.size = input_size(net.net, args.size)
         dets = run_inference(net, samples, args.size, args.resize, args.interp, args.conf,
-                             args.iou, args.batch, args.workers)
+                             args.iou, args.batch, args.workers, args.jobs, args.net,
+                             args.weights, args.blas_threads)
         dets = datasets.remap_detections(dets, view.det_lut)
         run = f"{args.net}-{args.resize}" + ("-darknet" if args.interp == "darknet" else "")
         tag = datasets.tag(args.dataset, split)

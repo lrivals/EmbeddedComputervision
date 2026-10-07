@@ -135,7 +135,7 @@ def s_per_image(run_dir, batch, n=50):
 
 
 def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=None,
-             data_root=None, out_dir=None):
+             data_root=None, out_dir=None, jobs=1):
     """mAP flottante du run par `tools/eval_voc.py`, réutilisée si déjà calculée pour ce
     `subset` ; rend la ligne de la table comparative."""
     from tools.notebooks import commandes as C
@@ -149,7 +149,8 @@ def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=No
     if read_map(md) is None:
         (ROOT / md).unlink(missing_ok=True)
         C.run(C.cmd_eval_voc(net, run.weights, dataset, resize, subset, metric, split, size,
-                             data_root, out=out / f"dets_s{subset or 'all'}", markdown=md))
+                             data_root, out=out / f"dets_s{subset or 'all'}", markdown=md,
+                             jobs=jobs))
     return row(run, read_map(md), subset)
 
 
