@@ -28,6 +28,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M16](M16-presentation-jeux.md) | Présentation des jeux (optionnel) | `make notebooks` génère un notebook de présentation et d'analyse statistique par jeu (classes, tailles de boîtes, densité, ancres, images) ; synthèse dans [stats-jeux.md](stats-jeux.md) |
 | [M17](M17-article.md) | Article (optionnel) | `make article` régénère les chiffres, tables, figures et l'état des jalons d'un article de type papier ([docs/article/](../article/)) ; `--check` dans `make ci` |
 | [M18](M18-jeux-drone.md) | Jeux drone et thermiques (optionnel) | AU-AIR, DroneVehicle, HIT-UAV et UAVDT prétraités, chargés et dotés de leurs notebooks (stats, hors domaine, affinage) |
+| [M19](M19-english.md) | Switch to English (optional) | docs, specification, generated text and code comments in English, with a language check in `make ci`; new content in English from 2026-10-07 |
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
@@ -64,6 +65,7 @@ graph LR
   M11 --> M18[M18]
   M16 --> M18
   M18 -.-> M15
+  M0 --> M19[M19]
 ```
 
 - **Raccourci T1.9 → M3** : avec les poids Darknet pré-entraînés, la mAP de référence est
@@ -114,3 +116,4 @@ reporter ici l'avancement par jalon.
 | M16 | 19 | 17 (T16.13 COCO et T16.14 KITTI : données absentes du PC) |
 | M17 | 21 | 0 |
 | M18 | 11 | 8 (données prêtes, chargeurs, 24 notebooks générés ; restent stats exécutés, Drive, affinages) |
+| M19 | 12 | 0 (rule in force: new content in English since 2026-10-07) |
