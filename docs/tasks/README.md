@@ -107,5 +107,5 @@ reporter ici l'avancement par jalon.
 | M13 | 54 | 54 (données en attente : synthèses Vitis pour T13.24, `make test-durations` pour T13.30) |
 | M14 | 12 | 5 (les 7 autres implémentées ; restent les passages de palier N, l'essai sur Colab et les entraînements) |
 | M15 | 14 | 0 |
-| M16 | 19 | 0 |
+| M16 | 19 | 17 (T16.13 COCO et T16.14 KITTI : données absentes du PC) |
 | M17 | 21 | 0 |

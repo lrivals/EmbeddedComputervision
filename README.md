@@ -86,11 +86,13 @@ make bench-report                   # results/benchmarks.csv, results/mesures.md
 make ci-model ci                    # CI (T10.13) : export synthétique, sans VOC ni poids Darknet
 make count-macs                     # tableaux du §3 (paramètres, MACs)
 make figures                        # figures M13 → results/figures/, galerie results/figures.md
-make notebooks                      # notebooks M14 → notebooks/<jeu>/, index notebooks/README.md
+make notebooks                      # notebooks M14 et M16 → notebooks/<jeu>/, index notebooks/README.md
 make notebooks-smoke                # fumée des notebooks dont les données sont là (T14.9)
 make test-durations                 # suite complète (slow compris) : durées des tests pour la figure T13.30
 tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
 python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
+python tools/data_stats.py --dataset visdrone --sample 200 --figures  # statistiques d'un jeu (M16)
+python tools/data_stats.py --report docs/tasks/stats-jeux.md         # synthèse des jeux (M16)
 tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)
 tools/get_datasets.sh kaggle        # relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
 tools/get_datasets.sh pack exdark   # data_archives/exdark.tar, à copier sur Drive pour Colab (M14)

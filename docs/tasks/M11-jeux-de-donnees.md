@@ -14,18 +14,19 @@ Constat de départ :
 
 ## Synthèse
 
-Les chiffres extérieurs au dépôt (taille, licence) viennent des pages des jeux de données
-et sont **à vérifier** au téléchargement. Une licence non commerciale suffit pour ce
-projet, qui ne publie pas de poids.
+Les effectifs de VOC, VisDrone, CrowdHuman, ExDark et FLIR sont **mesurés** par
+`tools/data_stats.py` ([stats-jeux.md](stats-jeux.md), M16) ; ceux de COCO et KITTI, dont
+les données manquent sur le PC, et les licences viennent des pages des jeux. Une licence
+non commerciale suffit pour ce projet, qui ne publie pas de poids.
 
 | Jeu | Images annotées | Classes | Résolution typique | Licence | Ce qu'il éprouve | Tâche |
 |---|---|---|---|---|---|---|
 | COCO val2017 | 5 000 | 80 | ≈ 640×480 | CC BY 4.0 (annotations) | `tiny-yolov3-coco` dans son domaine, AP@[.5:.95], calibration | T11.1 |
-| ExDark | 7 363 | 12 (proches de VOC) | variable | recherche | calibration INT8 sous faible luminosité | T11.3 |
+| ExDark | 7 363 (3 000 train, 1 800 val, 2 563 test) | 12 (proches de VOC) | variable | recherche | calibration INT8 sous faible luminosité | T11.3 |
 | KITTI 2D object | 7 481 (train) | 8 | ≈ 1242×375 | CC BY-NC-SA 3.0 | entrée non carrée, letterbox, ancres | T11.4 |
 | VisDrone2019-DET | 6 471 + 548 (train + val) | 10 | jusqu'à 2000×1500 | recherche | petits objets, grille 13×13, résolution | T11.5 |
 | CrowdHuman | 15 000 + 4 370 (train + val) | 1 (personne) | variable | recherche | NMS dense, 256 emplacements, débordements | T11.6 |
-| FLIR ADAS (thermique) | ≈ 10 000 et plus selon la version | ≈ 15 | 640×512 | recherche | entrée à 1 canal, L00 | T11.7 |
+| FLIR ADAS v2 (thermique) | 10 742 + 1 144 (train + val) | 15 retenues | 640×512 | recherche | entrée à 1 canal, L00 | T11.7 |
 
 Le coût CPU vient du rythme mesuré en T2.7, ≈ 0,45 s/image à 416 en entraînement. Une
 époque sur 7 000 images prend donc ≈ 1 h. Une évaluation en inférence seule coûte bien

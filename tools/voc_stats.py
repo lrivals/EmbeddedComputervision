@@ -2,6 +2,9 @@
 
     python tools/voc_stats.py                 # compare aux chiffres officiels
     python tools/voc_stats.py --show 10       # + 10 images au hasard dans build/voc_samples/
+
+Raccourci de `tools/data_stats.py --dataset voc --only comptes` (M16, T16.0), qui fait les
+comptes ; ce script les compare aux chiffres du devkit.
 """
 
 import argparse
@@ -10,16 +13,21 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "python"))
+for _p in (ROOT, ROOT / "python"):
+    sys.path.insert(0, str(_p))
 
-from yolo.data.voc import VOC_CLASSES, load_split  # noqa: E402
+from tools import data_stats  # noqa: E402
+from yolo.data.voc import VOC_CLASSES  # noqa: E402
 
-# Chiffres du devkit (tableaux « Main ») : objets non-difficult, ceux de l'évaluation.
+# Chiffres du devkit (tableaux « Main ») : objets non-difficult, ceux de l'évaluation
+# (repris dans la fiche VOC de tools/data_stats.py).
 OFFICIAL = {
     (2007, "trainval"): (5011, 12608),
     (2007, "test"): (4952, 12032),
     (2012, "trainval"): (11540, 27450),
 }
+assert all(data_stats.FICHES["voc"]["official"][f"{y}:{s}"] == v
+           for (y, s), v in OFFICIAL.items())
 
 
 def draw(sample, path):
@@ -46,17 +54,18 @@ def main():
     args = ap.parse_args()
 
     ok = True
-    pool = []
+    splits = [f"{y}:{s}" for y, s in OFFICIAL]
+    stats, parts = data_stats.compute("voc", splits, args.devkit, only=("comptes",),
+                                      log=lambda _: None)
+    pool = [s for sp in splits for s in parts[sp]]
     print("| split | images | objets (non-difficult) | objets (tous) | officiel | |")
     print("|---|---|---|---|---|---|")
     for (year, split), (n_img, n_obj) in OFFICIAL.items():
-        samples = load_split(args.devkit, year, split)
-        pool += samples
-        easy = sum(int((~s["difficult"]).sum()) for s in samples)
-        total = sum(len(s["labels"]) for s in samples)
-        match = (len(samples), easy) == (n_img, n_obj)
+        c = stats["splits"][f"{year}:{split}"]["comptes"]
+        easy, total = c["objects_easy"], c["objects"]
+        match = (c["images"], easy) == (n_img, n_obj)
         ok &= match
-        print(f"| VOC{year} {split} | {len(samples)} | {easy} | {total} | {n_img} / {n_obj} | "
+        print(f"| VOC{year} {split} | {c['images']} | {easy} | {total} | {n_img} / {n_obj} | "
               f"{'ok' if match else 'ÉCART'} |")
 
     if args.show:

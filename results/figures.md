@@ -205,7 +205,7 @@ Nuage (w, h) des boîtes VOC avec les ancres k-means (distance 1 − IoU) et les
 Statistiques de VOC : objets par classe en trainval et en test, aires des boîtes, objets par image.
 
 - Commande : `python -m tools.figures voc_stats`
-- Source : `data/VOCdevkit (comptes égaux à tools/voc_stats.py)`
+- Source : `data/VOCdevkit, tools/data_stats.py (comptes égaux à tools/voc_stats.py)`
 
 ![voc_stats](figures/modeles/voc_stats.png)
 

@@ -71,11 +71,18 @@ def test_generation_idempotente_sans_sorties(tmp_path):
 def test_structure_fixe():
     for nb in NOTEBOOKS.values():
         cells = render(nb)["cells"]
-        assert cells[0]["source"][0].startswith(f"# {nb.model} sur {nb.dataset}")
+        title = (f"# Statistiques de {nb.dataset}" if nb.role == "stats"
+                 else f"# {nb.model} sur {nb.dataset}")
+        assert cells[0]["source"][0].startswith(title)
         assert cells[2]["metadata"] == {"tags": ["parameters"]}
         assert "env.prepare(" in "".join(cells[4]["source"])
         assert cells[-2]["source"] == ["## Résumé"]
         p = _params(render(nb))
+        if nb.role == "stats":  # M16 : sans modèle ni poids
+            for k in ("DATASET", "SPLITS", "SIZE", "RESIZE", "SAMPLE", "GALLERY", "SEED"):
+                assert k in p
+            assert "WEIGHTS" not in p and p["OUT"] == f"build/notebooks/{nb.dataset}/stats"
+            continue
         assert p["OUT"].startswith("build/notebooks/") and p["SUBSET"] <= 100
         for k in ("NET", "DATASET", "SPLIT", "WEIGHTS", "DEVICE", "SUBSET", "SIZE", "RESIZE"):
             assert k in p
@@ -191,6 +198,35 @@ def test_matrice():
         train, sweep = (next(nb for nb in NOTEBOOKS.values() if nb.dataset == ds
                              and nb.role == role) for role in ("train", "sweep"))
         assert (sweep.net, sweep.train_dir) == (train.net, train.train_dir)
+
+
+def test_un_notebook_stats_par_jeu():
+    """M16 (T16.3) : exactement un notebook `stats` par jeu, en tête des notebooks du jeu."""
+    keys = list(NOTEBOOKS)
+    for ds in DATASETS:
+        stats = [k for k, nb in NOTEBOOKS.items() if nb.dataset == ds and nb.role == "stats"]
+        assert stats == [f"{ds}/{ds}_stats"], ds
+        first = next(k for k in keys if NOTEBOOKS[k].dataset == ds)
+        assert first == stats[0]
+        assert prerequis(NOTEBOOKS[stats[0]]) == {"données": DATA_MARKERS[ds]}
+
+
+def test_stats_appelle_data_stats_option_par_option():
+    nb = NOTEBOOKS["kitti/kitti_stats"]
+    src = "\n".join(_code(render(nb)))
+    assert "C.run(C.cmd_data_stats(DATASET, OUT, SPLITS, SIZE, RESIZE, NET, SAMPLE, GALLERY, SEED," \
+        in src
+    cmd = C.cmd_data_stats("kitti", "build/x", ["train", "val"], 416, "letterbox",
+                           "a.cfg", 200, 8, 0)
+    assert cmd == ["python", "tools/data_stats.py", "--dataset", "kitti", "--split",
+                   "train,val", "--size", "416", "--resize", "letterbox", "--net", "a.cfg",
+                   "--sample", "200", "--gallery", "8", "--seed", "0", "--figures",
+                   "--out", "build/x"]
+    # l'outil accepte chaque option (--dataset, --split : datasets.add_args)
+    text = (ROOT / "tools" / "data_stats.py").read_text() + \
+        (ROOT / "python" / "yolo" / "data" / "datasets.py").read_text()
+    for opt in [o for o in cmd if o.startswith("--")]:
+        assert f'"{opt}"' in text, opt
 
 
 def test_temoins_de_get_datasets():
@@ -431,6 +467,7 @@ def test_cfg_reconstruite_depuis_les_ancres_du_run(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------- T14.9 fumée
 
 SMOKE = {"SUBSET": 4, "ITERS": 2, "BATCH": 2, "SHOW": 2, "CALIB_IMAGES": 8, "JOBS": 2,
+         "SAMPLE": 8, "GALLERY": 2,
          "WORKERS": 2, "INT8": True, "BATCHES": [2], "TRAIN_SUBSETS": [4],
          "DEVICE": "cpu"}  # PC sans GPU
 

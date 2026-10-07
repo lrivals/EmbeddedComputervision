@@ -25,14 +25,15 @@ for _p in (ROOT, ROOT / "python"):
 
 NB_DIR = ROOT / "notebooks"
 OUT = "build/notebooks"  # relatif à la racine : les notebooks font os.chdir(ROOT)
-ROLES = ("infer", "train", "sweep")  # sweep : balayage lot × sous-ensemble (T14.10)
+ROLES = ("infer", "train", "sweep", "stats")  # sweep : balayage lot × sous-ensemble (T14.10) ;
+# stats : présentation et statistiques du jeu, sans modèle (M16)
 
 
 @dataclass(frozen=True)
 class Notebook:
     dataset: str
-    model: str            # nom affiché : tiny-yolov2-voc, tiny-yolov3-kitti…
-    role: str             # infer | train | sweep
+    model: str            # nom affiché : tiny-yolov2-voc, tiny-yolov3-kitti… (stats : le jeu)
+    role: str             # infer | train | sweep | stats
     net: str              # nom de CFG_FILES ou chemin de cfg (relatif à la racine)
     weights: str          # poids évalués (infer) ou de départ (train), relatifs à la racine
     family: str           # classes de sortie : voc, coco ou le jeu (poids affinés)
@@ -55,6 +56,8 @@ class Notebook:
 
     @property
     def out_dir(self):
+        if self.role == "stats":
+            return f"{OUT}/{self.dataset}/stats"
         return f"{self.train_dir}/eval" if self.role == "infer" and self.finetuned else self.train_dir
 
     @property

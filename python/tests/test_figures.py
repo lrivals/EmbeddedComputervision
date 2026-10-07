@@ -406,8 +406,11 @@ def test_anchors_md_parsed_as_published(tmp_path):
 
 
 def test_voc_stats_plot(tmp_path):
-    stats = {k: {"per_class": RNG.integers(100, 1000, 20), "areas": RNG.uniform(50, 1e5, 500),
-                 "per_image": RNG.integers(1, 8, 100), "images": 100}
+    """Vue de `donnees.voc_stats_view` (histogrammes de stats.json, M16)."""
+    edges = np.geomspace(1, 4096 ** 2, 61)
+    stats = {k: {"per_class": RNG.integers(100, 1000, 20),
+                 "area": np.histogram(RNG.uniform(50, 1e5, 500), edges)[0],
+                 "area_edges": edges, "per_image": RNG.integers(0, 40, 30), "images": 100}
              for k in ("trainval 07+12", "test 2007")}
     _pngs(modeles.plot_voc_stats(stats, tmp_path))
 

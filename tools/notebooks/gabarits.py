@@ -19,8 +19,11 @@ REPO_URL = "https://github.com/lrivals/EmbeddedComputervision.git"
 REV = "main"
 COLAB = "https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main"
 ROLE_TITLES = {"infer": "inférence", "train": "entraînement",
-               "sweep": "balayage lot × sous-ensemble"}
+               "sweep": "balayage lot × sous-ensemble", "stats": "statistiques du jeu"}
 SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
+# Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
+# à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
+REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True}}
 # Grille par défaut du notebook _sweep (T14.10) : 3 lots × (500 images, tout le jeu).
 SWEEP = {"batches": [8, 16, 32], "subsets": [500, 0], "iters": 600}
 
@@ -102,6 +105,11 @@ def header(nb):
         cost = (f"palier **{first}** au premier passage (`SUBSET = {SUBSET_FIRST}`), "
                 f"**{full}** sur le split complet ({n or 'taille non relevée'} images, "
                 "`SUBSET = 0`)")
+        if nb.path.as_posix() in REFERENCE:
+            cost += (". **Notebook de référence**, réglé sur le split complet (`SUBSET = 0`, "
+                     "`INT8 = True`) : mAP attendues 56,30 en flottant (T14.3) et 55,66 en "
+                     "entier (T14.4), `results/map_int8.md` ; mettre `SUBSET = "
+                     f"{SUBSET_FIRST}` pour un essai rapide")
     req = prerequis(nb)
     reqs = "\n".join(f"- {k} : `{v}` — {how_to_get(k, nb)}" for k, v in req.items()
                      if not (nb.trains and k == "cfg"))
@@ -202,6 +210,8 @@ def params(nb):
           ("OUT", nb.out_dir, "sorties du notebook"),
           ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
           ("REV", REV, "Colab : révision")]
+    ref = REFERENCE.get(nb.path.as_posix(), {})
+    p = [(k, ref.get(k, v), c) for k, v, c in p]
     return [md("## Paramètres"), code(_assign(p), tags=("parameters",))]
 
 
@@ -224,9 +234,18 @@ def environment(nb):
             CHOSEN = runs.pick(RUNS_DIR, RUN, hint={needs[2]})
             WEIGHTS, OUT = CHOSEN.weights, f"{{OUT}}/{{CHOSEN.name}}"
             print(f"run choisi : {{CHOSEN.name}} ({{WEIGHTS}})")"""
+    elif nb.role == "stats":  # ni poids ni cfg exigés : la cfg manquante est remplacée
+        needs = ("()", "None", "''")
     else:
         needs = ("INIT if str(INIT).endswith('.weights') else "
                  "'weights/yolov3-tiny.weights' if INIT == 'coco' else ()", "None", "''")
+    post = ""
+    if nb.role == "stats":
+        post = """
+        if str(NET).endswith(".cfg") and not env.restore_cfg(NET):
+            print(f"cfg {NET} absente (tools/m11.sh {DATASET}-prep) : ancres et grilles de "
+                  "tiny-yolov3-coco pour les collisions")
+            NET = "tiny-yolov3-coco\"""".rstrip()
     return [md("""
         ## Environnement
 
@@ -290,7 +309,7 @@ def environment(nb):
         TRACE = env.trace(DEVICE)
         env.check_device(DEVICE){pre}
         env.prepare(DATASET, {needs[0]}, {needs[1]}, DATA_ROOT, COLAB, hint={needs[2]},
-                    drive_dir=DRIVE_DIR)
+                    drive_dir=DRIVE_DIR){post}
         Path(OUT).mkdir(parents=True, exist_ok=True)
         """)]
 
@@ -728,7 +747,295 @@ def sweep_body(nb):
         """)]
 
 
+# ---------------------------------------------------------------------------- stats (M16)
+
+STATS_SAMPLE = 200   # images lues pour les pixels (palier selon SAMPLE)
+STATS_GALLERY = 8    # images de la galerie par split
+
+# Question propre à chaque jeu (docs/tasks/M16-presentation-jeux.md#questions-par-jeu) :
+# (question, renvoi, cellule de code). Les cellules n'appellent que tools/data_stats.py.
+QUESTIONS = {
+    "voc": ("Les classes à faible AP (bottle, pottedplant) sont-elles rares ou petites ?",
+            "T13.7, T13.13", """
+        ap = DS.voc_ap()
+        if ap:
+            print(f"AP flottante par classe : {ap['source']} (Tiny-YOLOv2 VOC, VOC2007 test)")
+        display(Markdown(DS.md_par_classe(STATS, ap.get("ap") if ap else None)))
+        """),
+    "coco": ("Quelle part des objets est petite (< 32²) une fois réduite à 416 ?", "T11.1", """
+        g = DS.whole(STATS)["geometrie"]
+        for mode in ("orig", "letterbox", "stretch"):
+            c = g[mode]["coco"]
+            print(f"{mode:9s} : petits {100 * c[0] / max(sum(c), 1):.1f} %, moyens "
+                  f"{100 * c[1] / max(sum(c), 1):.1f} %, grands {100 * c[2] / max(sum(c), 1):.1f} %")
+        if DS.group(STATS, "test").get("comptes"):
+            print(f"iscrowd (test) : {DS.group(STATS, 'test')['comptes']['crowd']}")
+        """),
+    "kitti": ("`letterbox` ou `stretch` : combien d'objets passent sous 8 px de haut ?",
+              "T11.4, T15", """
+        g = DS.whole(STATS)["geometrie"]
+        for mode in ("letterbox", "stretch"):
+            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]} : hauteur < 8 px "
+                  f"{100 * g[mode]['h_under']['8']:.1f} %, < 16 px {100 * g[mode]['h_under']['16']:.1f} %")
+        # Entrée non carrée de T11.4 : géométrie seule, sans pixels.
+        out_nc = f"{OUT}/640x192"
+        C.run(C.cmd_data_stats(DATASET, out_nc, SPLITS, "640x192", "letterbox", NET,
+                               only=["geometrie"], data_root=DATA_ROOT, figures=False))
+        display(Markdown(DS.md_geometrie(json.loads(Path(out_nc, "stats.json").read_text()))))
+        """),
+    "visdrone": ("Part des objets plus petits qu'une cellule 26×26 ; collisions de cibles.",
+                 "T11.5, T15", """
+        g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
+        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+                                                           for k, v in g["fit_cell"].items()))
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
+    "flir": ("Distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00.", "T11.7", """
+        px = DS.whole(STATS).get("images", {}).get("pixels")
+        if px:
+            lv = px["levels"]
+            print(f"{px['images']} images, {px['channels']} canal(aux) ; niveaux 8 bits occupés "
+                  f"{lv['8bit']} (99 % des pixels sur {lv['8bit_99']}) → {lv['int8']} niveaux "
+                  f"INT8 à l'échelle d'entrée {lv['input_scale']:.5f} (1/127, yolo.quant)")
+        else:
+            print("SAMPLE = 0 : pas de lecture de pixels")
+        """),
+    "exdark": ("Luminosité par type d'éclairage, et écart aux images de calibration VOC.",
+               "T11.3", """
+        light = STATS.get("exdark_light")
+        if light:
+            rows = ["| éclairage | images | luminance moy. |", "|---|---|---|"]
+            rows += [f"| {k} | {v['images']} | {v['lum_mean']:.1f} |" for k, v in light.items()]
+            display(Markdown("\\n".join(rows)))
+        ref = STATS.get("voc_ref")
+        if ref:
+            print(f"VOC2007 test ({ref['images']} images) : luminance moyenne {ref['lum_mean']:.1f}")
+        show("eclairage")
+        """),
+    "crowdhuman": ("Objets par image face aux 256 emplacements ; part d'objets occultés.",
+                   "T11.6", """
+        for name, a in DS._parts(STATS):
+            d, c = a.get("densite"), a.get("comptes")
+            if d and c:
+                print(f"{name:12s} : {c['images']} images, > 256 objets {d['over']['256']} "
+                      f"({100 * d['over']['256'] / max(c['images'], 1):.2f} %), > 1 024 "
+                      f"{d['over']['1024']} ; difficult (mask, ignore) "
+                      f"{100 * c['difficult'] / max(c['objects'], 1):.1f} % des boîtes")
+        """),
+}
+
+
+def _fiche_md(dataset):
+    from tools import data_stats
+
+    f = data_stats.FICHES.get(dataset)
+    if not f:
+        return "Fiche absente de `FICHES` (tools/data_stats.py)."
+    rows = [("source", f["source"]), ("version", f["version"]), ("licence", f["license"]),
+            ("capteur", f["sensor"]), ("résolution typique", f["resolution"])]
+    rows += [(f"officiel `{sp}`", f"{i or '—'} images, {o or '—'} objets")
+             for sp, (i, o) in f["official"].items()]
+    rows += [("chargeur", n) for n in f.get("notes", [])]
+    return "\n".join(["| | |", "|---|---|"] + [f"| {k} | {v} |" for k, v in rows])
+
+
+def stats_header(nb):
+    from tools.notebooks.matrice import NOTEBOOKS, READS_HEADERS, palier
+
+    others = [o for o in NOTEBOOKS.values() if o.dataset == nb.dataset and o.role != "stats"]
+    links = ", ".join(f"[{o.name}]({o.path.name})" for o in others) or "aucun"
+    colab = f"{COLAB}/notebooks/{nb.path.as_posix()}"
+    ann = "M (en-têtes d'image lus)" if nb.dataset in READS_HEADERS else "R"
+    q, ref, _ = QUESTIONS.get(nb.dataset, ("—", "—", ""))
+    return md(textwrap.dedent("""
+        # Statistiques de {dataset}
+
+        [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({colab})
+
+        Présentation et analyse statistique du jeu, lues du point de vue de Tiny-YOLO et de la
+        cible embarquée (entrée 416, grilles 13×13 et 26×26, 256 emplacements de `yolo_post`,
+        INT8). Tâches : {tasks} ; jalon : [M16](../../docs/tasks/M16-presentation-jeux.md) ;
+        synthèse : [stats-jeux.md](../../docs/tasks/stats-jeux.md). Autres notebooks du jeu :
+        {links}.
+
+        Palier : annotations **{ann}** (split entier), pixels **{px}** (`SAMPLE = {sample}`
+        images par partie). Prérequis : données `{marker}` — {how}. Ni poids ni GPU.
+
+        Question propre : {q} (renvoi : {ref}).
+
+        @FICHE@
+
+        Aucun calcul ici : `tools/data_stats.py` calcule (`stats.json`, `stats.md`, galerie),
+        `tools/figures/donnees.py` trace ; chaque étape affiche la commande. Sorties dans
+        `{out}/`, jamais dans `results/`. Notebook généré par `python -m tools.notebooks`
+        (`make notebooks`) : modifier `tools/notebooks/gabarits.py`, pas ce fichier.
+        """).format(dataset=nb.dataset, colab=colab, tasks=_task_links(nb.tasks), links=links,
+                    ann=ann, px=palier(STATS_SAMPLE), sample=STATS_SAMPLE,
+                    marker=prerequis(nb)["données"], how=how_to_get("données", nb), q=q,
+                    ref=ref, out=nb.out_dir).replace("@FICHE@", _fiche_md(nb.dataset)))
+
+
+def stats_params(nb):
+    p = [("DATASET", nb.dataset, "clé de DATASETS"),
+         ("SPLITS", None, "liste de splits ; None : splits train puis test du jeu"),
+         ("SIZE", None, "S ou 'LxH' ; None : entrée de la cfg du jeu (416 sinon)"),
+         ("RESIZE", "letterbox", "letterbox | stretch (grandeurs vues par le réseau)"),
+         ("SAMPLE", STATS_SAMPLE, "images lues pour les pixels, par partie ; 0 : aucune"),
+         ("GALLERY", STATS_GALLERY, "images de la galerie par split"),
+         ("SEED", 0, "tirage des images (pixels, galerie, nuages)"),
+         ("NET", nb.net, "cfg dont les ancres et grilles servent aux collisions"),
+         ("DEVICE", "cpu", "noyau CPU : rien ne tourne sur GPU"),
+         ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)"),
+         ("DRIVE_DIR", DRIVE_DIR, "Colab : archives data/<jeu>.tar ; None : pas de Drive"),
+         ("OUT", nb.out_dir, "sorties du notebook"),
+         ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
+         ("REV", REV, "Colab : révision")]
+    return [md("## Paramètres"), code(_assign(p), tags=("parameters",))]
+
+
+def _section(title, text, body):
+    return [md(f"## {title}\n\n{textwrap.dedent(text).strip()}"), code(body)]
+
+
+def stats_body(nb):
+    q, ref, qcode = QUESTIONS.get(nb.dataset, ("—", "—", "print('pas de question propre')"))
+    cells = _section("Calcul (T16.0)", """
+        `tools/data_stats.py` lit les annotations de chaque split (en entier), lit les pixels
+        de `SAMPLE` images par partie (tirées avec `SEED`), dessine la galerie et trace les
+        figures. Les grandeurs « vues par le réseau » sont calculées après `RESIZE` à `SIZE`.
+        """, """
+        import json
+
+        from IPython.display import Image as Img, Markdown, display
+
+        from tools import data_stats as DS
+        from tools.notebooks.matrice import SPLIT_IMAGES, palier_stats
+        from yolo.models.tiny_yolo import load_cfg
+
+        if SIZE is None:
+            _, h, w = load_cfg(NET)["input"]
+            SIZE = h if h == w else f"{w}x{h}"
+        ann, px = palier_stats(DATASET, SAMPLE)
+        print(f"palier : annotations {ann}, pixels {px} ({SAMPLE} images par partie) ; "
+              f"entrée {SIZE} ({RESIZE}) ; cfg {NET}")
+        C.run(C.cmd_data_stats(DATASET, OUT, SPLITS, SIZE, RESIZE, NET, SAMPLE, GALLERY, SEED,
+                               data_root=DATA_ROOT))
+        STATS = json.loads(Path(OUT, "stats.json").read_text())
+        FIG = Path(OUT, "figures")
+
+
+        def show(name):
+            png = FIG / f"{name}.png"
+            if png.exists():
+                display(Img(filename=str(png)))
+
+
+        def table(fn):
+            text = fn(STATS)
+            if text:
+                display(Markdown(text))
+        """)
+    cells += _section("Présentation et galerie (T16.4)", """
+        Classes du jeu et leur correspondance VOC et COCO (`MAPPINGS`), puis `GALLERY` images
+        par split, une image par classe ; vérités terrain dessinées par `tools/detect.py:draw`.
+        À `SEED` fixé, la galerie ne change pas.
+        """, """
+        from yolo.data import datasets as D
+
+        rows = ["| classe | VOC | COCO |", "|---|---|---|"]
+        for c in D.DATASETS[DATASET].classes:
+            m = [c if DATASET == f else D.MAPPINGS.get((DATASET, f), {}).get(c, "—")
+                 for f in ("voc", "coco")]
+            rows.append(f"| {c} | {m[0]} | {m[1]} |")
+        display(Markdown("\\n".join(rows)))
+        for g, sheet in STATS.get("galerie", {}).get("planches", {}).items():
+            if g != "suspectes":
+                print(f"galerie : {g}")
+                display(Img(filename=str(Path(OUT, sheet))))
+        """)
+    cells += _section("Comptes et classes (T16.5)", """
+        Comptes par split (annotations, split entier), face aux effectifs officiels de la
+        fiche ; objets par classe et co-occurrence.
+        """, """
+        table(DS.md_synthese)
+        chk = DS.check_official(STATS)
+        for sp, i, o, (a, b), ok in chk:
+            print(f"{sp} : {i} images, {o} objets ; officiel {a or '—'} / {b or '—'} : "
+                  f"{'ok' if ok else 'écart (voir les notes de la fiche)'}")
+        table(DS.md_classes)
+        show("classes")
+        show("cooccurrence")
+        """)
+    cells += _section("Géométrie des boîtes (T16.6)", """
+        Tailles en pixels d'origine et d'entrée (letterbox et stretch à `SIZE`), catégories
+        COCO avant et après redimensionnement, part des objets plus petits qu'une cellule de
+        chaque tête, centres des boîtes.
+        """, """
+        table(DS.md_geometrie)
+        show("tailles")
+        show("letterbox_stretch")
+        show("centres")
+        """)
+    cells += _section("Densité et collisions (T16.7)", """
+        Objets par image face aux 256 emplacements de `yolo_post` ; cibles perdues quand deux
+        objets tombent sur la même cellule et la même ancre (`build_targets`, ancres de `NET`).
+        """, """
+        table(DS.md_densite)
+        show("densite")
+        show("collisions")
+        """)
+    cells += _section("Images (T16.8)", """
+        Résolutions sur le split entier (annotations) ; canaux, intensités et luminance sur
+        `SAMPLE` images par partie, face à VOC2007 test (échelles INT8 de M4).
+        """, """
+        table(DS.md_images)
+        show("resolutions")
+        show("intensites")
+        """)
+    cells += _section("Ancres (T16.9)", """
+        Boîtes du groupe train en pixels d'entrée letterbox, ancres de la cfg, de VOC, de
+        COCO et du k-means (`tools/kmeans_anchors.py`, mêmes `--size` et `--seed`).
+        """, """
+        table(DS.md_ancres)
+        show("ancres")
+        show("ancres_k")
+        """)
+    cells += _section("Qualité des annotations (T16.10)", """
+        Boîtes retirées ou rognées par le chargeur, dégénérées, doublons, régions retirées ;
+        l'analyse signale, elle ne corrige pas (une correction passe par M11).
+        """, """
+        table(DS.md_qualite)
+        sus = DS.whole(STATS).get("qualite", {}).get("suspects", [])
+        for d in sus:
+            print(f"{d['id']} : score {d['score']} (retirées {d['retirées']}, rognées "
+                  f"{d['rognées']}, dégénérées {d['dégénérées']}, doublons {d['doublons']})")
+        sheet = STATS.get("galerie", {}).get("planches", {}).get("suspectes")
+        if sheet:
+            display(Img(filename=str(Path(OUT, sheet))))
+        """)
+    cells += _section("Écart entre splits et couverture hors domaine (T16.11)", """
+        Distance en variation totale entre train et test, par grandeur ; part des objets qui
+        ont une classe VOC ou COCO (ce qu'évaluent les notebooks hors domaine de T14.5).
+        """, """
+        table(DS.md_ecart)
+        show("ecart")
+        """)
+    cells += [md(f"## Question propre au jeu\n\n{q} (renvoi : {ref})"), code(qcode)]
+    cells += [md("## Résumé"), code("""
+        table(DS.md_synthese)
+        print(f"sorties : {OUT}/ (stats.json, stats.md, figures/, galerie/) ; "
+              f"révision {TRACE['rev']}")
+        print("commandes équivalentes :")
+        for c in C.HISTORY:
+            print("  " + c)
+        """)]
+    return cells
+
+
 def render(nb):
+    if nb.role == "stats":
+        return notebook([stats_header(nb), *stats_params(nb), *environment(nb),
+                         *stats_body(nb)])
     body = {"infer": infer_body, "train": train_body, "sweep": sweep_body}[nb.role](nb)
     return notebook([header(nb), *params(nb), *environment(nb), *body], gpu=nb.trains)
 

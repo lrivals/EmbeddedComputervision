@@ -7,7 +7,7 @@ from pathlib import Path
 from tools.notebooks import NB_DIR, ROLES, ROOT
 from tools.notebooks.gabarits import (ANALYSIS, COLAB, ROLE_TITLES, SUBSET_FIRST, VIEWER,
                                       analysis, dumps, render, viewer)
-from tools.notebooks.matrice import NOTEBOOKS, how_to_get, palier_of, prerequis
+from tools.notebooks.matrice import NOTEBOOKS, how_to_get, palier_of, palier_stats, prerequis
 from tools.notebooks.commandes import M11_TRAIN
 
 
@@ -31,7 +31,12 @@ def select(targets):
 
 
 def _palier(nb):
-    """« premier passage / complet » pour l'inférence ; ITERS par défaut pour l'entraînement."""
+    """« premier passage / complet » pour l'inférence ; ITERS par défaut pour l'entraînement ;
+    « annotations / pixels » pour les statistiques (M16)."""
+    if nb.role == "stats":
+        from tools.notebooks.gabarits import STATS_SAMPLE
+
+        return "/".join(palier_stats(nb.dataset, STATS_SAMPLE))
     if nb.trains:
         return palier_of(nb, 0, M11_TRAIN["iters"])
     return f"{palier_of(nb, SUBSET_FIRST)} / {palier_of(nb)}"
@@ -47,7 +52,8 @@ def index():
              "`build/notebooks/<jeu>/<modèle>/`. Voir "
              "[docs/tasks/M14-notebooks.md](../docs/tasks/M14-notebooks.md).", "",
              f"Palier (règles de M12) : premier passage (`SUBSET = {SUBSET_FIRST}`) / passage "
-             f"complet (`SUBSET = 0`, ou `ITERS = {M11_TRAIN['iters']}` à l'entraînement).", "",
+             f"complet (`SUBSET = 0`, ou `ITERS = {M11_TRAIN['iters']}` à l'entraînement) ; "
+             "statistiques (M16) : annotations / pixels.", "",
              f"Affichage seul : [{VIEWER}]({VIEWER}) montre les figures (M13, runs) et les "
              "les range par famille, avec leur contexte.", "",
              f"Analyse : [{ANALYSIS}]({ANALYSIS}) compare les balayages lot × sous-ensemble "

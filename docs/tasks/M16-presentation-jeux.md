@@ -25,7 +25,12 @@ statistiques sont calculées par un outil du dépôt (`tools/data_stats.py`) et 
 un générateur de figures (`tools/figures/donnees.py`). Le notebook les enchaîne, les
 affiche et les commente. Tout résultat du notebook se reproduit en ligne de commande.
 
-**État** : 0 tâche faite sur 19.
+**État** : 17 tâches faites sur 19. Outil, figures, fiches, gabarit et analyses en place ;
+notebooks VOC, VisDrone, FLIR, ExDark et CrowdHuman exécutés et versionnés avec leurs
+sorties, synthèse dans [stats-jeux.md](stats-jeux.md). Restent T16.13 (COCO : `data/coco`
+absent du PC) et T16.14 (KITTI : images `training/` absentes, archive
+`data_object_image_2.zip` incomplète) ; leurs notebooks sont générés et passeront tels quels
+une fois les données là.
 
 ## Conventions communes
 
@@ -110,7 +115,7 @@ renvoie à l'axe de M11 ou M15.
 
 ## A. Infrastructure
 
-### [ ] T16.0 — Outil `tools/data_stats.py`
+### [x] T16.0 — Outil `tools/data_stats.py`
 - **Spec** : — · **Dépend de** : T11.0 · **Taille** : M
 - **Livrables** : `tools/data_stats.py` (fonctions pures + `main()`) ;
   `python/tests/test_data_stats.py`.
@@ -128,7 +133,7 @@ renvoie à l'axe de M11 ou M15.
 - **Notes** : pas de pandas ; le paquet `yolo` reste en NumPy pur
   ([ADR 0001](../adr/0001-numpy-pur.md)) et l'outil vit dans `tools/`.
 
-### [ ] T16.1 — Figures `tools/figures/donnees.py`
+### [x] T16.1 — Figures `tools/figures/donnees.py`
 - **Spec** : — · **Dépend de** : T16.0, T13.7 · **Taille** : M
 - **Livrables** : `tools/figures/donnees.py` ; option `--figures` de `data_stats.py`.
 - **Acceptation** :
@@ -137,7 +142,7 @@ renvoie à l'axe de M11 ou M15.
     totaux ;
   - style commun de `tools/figures/style.py`.
 
-### [ ] T16.2 — Fiche de chaque jeu
+### [x] T16.2 — Fiche de chaque jeu
 - **Spec** : — · **Dépend de** : T16.0 · **Taille** : S
 - **Livrables** : `FICHES` dans `tools/data_stats.py`, une entrée par jeu de `DATASETS`.
 - **Contenu** : source (URL), version, licence, capteur et conditions de prise de vue,
@@ -150,7 +155,7 @@ renvoie à l'axe de M11 ou M15.
   - `SPLIT_IMAGES` de `matrice.py` est rempli pour tous les jeux (ExDark et FLIR compris),
     depuis les comptes mesurés, et le tableau Synthèse de M11 est corrigé si besoin.
 
-### [ ] T16.3 — Rôle `stats` dans le registre et gabarit
+### [x] T16.3 — Rôle `stats` dans le registre et gabarit
 - **Spec** : — · **Dépend de** : T14.0, T14.1, T16.0 · **Taille** : M
 - **Livrables** : rôle `stats` dans `tools/notebooks/matrice.py` ; `stats_body` dans
   `tools/notebooks/gabarits.py` ; 7 notebooks `notebooks/<jeu>/<jeu>_stats.ipynb`.
@@ -163,7 +168,7 @@ renvoie à l'axe de M11 ou M15.
 
 ## B. Analyses (sections du gabarit)
 
-### [ ] T16.4 — Présentation et galerie
+### [x] T16.4 — Présentation et galerie
 - **Spec** : — · **Dépend de** : T16.2, T16.3 · **Taille** : S
 - **Contenu** :
   - la fiche (T16.2) en tableau, puis la liste des classes avec leurs correspondances VOC
@@ -173,7 +178,7 @@ renvoie à l'axe de M11 ou M15.
   - une image par classe, au moins une boîte de la classe.
 - **Acceptation** : à `SEED` fixé, la galerie ne change pas d'une exécution à l'autre.
 
-### [ ] T16.5 — Comptes et classes
+### [x] T16.5 — Comptes et classes
 - **Spec** : §8.3 · **Dépend de** : T16.0 · **Taille** : S
 - **Contenu** :
   - images, objets, objets `difficult` ou `crowd`, images sans objet, par split ;
@@ -182,7 +187,7 @@ renvoie à l'axe de M11 ou M15.
   - matrice de co-occurrence des classes (images où deux classes apparaissent ensemble).
 - **Acceptation** : totaux égaux à la fiche (voir Acceptation commune).
 
-### [ ] T16.6 — Géométrie des boîtes et taille d'entrée
+### [x] T16.6 — Géométrie des boîtes et taille d'entrée
 - **Spec** : §5.1, §8.3 · **Dépend de** : T16.0 · **Taille** : M
 - **Contenu** :
   - largeur, hauteur, aire relative et rapport d'aspect des boîtes, en pixels d'origine et
@@ -195,7 +200,7 @@ renvoie à l'axe de M11 ou M15.
 - **Acceptation** : un test vérifie le passage aux pixels d'entrée contre
   `yolo.data.letterbox.boxes_to_letterbox`.
 
-### [ ] T16.7 — Densité et collisions de cibles
+### [x] T16.7 — Densité et collisions de cibles
 - **Spec** : §5.1, §10.3 · **Dépend de** : T16.6 · **Taille** : M
 - **Contenu** :
   - objets par image (histogramme, médiane, maximum) ;
@@ -206,7 +211,7 @@ renvoie à l'axe de M11 ou M15.
 - **Acceptation** : le nombre de cibles perdues égale, sur un lot, l'écart entre objets et
   cibles positives de `build_targets`.
 
-### [ ] T16.8 — Images : résolution, canaux, intensité
+### [x] T16.8 — Images : résolution, canaux, intensité
 - **Spec** : §9 · **Dépend de** : T16.0 · **Taille** : S · **Palier** : selon `SAMPLE`
 - **Contenu** :
   - résolutions et rapports d'aspect (depuis les en-têtes, split entier) ;
@@ -217,7 +222,7 @@ renvoie à l'axe de M11 ou M15.
 - **Notes** : pour FLIR, les images 8 bits du jeu ; une analyse 16 bits sort du
   périmètre.
 
-### [ ] T16.9 — Ancres du jeu
+### [x] T16.9 — Ancres du jeu
 - **Spec** : §5.2 · **Dépend de** : T16.6 · **Taille** : S
 - **Contenu** :
   - nuage (largeur, hauteur) des boîtes en pixels d'entrée, avec les ancres du cfg et
@@ -228,7 +233,7 @@ renvoie à l'axe de M11 ou M15.
 - **Acceptation** : les ancres affichées sont celles qu'écrit `kmeans_anchors.py` aux
   mêmes `--size` et `--seed`.
 
-### [ ] T16.10 — Qualité des annotations
+### [x] T16.10 — Qualité des annotations
 - **Spec** : — · **Dépend de** : T16.0 · **Taille** : S
 - **Contenu** :
   - boîtes retirées ou rognées par `make_sample` (hors image, vides) ;
@@ -239,7 +244,7 @@ renvoie à l'axe de M11 ou M15.
 - **Notes** : l'analyse signale, elle ne corrige pas ; une correction de chargeur passe
   par une tâche de M11.
 
-### [ ] T16.11 — Écart entre splits et couverture hors domaine
+### [x] T16.11 — Écart entre splits et couverture hors domaine
 - **Spec** : §8.3 · **Dépend de** : T16.5, T16.6 · **Taille** : S
 - **Contenu** :
   - distributions train et test superposées (classes, tailles, densité), avec une
@@ -256,7 +261,7 @@ Chaque tâche lance le notebook du jeu sur les splits complets (`SAMPLE` par dé
 remplit sa section de [stats-jeux.md](stats-jeux.md), et répond à la question propre au
 jeu ([Questions par jeu](#questions-par-jeu)).
 
-### [ ] T16.12 — VOC
+### [x] T16.12 — VOC
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : comptes de VOC2007 test, VOC2007 trainval et VOC2012 trainval égaux
   aux chiffres du devkit (`OFFICIAL`) ; AP par classe de T13.13 mise en regard du nombre
@@ -268,30 +273,36 @@ jeu ([Questions par jeu](#questions-par-jeu)).
   grand avant et après réduction à 416.
 - **Notes** : train2017 se limite aux annotations (pas de lecture de pixels) ; le split
   `calib2017` de `tools/coco_subset.py` est comparé à val2017.
+- **Reste** : `data/coco` absent du PC ; lancer `tools/get_datasets.sh coco` puis le
+  notebook `notebooks/coco/coco_stats.ipynb`.
 
 ### [ ] T16.14 — KITTI
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : comptes du découpage `kitti_ids` (5 985 train, 1 496 val) ; tailles
   d'objets en `letterbox` et `stretch` à 416, et à l'entrée non carrée de T11.4.
+- **Reste** : seules les images `testing/` sont sur le PC (`data/kitti dataset/`), et
+  `data/kitti/data_object_image_2.zip.part` est incomplet ; finir le téléchargement de
+  `training/image_2`, puis lancer `notebooks/kitti/kitti_stats.ipynb` (la question propre
+  refait la géométrie à 640x192).
 
-### [ ] T16.15 — VisDrone
+### [x] T16.15 — VisDrone
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : 6 471 + 548 images ; part des objets sous 16 px à 416 et cibles
   perdues par collision, mises en regard des mAP par classe de M15.
 
-### [ ] T16.16 — FLIR
+### [x] T16.16 — FLIR
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : effectifs mesurés de la version v2 (le dépôt n'en a pas encore) ;
   histogramme thermique sur un canal, face à l'échelle d'entrée INT8 de L00.
 
-### [ ] T16.17 — ExDark
+### [x] T16.17 — ExDark
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : effectifs par split du découpage officiel ; luminance moyenne par
   type d'éclairage (colonne de `imageclasslist.txt`), face à VOC.
 - **Notes** : le type d'éclairage n'est pas lu par le chargeur ; `data_stats.py` le lit
   dans `imageclasslist.txt` sans changer `load_exdark`.
 
-### [ ] T16.18 — CrowdHuman
+### [x] T16.18 — CrowdHuman
 - **Dépend de** : T16.4 à T16.11 · **Taille** : S
 - **Acceptation** : 15 000 + 4 370 images ; part des images au-delà de 256 et de 1 024
   objets ; part des boîtes en `difficult` (`ignore`, `mask`).

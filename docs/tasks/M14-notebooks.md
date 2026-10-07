@@ -18,9 +18,21 @@ les images, les courbes et les tables, et garde la trace des paramètres. Comme 
 de [M13](M13-figures.md), il **appelle le code du dépôt** (`python/yolo/` et les `main()`
 de `tools/`), jamais une réécriture.
 
-**État** : 5 tâches faites sur 12 (T14.0, T14.2, T14.7, T14.10, T14.11). Les 7 autres sont
-implémentées ; il leur manque un passage long (palier N), un essai sur Colab ou un
-entraînement (« Reste » de chaque tâche).
+**État** (2026-10-07) : 6 tâches faites sur 12 (T14.0, T14.1, T14.2, T14.7, T14.10,
+T14.11). Les notebooks `_infer` et `_sweep` des six jeux (VOC, VisDrone, KITTI, FLIR,
+ExDark, CrowdHuman) ont tourné sur Colab GPU au palier R et sont versionnés avec leurs
+sorties ([resultats-balayages.md](resultats-balayages.md)). Les 6 autres tâches sont
+implémentées ; il leur manque un passage palier N, une comparaison à `tools/m11.sh`, une
+mesure sur Colab ou l'exécution des notebooks `_train` (« Reste » de chaque tâche) :
+
+| tâche | reste à faire |
+|---|---|
+| T14.3 | `voc/tiny-yolov2-voc_infer` avec `SUBSET = 0` : **56,30** attendu (palier N, ≈ 40 min) |
+| T14.4 | même notebook avec `INT8 = True`, `SUBSET = 0` : **55,66** attendu (palier N) |
+| T14.5 | mAP hors domaine des notebooks contre `tools/m11.sh hors-domaine`, mêmes paramètres |
+| T14.6 | exécuter au moins un notebook `_train` de bout en bout (kitti d'abord) |
+| T14.8 | reprise d'un affinage kitti après coupure Colab ; gain GPU (s/image, lot maximal) vers T12.11-e |
+| T14.9 | fumée des notebooks `_train` (`make notebooks-smoke`) |
 
 ## Conventions communes
 
@@ -216,7 +228,7 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   d'une exécution complète (acceptée, gardée par `make notebooks`), en erreur et partielle
   (refusées).
 
-### [ ] T14.1 — Cellules d'environnement et de paramètres (local et Colab)
+### [x] T14.1 — Cellules d'environnement et de paramètres (local et Colab)
 - **Spec** : — · **Dépend de** : T14.0, T12.11 · **Taille** : M
 - **Livrables** : les cellules communes de `gabarits.py`.
 - **Comportement attendu** :
@@ -250,7 +262,10 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
     Drive seulement pour les jeux qui ne se téléchargent pas ;
   - contrôle GPU par `yolo.backend.use`, sans repli ; traçabilité par `env.trace` (révision,
     NumPy, backend).
-- **Reste** : l'essai sur un vrai Colab (environnement vierge jusqu'à la cellule suivante).
+- **Validé sur Colab** : les notebooks `_infer` et `_sweep` des six jeux sont partis de
+  runtimes neufs (révisions `1a967f4` à `35e949b`, sorties versionnées) ; corrections
+  issues de ces essais : Drive monté avant `prepare_data`, arrêt clair sans GPU, roue CuPy
+  selon le pilote, cfg d'affinage reconstruite par `env.restore_cfg`, jeton Kaggle pour FLIR.
 
 ### [x] T14.2 — Matrice modèle × jeu × rôle et index
 - **Spec** : — · **Dépend de** : T14.0 · **Taille** : S
@@ -294,7 +309,9 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
     `eval_voc.py --markdown --out` dans `OUT`, courbes PR ;
   - `tools/eval_voc.py` met désormais ses courbes PR dans `<out>/figures/` quand `--out`
     est donné ;
-  - fumée de `voc/tiny-yolov2-voc_infer` avec `SUBSET = 4`.
+  - fumée de `voc/tiny-yolov2-voc_infer` avec `SUBSET = 4` ;
+  - tous les `_infer` exécutés sur Colab avec `SUBSET = 50` (palier R), sauf
+    `coco/tiny-yolov3-coco_infer` (COCO absent) : Tiny-YOLOv2 VOC y fait 63,51.
 - **Reste** : la référence 56,30 avec `SUBSET = 0` (palier N, environ 40 min), non lancée.
 
 ### [ ] T14.4 — Volet entier : calibration et mAP INT8
@@ -329,7 +346,9 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   - notebooks hors domaine de tous les jeux, avec la table `MAPPINGS`, les classes
     ignorées et `eval_view` ;
   - fumée réussie pour ExDark, VisDrone et CrowdHuman ;
-  - COCO, KITTI et FLIR sont sautés faute de données.
+  - COCO, KITTI et FLIR sont sautés faute de données ;
+  - depuis, les six jeux exécutés sur Colab (palier R, 50 images), tables dans
+    [resultats-balayages.md](resultats-balayages.md).
 - **Reste** : comparer les mAP à `tools/m11.sh hors-domaine` aux mêmes paramètres.
 
 ## C. Entraînement
@@ -363,8 +382,11 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
     de `final.weights` ;
   - le test compare, option par option, les commandes kitti à `tools/m11.sh prep` et
     `train` : seules les sorties sont propres au notebook (`OUT`, ancres dans `OUT`) ;
-  - les cellules avant l'affinage ont été exécutées sur VOC.
-- **Reste** : aucun entraînement lancé (KITTI absent de `data/` au moment de l'écriture).
+  - les cellules avant l'affinage ont été exécutées sur VOC ;
+  - la commande d'affinage a tourné à travers les `_sweep` (même commande à `--batch` et
+    `--subset` près, T14.10) : 6 cases × 6 jeux sur Colab GPU, 600 itérations.
+- **Reste** : aucun notebook `_train` exécuté de bout en bout (versionnés sans sorties) ;
+  KITTI est désormais présent, il peut servir au premier passage.
 
 ### [x] T14.7 — Variantes QAT et ADMM
 - **Spec** : §9 · **Dépend de** : T14.6, T9.2.3, T9.3.3 · **Taille** : S
@@ -409,7 +431,10 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
     classe) puis copie dans `<DRIVE_DIR>/runs/`. Couvre les évaluations des `_sweep` et
     les `_infer`, que la copie périodique ne voyait pas ; aucune cellule modifiée.
     `EMBEDDEDCV_AUTOSYNC=0` la coupe. Sur le PC : `make harvest` (rclone sans poids) ;
-- **Reste** : la reprise kitti sur Colab, et le gain GPU mesuré, à renvoyer à T12.11-e.
+  - durée observée : ≈ 10 min par run de lot 32 (624 s pour b32-sall, 600 itérations).
+- **Reste** : la reprise kitti sur Colab après coupure (à l'itération près), et le gain GPU
+  (s/image, lot maximal tenant en mémoire) noté dans le notebook et renvoyé à T12.11-e
+  ([M12](M12-profils-pc.md), ligne « à mesurer »).
 
 ## D. Balayages et choix du run
 
@@ -434,8 +459,9 @@ de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait loc
   images classe les runs, elle n'est pas publiable (règles de M12).
 - **Fait** : notebooks et `runs.py` ; tests de la commande d'une case, de
   `find_runs`/`pick`/`table` et de `read_map` (tables VOC et COCO de `eval_voc.py`).
-- **Lancés** sur Colab (palier R) pour les quatre jeux, VOC, VisDrone, KITTI et FLIR :
-  [resultats-balayages.md](resultats-balayages.md).
+- **Lancés** sur Colab (palier R) pour les six jeux, VOC, VisDrone, KITTI, FLIR, ExDark et
+  CrowdHuman : [resultats-balayages.md](resultats-balayages.md) ; analyse transversale
+  dans [notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb).
 
 ### [x] T14.11 — Inférence : choix d'un run et comparaison
 - **Spec** : §8 · **Dépend de** : T14.3, T14.10 · **Taille** : S

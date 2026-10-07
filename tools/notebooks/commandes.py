@@ -158,6 +158,21 @@ def cmd_act_hist(net, weights, datasets, calib, out, images=200):
             "--out", str(out)]
 
 
+def cmd_data_stats(dataset, out, splits=None, size=None, resize="letterbox", net=None,
+                   sample=0, gallery=0, seed=0, only=None, data_root=None, figures=True):
+    """`tools/data_stats.py` (notebooks `stats`, M16), option par option."""
+    cmd = ["python", "tools/data_stats.py", "--dataset", dataset]
+    _opt(cmd, "--split", ",".join(splits) if isinstance(splits, (list, tuple)) else splits)
+    _opt(cmd, "--size", _size(size))
+    cmd += ["--resize", resize]
+    _opt(cmd, "--net", net)
+    cmd += ["--sample", str(sample), "--gallery", str(gallery), "--seed", str(seed)]
+    _opt(cmd, "--only", ",".join(only) if isinstance(only, (list, tuple)) else only)
+    _opt(cmd, "--data-root", data_root)
+    _opt(cmd, "--figures", figures)
+    return cmd + ["--out", str(out)]
+
+
 def cmd_figures(kind, path):
     """Mode automatique de M13 : figures de `path` dans `<path>/figures/`."""
     return ["python", "-m", "tools.figures", "--run", kind, "--dir", str(path)]

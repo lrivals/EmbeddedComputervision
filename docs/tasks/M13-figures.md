@@ -211,7 +211,10 @@ restent des données à produire :
   - nombre d'objets par image.
 - **Acceptation** : les totaux sont égaux à la sortie de `tools/voc_stats.py`
 - **Notes** : utile pour lire T13.13. Les classes rares ou à petits objets (bottle,
-  pottedplant) ont les AP les plus faibles.
+  pottedplant) ont les AP les plus faibles. Depuis M16 (T16.1), les comptes viennent de
+  `tools/data_stats.py` et le tracé de `tools/figures/donnees.py` ; `voc_stats.py` reste
+  un raccourci. Sur VOC2007 test, bottle et pottedplant ne sont pas rares (≈ 4 % des
+  objets chacune) mais petites ([stats-jeux.md](stats-jeux.md#voc)).
 
 ## C. Architecture matérielle
 

@@ -5,6 +5,8 @@
   COCO n'évalue pas les poids VOC : il a son réseau à 80 classes (T11.1).
 - Inférence, poids affinés : `tiny-yolov3-<jeu>` pour chaque jeu de `TRAINABLE`, avec les
   poids `final.weights` du notebook d'entraînement correspondant.
+- Statistiques (M16) : un notebook `<jeu>_stats` par jeu de `DATASETS`, sans modèle, en tête
+  des notebooks du jeu ; la cfg du jeu ne sert qu'aux ancres et aux grilles (collisions).
 - Entraînement : `TRAINABLE`, seule liste écrite à la main (COCO train2017 est trop grand en
   NumPy ; ExDark et CrowdHuman ajoutés pour T15.14) : un notebook `train`
   (affinage unique de tools/m11.sh) et un notebook `sweep` (balayage lot × sous-ensemble,
@@ -24,10 +26,11 @@ TRAINABLE = ("voc", "kitti", "visdrone", "flir", "exdark", "crowdhuman")
 # Entrée des cfg d'affinage (options SIZE et CH de tools/m11.sh) : FLIR thermique à un canal.
 TRAIN_INPUT = {"flir": {"channels": 1}}
 
-# Images du split d'évaluation (`Dataset.test`), d'après docs/tasks/M11-jeux-de-donnees.md
-# (KITTI : 20 % des 7 481 images de training, `kitti_ids`). None : non relevé.
+# Images du split d'évaluation (`Dataset.test`), comptées par tools/data_stats.py (M16,
+# docs/tasks/stats-jeux.md ; KITTI : 20 % des 7 481 images de training, `kitti_ids` ; COCO :
+# chiffre officiel de val2017).
 SPLIT_IMAGES = {"voc": 4952, "coco": 5000, "kitti": 1496, "visdrone": 548,
-                "crowdhuman": 4370, "exdark": None, "flir": None}
+                "crowdhuman": 4370, "exdark": 2563, "flir": 1144}
 
 # Fichier témoin de chaque jeu (celui de `tools/get_datasets.sh check`, VOC : get_voc.sh).
 DATA_MARKERS = {"voc": "data/VOCdevkit/VOC2007/ImageSets/Main/test.txt",
@@ -48,6 +51,16 @@ TASKS = {("voc", "infer"): ("T3.4", "T4.5", "T11.0"), ("coco", "infer"): ("T11.1
          ("flir", "train"): ("T11.7",), ("exdark", "train"): ("T11.3", "T15.14"),
          ("crowdhuman", "train"): ("T11.6", "T15.14"), ("exdark", "infer"): ("T11.3",),
          ("crowdhuman", "infer"): ("T11.6",), ("sweep", "sweep"): ("T14.10",)}
+
+# Tâche M11 de chaque jeu et tâche d'exécution M16 (en-tête des notebooks `stats`).
+STATS_TASKS = {"voc": ("T13.7", "T16.12"), "coco": ("T11.1", "T16.13"),
+               "kitti": ("T11.4", "T16.14"), "visdrone": ("T11.5", "T16.15"),
+               "flir": ("T11.7", "T16.16"), "exdark": ("T11.3", "T16.17"),
+               "crowdhuman": ("T11.6", "T16.18")}
+
+# Jeux dont le chargeur lit l'en-tête de chaque image (taille) : palier M pour les
+# annotations seules (docs/tasks/M16-presentation-jeux.md#règles).
+READS_HEADERS = ("kitti", "visdrone", "crowdhuman", "exdark")
 
 
 def family_of(net):
@@ -70,9 +83,21 @@ def finetuned(dataset):
     return f"tiny-yolov3-{dataset}", cfg_path("tiny-yolov3", dataset, **inp), inp
 
 
+def stats_net(dataset):
+    """Cfg des notebooks `stats` : celle de l'affinage du jeu (ancres et grilles des
+    collisions), tiny-yolov3-voc pour VOC, tiny-yolov3-coco pour COCO."""
+    if dataset == "voc":
+        return "tiny-yolov3-voc"
+    if dataset in TRAINABLE:
+        return finetuned(dataset)[1]
+    return "tiny-yolov3-coco"
+
+
 def build_registry():
     out = []
     for ds in DATASETS:
+        out.append(Notebook(ds, ds, "stats", stats_net(ds), "", ds,
+                            STATS_TASKS.get(ds, ()) + ("T16.4",)))
         for net, weights in PRETRAINED.items():
             fam = family_of(net)
             if ds == fam or ((ds, fam) in MAPPINGS and ds != "coco"):
@@ -108,6 +133,12 @@ def palier(images=0, iters=0):
     return "R"
 
 
+def palier_stats(dataset, sample):
+    """(annotations, pixels) : R ou M pour les annotations (M si le chargeur lit les en-têtes
+    d'image), palier de `sample` images lues pour les pixels."""
+    return ("M" if dataset in READS_HEADERS else "R"), palier(sample)
+
+
 def palier_of(nb, subset=0, iters=0):
     """Palier d'un passage du notebook : `subset` images (0 : split complet)."""
     images = subset or SPLIT_IMAGES.get(nb.dataset)
@@ -119,6 +150,8 @@ def palier_of(nb, subset=0, iters=0):
 def prerequis(nb):
     """{type: chemin ou commande} : ce que le notebook demande avant de tourner."""
     req = {"données": DATA_MARKERS[nb.dataset]}
+    if nb.role == "stats":  # sans poids ; la cfg du jeu est remplacée si elle manque
+        return req
     # Poids affinés : le run choisi (RUN) parmi ceux du notebook _train ou _sweep.
     req["poids"] = (f"{nb.train_dir}/[runs/<run>/]final.weights" if nb.finetuned
                     else nb.weights)

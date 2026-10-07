@@ -290,91 +290,28 @@ def ancres(out_dir):
 
 
 # --- T13.7 : statistiques VOC -------------------------------------------------------------
+# Calcul par tools/data_stats.py et tracé par tools/figures/donnees.py (M16, T16.1).
 
-SPLITS = {"trainval 07+12": [(2007, "trainval"), (2012, "trainval")],
-          "test 2007": [(2007, "test")]}
-AREA_BINS = (32 ** 2, 96 ** 2)  # petits / moyens / grands (convention COCO, en pixels)
+from tools.figures.donnees import AREA_BINS, plot_voc_stats, voc_stats_view  # noqa: E402,F401
 
 
 def load_voc_stats(devkit=None):
-    """{split: {per_class (C,), areas (n,), per_image (images,)}}, objets non-difficult."""
-    from yolo.data.voc import VOC_CLASSES, load_split
+    """Vue de `donnees.voc_stats_view` : trainval 07+12 et test 2007, objets non-difficult,
+    comptes de `tools/data_stats.py` (égaux à `OFFICIAL` de tools/voc_stats.py)."""
+    from tools import data_stats
 
-    devkit = devkit or DEVKIT
-    out = {}
-    for name, splits in SPLITS.items():
-        for year, split in splits:
-            need(Path(devkit) / f"VOC{year}" / "ImageSets" / "Main" / f"{split}.txt")
-        samples = [s for y, sp in splits for s in load_split(devkit, y, sp)]
-        per_class = np.zeros(len(VOC_CLASSES), dtype=np.int64)
-        areas, per_image = [], []
-        for s in samples:
-            keep = ~s["difficult"]
-            np.add.at(per_class, s["labels"][keep], 1)
-            b = s["xyxy"][keep]
-            areas.append((b[:, 2] - b[:, 0] + 1) * (b[:, 3] - b[:, 1] + 1))
-            per_image.append(int(keep.sum()))
-        out[name] = {"per_class": per_class, "areas": np.concatenate(areas),
-                     "per_image": np.array(per_image), "images": len(samples)}
-    return out
-
-
-def plot_voc_stats(stats, out_dir, name="voc_stats"):
-    from yolo.data.voc import VOC_CLASSES
-
-    plt = st.plt()
-    fig = plt.figure(figsize=(st.FULL, 6.6))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1.2, 1])
-    ax = fig.add_subplot(gs[0, :])
-    splits = list(stats)
-    x = np.arange(len(VOC_CLASSES))
-    for k, sp in enumerate(splits):
-        ax.bar(x + (k - 0.5) * 0.4, stats[sp]["per_class"], 0.38, color=st.PALETTE[k],
-               hatch=("", "//")[k], edgecolor="white", linewidth=0.4,
-               label=f"{sp} : {stats[sp]['per_class'].sum()} objets, {stats[sp]['images']} images")
-    ax.set_xticks(x, VOC_CLASSES, rotation=40, ha="right")
-    ax.set_yscale("log")
-    ax.set_ylabel("objets (non-difficult)")
-    ax.set_title("Objets par classe")
-    ax.legend(loc="upper left")
-    ax.grid(axis="x", visible=False)
-
-    ax2 = fig.add_subplot(gs[1, 0])
-    bins = np.logspace(1, np.log10(500 * 500), 60)
-    for k, sp in enumerate(splits):
-        a = stats[sp]["areas"]
-        ax2.hist(a, bins=bins, histtype="step", lw=1.6, color=st.PALETTE[k], density=True,
-                 ls=("-", "--")[k], label=sp)
-    for b in AREA_BINS:
-        ax2.axvline(b, color=st.MUTED, lw=0.9, ls=":")
-    a = stats[splits[-1]]["areas"]
-    frac = [np.mean(a < AREA_BINS[0]), np.mean((a >= AREA_BINS[0]) & (a < AREA_BINS[1])),
-            np.mean(a >= AREA_BINS[1])]
-    st.note(ax2, f"{splits[-1]} : petits {frac[0] * 100:.0f} %, moyens {frac[1] * 100:.0f} %, "
-            f"grands {frac[2] * 100:.0f} %", "upper left")
-    ax2.set_xscale("log")
-    ax2.set_xlabel("aire de la boîte (px², image d'origine)")
-    ax2.set_ylabel("densité")
-    ax2.set_title("Aires des boîtes (seuils 32² et 96²)")
-    ax2.legend(loc="upper right")
-
-    ax3 = fig.add_subplot(gs[1, 1])
-    top = max(int(stats[sp]["per_image"].max()) for sp in splits)
-    edges = np.arange(0, min(top, 25) + 2) - 0.5
-    for k, sp in enumerate(splits):
-        ax3.hist(np.minimum(stats[sp]["per_image"], 25), bins=edges, histtype="step", lw=1.6,
-                 color=st.PALETTE[k], density=True, ls=("-", "--")[k], label=sp)
-    ax3.set_xlabel("objets par image (25 = 25 et plus)")
-    ax3.set_title("Objets par image")
-    ax3.legend(loc="upper right")
-    fig.tight_layout()
-    return st.save(fig, out_dir, name)
+    devkit = Path(devkit or DEVKIT)
+    for y, sp in ((2007, "trainval"), (2012, "trainval"), (2007, "test")):
+        need(devkit / f"VOC{y}" / "ImageSets" / "Main" / f"{sp}.txt")
+    stats, _ = data_stats.compute("voc", data_root=devkit, only=("comptes", "geometrie",
+                                                                  "densite"), log=lambda _: None)
+    return voc_stats_view(data_stats._py(stats))
 
 
 @figure("voc_stats", "modeles", "T13.7",
         "Statistiques de VOC : objets par classe en trainval et en test, aires des boîtes, "
         "objets par image.",
-        "data/VOCdevkit (comptes égaux à tools/voc_stats.py)")
+        "data/VOCdevkit, tools/data_stats.py (comptes égaux à tools/voc_stats.py)")
 def voc_stats(out_dir):
     return plot_voc_stats(load_voc_stats(), out_dir)
 

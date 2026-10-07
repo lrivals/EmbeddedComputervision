@@ -27,14 +27,18 @@ COLORS = [tuple(int(v) for v in np.random.default_rng(c).integers(64, 256, 3))
 
 
 def draw(img, boxes, scores, labels, names):
+    """Boîtes `(cx, cy, w, h)` normalisées sur `img` ; `scores` None : vérités terrain,
+    étiquette sans score (galeries de M16)."""
     img = img.convert("RGB")
     d = ImageDraw.Draw(img)
     w, h = img.size
+    if scores is None:
+        scores = [None] * len(labels)
     for b, s, c in zip(cxcywh_to_xyxy(boxes) * [w, h, w, h], scores, labels):
         x1, y1, x2, y2 = np.clip(b, 0, [w - 1, h - 1, w - 1, h - 1])
         col = COLORS[c % len(COLORS)]
         d.rectangle([x1, y1, x2, y2], outline=col, width=3)
-        text = f"{names[c]} {s:.2f}"
+        text = names[c] if s is None else f"{names[c]} {s:.2f}"
         tx, ty, tx2, ty2 = d.textbbox((x1, y1), text)
         d.rectangle([tx - 1, ty - 1, tx2 + 1, ty2 + 1], fill=col)
         d.text((x1, y1), text, fill=(0, 0, 0))
