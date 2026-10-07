@@ -1,9 +1,9 @@
-"""Boucle d'entraînement (§7.1) : passe avant, perte (§6.2), passe arrière, SGD.
+"""Boucle d'entraînement (§7.1) : passe avant, perte (§6.2), passe arrière, pas d'optimiseur.
 
     for X, cibles in lots:
         si multi-échelle et it % 10 == 0 : nouvelle taille parmi 320, 352, …, 608   (§2.2)
         sorties = forward(X) ; L, δ = perte(sorties) ; grads = backward(δ / N)
-        p ← SGD(p, grads, lr(it))
+        p ← optimiseur(p, grads, lr(it))          (SGD ou AdamW, `yolo.train.optim`)
 
 La perte de `yolo_loss` est une somme sur le lot ; le trainer la divise par N (perte
 moyenne par image), ce qui rend le taux d'apprentissage indépendant de la taille du lot.
@@ -135,7 +135,7 @@ class Trainer:
 
     # ---------------------------------------------------------------- checkpoints
     def save_checkpoint(self, path):
-        """Paramètres, état BN, vitesses SGD et itération dans un `.npz`."""
+        """Paramètres, état BN, état de l'optimiseur et itération dans un `.npz`."""
         arrays = {"it": np.array(self.it), "seed": np.array(self.seed)}
         for i, (p, s) in enumerate(zip(self.net.params, self.net.state)):
             arrays.update({f"param/{i}/{k}": to_numpy(v) for k, v in p.items()})

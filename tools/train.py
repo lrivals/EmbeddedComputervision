@@ -11,6 +11,9 @@
         --qat w4a4 --qat-steps build/m9/models/tiny-yolov2-voc-w4a4-ptq/steps.json \
         --lr 1e-4 --burn-in 100 --batch 8 --iters 4000 --out build/train/qat-w4a4
 
+    # même QAT avec AdamW : pas normalisé par paramètre, utile aux pas log2_s appris
+    python tools/train.py … --optim adamw --lr 1e-4
+
     # même entraînement sur le GPU (CuPy, T12.11) ; le CPU reste le défaut et la référence
     python tools/train.py … --device gpu
 
@@ -49,7 +52,7 @@ from yolo.data.letterbox import input_size, parse_size  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights, save_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import build  # noqa: E402
 from yolo.quant.fuse_bn import fuse_network  # noqa: E402
-from yolo.train.optim import NO_DECAY, SGD  # noqa: E402
+from yolo.train.optim import NO_DECAY, OPTIMIZERS  # noqa: E402
 from yolo.train.schedule import StepSchedule  # noqa: E402
 from yolo.train.trainer import Trainer, copy_matching  # noqa: E402
 
@@ -92,6 +95,10 @@ def main():
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--iters", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--optim", choices=sorted(OPTIMIZERS), default="sgd",
+                    help="sgd (momentum 0,9, référence Darknet) ou adamw (betas 0,9 et 0,999)")
+    ap.add_argument("--weight-decay", type=float, default=None,
+                    help="défaut : 5e-4 en SGD, 1e-2 en AdamW (decay découplé)")
     ap.add_argument("--burn-in", type=int, default=1000)
     ap.add_argument("--steps", default="", help="ex. 16000,18000")
     ap.add_argument("--scales", default="", help="ex. 0.1,0.1")
@@ -149,7 +156,7 @@ def main():
     elif not args.resume:
         init_weights(net, args.net, args.init, dtype, args.init_net)
     if args.device == "gpu":
-        net.to_device()  # avant l'ADMM et le SGD : Z, U et vitesses suivent les paramètres
+        net.to_device()  # avant l'ADMM et l'optimiseur : Z, U et moments suivent les paramètres
     if args.admm:
         from yolo.train.admm import ADMM
 
@@ -160,7 +167,9 @@ def main():
         grad_hook = admm.hook
     steps = [int(s) for s in args.steps.split(",") if s]
     scales = [float(s) for s in args.scales.split(",") if s]
-    trainer = Trainer(net, SGD(net.params, no_decay=no_decay),
+    opt_kw = {} if args.weight_decay is None else {"weight_decay": args.weight_decay}
+    optimizer = OPTIMIZERS[args.optim](net.params, no_decay=no_decay, **opt_kw)
+    trainer = Trainer(net, optimizer,
                       StepSchedule(args.lr, args.burn_in, steps=steps, scales=scales),
                       size=None if args.multiscale else input_size(net.net, args.size),
                       seed=args.seed,
