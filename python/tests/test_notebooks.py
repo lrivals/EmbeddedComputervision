@@ -410,6 +410,24 @@ def test_anchors_k(tmp_path):
     assert C.anchors_k(p, 6) == "10,14  23,27"
 
 
+def test_cfg_reconstruite_depuis_les_ancres_du_run(tmp_path, monkeypatch):
+    """Runtime Colab neuf : runs restaurés de Drive, build/m11/cfg/ absent (FLIR, un canal)."""
+    from tools.notebooks import env
+
+    nb = NOTEBOOKS["flir/tiny-yolov3-flir_sweep"]
+    monkeypatch.setattr(env, "ROOT", tmp_path)
+    called = []
+    monkeypatch.setattr(C, "run", lambda cmd, **kw: called.append(cmd))
+    assert not env.restore_cfg(nb.net)  # ni cfg ni table d'ancres
+    anchors = tmp_path / nb.train_dir / "anchors_flir.md"
+    anchors.parent.mkdir(parents=True)
+    anchors.write_text("| k | ancres | IoU |\n|---|---|---|\n| 6 | `10,14  23,27` | 0.6 |\n")
+    assert env.restore_cfg(nb.net)
+    assert called == [C.cmd_make_cfg("tiny-yolov3-voc", "flir", "10,14  23,27", nb.net,
+                                     channels=1)]
+    assert not env.restore_cfg("build/m11/cfg/inconnue.cfg")
+
+
 # ---------------------------------------------------------------------- T14.9 fumée
 
 SMOKE = {"SUBSET": 4, "ITERS": 2, "BATCH": 2, "SHOW": 2, "CALIB_IMAGES": 8, "JOBS": 2,

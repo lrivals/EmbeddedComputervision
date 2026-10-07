@@ -40,6 +40,30 @@ def data_ok(dataset, data_root=None):
     return (ROOT / DATA_MARKERS[dataset]).exists()
 
 
+def restore_cfg(cfg):
+    """Cfg d'affinage `cfg` absente (runtime Colab neuf : build/m11/cfg/ n'est ni dans le
+    dépôt ni sur Drive) : reconstruite par `tools/make_cfg.py` depuis la table d'ancres que
+    la préparation des notebooks _train et _sweep laisse dans leur dossier (copié sur Drive
+    avec les runs), ou depuis celle de `tools/m11.sh <jeu>-prep` (results/). Mêmes ancres,
+    même cfg (BASE et ANCHORS_K par défaut). Rend True si la cfg existe à la fin."""
+    from tools.notebooks import commandes as C
+    from tools.notebooks.matrice import NOTEBOOKS
+
+    if (ROOT / cfg).exists():
+        return True
+    nb = next((n for n in NOTEBOOKS.values() if n.trains and n.net == str(cfg)), None)
+    if nb is None:
+        return False
+    name = f"anchors_{nb.dataset}{'_' + str(nb.size) if nb.size else ''}.md"
+    for anchors in (Path(nb.train_dir) / name, Path("results") / name):
+        if (ROOT / anchors).exists():
+            print(f"cfg {cfg} absente : reconstruite depuis {anchors}")
+            C.run(C.cmd_make_cfg("tiny-yolov3-voc", nb.dataset,
+                                 C.anchors_k(ROOT / anchors, 6), cfg, nb.size, nb.channels))
+            return True
+    return False
+
+
 def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint="",
             drive_dir=None):
     """Données de `dataset`, poids `weights` (chemins relatifs à la racine) et `cfg`.
@@ -73,7 +97,7 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
         if not (ROOT / w).exists():
             missing.append(f"poids {w} absents : "
                            + ("tools/get_weights.sh" if w.startswith("weights/") else hint))
-    if cfg and str(cfg).endswith(".cfg") and not (ROOT / cfg).exists():
+    if cfg and str(cfg).endswith(".cfg") and not restore_cfg(cfg):
         missing.append(f"cfg {cfg} absente : {hint}")
     if missing:
         raise Prerequis("à lancer avant ce notebook :\n  " + "\n  ".join(missing))
