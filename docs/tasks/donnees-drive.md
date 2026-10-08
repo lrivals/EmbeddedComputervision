@@ -64,6 +64,10 @@ C'est plus que le Drive gratuit (15 Go), mais le compte du projet a 100 Go. Vér
 avec `rclone about gdrive:` avant un gros envoi. Après un nouvel envoi, mettre à jour la
 colonne « Sur le Drive ».
 
+Le 2026-10-08, les tailles des neuf archives du Drive ont été comparées à celles de
+`data_archives/`, qui a ensuite été vidé. crowdhuman, exdark et flir ne sont plus que sur
+le Drive (absents de `data/`) : `tools/get_datasets.sh pull <jeu>` les reprend.
+
 ## Accès
 
 La règle est la même partout : **un jeu présent est utilisé tel quel ; sinon, il est repris du

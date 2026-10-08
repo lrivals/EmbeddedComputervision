@@ -249,6 +249,7 @@ puis `python -m tools.notebooks <jeu>` (ou `make notebooks`).
 - **Status (2026-10-08)**: done. The four archives are on `gdrive:EmbeddedCV/data`, with
   the same sizes as in `data_archives/` (auair 2,477,015,040; dronevehicle 2,244,229,120;
   hituav 203,950,080; uavdt 6,855,751,680 bytes). The Drive has 32.7 GiB free.
+  `data_archives/` was then emptied; `tools/get_datasets.sh pull <jeu>` restores a dataset.
 
 ### [ ] T18.10 — Hors domaine et affinages
 - **Dépend de** : T18.8, T18.9 · **Taille** : L
