@@ -240,16 +240,15 @@ puis `python -m tools.notebooks <jeu>` (ou `make notebooks`).
 - **Notes** : refaire après `tools/m11.sh <jeu>-prep`, pour que les collisions utilisent
   les ancres du jeu et non celles de COCO.
 
-### [ ] T18.9 — Envoi sur le Drive
+### [x] T18.9 — Envoi sur le Drive
 - **Dépend de** : T18.0 · **Taille** : S
 - **Livrables** : `tools/get_datasets.sh push auair dronevehicle hituav uavdt` ; lignes
   du tableau de [donnees-drive.md](donnees-drive.md).
 - **Notes** : ≈ 2,4 + 2,2 + 0,2 + 6,5 Go (`du -shL`). UAVDT est le plus long à envoyer.
   Vérifier la place (`rclone about gdrive:`).
-- **Status (2026-10-07)**: a first `push` was stopped by hand during the AU-AIR upload.
-  `data_archives/auair.tar` (2,477,015,040 bytes) is complete locally but not on the
-  Drive. The other three archives are not built yet. The Drive has 43.7 GiB free. To
-  resume, run the same `push` command (`pack` rebuilds `auair.tar`).
+- **Status (2026-10-08)**: done. The four archives are on `gdrive:EmbeddedCV/data`, with
+  the same sizes as in `data_archives/` (auair 2,477,015,040; dronevehicle 2,244,229,120;
+  hituav 203,950,080; uavdt 6,855,751,680 bytes). The Drive has 32.7 GiB free.
 
 ### [ ] T18.10 — Hors domaine et affinages
 - **Dépend de** : T18.8, T18.9 · **Taille** : L
@@ -271,5 +270,5 @@ puis `python -m tools.notebooks <jeu>` (ou `make notebooks`).
 
 ## Ordre conseillé
 
-T18.0 → T18.1 à T18.4 → T18.5 → T18.6 → T18.7 sont faites. Ensuite T18.9 (Drive, pour
-Colab), puis T18.8, puis T18.10.
+T18.0 → T18.1 à T18.4 → T18.5 → T18.6 → T18.7 et T18.9 (Drive, pour Colab) sont faites.
+Ensuite T18.8, puis T18.10.

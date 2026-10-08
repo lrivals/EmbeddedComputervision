@@ -53,13 +53,13 @@ ls -l data_archives/                 # doivent être identiques
 | crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | ✓ (6 oct. 2026) | aussi par l'API Kaggle ; le plus long à envoyer |
 | coco | ≈ 1,3 Go | `coco/annotations/instances_val2017.json` | — | absent du PC ; se retélécharge (`get_datasets.sh coco`) |
 | kitti | ≈ 12 Go | `kitti/training/image_2/000000.png` | — | absent du PC ; se retélécharge (`get_datasets.sh kitti`) |
-| auair | 2,5 Go | `auair/annotations.json` | — (archive locale prête, envoi à faire) | M18 : lien vers `AU-AIR dataset/` (`get_datasets.sh kaggle`) |
-| dronevehicle | 2,2 Go | `dronevehicle/test/labels` | — | M18 : sortie de `tools/prep_datasets.py dronevehicle` (recadrée) |
-| hituav | 0,2 Go | `hituav/labels/test` | — | M18 : lien vers `HIT-UAV: …/hit-uav` |
-| uavdt | 6,5 Go | `uavdt/annotations_test.json` | — | M18 : sortie de `tools/prep_datasets.py uavdt` (séquences M seules) |
+| auair | 2,5 Go | `auair/annotations.json` | ✓ (8 oct. 2026) | M18 : lien vers `AU-AIR dataset/` (`get_datasets.sh kaggle`) |
+| dronevehicle | 2,2 Go | `dronevehicle/test/labels` | ✓ (8 oct. 2026) | M18 : sortie de `tools/prep_datasets.py dronevehicle` (recadrée) |
+| hituav | 0,2 Go | `hituav/labels/test` | ✓ (8 oct. 2026) | M18 : lien vers `HIT-UAV: …/hit-uav` |
+| uavdt | 6,5 Go | `uavdt/annotations_test.json` | ✓ (8 oct. 2026) | M18 : sortie de `tools/prep_datasets.py uavdt` (séquences M seules) |
 | flir | 12 Go | `flir/images_thermal_val/coco.json` | ✓ (7 oct. 2026) | aussi par l'API Kaggle (miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2`) ; RGB et vidéos compris (images thermiques seules : 4,9 Go) |
 
-Les tailles sont celles de `du -shL` sur le PC. Ensemble, les cinq jeux envoyés font environ 30 Go.
+Les tailles sont celles de `du -shL` sur le PC. Ensemble, les neuf jeux envoyés font environ 42 Go.
 C'est plus que le Drive gratuit (15 Go), mais le compte du projet a 100 Go. Vérifier la place
 avec `rclone about gdrive:` avant un gros envoi. Après un nouvel envoi, mettre à jour la
 colonne « Sur le Drive ».
