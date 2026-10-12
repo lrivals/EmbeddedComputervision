@@ -68,7 +68,7 @@ une fois les données là.
 
 ### Règles
 
-- Les règles de [M14](M14-notebooks.md#règles) s'appliquent : notebooks versionnés sans
+- Les règles de [M14](M14-notebooks.md#rules) s'appliquent : notebooks versionnés sans
   sorties ou exécutés en entier sans erreur, `--check`, commande CLI équivalente affichée
   à chaque étape.
 - **Structure fixe** de chaque notebook, dans cet ordre :

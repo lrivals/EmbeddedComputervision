@@ -48,7 +48,7 @@ exécution, installe `python[data,plots]` et CuPy (`DEVICE = 'gpu'`). **Le code 
 est celui de `REV` sur GitHub, pas celui du PC** : pousser d'abord ce qui doit tourner.
 
 Les données passent par `colab.prepare_data(DATASET, DRIVE_DIR)` (ordre : témoin, archive
-Drive, rclone, téléchargement direct ; [M14](M14-notebooks.md#données-sur-colab)). Ce qui
+Drive, rclone, téléchargement direct ; [M14](M14-notebooks.md#data-on-colab)). Ce qui
 est sur Drive aujourd'hui :
 
 | Jeu | Source sur Colab |
@@ -149,7 +149,7 @@ les runs, elle n'est pas publiable (M12).
 Sous VS Code, les sorties d'un kernel Colab (texte, figures) s'enregistrent dans le
 `.ipynb` du PC. GitHub les affiche si le fichier est poussé avec, les images comprises
 (PNG en base64), mais pas le JavaScript ni les widgets, et l'aperçu échoue sur les gros
-notebooks. Règle du dépôt ([M14](M14-notebooks.md#règles)) :
+notebooks. Règle du dépôt ([M14](M14-notebooks.md#rules)) :
 
 - notebook **exécuté en entier sans erreur**, cellules du gabarit intactes : il se commite
   avec ses sorties, et `make notebooks` le garde ;

@@ -9,7 +9,7 @@ Colab à GPU ([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inféren
 [donnees-drive.md](donnees-drive.md)).
 
 Les notebooks exécutés sont versionnés avec leurs sorties (règle de
-[M14](M14-notebooks.md#règles)) ; toutes les tables et courbes ci-dessous s'y relisent :
+[M14](M14-notebooks.md#rules)) ; toutes les tables et courbes ci-dessous s'y relisent :
 
 | jeu | balayage | inférence |
 |---|---|---|

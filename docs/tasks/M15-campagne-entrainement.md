@@ -67,7 +67,7 @@ VisDrone (T15.8, T15.10, T15.15, T15.16) : outillage prêt, runs à lancer.
   résumés, tables et figures dans `build/notebooks/` (sans poids), puis
   `python -m tools.notebooks.balayages --runs` refait la synthèse ; ensuite seulement,
   reporter les chiffres ici et dans [resultats-balayages.md](resultats-balayages.md).
-- Les notebooks restent versionnés sans sorties ([M14](M14-notebooks.md#règles)) ; un
+- Les notebooks restent versionnés sans sorties ([M14](M14-notebooks.md#rules)) ; un
   changement de paramètre par défaut passe par `tools/notebooks/gabarits.py` et
   `make notebooks`.
 

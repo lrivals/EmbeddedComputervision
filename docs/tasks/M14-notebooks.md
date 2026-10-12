@@ -1,527 +1,529 @@
-# M14 — Notebooks d'entraînement et d'inférence (optionnel)
+# M14 — Training and inference notebooks (optional)
 
-Objectif : un notebook Jupyter par couple **modèle × jeu de données** et par rôle
-(**entraînement** ou **inférence**), généré depuis un gabarit et exécutable en local comme
-sur Colab (GPU).
+Goal: one Jupyter notebook per **model × dataset** pair and per role (**training** or
+**inference**), generated from a template and runnable locally as well as on Colab (GPU).
 
-Constat de départ :
-- la chaîne ne se pilote qu'en ligne de commande : `tools/train.py`, `tools/detect.py`,
-  `tools/eval_voc.py`, `tools/calibrate.py`, `tools/eval_quant.py`, et les profils
-  `tools/m11.sh` et `tools/m12.sh` ;
-- le dépôt ne contient aucun `.ipynb` ;
-- les affinages hors VOC (T11.4, T11.5, T11.7) coûtent des heures sur CPU (≈ 0,45 s/image,
-  [M12](M12-profils-pc.md#cost-tiers)) ; un GPU distant (Colab) les rend praticables,
-  à condition que la chaîne s'y installe en une cellule.
+Starting point:
+- the chain can only be driven from the command line: `tools/train.py`,
+  `tools/detect.py`, `tools/eval_voc.py`, `tools/calibrate.py`, `tools/eval_quant.py`, and
+  the profiles `tools/m11.sh` and `tools/m12.sh`;
+- the repository contains no `.ipynb`;
+- the fine-tunings outside VOC (T11.4, T11.5, T11.7) cost hours on CPU (≈ 0.45 s/image,
+  [M12](M12-profils-pc.md#cost-tiers)); a remote GPU (Colab) makes them practical,
+  provided the chain installs there in one cell.
 
-Un notebook n'apporte **aucun calcul nouveau** : il enchaîne les outils existants, montre
-les images, les courbes et les tables, et garde la trace des paramètres. Comme les figures
-de [M13](M13-figures.md), il **appelle le code du dépôt** (`python/yolo/` et les `main()`
-de `tools/`), jamais une réécriture.
+A notebook brings **no new computation**: it chains the existing tools, shows the images,
+the curves and the tables, and keeps a record of the parameters. Like the figures of
+[M13](M13-figures.md), it **calls the repository code** (`python/yolo/` and the `main()`
+functions of `tools/`), never a rewrite.
 
-**État** (2026-10-07) : 8 tâches faites sur 12 (T14.0 à T14.4, T14.7, T14.10,
-T14.11). Les notebooks `_infer` et `_sweep` des six jeux (VOC, VisDrone, KITTI, FLIR,
-ExDark, CrowdHuman) ont tourné sur Colab GPU au palier R et sont versionnés avec leurs
-sorties ([resultats-balayages.md](resultats-balayages.md)). Les 6 autres tâches sont
-implémentées ; il leur manque un passage palier N, une comparaison à `tools/m11.sh`, une
-mesure sur Colab ou l'exécution des notebooks `_train` (« Reste » de chaque tâche) :
+**State** (2026-10-07): 8 tasks done out of 12 (T14.0 to T14.4, T14.7, T14.10, T14.11).
+The `_infer` and `_sweep` notebooks of the six datasets (VOC, VisDrone, KITTI, FLIR,
+ExDark, CrowdHuman) ran on a Colab GPU at tier R and are versioned with their outputs
+([resultats-balayages.md](resultats-balayages.md)). The other tasks are implemented; what
+they lack is a tier N run, a comparison with `tools/m11.sh`, a measurement on Colab or the
+execution of the `_train` notebooks ("Remaining" of each task):
 
-| tâche | reste à faire |
+| task | remaining |
 |---|---|
-| T14.5 | mAP hors domaine des notebooks contre `tools/m11.sh hors-domaine`, mêmes paramètres |
-| T14.6 | exécuter au moins un notebook `_train` de bout en bout (kitti d'abord) |
-| T14.8 | reprise d'un affinage kitti après coupure Colab ; gain GPU (s/image, lot maximal) vers T12.11-e |
-| T14.9 | fumée des notebooks `_train` (`make notebooks-smoke`) |
+| T14.5 | out-of-domain mAP of the notebooks against `tools/m11.sh hors-domaine`, same parameters |
+| T14.6 | run at least one `_train` notebook end to end (kitti first) |
+| T14.8 | resume of a kitti fine-tuning after a Colab disconnect; GPU gain (s/image, max batch) to T12.11-e |
+| T14.9 | smoke run of the `_train` notebooks (`make notebooks-smoke`) |
 
-## Conventions communes
+## Shared conventions
 
-### Outillage
+### Tooling
 
-- **Paquet** : `tools/notebooks/`. Il contient :
-  - `matrice.py`, le registre des notebooks (couple modèle × jeu × rôle, voir plus bas) ;
-  - `gabarits.py`, les cellules communes et les gabarits `infer` et `train` ;
-  - `__main__.py`, la ligne de commande.
-- **Commandes** :
-  - `python -m tools.notebooks <nom|jeu|rôle|all>` écrit les notebooks demandés, la
-    visionneuse `notebooks/figures_live.ipynb` et l'index ; un notebook exécuté en entier
-    sans erreur est gardé (« gardé » dans la sortie) ;
-  - `python -m tools.notebooks --list` affiche le registre ;
-  - `python -m tools.notebooks --check` échoue si un notebook versionné diffère de ce que
-    produirait le générateur, sorties et métadonnées du noyau mises à part, ou s'il porte
-    une exécution partielle ou en erreur (voir [Règles](#règles)) ;
-  - `make notebooks` régénère tout ; `make ci` lance `--check`.
-- **Format** : JSON nbformat 4 écrit avec `json` de la bibliothèque standard. `nbformat`
-  n'est pas une dépendance obligatoire ; il sert seulement à valider le schéma dans le test,
-  qui est sauté s'il est absent.
-- **Dépendances** : extra `notebooks = ["jupyter", "matplotlib>=3.7", "pillow>=10"]` dans
-  `python/pyproject.toml`. Le paquet `yolo` reste en NumPy pur
-  ([ADR 0001](../adr/0001-numpy-pur.md)) : ni Jupyter ni matplotlib ne sont importés depuis
+- **Package**: `tools/notebooks/`. It contains:
+  - `matrice.py`, the notebook registry (model × dataset × role, see below);
+  - `gabarits.py`, the shared cells and the `infer` and `train` templates;
+  - `__main__.py`, the command line.
+- **Commands**:
+  - `python -m tools.notebooks <name|dataset|role|all>` writes the requested notebooks,
+    the viewer `notebooks/figures_live.ipynb` and the index; a notebook executed in full
+    without error is kept ("gardé" in the output);
+  - `python -m tools.notebooks --list` prints the registry;
+  - `python -m tools.notebooks --check` fails if a versioned notebook differs from what the
+    generator would produce, outputs and kernel metadata aside, or if it carries a partial
+    or failed execution (see [Rules](#rules));
+  - `make notebooks` regenerates everything; `make ci` runs `--check`.
+- **Format**: nbformat 4 JSON written with the standard library `json`. `nbformat` is not a
+  required dependency; it only validates the schema in the test, which is skipped if it is
+  missing.
+- **Dependencies**: extra `notebooks = ["jupyter", "matplotlib>=3.7", "pillow>=10"]` in
+  `python/pyproject.toml`. The `yolo` package stays pure NumPy
+  ([ADR 0001](../adr/0001-numpy-pur.md)): neither Jupyter nor matplotlib is imported from
   `python/yolo/`.
 
-### Sorties
+### Outputs
 
-- **Notebooks** : `notebooks/<jeu>/<modèle>_<rôle>.ipynb`, par exemple
-  `notebooks/voc/tiny-yolov2-voc_infer.ipynb` ou
+- **Notebooks**: `notebooks/<dataset>/<model>_<role>.ipynb`, for example
+  `notebooks/voc/tiny-yolov2-voc_infer.ipynb` or
   `notebooks/kitti/tiny-yolov3-kitti_train.ipynb`.
-- **Index** : `notebooks/README.md`, réécrit depuis le registre comme
-  [results/figures.md](../../results/figures.md). Une ligne par notebook : jeu, modèle,
-  rôle, palier de coût, poids requis, badge « Open in Colab ».
-- **Visionneuse** : `notebooks/figures_live.ipynb`, hors registre modèle × jeu, générée
-  avec l'index (`gabarits.viewer`). Affichage seul et **sans exécution** : les PNG
-  versionnés (`docs/tasks/figures/`, `results/figures/`) en cellules Markdown, liens
-  `![](../…)`, visibles dès l'ouverture dans VS Code comme sur GitHub. Ils sont rangés par
-  famille du registre `tools/figures/` (section ouverte par un paragraphe de contexte,
-  `FAMILY_INTROS`, et la liste des figures), puis par figure : tâche T13.x, légende,
-  source, commande (`EXTRA_PREFIXES` rattache les PNG au nom d'une autre figure). Un PNG
-  qu'aucune figure ne réclame tombe dans « Autres figures ». La liste est
-  lue sur le disque à la génération : après `make figures`, lancer `make notebooks`
-  (sinon `--check` signale la visionneuse). Les PNG de `build/` (non versionnés)
-  s'affichent par la dernière cellule, avec un noyau local.
-- **Analyse des balayages** : `notebooks/analyse_balayages.ipynb`, hors registre, générée
-  avec l'index (`gabarits.analysis`). Compare les balayages lot × sous-ensemble de tous
-  les jeux en relisant les sorties versionnées des `_sweep` et `_infer` : ni GPU ni
-  données. Lecture et statistiques dans `tools/notebooks/balayages.py` (CLI
-  `python -m tools.notebooks.balayages --runs`), figures dans `tools/figures/balayages.py`
-  (`python -m tools.figures balayages`). Versionnée exécutée ; après un nouveau balayage,
-  la relancer en entier.
-- **Résultats d'exécution** : `build/notebooks/<jeu>/<modèle>/` (checkpoints, JSON des mAP,
-  figures). Un notebook n'écrit **jamais** dans `results/`.
+- **Index**: `notebooks/README.md`, rewritten from the registry like
+  [results/figures.md](../../results/figures.md). One row per notebook: dataset, model,
+  role, cost tier, required weights, "Open in Colab" badge.
+- **Viewer**: `notebooks/figures_live.ipynb`, outside the model × dataset registry,
+  generated with the index (`gabarits.viewer`). Display only and **without execution**: the
+  versioned PNGs (`docs/tasks/figures/`, `results/figures/`) in Markdown cells, links
+  `![](../…)`, visible on opening in VS Code as on GitHub. They are sorted by family of the
+  `tools/figures/` registry (a section opened by a context paragraph, `FAMILY_INTROS`, and
+  the list of figures), then by figure: task T13.x, caption, source, command
+  (`EXTRA_PREFIXES` attaches the PNGs to the name of another figure). A PNG that no figure
+  claims falls into "Autres figures". The list is read from disk at generation time: after
+  `make figures`, run `make notebooks` (otherwise `--check` flags the viewer). The PNGs of
+  `build/` (not versioned) are shown by the last cell, with a local kernel.
+- **Sweep analysis**: `notebooks/analyse_balayages.ipynb`, outside the registry, generated
+  with the index (`gabarits.analysis`). It compares the batch × subset sweeps of all the
+  datasets by rereading the versioned outputs of the `_sweep` and `_infer` notebooks:
+  neither GPU nor data. Reading and statistics in `tools/notebooks/balayages.py` (CLI
+  `python -m tools.notebooks.balayages --runs`), figures in `tools/figures/balayages.py`
+  (`python -m tools.figures balayages`). Versioned executed; after a new sweep, rerun it in
+  full.
+- **Run results**: `build/notebooks/<dataset>/<model>/` (checkpoints, mAP JSON,
+  figures). A notebook **never** writes to `results/`.
 
-### Règles
+### Rules
 
-- **Versionnés sans sorties, ou exécutés en entier sans erreur** : un notebook versionné
-  a les cellules du générateur, et soit aucune sortie (ni `outputs`, ni `execution_count`),
-  soit **toutes** ses cellules de code exécutées sans sortie d'erreur ; ses sorties sont
-  alors visibles sur GitHub. Les métadonnées du noyau (`kernelspec`, `language_info`) sont
-  ignorées. Une exécution partielle ou en erreur ne se versionne pas : `--check` la
-  refuse et `make notebooks` la remplace par le notebook vide. Une exécution complète est
-  gardée par `make notebooks` tant que le gabarit ne change pas ; une cellule ajoutée ou
-  retouchée à la main est refusée dans les deux cas.
-- **Archives** : avant un changement de gabarit, `python -m tools.notebooks <cibles>
-  --archive` fige les exécutions complètes et à jour (empreinte sans sorties dans
-  `notebooks/archives.json`). Une archive reste gardée par `make notebooks` et admise par
-  `--check` (« archivé ») tant que son empreinte ne change pas ; une retouche la fait
-  refuser. `--force` régénère la cible depuis le gabarit courant et retire l'archive.
-  Sert aux sorties que lit `tools/notebooks/balayages.py` (12 notebooks `_sweep` et
-  `_infer` affinés archivés pour M15).
-- **Structure fixe** de chaque notebook, dans cet ordre :
-  1. titre, rôle, palier de coût M12, liens vers la tâche M11/M2/M9 concernée ;
-  2. **cellule de paramètres** (tag `parameters`, compatible papermill sans l'exiger) :
-     `NET`, `DATASET`, `SPLIT`, `WEIGHTS`, `DEVICE`, `SUBSET`, `SIZE`, `RESIZE`, et pour
-     l'entraînement `ITERS`, `BATCH`, `LR`, `INIT`, `QAT`, `ADMM` ;
-  3. **cellule d'environnement** (T14.1) ;
-  4. corps du gabarit `infer` ou `train` ;
-  5. résumé : table des mAP, chemins des sorties, commande CLI équivalente.
-- **Commande équivalente** : chaque étape affiche la commande `python tools/… ` qu'elle
-  exécute. Un résultat de notebook se reproduit donc en CLI, et inversement.
-- **Paramètres par défaut prudents** : `SUBSET` petit (palier R) pour un premier passage.
-  Les règles de [M12](M12-profils-pc.md#rules) s'appliquent : une mAP sur `--subset` n'est
-  jamais publiée dans `results/`.
-- **GPU** : `DEVICE = "gpu"` (défaut des notebooks `_train` et `_sweep`, faits pour
-  Colab ; `"cpu"` sur un PC sans GPU) passe `--device gpu` à `tools/train.py` (T12.11). Pas de
-  repli silencieux : sans CuPy ou sans GPU, la cellule s'arrête avec le message de
-  `yolo.backend`. Tout ce qui est entier (`eval_quant.py`, export) reste sur CPU.
-- **Figures** : celles du mode automatique de M13 (`tools/figures/auto.py`), affichées
-  depuis `build/notebooks/…` ; pas de tracé ad hoc qui dupliquerait un générateur.
-- **Acceptation commune** (toutes les tâches) :
-  - le notebook est produit par `make notebooks` et listé dans `notebooks/README.md` ;
-  - `--check` passe ;
-  - le test de fumée l'exécute de bout en bout avec `SUBSET` et `ITERS` minimaux (T14.9).
+- **Versioned without outputs, or executed in full without error**: a versioned notebook
+  has the cells of the generator, and either no output (neither `outputs` nor
+  `execution_count`), or **all** its code cells executed without an error output; its
+  outputs are then visible on GitHub. The kernel metadata (`kernelspec`, `language_info`)
+  is ignored. A partial or failed execution is not versioned: `--check` refuses it and
+  `make notebooks` replaces it with the empty notebook. A complete execution is kept by
+  `make notebooks` as long as the template does not change; a cell added or edited by hand
+  is refused in both cases.
+- **Archives**: before a template change, `python -m tools.notebooks <targets> --archive`
+  freezes the complete and up-to-date executions (fingerprint without outputs in
+  `notebooks/archives.json`). An archive stays kept by `make notebooks` and accepted by
+  `--check` ("archivé") as long as its fingerprint does not change; an edit makes it
+  refused. `--force` regenerates the target from the current template and removes the
+  archive. Used for the outputs read by `tools/notebooks/balayages.py` (12 fine-tuned
+  `_sweep` and `_infer` notebooks archived for M15).
+- **Fixed structure** of each notebook, in this order:
+  1. title, role, M12 cost tier, links to the relevant M11/M2/M9 task;
+  2. **parameter cell** (tag `parameters`, compatible with papermill without requiring
+     it): `NET`, `DATASET`, `SPLIT`, `WEIGHTS`, `DEVICE`, `SUBSET`, `SIZE`, `RESIZE`, and
+     for training `ITERS`, `BATCH`, `LR`, `INIT`, `QAT`, `ADMM`;
+  3. **environment cell** (T14.1);
+  4. body of the `infer` or `train` template;
+  5. summary: mAP table, output paths, equivalent CLI command.
+- **Equivalent command**: each step prints the `python tools/… ` command it runs. A
+  notebook result can therefore be reproduced from the CLI, and the other way round.
+- **Cautious default parameters**: a small `SUBSET` (tier R) for a first run. The rules of
+  [M12](M12-profils-pc.md#rules) apply: an mAP on `--subset` is never published in
+  `results/`.
+- **GPU**: `DEVICE = "gpu"` (default of the `_train` and `_sweep` notebooks, made for
+  Colab; `"cpu"` on a PC without a GPU) passes `--device gpu` to `tools/train.py` (T12.11).
+  No silent fallback: without CuPy or without a GPU, the cell stops with the message of
+  `yolo.backend`. Everything integer (`eval_quant.py`, export) stays on the CPU.
+- **Figures**: those of the automatic mode of M13 (`tools/figures/auto.py`), shown from
+  `build/notebooks/…`; no ad hoc plot that would duplicate a generator.
+- **Shared acceptance** (all tasks):
+  - the notebook is produced by `make notebooks` and listed in `notebooks/README.md`;
+  - `--check` passes;
+  - the smoke test runs it end to end with minimal `SUBSET` and `ITERS` (T14.9).
 
-### Matrice des notebooks
+### Notebook matrix
 
-Le registre se construit depuis le code : `NETWORKS` et les cfg de
-`python/yolo/models/tiny_yolo.py`, `DATASETS` et `MAPPINGS` de
-`python/yolo/data/datasets.py`. Ajouter un jeu au registre `DATASETS` ajoute ses notebooks
-d'inférence hors domaine sans toucher au générateur.
+The registry is built from the code: `NETWORKS` and the cfgs of
+`python/yolo/models/tiny_yolo.py`, `DATASETS` and `MAPPINGS` of
+`python/yolo/data/datasets.py`. Adding a dataset to the `DATASETS` registry adds its
+out-of-domain inference notebooks without touching the generator.
 
-| Jeu | Inférence | Entraînement | Tâche source |
+| Dataset | Inference | Training | Source task |
 |---|---|---|---|
-| voc | `tiny-yolov2-voc` (poids Darknet), `tiny-yolov3-coco` (via `MAPPINGS`), `tiny-yolov3-voc` (poids affinés) | `tiny-yolov3-voc` (affinage VOC07+12, QAT, ADMM) | T2.9, T3.4, T4.5, T9.2, T9.3 |
-| coco | `tiny-yolov3-coco` | — (train2017 trop grand en NumPy) | T11.1 |
-| kitti | `tiny-yolov2-voc`, `tiny-yolov3-coco` (hors domaine), `tiny-yolov3-kitti` | `tiny-yolov3-kitti` | T11.2, T11.4 |
-| visdrone | idem, `tiny-yolov3-visdrone` | `tiny-yolov3-visdrone` | T11.2, T11.5 |
-| flir | idem, `tiny-yolov3-flir` | `tiny-yolov3-flir` | T11.7 |
-| exdark | `tiny-yolov2-voc`, `tiny-yolov3-coco` (hors domaine), `tiny-yolov3-exdark` | `tiny-yolov3-exdark` | T11.2, T11.3, T15.14 |
+| voc | `tiny-yolov2-voc` (Darknet weights), `tiny-yolov3-coco` (through `MAPPINGS`), `tiny-yolov3-voc` (fine-tuned weights) | `tiny-yolov3-voc` (VOC07+12 fine-tuning, QAT, ADMM) | T2.9, T3.4, T4.5, T9.2, T9.3 |
+| coco | `tiny-yolov3-coco` | — (train2017 too large for NumPy) | T11.1 |
+| kitti | `tiny-yolov2-voc`, `tiny-yolov3-coco` (out-of-domain), `tiny-yolov3-kitti` | `tiny-yolov3-kitti` | T11.2, T11.4 |
+| visdrone | same, `tiny-yolov3-visdrone` | `tiny-yolov3-visdrone` | T11.2, T11.5 |
+| flir | same, `tiny-yolov3-flir` | `tiny-yolov3-flir` | T11.7 |
+| exdark | `tiny-yolov2-voc`, `tiny-yolov3-coco` (out-of-domain), `tiny-yolov3-exdark` | `tiny-yolov3-exdark` | T11.2, T11.3, T15.14 |
 | crowdhuman | `tiny-yolov2-voc`, `tiny-yolov3-coco`, `tiny-yolov3-crowdhuman` | `tiny-yolov3-crowdhuman` | T11.6, T15.14 |
 
-Les modèles `tiny-yolov3-<jeu>` sont les cfg produits par `tools/make_cfg.py`
-(`build/m11/cfg/tiny-yolov3-<jeu>.cfg`). Chaque jeu de la colonne Entraînement a aussi un
-notebook de **balayage** `<modèle>_sweep` (lot × sous-ensemble, T14.10). Le notebook
-d'inférence de ces modèles choisit les poids parmi les runs de `_train` et `_sweep`
-(`RUN`, T14.11) et le dit en tête s'il n'y en a aucun.
+The `tiny-yolov3-<dataset>` models are the cfgs produced by `tools/make_cfg.py`
+(`build/m11/cfg/tiny-yolov3-<dataset>.cfg`). Each dataset of the Training column also has
+a **sweep** notebook `<model>_sweep` (batch × subset, T14.10). The inference notebook of
+these models picks the weights among the runs of `_train` and `_sweep` (`RUN`, T14.11) and
+says so at the top if there are none.
 
-### Runs d'entraînement
+### Training runs
 
-`build/notebooks/<jeu>/<modèle>/` (`RUNS_DIR`, `tools/notebooks/runs.py`) :
+`build/notebooks/<dataset>/<model>/` (`RUNS_DIR`, `tools/notebooks/runs.py`):
 
 ```
-final.weights, loss.csv, run.json …   run « train » (notebook _train)
-runs/b16-sall/                        balayage : lot 16, tout le split d'entraînement
-runs/b8-s500/                         lot 8, 500 premières images
-eval/<run>/                           évaluations des notebooks d'inférence
+final.weights, loss.csv, run.json …   "train" run (_train notebook)
+runs/b16-sall/                        sweep: batch 16, the whole training split
+runs/b8-s500/                         batch 8, first 500 images
+eval/<run>/                           evaluations of the inference notebooks
 ```
 
-Un run compte dès qu'il a un `final.weights` ; `run.json` donne lot, sous-ensemble,
-itérations, backend et révision. Sur Colab, `colab.sync_outputs` copie tout le dossier,
-`runs/` compris, dans `<DRIVE_DIR>/runs/`.
+A run counts as soon as it has a `final.weights`; `run.json` gives batch, subset,
+iterations, backend and revision. On Colab, `colab.sync_outputs` copies the whole folder,
+`runs/` included, into `<DRIVE_DIR>/runs/`.
 
 ---
 
-### Données sur Colab
+<a id="données-sur-colab"></a>
 
-Les jeux ne passent ni par git ni par le dépôt (33 Go). Sur Colab,
-`tools/notebooks/colab.py:prepare_data(jeu, DRIVE_DIR)` les met dans `data/` (disque local
-de la session) en essayant, dans l'ordre :
+### Data on Colab
 
-1. le témoin du jeu (`tools/get_datasets.sh ready <jeu>`) ;
-2. l'archive `<DRIVE_DIR>/data/<jeu>.tar` sur Google Drive ;
-3. la même archive par rclone (`tools/get_datasets.sh pull <jeu>`), sur un PC sans le jeu ;
-4. le téléchargement direct : `get_voc.sh`, `get_datasets.sh coco|kitti`, ou l'API Kaggle
-   (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, avec un jeton dans
-   `<DRIVE_DIR>/access_token` (jeton `KGAT_…`) ou les secrets Colab (`KAGGLE_API_TOKEN`), qu'un
-   noyau Colab sous VS Code ne peut pas lire).
+The datasets go neither through git nor through the repository (33 GB). On Colab,
+`tools/notebooks/colab.py:prepare_data(dataset, DRIVE_DIR)` puts them in `data/` (local
+disk of the session) by trying, in order:
 
-Drive ne sert qu'à ce qui ne se télécharge pas : ExDark (les annotations ne sont pas sur
-Kaggle), ou un jeu qu'on ne veut pas retélécharger. Le Drive gratuit
-(15 Go) ne contiendrait pas tout `data/`.
+1. the marker file of the dataset (`tools/get_datasets.sh ready <dataset>`);
+2. the archive `<DRIVE_DIR>/data/<dataset>.tar` on Google Drive;
+3. the same archive through rclone (`tools/get_datasets.sh pull <dataset>`), on a PC
+   without the dataset;
+4. the direct download: `get_voc.sh`, `get_datasets.sh coco|kitti`, or the Kaggle API
+   (`get_datasets.sh kaggle-download crowdhuman|visdrone|flir`, with a token in
+   `<DRIVE_DIR>/access_token` (`KGAT_…` token) or the Colab secrets (`KAGGLE_API_TOKEN`),
+   which a Colab kernel under VS Code cannot read).
+
+Drive is only used for what cannot be downloaded: ExDark (the annotations are not on
+Kaggle), or a dataset one does not want to download again. The free Drive (15 GB) would
+not hold the whole of `data/`.
 
 ```
-tools/get_datasets.sh push exdark     # PC : pack (data_archives/exdark.tar), puis rclone
+tools/get_datasets.sh push exdark     # PC: pack (data_archives/exdark.tar), then rclone
 ```
 
-Mise en place de rclone, export des autres jeux et accès selon l'environnement :
-[donnees-drive.md](donnees-drive.md).
-Exécution depuis VS Code sur un kernel Colab (paramètres, reprise, suivi par rclone) :
-[colab-vscode.md](colab-vscode.md).
+Setting up rclone, exporting the other datasets and access depending on the environment:
+[donnees-drive.md](donnees-drive.md). Running from VS Code on a Colab kernel (parameters,
+resume, tracking through rclone): [colab-vscode.md](colab-vscode.md).
 
 ```
 MyDrive/EmbeddedCV/
-  data/   <jeu>.tar   un tar non compressé par jeu, liens suivis (arborescence de data/)
-  runs/               sorties et checkpoints (colab.sync_outputs, restore_outputs ; T14.8)
+  data/   <dataset>.tar   one uncompressed tar per dataset, links followed (tree of data/)
+  runs/                   outputs and checkpoints (colab.sync_outputs, restore_outputs; T14.8)
 ```
 
-Les images ne sont jamais lues à travers le montage de Drive, qui est lent pour des milliers
-de petits fichiers : seul le tar y est lu, d'une traite, puis il est extrait localement.
+The images are never read through the Drive mount, which is slow for thousands of small
+files: only the tar is read there, in one go, then it is extracted locally.
 
 ## A. Infrastructure
 
-### [x] T14.0 — Paquet `tools/notebooks/`, registre et vérification
-- **Spec** : — · **Dépend de** : T11.0 · **Taille** : M
-- **Livrables** :
-  - `tools/notebooks/__init__.py`, `__main__.py`, `matrice.py`, `gabarits.py` ;
-  - la cible `make notebooks` et l'appel à `--check` dans `make ci` ;
+### [x] T14.0 — `tools/notebooks/` package, registry and check
+- **Spec**: — · **Depends on**: T11.0 · **Size**: M
+- **Deliverables**:
+  - `tools/notebooks/__init__.py`, `__main__.py`, `matrice.py`, `gabarits.py`;
+  - the `make notebooks` target and the call to `--check` in `make ci`;
   - `python/tests/test_notebooks.py`.
-- **Acceptation** :
-  - `make notebooks` est idempotent : deux passes de suite ne changent aucun octet ;
-  - le test génère tous les notebooks dans un répertoire temporaire et vérifie pour
-    chacun : JSON valide (schéma nbformat 4 si `nbformat` est installé), aucune sortie,
-    aucun `execution_count`, et chaque cellule de code passe `compile()` (les lignes
-    `!` et `%` sont retirées avant) ;
-  - `--check` échoue sur un notebook modifié à la main.
-- **Notes** :
-  - JSON trié et indenté, fin de ligne finale : un diff lisible ;
-  - les cellules sont des listes de lignes, comme les écrit Jupyter, pour que l'ouverture
-    puis l'enregistrement sans exécution ne change rien.
-- **Fait** : `tools/notebooks/` (`__init__.py`, `__main__.py`, `matrice.py`, `gabarits.py`,
-  plus `commandes.py`, les commandes des outils et le lanceur en sous-processus, et `env.py`,
-  la cellule d'environnement), 21 notebooks dans `notebooks/` et `notebooks/README.md`.
-  `make notebooks`, `make ci` (`--check` après le lint). `python/tests/test_notebooks.py`
-  vérifie l'idempotence, le format d'enregistrement de Jupyter, le schéma nbformat (s'il est
-  installé), l'absence de sorties, le `compile()` des cellules et l'échec de `--check`
-  après une retouche, et que les notebooks versionnés sont à jour. Depuis la règle des
-  notebooks exécutés : `strip_outputs`, `executed_ok` et `state` de `__main__.py` ; tests
-  d'une exécution complète (acceptée, gardée par `make notebooks`), en erreur et partielle
-  (refusées).
+- **Acceptance**:
+  - `make notebooks` is idempotent: two passes in a row change no byte;
+  - the test generates all the notebooks in a temporary directory and checks for each one:
+    valid JSON (nbformat 4 schema if `nbformat` is installed), no output, no
+    `execution_count`, and each code cell passes `compile()` (the `!` and `%` lines are
+    removed first);
+  - `--check` fails on a notebook edited by hand.
+- **Notes**:
+  - sorted and indented JSON, final newline: a readable diff;
+  - the cells are lists of lines, as Jupyter writes them, so that opening then saving
+    without execution changes nothing.
+- **Done**: `tools/notebooks/` (`__init__.py`, `__main__.py`, `matrice.py`, `gabarits.py`,
+  plus `commandes.py`, the tool commands and the subprocess launcher, and `env.py`, the
+  environment cell), 21 notebooks in `notebooks/` and `notebooks/README.md`.
+  `make notebooks`, `make ci` (`--check` after the lint). `python/tests/test_notebooks.py`
+  checks the idempotence, the Jupyter save format, the nbformat schema (if installed), the
+  absence of outputs, the `compile()` of the cells and the failure of `--check` after an
+  edit, and that the versioned notebooks are up to date. Since the rule on executed
+  notebooks: `strip_outputs`, `executed_ok` and `state` of `__main__.py`; tests of a
+  complete execution (accepted, kept by `make notebooks`), a failed one and a partial one
+  (refused).
 
-### [x] T14.1 — Cellules d'environnement et de paramètres (local et Colab)
-- **Spec** : — · **Dépend de** : T14.0, T12.11 · **Taille** : M
-- **Livrables** : les cellules communes de `gabarits.py`.
-- **Comportement attendu** :
-  - **Colab** (détecté par `"google.colab" in sys.modules`) :
-    - clone du dépôt (URL et révision en paramètres), `pip install -e "python[data,plots]"` ;
-    - si `DEVICE == "gpu"` : `pip install cupy-cuda12x`, puis le contrôle de T12.11
-      (`cupy.cuda.runtime.getDeviceCount() >= 1`) ;
-    - poids : `tools/get_weights.sh` ; données : `tools/get_voc.sh` ou
-      `tools/get_datasets.sh <jeu>`. Pour les jeux à inscription (VisDrone, CrowdHuman,
-      ExDark, FLIR), la cellule affiche la source et l'arborescence attendue ; le tout
-      passe par `colab.prepare_data(DATASET, DRIVE_DIR)` (voir
-      [Données sur Colab](#données-sur-colab)), déjà écrit avec ses tests
+### [x] T14.1 — Environment and parameter cells (local and Colab)
+- **Spec**: — · **Depends on**: T14.0, T12.11 · **Size**: M
+- **Deliverables**: the shared cells of `gabarits.py`.
+- **Expected behaviour**:
+  - **Colab** (detected by `"google.colab" in sys.modules`):
+    - clone of the repository (URL and revision as parameters),
+      `pip install -e "python[data,plots]"`;
+    - if `DEVICE == "gpu"`: `pip install cupy-cuda12x`, then the check of T12.11
+      (`cupy.cuda.runtime.getDeviceCount() >= 1`);
+    - weights: `tools/get_weights.sh`; data: `tools/get_voc.sh` or
+      `tools/get_datasets.sh <dataset>`. For the datasets that need registration
+      (VisDrone, CrowdHuman, ExDark, FLIR), the cell prints the source and the expected
+      tree; everything goes through `colab.prepare_data(DATASET, DRIVE_DIR)` (see
+      [Data on Colab](#data-on-colab)), already written with its tests
       (`python/tests/test_colab_data.py`).
-  - **Local** : rien n'est installé ni téléchargé. La cellule vérifie seulement
-    (`tools/get_datasets.sh check`, présence des poids) et s'arrête avec la commande à
-    lancer si quelque chose manque.
-  - Dans les deux cas : `os.chdir` à la racine du dépôt, affichage de la version de
-    NumPy, du backend choisi et de la révision git, pour la traçabilité.
-- **Acceptation** : en local, la cellule s'exécute en moins de 5 s sans réseau ; sur
-  Colab, un notebook VOC d'inférence part d'un environnement vierge et atteint la cellule
-  suivante sans intervention.
-- **Fait** :
-  - cellules communes de `gabarits.py`, logique dans `tools/notebooks/env.py` ;
-  - en local, contrôle des témoins de `tools/get_datasets.sh` (`matrice.DATA_MARKERS`, que
-    le test compare au script), des poids et de la cfg, puis arrêt (`env.Prerequis`) avec
-    les commandes à lancer ;
-  - sur Colab, clone remis à `REV` à chaque exécution (`git fetch` puis `checkout
-    FETCH_HEAD`, modules `tools` et `yolo` déjà importés oubliés) : un clone d'une session
-    précédente ne reste pas en retard sur le notebook ;
-  - sur Colab, branchement sur `colab.prepare_data(DATASET, DRIVE_DIR)`, avec montage de
-    Drive seulement pour les jeux qui ne se téléchargent pas ;
-  - contrôle GPU par `yolo.backend.use`, sans repli ; traçabilité par `env.trace` (révision,
-    NumPy, backend).
-- **Validé sur Colab** : les notebooks `_infer` et `_sweep` des six jeux sont partis de
-  runtimes neufs (révisions `1a967f4` à `35e949b`, sorties versionnées) ; corrections
-  issues de ces essais : Drive monté avant `prepare_data`, arrêt clair sans GPU, roue CuPy
-  selon le pilote, cfg d'affinage reconstruite par `env.restore_cfg`, jeton Kaggle pour FLIR.
+  - **Local**: nothing is installed or downloaded. The cell only checks
+    (`tools/get_datasets.sh check`, presence of the weights) and stops with the command to
+    run if something is missing.
+  - In both cases: `os.chdir` to the repository root, printing of the NumPy version, of the
+    chosen backend and of the git revision, for traceability.
+- **Acceptance**: locally, the cell runs in less than 5 s without network; on Colab, a VOC
+  inference notebook starts from a blank environment and reaches the next cell without
+  intervention.
+- **Done**:
+  - shared cells of `gabarits.py`, logic in `tools/notebooks/env.py`;
+  - locally, check of the marker files of `tools/get_datasets.sh`
+    (`matrice.DATA_MARKERS`, which the test compares with the script), of the weights and
+    of the cfg, then stop (`env.Prerequis`) with the commands to run;
+  - on Colab, clone reset to `REV` at each run (`git fetch` then `checkout FETCH_HEAD`,
+    already imported `tools` and `yolo` modules forgotten): a clone from a previous session
+    does not stay behind the notebook;
+  - on Colab, hook into `colab.prepare_data(DATASET, DRIVE_DIR)`, with Drive mounted only
+    for the datasets that cannot be downloaded;
+  - GPU check by `yolo.backend.use`, without fallback; traceability by `env.trace`
+    (revision, NumPy, backend).
+- **Validated on Colab**: the `_infer` and `_sweep` notebooks of the six datasets started
+  from fresh runtimes (revisions `1a967f4` to `35e949b`, outputs versioned); fixes coming
+  from these runs: Drive mounted before `prepare_data`, clear stop without a GPU, CuPy wheel
+  depending on the driver, fine-tuning cfg rebuilt by `env.restore_cfg`, Kaggle token for
+  FLIR.
 
-### [x] T14.2 — Matrice modèle × jeu × rôle et index
-- **Spec** : — · **Dépend de** : T14.0 · **Taille** : S
-- **Livrables** : `tools/notebooks/matrice.py` ; `notebooks/README.md`.
-- **Acceptation** :
-  - le registre reproduit le tableau [Matrice des notebooks](#matrice-des-notebooks) ;
-  - un test vérifie que chaque jeu de `DATASETS` a au moins un notebook d'inférence et
-    que chaque couple hors domaine a une entrée dans `MAPPINGS` ;
-  - l'index donne pour chaque notebook son palier et ses prérequis (poids, données, cfg).
-- **Notes** : le palier vient de la taille du split et du rôle (règles de M12) ; il n'est
-  pas recopié à la main.
-- **Fait** :
-  - `matrice.py` construit 19 notebooks d'inférence, 6 d'entraînement et 6 de balayage depuis
-    `PRETRAINED`, `CFG_FILES`, `DATASETS` et `MAPPINGS`, avec `TRAINABLE` comme seule liste
-    écrite à la main ;
-  - le palier vient de `palier()` (règles de M12 : R jusqu'à 100 images, M jusqu'à 500
-    images ou moins de 600 itérations, N au-delà) et des effectifs `SPLIT_IMAGES` ;
-  - l'index donne pour chaque notebook son palier, ses prérequis et le badge Colab ;
-  - la cfg FLIR est `tiny-yolov3-flir-c1.cfg` (un canal, T11.7).
+### [x] T14.2 — Model × dataset × role matrix and index
+- **Spec**: — · **Depends on**: T14.0 · **Size**: S
+- **Deliverables**: `tools/notebooks/matrice.py`; `notebooks/README.md`.
+- **Acceptance**:
+  - the registry reproduces the table [Notebook matrix](#notebook-matrix);
+  - a test checks that each dataset of `DATASETS` has at least one inference notebook and
+    that each out-of-domain pair has an entry in `MAPPINGS`;
+  - the index gives for each notebook its tier and its prerequisites (weights, data, cfg).
+- **Notes**: the tier comes from the split size and the role (rules of M12); it is not
+  copied by hand.
+- **Done**:
+  - `matrice.py` builds 19 inference, 6 training and 6 sweep notebooks from `PRETRAINED`,
+    `CFG_FILES`, `DATASETS` and `MAPPINGS`, with `TRAINABLE` as the only hand-written
+    list;
+  - the tier comes from `palier()` (rules of M12: R up to 100 images, M up to 500 images or
+    fewer than 600 iterations, N beyond) and from the counts `SPLIT_IMAGES`;
+  - the index gives for each notebook its tier, its prerequisites and the Colab badge;
+  - the FLIR cfg is `tiny-yolov3-flir-c1.cfg` (single channel, T11.7).
 
-## B. Inférence
+## B. Inference
 
-### [x] T14.3 — Gabarit `infer` : détection et mAP flottante
-- **Spec** : §8 · **Dépend de** : T14.1, T14.2, T3.4 · **Taille** : M
-- **Livrables** : gabarit `infer` dans `gabarits.py`.
-- **Contenu** :
-  1. construction du réseau (`yolo.models.tiny_yolo.build`) et chargement des poids
-     (`yolo.io.darknet_weights.load_darknet_weights`) ;
-  2. détection sur 6 à 8 images du split, boîtes dessinées avec `tools/detect.py:draw`,
-     via `yolo.infer.pipeline.preprocess` et `detect` ;
-  3. mAP flottante par `tools/eval_voc.py --dataset … --metric …`, avec
-     `--subset SUBSET` ; table par classe et courbes PR (mode auto de M13) ;
-  4. pour un jeu hors domaine, la vue de `eval_view` : classes évaluées, classes
-     ignorées.
-- **Acceptation** : `notebooks/voc/tiny-yolov2-voc_infer.ipynb` avec `SUBSET = 0` et
-  `RESIZE = "stretch"` redonne **56,30** (la référence de T11.0).
-- **Notes** : la métrique par défaut est celle du jeu (`Dataset.metric`) ; COCO et FLIR
-  affichent AP@[.5:.95] et AP50.
-- **Fait** :
-  - gabarit `infer` : réseau, 6 détections dessinées par `tools/detect.py:draw`,
-    `eval_voc.py --markdown --out` dans `OUT`, courbes PR ;
-  - `tools/eval_voc.py` met désormais ses courbes PR dans `<out>/figures/` quand `--out`
-    est donné ;
-  - fumée de `voc/tiny-yolov2-voc_infer` avec `SUBSET = 4` ;
-  - tous les `_infer` exécutés sur Colab avec `SUBSET = 50` (palier R), sauf
-    `coco/tiny-yolov3-coco_infer` (COCO absent) : Tiny-YOLOv2 VOC y fait 63,51.
-- **Validé** (2026-10-07, Colab CPU, révision `214f269`) : `voc/tiny-yolov2-voc_infer`,
-  réglé sur le split complet par `gabarits.REFERENCE` (`SUBSET = 0`, `INT8 = True`,
-  `JOBS = 16`), redonne **56,30** sur 4 952 images (906 s, 181 ms/image).
+### [x] T14.3 — `infer` template: detection and float mAP
+- **Spec**: §8 · **Depends on**: T14.1, T14.2, T3.4 · **Size**: M
+- **Deliverables**: `infer` template in `gabarits.py`.
+- **Contents**:
+  1. building the network (`yolo.models.tiny_yolo.build`) and loading the weights
+     (`yolo.io.darknet_weights.load_darknet_weights`);
+  2. detection on 6 to 8 images of the split, boxes drawn with `tools/detect.py:draw`,
+     through `yolo.infer.pipeline.preprocess` and `detect`;
+  3. float mAP by `tools/eval_voc.py --dataset … --metric …`, with `--subset SUBSET`;
+     per-class table and PR curves (automatic mode of M13);
+  4. for an out-of-domain dataset, the `eval_view`: evaluated classes, ignored classes.
+- **Acceptance**: `notebooks/voc/tiny-yolov2-voc_infer.ipynb` with `SUBSET = 0` and
+  `RESIZE = "stretch"` gives back **56.30** (the reference of T11.0).
+- **Notes**: the default metric is the dataset's (`Dataset.metric`); COCO and FLIR show
+  AP@[.5:.95] and AP50.
+- **Done**:
+  - `infer` template: network, 6 detections drawn by `tools/detect.py:draw`,
+    `eval_voc.py --markdown --out` into `OUT`, PR curves;
+  - `tools/eval_voc.py` now puts its PR curves in `<out>/figures/` when `--out` is given;
+  - smoke run of `voc/tiny-yolov2-voc_infer` with `SUBSET = 4`;
+  - all the `_infer` notebooks executed on Colab with `SUBSET = 50` (tier R), except
+    `coco/tiny-yolov3-coco_infer` (COCO missing): Tiny-YOLOv2 VOC gets 63.51 there.
+- **Validated** (2026-10-07, Colab CPU, revision `214f269`): `voc/tiny-yolov2-voc_infer`,
+  set to the full split by `gabarits.REFERENCE` (`SUBSET = 0`, `INT8 = True`,
+  `JOBS = 16`), gives back **56.30** on 4,952 images (906 s, 181 ms/image).
 
-### [x] T14.4 — Volet entier : calibration et mAP INT8
-- **Spec** : §9 · **Dépend de** : T14.3, T4.5 · **Taille** : M
-- **Livrables** : section « entier » du gabarit `infer`, activée par `INT8 = True`.
-- **Contenu** :
-  - calibration par `tools/calibrate.py --dataset …` sur le split `calib` du jeu (sortie
-    dans `build/notebooks/…`, pas dans `results/`) ;
-  - `tools/eval_quant.py --variants float,int` ;
-  - écart flottant / entier par classe, et histogrammes d'activations si demandé
+### [x] T14.4 — Integer part: calibration and INT8 mAP
+- **Spec**: §9 · **Depends on**: T14.3, T4.5 · **Size**: M
+- **Deliverables**: "integer" section of the `infer` template, enabled by `INT8 = True`.
+- **Contents**:
+  - calibration by `tools/calibrate.py --dataset …` on the `calib` split of the dataset
+    (output in `build/notebooks/…`, not in `results/`);
+  - `tools/eval_quant.py --variants float,int`;
+  - float / integer gap per class, and activation histograms if requested
     (`tools/act_hist.py`).
-- **Acceptation** : sur voc / `tiny-yolov2-voc`, `SUBSET = 0`, la mAP entière vaut
-  **55,66**.
-- **Notes** : palier N sur le jeu complet ; le notebook l'annonce avant de lancer.
-- **Fait** :
-  - section `INT8` : `calibrate.py --out --markdown` dans `OUT`, `eval_quant.py --variants
-    float,int --calib` ;
-  - table des écarts par classe, figures du mode automatique, `act_hist.py` si
-    `ACT_HIST = True` ;
-  - fumée sur VOC (8 images de calibration, 4 évaluées).
-- **Validé** (même passage) : calibration 500 images trainval (93 s), puis `eval_quant.py
-  --variants float,int --jobs 16` (337 s, 66 ms/image) : flottant **56,30**, entier
-  **55,66**, écart −0,64 point, identique à `results/map_int8.md`.
+- **Acceptance**: on voc / `tiny-yolov2-voc`, `SUBSET = 0`, the integer mAP is **55.66**.
+- **Notes**: tier N on the full dataset; the notebook announces it before starting.
+- **Done**:
+  - `INT8` section: `calibrate.py --out --markdown` into `OUT`, `eval_quant.py --variants
+    float,int --calib`;
+  - table of the gaps per class, figures of the automatic mode, `act_hist.py` if
+    `ACT_HIST = True`;
+  - smoke run on VOC (8 calibration images, 4 evaluated).
+- **Validated** (same run): calibration on 500 trainval images (93 s), then
+  `eval_quant.py --variants float,int --jobs 16` (337 s, 66 ms/image): float **56.30**,
+  integer **55.66**, gap −0.64 point, identical to `results/map_int8.md`.
 
-### [ ] T14.5 — Inférence hors domaine (T11.2)
-- **Spec** : §8.3 · **Dépend de** : T14.3 · **Taille** : S
-- **Livrables** : notebooks d'inférence de `tiny-yolov2-voc` et `tiny-yolov3-coco` sur
-  exdark, kitti, visdrone, crowdhuman et flir.
-- **Acceptation** : les mAP égalent celles de `tools/m11.sh hors-domaine` aux mêmes
-  paramètres.
-- **Notes** : la table de correspondance (`MAPPINGS`) est affichée telle quelle, avec les
-  classes sans équivalent.
-- **Fait** :
-  - notebooks hors domaine de tous les jeux, avec la table `MAPPINGS`, les classes
-    ignorées et `eval_view` ;
-  - fumée réussie pour ExDark, VisDrone et CrowdHuman ;
-  - COCO, KITTI et FLIR sont sautés faute de données ;
-  - depuis, les six jeux exécutés sur Colab (palier R, 50 images), tables dans
+### [ ] T14.5 — Out-of-domain inference (T11.2)
+- **Spec**: §8.3 · **Depends on**: T14.3 · **Size**: S
+- **Deliverables**: inference notebooks of `tiny-yolov2-voc` and `tiny-yolov3-coco` on
+  exdark, kitti, visdrone, crowdhuman and flir.
+- **Acceptance**: the mAPs equal those of `tools/m11.sh hors-domaine` with the same
+  parameters.
+- **Notes**: the mapping table (`MAPPINGS`) is shown as it is, with the classes without an
+  equivalent.
+- **Done**:
+  - out-of-domain notebooks of all the datasets, with the `MAPPINGS` table, the ignored
+    classes and `eval_view`;
+  - smoke run passed for ExDark, VisDrone and CrowdHuman;
+  - COCO, KITTI and FLIR are skipped for lack of data;
+  - since then, the six datasets executed on Colab (tier R, 50 images), tables in
     [resultats-balayages.md](resultats-balayages.md).
-- **Reste** : comparer les mAP à `tools/m11.sh hors-domaine` aux mêmes paramètres.
+- **Remaining**: compare the mAPs with `tools/m11.sh hors-domaine` with the same
+  parameters.
 
-## C. Entraînement
+## C. Training
 
-### [ ] T14.6 — Gabarit `train` : préparation, affinage, évaluation
-- **Spec** : §5-§7 · **Dépend de** : T14.1, T14.2, T2.9 · **Taille** : L
-- **Livrables** : gabarit `train` dans `gabarits.py` ; notebooks `train` de la matrice.
-- **Contenu** :
-  1. **préparation** (jeux hors VOC) : ancres par `tools/kmeans_anchors.py --dataset …`,
-     cfg à N classes par `tools/make_cfg.py --base tiny-yolov3-voc --dataset …`,
-     cellule sautée si le cfg existe déjà ;
-  2. **aperçu des cibles** : quelques images augmentées (`yolo.data.augment`) avec leurs
-     boîtes, pour contrôler les annotations avant de lancer des heures de calcul ;
-  3. **affinage** : `tools/train.py --net <cfg> --dataset … --init coco --iters ITERS
-     --batch BATCH --multiscale --device DEVICE --out build/notebooks/<jeu>/<modèle>`,
-     avec `--resume` automatique si un `checkpoint.npz` existe ;
-  4. **courbes** de perte et de taux d'apprentissage (mode auto de M13, à chaque
-     `--save-every`) ;
-  5. **évaluation** de `final.weights` par le gabarit `infer` (T14.3), en fin de notebook.
-- **Acceptation** : pour kitti, la suite de commandes est identique, option par option, à
-  `tools/m11.sh kitti-prep` puis `kitti-train` (même cfg, mêmes ancres, mêmes
-  hyperparamètres par défaut) ; un test compare les commandes générées à celles du script.
-- **Notes** :
-  - l'entraînement tourne dans un sous-processus dont la sortie est relayée ligne à ligne :
-    une interruption du noyau laisse un checkpoint exploitable ;
-  - la durée estimée est affichée avant le lancement (images × itérations × s/image du
-    backend choisi).
-- **Fait** :
-  - gabarit `train` : préparation (sautée si la cfg existe), aperçu des cibles, durée
-    estimée, `train.py` en sous-processus avec `--resume` automatique, courbes, évaluation
-    de `final.weights` ;
-  - le test compare, option par option, les commandes kitti à `tools/m11.sh prep` et
-    `train` : seules les sorties sont propres au notebook (`OUT`, ancres dans `OUT`) ;
-  - les cellules avant l'affinage ont été exécutées sur VOC ;
-  - la commande d'affinage a tourné à travers les `_sweep` (même commande à `--batch` et
-    `--subset` près, T14.10) : 6 cases × 6 jeux sur Colab GPU, 600 itérations.
-- **Reste** : aucun notebook `_train` exécuté de bout en bout (versionnés sans sorties) ;
-  KITTI est désormais présent, il peut servir au premier passage.
+### [ ] T14.6 — `train` template: preparation, fine-tuning, evaluation
+- **Spec**: §5-§7 · **Depends on**: T14.1, T14.2, T2.9 · **Size**: L
+- **Deliverables**: `train` template in `gabarits.py`; `train` notebooks of the matrix.
+- **Contents**:
+  1. **preparation** (datasets other than VOC): anchors by
+     `tools/kmeans_anchors.py --dataset …`, N-class cfg by
+     `tools/make_cfg.py --base tiny-yolov3-voc --dataset …`, cell skipped if the cfg
+     already exists;
+  2. **target preview**: a few augmented images (`yolo.data.augment`) with their boxes, to
+     check the annotations before starting hours of computation;
+  3. **fine-tuning**: `tools/train.py --net <cfg> --dataset … --init coco --iters ITERS
+     --batch BATCH --multiscale --device DEVICE --out build/notebooks/<dataset>/<model>`,
+     with an automatic `--resume` if a `checkpoint.npz` exists;
+  4. loss and learning-rate **curves** (automatic mode of M13, at each `--save-every`);
+  5. **evaluation** of `final.weights` by the `infer` template (T14.3), at the end of the
+     notebook.
+- **Acceptance**: for kitti, the sequence of commands is identical, option by option, to
+  `tools/m11.sh kitti-prep` then `kitti-train` (same cfg, same anchors, same default
+  hyperparameters); a test compares the generated commands with those of the script.
+- **Notes**:
+  - training runs in a subprocess whose output is relayed line by line: an interruption of
+    the kernel leaves a usable checkpoint;
+  - the estimated duration is printed before the start (images × iterations × s/image of
+    the chosen backend).
+- **Done**:
+  - `train` template: preparation (skipped if the cfg exists), target preview, estimated
+    duration, `train.py` in a subprocess with an automatic `--resume`, curves, evaluation
+    of `final.weights`;
+  - the test compares, option by option, the kitti commands with `tools/m11.sh prep` and
+    `train`: only the outputs are specific to the notebook (`OUT`, anchors in `OUT`);
+  - the cells before the fine-tuning have been executed on VOC;
+  - the fine-tuning command ran through the `_sweep` notebooks (same command up to
+    `--batch` and `--subset`, T14.10): 6 cells × 6 datasets on a Colab GPU, 600
+    iterations.
+- **Remaining**: no `_train` notebook executed end to end (versioned without outputs);
+  KITTI is now present, it can serve for the first run.
 
-### [x] T14.7 — Variantes QAT et ADMM
-- **Spec** : §9 · **Dépend de** : T14.6, T9.2.3, T9.3.3 · **Taille** : S
-- **Livrables** : paramètres `QAT` (schéma `wXaY`, `--qat-steps`) et `ADMM` (fichier de
-  contraintes, `--admm-rho`, `--admm-every`, `--admm-growth`) du gabarit `train` ;
-  notebooks `notebooks/voc/tiny-yolov3-voc_train.ipynb` avec ces options documentées.
-- **Acceptation** : avec les paramètres de T12.5 et T12.6, la commande générée est celle
-  du profil M12 correspondant.
-- **Notes** : l'évaluation finale passe par `eval_quant.py` avec les variantes
-  basse précision (`tools/quant_lowbit.py`), pas par la mAP flottante seule.
-- **Fait** :
-  - paramètres `QAT`, `QAT_STEPS`, `ADMM`, `ADMM_RHO`, `ADMM_GROWTH` et `ADMM_EVERY` ;
-  - le notebook `voc/tiny-yolov3-voc_train` donne les jeux de T12.5 et T12.6
-    (`gabarits.M12_QAT`, `M12_ADMM`) ;
-  - le test vérifie que les commandes générées sont celles de `tools/m12.sh qat ref` et
-    `admm ref` ;
-  - l'évaluation passe par `quant_lowbit.py` puis `eval_quant.py --variants int
+### [x] T14.7 — QAT and ADMM variants
+- **Spec**: §9 · **Depends on**: T14.6, T9.2.3, T9.3.3 · **Size**: S
+- **Deliverables**: parameters `QAT` (`wXaY` scheme, `--qat-steps`) and `ADMM` (constraint
+  file, `--admm-rho`, `--admm-every`, `--admm-growth`) of the `train` template; notebooks
+  `notebooks/voc/tiny-yolov3-voc_train.ipynb` with these options documented.
+- **Acceptance**: with the parameters of T12.5 and T12.6, the generated command is that of
+  the corresponding M12 profile.
+- **Notes**: the final evaluation goes through `eval_quant.py` with the low-precision
+  variants (`tools/quant_lowbit.py`), not through the float mAP alone.
+- **Done**:
+  - parameters `QAT`, `QAT_STEPS`, `ADMM`, `ADMM_RHO`, `ADMM_GROWTH` and `ADMM_EVERY`;
+  - the notebook `voc/tiny-yolov3-voc_train` gives the settings of T12.5 and T12.6
+    (`gabarits.M12_QAT`, `M12_ADMM`);
+  - the test checks that the generated commands are those of `tools/m12.sh qat ref` and
+    `admm ref`;
+  - the evaluation goes through `quant_lowbit.py` then `eval_quant.py --variants int
     --model-dir`.
 
-### [ ] T14.8 — Exécution sur Colab GPU
-- **Spec** : — · **Dépend de** : T14.6, T12.11 · **Taille** : M
-- **Livrables** : options `DRIVE_DIR` (checkpoints et sorties copiés sur Google Drive) et
-  reprise après coupure de session. `colab.sync_outputs` et `colab.restore_outputs`
-  copient `build/notebooks/` vers et depuis `<DRIVE_DIR>/runs/` ; le gabarit `train`
-  les appelle (voir « Fait »).
-- **Acceptation** :
-  - un affinage kitti interrompu (session Colab coupée) reprend depuis le dernier
-    checkpoint sur Drive, à l'itération près ;
-  - le gain GPU mesuré (s/image, batch maximal tenant en mémoire) est noté dans le
-    notebook et renvoyé à T12.11-e.
-- **Notes** : la reprise exacte n'est garantie que sur le même backend (T12.11). Un chiffre
-  issu d'un poids entraîné sur GPU indique le backend.
-- **Fait** :
-  - `DRIVE_DIR` (défaut `colab.DRIVE_DIR`) ;
-  - `colab.restore_outputs` avant l'affinage, puis `colab.sync_outputs` toutes les 10 min
-    et en fin de cellule, interruption comprise ;
-  - cellule de vitesse : s/image d'après `loss.csv` ;
-  - collecte en fin de commande : `commandes.run` appelle `colab.autosync` après chaque
-    `tools/train.py`, `eval_voc.py` ou `eval_quant.py` réussi (ou interrompu) ; sur
-    Colab avec Drive monté, `summary.json` du dossier de `--out` et de `--markdown`
-    (`runs.write_summary` : `run.json`, perte et composantes finales, durée, mAP et AP par
-    classe) puis copie dans `<DRIVE_DIR>/runs/`. Couvre les évaluations des `_sweep` et
-    les `_infer`, que la copie périodique ne voyait pas ; aucune cellule modifiée.
-    `EMBEDDEDCV_AUTOSYNC=0` la coupe. Sur le PC : `make harvest` (rclone sans poids) ;
-  - durée observée : ≈ 10 min par run de lot 32 (624 s pour b32-sall, 600 itérations).
-- **Reste** : la reprise kitti sur Colab après coupure (à l'itération près), et le gain GPU
-  (s/image, lot maximal tenant en mémoire) noté dans le notebook et renvoyé à T12.11-e
-  ([M12](M12-profils-pc.md), ligne « à mesurer »).
+### [ ] T14.8 — Running on a Colab GPU
+- **Spec**: — · **Depends on**: T14.6, T12.11 · **Size**: M
+- **Deliverables**: options `DRIVE_DIR` (checkpoints and outputs copied to Google Drive)
+  and resume after a session disconnect. `colab.sync_outputs` and `colab.restore_outputs`
+  copy `build/notebooks/` to and from `<DRIVE_DIR>/runs/`; the `train` template calls them
+  (see "Done").
+- **Acceptance**:
+  - an interrupted kitti fine-tuning (Colab session cut) resumes from the last checkpoint
+    on Drive, to the iteration;
+  - the measured GPU gain (s/image, largest batch that fits in memory) is noted in the
+    notebook and sent to T12.11-e.
+- **Notes**: an exact resume is only guaranteed on the same backend (T12.11). A figure
+  coming from weights trained on GPU states the backend.
+- **Done**:
+  - `DRIVE_DIR` (default `colab.DRIVE_DIR`);
+  - `colab.restore_outputs` before the fine-tuning, then `colab.sync_outputs` every 10 min
+    and at the end of the cell, interruption included;
+  - speed cell: s/image from `loss.csv`;
+  - collection at the end of a command: `commandes.run` calls `colab.autosync` after each
+    successful (or interrupted) `tools/train.py`, `eval_voc.py` or `eval_quant.py`; on
+    Colab with Drive mounted, `summary.json` of the `--out` and `--markdown` folder
+    (`runs.write_summary`: `run.json`, final loss and components, duration, mAP and AP per
+    class) then a copy into `<DRIVE_DIR>/runs/`. It covers the evaluations of the
+    `_sweep` and `_infer` notebooks, which the periodic copy did not see; no cell changed.
+    `EMBEDDEDCV_AUTOSYNC=0` switches it off. On the PC: `make harvest` (rclone without
+    weights);
+  - observed duration: ≈ 10 min per batch-32 run (624 s for b32-sall, 600 iterations).
+- **Remaining**: the kitti resume on Colab after a disconnect (to the iteration), and the
+  GPU gain (s/image, largest batch that fits in memory) noted in the notebook and sent to
+  T12.11-e ([M12](M12-profils-pc.md), "to measure" row).
 
-## D. Balayages et choix du run
+## D. Sweeps and choice of the run
 
-### [x] T14.10 — Notebook `_sweep` : grille lot × sous-ensemble d'entraînement
-- **Spec** : §7 · **Dépend de** : T14.6 · **Taille** : M
-- **Livrables** : `notebooks/<jeu>/<modèle>_sweep.ipynb` pour voc, kitti, visdrone, flir,
-  exdark et crowdhuman ;
-  `tools/notebooks/runs.py`.
-- **Contenu** :
-  - paramètres `BATCHES` (défaut `[8, 16, 32]`), `TRAIN_SUBSETS` (défaut `[500, 0]`, où 0
-    veut dire tout le split, et n les n premières images, `train.py --subset`), `ITERS`
-    (600 par run), `SKIP_DONE` ;
-  - préparation et aperçu communs avec `_train` ;
-  - table du plan (images, époques effectives, durée estimée) ;
-  - un run par case dans `runs/b<lot>-s<n|all>/` avec `run.json`, `--resume` si
-    interrompu, synchronisation Drive comme T14.8 ;
-  - comparaison : mAP sur `SUBSET` images, perte finale et s/image (`runs.table`), puis
-    courbes superposées (`plot_training`, M13).
-- **Acceptation** : la commande d'une case est celle du notebook `_train` à `--batch` et
-  `--subset` près (test) ; un run fini n'est pas relancé.
-- **Notes** : le taux d'apprentissage n'est pas ajusté au lot ; une mAP sur `SUBSET`
-  images classe les runs, elle n'est pas publiable (règles de M12).
-- **Fait** : notebooks et `runs.py` ; tests de la commande d'une case, de
-  `find_runs`/`pick`/`table` et de `read_map` (tables VOC et COCO de `eval_voc.py`).
-- **Lancés** sur Colab (palier R) pour les six jeux, VOC, VisDrone, KITTI, FLIR, ExDark et
-  CrowdHuman : [resultats-balayages.md](resultats-balayages.md) ; analyse transversale
-  dans [notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb).
+### [x] T14.10 — `_sweep` notebook: batch × training subset grid
+- **Spec**: §7 · **Depends on**: T14.6 · **Size**: M
+- **Deliverables**: `notebooks/<dataset>/<model>_sweep.ipynb` for voc, kitti, visdrone,
+  flir, exdark and crowdhuman; `tools/notebooks/runs.py`.
+- **Contents**:
+  - parameters `BATCHES` (default `[8, 16, 32]`), `TRAIN_SUBSETS` (default `[500, 0]`,
+    where 0 means the whole split, and n the first n images, `train.py --subset`), `ITERS`
+    (600 per run), `SKIP_DONE`;
+  - preparation and preview shared with `_train`;
+  - plan table (images, effective epochs, estimated duration);
+  - one run per cell in `runs/b<batch>-s<n|all>/` with `run.json`, `--resume` if
+    interrupted, Drive synchronisation as in T14.8;
+  - comparison: mAP on `SUBSET` images, final loss and s/image (`runs.table`), then
+    overlaid curves (`plot_training`, M13).
+- **Acceptance**: the command of a cell is that of the `_train` notebook up to `--batch`
+  and `--subset` (test); a finished run is not restarted.
+- **Notes**: the learning rate is not adjusted to the batch; an mAP on `SUBSET` images
+  ranks the runs, it is not publishable (rules of M12).
+- **Done**: notebooks and `runs.py`; tests of the command of a cell, of
+  `find_runs`/`pick`/`table` and of `read_map` (VOC and COCO tables of `eval_voc.py`).
+- **Run** on Colab (tier R) for the six datasets, VOC, VisDrone, KITTI, FLIR, ExDark and
+  CrowdHuman: [resultats-balayages.md](resultats-balayages.md); cross-dataset analysis in
+  [notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb).
 
-### [x] T14.11 — Inférence : choix d'un run et comparaison
-- **Spec** : §8 · **Dépend de** : T14.3, T14.10 · **Taille** : S
-- **Livrables** : paramètres `RUNS_DIR`, `RUN` et `COMPARE` des notebooks d'inférence des
-  modèles affinés (`tiny-yolov3-voc`, `tiny-yolov3-<jeu>`).
-- **Contenu** :
-  - `WEIGHTS = None` prend `final.weights` du run `RUN` (None : le plus récent ; `'train'`,
-    `'b16-sall'`…) ; sur Colab, les runs sont d'abord restaurés depuis Drive ;
-  - sans run, arrêt en tête avec la liste et le notebook à lancer ;
-  - sorties dans `RUNS_DIR/eval/<run>/` ;
-  - `COMPARE = True` évalue chaque run sur les mêmes `SUBSET` images (mAP réutilisée si
-    déjà calculée) et affiche la table des runs.
-- **Acceptation** : avec deux runs présents, le plus récent est choisi par défaut et la
-  table compare les deux.
-- **Fait** : vérifié de bout en bout sur deux faux runs `tiny-yolov3-voc` (poids
-  initialisés au hasard, sans entraînement) : choix du plus récent, mAP de chacun, table.
+### [x] T14.11 — Inference: choosing a run and comparing
+- **Spec**: §8 · **Depends on**: T14.3, T14.10 · **Size**: S
+- **Deliverables**: parameters `RUNS_DIR`, `RUN` and `COMPARE` of the inference notebooks
+  of the fine-tuned models (`tiny-yolov3-voc`, `tiny-yolov3-<dataset>`).
+- **Contents**:
+  - `WEIGHTS = None` takes `final.weights` of the run `RUN` (None: the most recent;
+    `'train'`, `'b16-sall'`…); on Colab, the runs are first restored from Drive;
+  - without a run, stop at the top with the list and the notebook to run;
+  - outputs in `RUNS_DIR/eval/<run>/`;
+  - `COMPARE = True` evaluates each run on the same `SUBSET` images (mAP reused if already
+    computed) and prints the table of the runs.
+- **Acceptance**: with two runs present, the most recent is chosen by default and the
+  table compares both.
+- **Done**: checked end to end on two fake `tiny-yolov3-voc` runs (randomly initialised
+  weights, without training): choice of the most recent, mAP of each, table.
 
 ## E. Validation
 
-### [ ] T14.9 — Exécution de fumée de tous les notebooks
-- **Spec** : — · **Dépend de** : T14.3 à T14.7 · **Taille** : S · **Palier** : M
-- **Livrables** : test `slow` dans `python/tests/test_notebooks.py`, et la cible
+### [ ] T14.9 — Smoke run of all the notebooks
+- **Spec**: — · **Depends on**: T14.3 to T14.7 · **Size**: S · **Tier**: M
+- **Deliverables**: `slow` test in `python/tests/test_notebooks.py`, and the target
   `make notebooks-smoke`.
-- **Acceptation** : chaque notebook dont les données sont présentes s'exécute par
-  `jupyter nbconvert --execute` avec `SUBSET = 4`, `ITERS = 2`, `BATCH = 2`, sorties dans
-  `build/notebooks/smoke/` ; les notebooks sans données sont sautés avec un message, ce
-  n'est pas une erreur.
-- **Notes** : paramètres injectés en réécrivant la cellule `parameters` d'une copie, pour
-  ne pas dépendre de papermill.
-- **Fait** :
-  - `test_fumee` (`slow`) et `make notebooks-smoke` ;
-  - paramètres réécrits dans une copie, sous `build/notebooks/smoke/` ;
-  - 8 notebooks d'inférence passent (1 min 44 s), 9 sont sautés avec un message.
-- **Reste** : la fumée des notebooks `train` (voc, visdrone), non lancée, faute
-  d'entraînement autorisé pendant l'implémentation.
+- **Acceptance**: each notebook whose data is present runs through
+  `jupyter nbconvert --execute` with `SUBSET = 4`, `ITERS = 2`, `BATCH = 2`, outputs in
+  `build/notebooks/smoke/`; the notebooks without data are skipped with a message, which
+  is not an error.
+- **Notes**: parameters injected by rewriting the `parameters` cell of a copy, so as not to
+  depend on papermill.
+- **Done**:
+  - `test_fumee` (`slow`) and `make notebooks-smoke`;
+  - parameters rewritten in a copy, under `build/notebooks/smoke/`;
+  - 8 inference notebooks pass (1 min 44 s), 9 are skipped with a message.
+- **Remaining**: the smoke run of the `train` notebooks (voc, visdrone), not started, since
+  no training was allowed during the implementation.
 
 ---
 
-## Hors périmètre
+## Out of scope
 
-- Notebooks HLS, Vivado ou carte (M6 à M8) : ces étapes passent par `make` et des outils
-  propriétaires, sans intérêt à les encapsuler.
-- Entraînement sur COCO train2017 : trop long en NumPy, même sur GPU.
-- Publication de poids entraînés.
-- Toute dépendance à PyTorch ou TensorFlow.
+- HLS, Vivado or board notebooks (M6 to M8): these steps go through `make` and proprietary
+  tools, with no point in wrapping them.
+- Training on COCO train2017: too long in NumPy, even on GPU.
+- Publishing trained weights.
+- Any dependency on PyTorch or TensorFlow.
 
-## Ordre conseillé
+## Suggested order
 
-T14.0 → T14.1 et T14.2 → T14.3 sur VOC (référence 56,30 vérifiable tout de suite) → T14.4
-et T14.5 ; puis T14.6, d'abord sur kitti (seul jeu hors VOC téléchargé), → T14.7 et T14.8 ;
-T14.9 en dernier.
+T14.0 → T14.1 and T14.2 → T14.3 on VOC (reference 56.30 checkable right away) → T14.4 and
+T14.5; then T14.6, first on kitti (the only dataset outside VOC downloaded), → T14.7 and
+T14.8; T14.9 last.
 
 ```mermaid
 graph LR
