@@ -1,19 +1,19 @@
-# Statistiques des jeux de données (M16)
+# Dataset statistics (M16)
 
-Synthèse des notebooks `notebooks/<jeu>/<jeu>_stats.ipynb`
-([M16](M16-presentation-jeux.md)). Les blocs entre marqueurs `data_stats` sont générés
-depuis `build/notebooks/<jeu>/stats/stats.json` par
-`python tools/data_stats.py --report docs/tasks/stats-jeux.md` ; le reste (réponses aux
-questions propres) est écrit à la main. Ce document sert de référence aux tâches de M11 et
-M15.
+Summary of the notebooks `notebooks/<dataset>/<dataset>_stats.ipynb`
+([M16](M16-presentation-jeux.md)). The blocks between `data_stats` markers are generated
+from `build/notebooks/<dataset>/stats/stats.json` by
+`python tools/data_stats.py --report docs/tasks/stats-jeux.md`, and stay in French until
+their generator is translated (M19, T19.6); the rest (answers to the specific questions) is
+written by hand. This document serves as the reference for the tasks of M11 and M15.
 
-Conventions : grandeurs « vues par le réseau » en letterbox 416×416 ; « petits » : aire
-< 32² px à l'entrée ; « plus petits qu'une cellule » : plus grand côté sous le pas de la
-tête (32 px pour 13×13, 16 px pour 26×26) ; « cibles perdues » : objets non-difficult qui
-tombent sur la même cellule et la même ancre qu'un autre (`build_targets` n'en garde qu'un),
-avec les ancres de la cfg d'affinage du jeu. Pixels sur 200 images par partie (graine 0).
+Conventions: quantities "seen by the network" in a 416×416 letterbox; "small": area
+< 32² px at the input; "smaller than a cell": longest side under the stride of the head
+(32 px for 13×13, 16 px for 26×26); "lost targets": non-difficult objects that fall on the
+same cell and the same anchor as another one (`build_targets` keeps only one), with the
+anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0).
 
-## Comparatif
+## Comparison
 
 <!-- data_stats:comparatif -->
 | jeu | classes | images | objets | objets/image (méd.) | petits à l'entrée | plus petits qu'une cellule fine | cibles perdues | images > 256 | luminance moy. | IoU ancres de la cfg |
@@ -45,23 +45,24 @@ Révision `214f269`, entrée 416×416 (letterbox), cfg `tiny-yolov3-voc`, pixels
 | 2012:trainval | 11 540 | 27 450 | 11 540 / 27 450 | ok |
 <!-- /data_stats:voc -->
 
-**Question (T13.7, T13.13) : les classes à faible AP (bottle, pottedplant) sont-elles
-rares ou petites ?** Ni l'une ni l'autre ne sont rares : sur VOC2007 test, bottle (469 objets
-non-difficult, 3,9 %) et pottedplant (480, 4,0 %) sont plus fréquentes que 12 autres classes.
-Elles sont **petites** : bottle a le plus petit côté médian à l'entrée (55 px en letterbox 416,
-15 % de petits) et pottedplant le quatrième (80 px). La taille n'explique pas tout : car a autant
-de petits objets (11 %, côté 93 px) pour une AP de 67,0 contre 21,6 (bottle) et 27,5
-(pottedplant), et chair (35,3) n'a que 2 % de petits. Restent la forme (objets fins ou
-irréguliers) et l'occultation. Les collisions sont négligeables partout (0,69 % des cibles).
+**Question (T13.7, T13.13): are the classes with a low AP (bottle, pottedplant) rare or
+small?** Neither is rare: on VOC2007 test, bottle (469 non-difficult objects, 3.9 %) and
+pottedplant (480, 4.0 %) are more frequent than 12 other classes. They are **small**:
+bottle has the smallest median side at the input (55 px in a 416 letterbox, 15 % small)
+and pottedplant the fourth (80 px). Size does not explain everything: car has as many
+small objects (11 %, side 93 px) for an AP of 67.0 against 21.6 (bottle) and 27.5
+(pottedplant), and chair (35.3) has only 2 % small objects. What remains is the shape
+(thin or irregular objects) and occlusion. Collisions are negligible everywhere (0.69 % of
+the targets).
 
 ## COCO val2017
 
-Non exécuté : `data/coco` absent du PC (T16.13 reste ouverte).
+Not run: `data/coco` missing from the PC (T16.13 stays open).
 
 ## KITTI
 
-Non exécuté : seules les images `testing/` (sans annotations) sont sur le PC,
-`data_object_image_2.zip` est incomplet (T16.14 reste ouverte).
+Not run: only the `testing/` images (without annotations) are on the PC,
+`data_object_image_2.zip` is incomplete (T16.14 stays open).
 
 ## VisDrone
 
@@ -80,15 +81,15 @@ Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov
 | val | 548 | 38 759 | 548 / — | ok |
 <!-- /data_stats:visdrone -->
 
-**Question (T11.5, T15) : part des objets plus petits qu'une cellule 26×26 ; collisions
-de cibles.** En letterbox 416, **75 %** des objets sont plus petits qu'une cellule 26×26
-(16 px) et 94 % qu'une cellule 13×13 ; 97 % sont « petits » au sens COCO. Un tiers des cibles
-(**32,4 %**) se perd par collision : Tiny-YOLOv3 ne voit qu'un objet par cellule et par ancre.
-Sur val, la classe car (36 % des objets) a un côté médian de 10 px et perd 28 % de ses cibles ;
-pedestrian et people (5 px, 100 % de petits) en perdent 40 et 43 %, motor (6 px) 33 %. Cela
-explique que seule car décolle dans les balayages de M15. Il faut une entrée plus grande ou des
-tuiles, pas plus d'itérations. Le chargeur retire 10 191 régions ignorées et 1 564 « others » ;
-32 959 boîtes font moins de 2 px de côté à l'entrée.
+**Question (T11.5, T15): share of objects smaller than a 26×26 cell; target collisions.**
+In a 416 letterbox, **75 %** of the objects are smaller than a 26×26 cell (16 px) and 94 %
+smaller than a 13×13 cell; 97 % are "small" in the COCO sense. A third of the targets
+(**32.4 %**) are lost by collision: Tiny-YOLOv3 only sees one object per cell and per
+anchor. On val, the car class (36 % of the objects) has a median side of 10 px and loses
+28 % of its targets; pedestrian and people (5 px, 100 % small) lose 40 and 43 %, motor
+(6 px) 33 %. This explains why only car takes off in the sweeps of M15. What is needed is
+a larger input or tiles, not more iterations. The loader removes 10,191 ignored regions
+and 1,564 "others"; 32,959 boxes are less than 2 px wide at the input.
 
 ## FLIR ADAS v2
 
@@ -107,14 +108,14 @@ Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov
 | val | 1 144 | 16 696 | 1 144 / — | ok |
 <!-- /data_stats:flir -->
 
-**Question (T11.7) : distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00.**
-Les images thermiques 8 bits du jeu sont à un canal et plus claires que VOC (luminance
-moyenne 133 contre 108 sur VOC2007 test). Les 256 niveaux sont occupés, et 99 % des pixels
-tiennent sur 236 d'entre eux. L'entrée INT8 de L00 (échelle 1/127, `yolo.quant`) n'en garde que
-**128** : deux niveaux thermiques voisins donnent le même entier, sur toute la plage. L'objet
-dominant est petit (86 % de petits à 416, 51 % sous la cellule 26×26) et 18 % des cibles se
-perdent par collision. La quantification de l'entrée pèse donc sans doute moins que la taille
-des objets.
+**Question (T11.7): distribution of the thermal levels, and what the INT8 of L00 keeps of
+it.** The 8-bit thermal images of the dataset are single-channel and brighter than VOC
+(mean luminance 133 against 108 on VOC2007 test). The 256 levels are all used, and 99 % of
+the pixels fit in 236 of them. The INT8 input of L00 (scale 1/127, `yolo.quant`) only keeps
+**128**: two neighbouring thermal levels give the same integer, over the whole range. The
+dominant object is small (86 % small at 416, 51 % under the 26×26 cell) and 18 % of the
+targets are lost by collision. The quantization of the input therefore probably weighs
+less than the size of the objects.
 
 ## ExDark
 
@@ -133,15 +134,15 @@ Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov
 | test | 2 563 | 7 117 | 2 563 / — | ok |
 <!-- /data_stats:exdark -->
 
-**Question (T11.3) : luminosité par type d'éclairage, et écart aux images de calibration
-VOC.** Luminance moyenne **33** sur 200 images d'ExDark, contre **108** sur VOC2007 test (le
-split de calibration des échelles INT8 de M4) : 3,2 fois plus sombre. Par type d'éclairage
-(imageclasslist.txt) : Low 6,5, Weak 20, Ambient 25, Single 32, Window 35, Strong 38, Object
-40, Screen 59, Twilight 78 (3 à 63 images par type, à lire avec prudence). À l'échelle
-d'entrée 1/127, une image moyenne d'ExDark n'occupe que les 16 premiers niveaux entiers environ
-sur 127. Une calibration sur VOC fixe les échelles des activations pour une dynamique d'entrée
-que ces images n'atteignent pas : c'est l'enjeu de T11.3. Côté géométrie, rien de
-particulier (18 % de petits, 0,7 % de cibles perdues).
+**Question (T11.3): luminance per lighting type, and gap to the VOC calibration images.**
+Mean luminance **33** on 200 ExDark images, against **108** on VOC2007 test (the
+calibration split of the INT8 scales of M4): 3.2 times darker. Per lighting type
+(imageclasslist.txt): Low 6.5, Weak 20, Ambient 25, Single 32, Window 35, Strong 38, Object
+40, Screen 59, Twilight 78 (3 to 63 images per type, to be read with care). At the input
+scale 1/127, an average ExDark image only uses about the first 16 integer levels out of
+127. A calibration on VOC sets the activation scales for an input range that these images
+do not reach: that is what T11.3 is about. On the geometry side, nothing special (18 %
+small, 0.7 % of targets lost).
 
 ## CrowdHuman
 
@@ -160,10 +161,10 @@ Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov
 | val | 4 370 | 99 481 | 4 370 / 99 481 | ok |
 <!-- /data_stats:crowdhuman -->
 
-**Question (T11.6) : objets par image face aux 256 emplacements ; part d'objets occultés.**
-Médiane de 20 personnes par image, maximum 468 ; **32 images** sur 19 370 (0,17 %) dépassent
-256 boîtes annotées, aucune ne dépasse 1 024. Les emplacements de `yolo_post` suffisent donc
-presque toujours pour la vérité terrain. Le goulot est la grille : **19,8 %** des cibles se
-perdent par collision. **22,5 %** des boîtes sont en `difficult` (`mask` et `ignore`).
-77 738 boîtes `fbox` débordent de l'image : elles sont rognées par le chargeur, 15 deviennent
-vides et sont retirées.
+**Question (T11.6): objects per image against the 256 slots; share of occluded objects.**
+Median of 20 people per image, maximum 468; **32 images** out of 19,370 (0.17 %) exceed
+256 annotated boxes, none exceeds 1,024. The slots of `yolo_post` are therefore almost
+always enough for the ground truth. The bottleneck is the grid: **19.8 %** of the targets
+are lost by collision. **22.5 %** of the boxes are `difficult` (`mask` and `ignore`).
+77,738 `fbox` boxes overflow the image: they are clipped by the loader, 15 become empty
+and are removed.
