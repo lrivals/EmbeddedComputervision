@@ -37,6 +37,10 @@ OUT_DIR = ROOT / "build" / "autolabel"
 EXTRAS = ("torch", "transformers", "gradio", "gradio_image_annotation")
 MERGE_IOU = 0.5     # Re-run: a new prediction overlapping a manual box is dropped
 SAVE_EVERY = 20     # images between two writes of autolabel.json in a folder run
+# Vertical space around the editor's image (page header, tab bar, label, toolbar), in CSS
+# px: the image is shown whole in the window, without scrolling (`fit_width`).
+IMAGE_TAB_MARGIN = 330   # "Image" tab: the editor is right under the header
+FOLDER_TAB_MARGIN = 140  # "Folder" tab: the editor is under the gallery, fit to the window
 
 
 # ---------------------------------------------------------------- classes
@@ -190,8 +194,9 @@ def color_hex(c):
 def to_pixels(box, w, h):
     """Normalised `(cx, cy, w, h)` → integer `(xmin, ymin, xmax, ymax)` in the image."""
     cx, cy, bw, bh = box
-    return (int(np.clip(round((cx - bw / 2) * w), 0, w)), int(np.clip(round((cy - bh / 2) * h), 0, h)),
-            int(np.clip(round((cx + bw / 2) * w), 0, w)), int(np.clip(round((cy + bh / 2) * h), 0, h)))
+    x0, y0, x1, y1 = ((cx - bw / 2) * w, (cy - bh / 2) * h, (cx + bw / 2) * w, (cy + bh / 2) * h)
+    return (int(np.clip(round(x0), 0, w)), int(np.clip(round(y0), 0, h)),
+            int(np.clip(round(x1), 0, w)), int(np.clip(round(y1), 0, h)))
 
 
 def annotator_boxes(record, names, conf):
@@ -274,6 +279,12 @@ def remap_manual(record, old, new):
     return record
 
 
+def fit_width(w, h, margin):
+    """CSS width of the editor so that a w × h image fits the window: the component scales
+    the image to its width, so the width is capped at (window height − margin) × w / h."""
+    return f"min(100%, calc(max(240px, 100vh - {margin}px) * {w / h:.4f}))"
+
+
 def build_app(args):
     import gradio as gr
     from gradio_image_annotation import image_annotator
@@ -290,9 +301,10 @@ def build_app(args):
         value = {"image": record["path"], "boxes": boxes}
         return value, (boxes, idx)
 
-    def annotator_update(value, names):
+    def annotator_update(value, names, record, margin=IMAGE_TAB_MARGIN):
         return image_annotator(value=value, label_list=list(names),
-                               label_colors=[color_hex(c) for c in range(len(names))])
+                               label_colors=[color_hex(c) for c in range(len(names))],
+                               width=fit_width(record["width"], record["height"], margin))
 
     def predict(path, model, names, prompts):
         lab = get_labeller(model, args.device, args.cfg, args.dataset)
@@ -317,7 +329,7 @@ def build_app(args):
         record.update(path=str(shown_path), name=Path(file).name, model=lab.name,
                       version=lab.version, names=names, prompts=prompts)
         value, shown = editor(record, names, conf)
-        return annotator_update(value, names), record, shown, info(record, conf)
+        return annotator_update(value, names, record), record, shown, info(record, conf)
 
     def info(record, conf):
         boxes, scores, labels, _ = lio.labels_of(record, conf)
@@ -347,7 +359,7 @@ def build_app(args):
         merge_manual(remap_manual(record, old, names), raw, old, names)
         record.update(names=names, prompts=prompts, model=lab.name, version=lab.version)
         value, shown = editor(record, names, conf)
-        return annotator_update(value, names), record, shown, info(record, conf)
+        return annotator_update(value, names, record), record, shown, info(record, conf)
 
     def on_download_labels(record, conf):
         if record is None:
@@ -424,7 +436,7 @@ def build_app(args):
             prov = relabel(Path(session) / "result", conf)
         rec = dict(prov["images"][rel], path=str(Path(session) / "images" / rel), rel=rel)
         value, shown = editor(rec, prov["classes"], conf)
-        return annotator_update(value, prov["classes"]), rel, shown
+        return annotator_update(value, prov["classes"], rec, FOLDER_TAB_MARGIN), rel, shown
 
     def on_folder_edit(value, session, rel, shown, conf):
         if not (session and rel and value is not None and shown is not None):
@@ -448,17 +460,17 @@ def build_app(args):
     # -------- layout
 
     with gr.Blocks(title="Auto-label") as app:
-        gr.Markdown("## Auto-label — open-vocabulary boxes, manual correction, YOLO txt")
+        gr.Markdown("### Auto-label — boxes from class names, correction, YOLO txt")
         with gr.Row():
-            classes = gr.Textbox(label="Classes (comma-separated; order = class id; "
-                                       "name=prompt to send another text)",
+            classes = gr.Textbox(label="Classes (order = class id)",
+                                 placeholder="person, dog, tvmonitor=tv monitor",
                                  value=args.classes or (preset_text(args.preset)
                                                         if args.preset else "person, dog"),
                                  scale=4)
             preset = gr.Dropdown(["", *presets()], value="", label="Preset", scale=1)
             model = gr.Dropdown(models, value=args.model, label="Labeller", scale=1)
             conf = gr.Slider(0.05, 0.95, value=args.conf, step=0.01, label="Confidence",
-                             scale=1)
+                             scale=1, min_width=220)
         preset.change(lambda p: preset_text(p) if p else gr.skip(), preset, classes)
         model.change(lm.default_conf, model, conf)  # each labeller has its score scale
 
@@ -474,7 +486,7 @@ def build_app(args):
                 with gr.Column(scale=3):
                     ann = image_annotator(label="Boxes: drag to draw, click to select "
                                                 "(Del removes), double-click to change class",
-                                          sources=[], use_default_label=True,
+                                          sources=[], use_default_label=True, boxes_alpha=0.15,
                                           image_type="filepath")
                     status = gr.Markdown()
             photo.change(on_upload, [photo, classes, model, conf], [ann, record, shown, status])
@@ -501,10 +513,14 @@ def build_app(args):
                     gal = gr.Gallery(label="Needs review first — click to edit", columns=6,
                                      height=320, allow_preview=False)
                     fann = image_annotator(label="Edits are saved at once", sources=[],
-                                           use_default_label=True, image_type="filepath")
+                                           elem_id="folder-editor",
+                                           use_default_label=True, boxes_alpha=0.15,
+                                           image_type="filepath")
             run.click(on_folder_run, [upload, path, recursive, classes, model, conf],
                       [session, gal, order, fstatus])
-            gal.select(on_select, [session, order, conf], [fann, rel, fshown])
+            gal.select(on_select, [session, order, conf], [fann, rel, fshown]).then(
+                None, js="() => document.getElementById('folder-editor')"
+                         "?.scrollIntoView({behavior: 'smooth', block: 'start'})")
             fann.change(on_folder_edit, [fann, session, rel, fshown, conf], [fshown, fstatus])
             dl_all.click(on_download_all, [session, conf], zip_out)
     return app

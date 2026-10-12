@@ -79,6 +79,10 @@ Tiny-YOLOv2 (0.3 s); details in T22.7 of [tasks/M22-autolabel.md](tasks/M22-auto
 
 ## 4. Tab "Image"
 
+The editor fits each photo to the window (width and height, portrait or landscape), so
+the whole image and its toolbar are visible without scrolling, down to a 1000 × 600
+window. In the "Folder" tab, a click in the gallery scrolls the editor into view.
+
 1. Type the classes, pick the labeller.
 2. Drop a photo (JPEG, PNG, WebP). Its EXIF orientation is applied first.
 3. The boxes appear with their class. The **Confidence** slider hides or shows boxes
