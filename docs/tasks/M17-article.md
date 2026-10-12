@@ -1,38 +1,35 @@
-# M17 — Article (optionnel)
+# M17 — Article (optional)
 
-Objectif : un **article de type papier, en français**, qui rend compte du travail du
-dépôt : un détecteur Tiny-YOLO réécrit de zéro en NumPy, quantifié en INT8, vérifié
-bit-exact en C++ puis sur un accélérateur HLS piloté par l'ARM d'un SoC, avec ses
-extensions (formats basse précision, post-traitement matériel, streaming, autres jeux de
-données). L'article doit **suivre le projet sans réécriture** : chiffres, tables, figures
-et état des jalons y sont **générés dans des blocs balisés**, seul le récit est écrit à la
-main.
+Goal: a **paper-style article, in French**, that reports the work of the repository: a
+Tiny-YOLO detector rewritten from scratch in NumPy, quantized to INT8, checked bit-exact
+in C++ then on an HLS accelerator driven by the ARM of a SoC, with its extensions
+(low-precision formats, hardware post-processing, streaming, other datasets). The article
+must **follow the project without rewriting**: numbers, tables, figures and milestone
+status are **generated in tagged blocks**, only the narrative is written by hand.
 
-Constat de départ :
-- la [spécification](../../yolo-embarque-de-zero.md) est un document de **méthode**
-  (ce qu'il faut implémenter et pourquoi, sourcé dans la base d'articles), pas un compte
-  rendu de ce qui a été fait ni de ce que cela donne ;
-- les résultats sont dispersés dans `results/` :
-  [map_stades.md](../../results/map_stades.md) (VOC2007 test, flottant 56,30, entier
-  55,66, C-sim 55,66, 4 952 images identiques),
+Starting point:
+- the [specification](../../yolo-embarque-de-zero.md) is a **method** document (what to
+  implement and why, sourced in the paper base), not a report of what was done or of what
+  it gives;
+- the results are scattered in `results/`: [map_stades.md](../../results/map_stades.md)
+  (VOC2007 test, float 56.30, integer 55.66, C-sim 55.66, 4,952 identical images),
   [map_int8.md](../../results/map_int8.md), [rapport.md](../../results/rapport.md)
-  (projection 37,2 ms, 187,3 GOPS sur KV260), [quant_4bits.md](../../results/quant_4bits.md),
+  (projection 37.2 ms, 187.3 GOPS on KV260), [quant_4bits.md](../../results/quant_4bits.md),
   [req_yolo.md](../../results/req_yolo.md), [postproc_hw.md](../../results/postproc_hw.md),
   [streaming.md](../../results/streaming.md), [benchmarks.csv](../../results/benchmarks.csv),
-  et dans [resultats-balayages.md](resultats-balayages.md) pour les jeux hors VOC ;
-- environ 80 figures sont publiées dans `results/figures/` par le registre de
-  `tools/figures` ([M13](M13-figures.md)), chacune avec sa légende, sa source et sa
-  commande ;
-- une partie des chiffres sont des **projections** ou des **C-sim** : la KV260 et Vitis
-  ne sont pas encore disponibles (M6-M8). L'article doit le dire chiffre par chiffre, et
-  basculer quand les mesures arriveront ;
-- M15 et M16 sont ouverts : la section « au-delà de VOC » changera encore.
+  and in [resultats-balayages.md](resultats-balayages.md) for the datasets other than VOC;
+- about 80 figures are published in `results/figures/` by the registry of `tools/figures`
+  ([M13](M13-figures.md)), each with its caption, its source and its command;
+- some of the numbers are **projections** or **C-sim**: the KV260 and Vitis are not
+  available yet (M6-M8). The article must say so number by number, and switch over when
+  the measurements arrive;
+- M15 and M16 are open: the "beyond VOC" section will still change.
 
-Comme en [M14](M14-notebooks.md) et [M16](M16-presentation-jeux.md), l'article n'apporte
-**aucun calcul propre** : tout nombre vient d'un outil du dépôt et se régénère en ligne de
-commande.
+As in [M14](M14-notebooks.md) and [M16](M16-presentation-jeux.md), the article brings **no
+computation of its own**: every number comes from a repository tool and is regenerated
+from the command line.
 
-**État** : 17 tâches faites sur 21 (T17.0 à T17.16) ; T17.17 à T17.20 restent.
+**State**: 17 tasks done out of 21 (T17.0 to T17.16); T17.17 to T17.20 remain.
 
 **LaTeX (2026-10-07).** The source is now `docs/article/article.tex`, compiled by xelatex
 and bibtex (`make article-pdf`) into `docs/article/article.pdf`. LaTeX comments run to the
@@ -66,25 +63,26 @@ thousands separator, minus sign −). Differences from the plan below:
 - `make article-pdf` compiles `build/article/article.pdf` (latexmk -xelatex) and copies it
   to `docs/article/article.pdf`, the one exported file kept in git.
 
-## Conventions communes
+## Shared conventions
 
-### Fichiers
+### Files
 
-- **Source** : `docs/article/article.md`, un seul fichier Markdown (LaTeX en ligne
-  `$…$` comme la spécification).
-- **Chiffres** : `docs/article/chiffres.json`, instantané **versionné** de tous les nombres
-  et tables de l'article. Une entrée par clé :
+- **Source**: `docs/article/article.md`, a single Markdown file (inline LaTeX `$…$` like
+  the specification).
+- **Numbers**: `docs/article/chiffres.json`, a **versioned** snapshot of all the numbers
+  and tables of the article. One entry per key:
   `{"valeur": …, "statut": …, "source": …, "commande": …, "rev": …, "date": …}`.
-- **Références** : `docs/article/refs.md`, reprise du §12 de la spécification ; citations
-  au format de la base d'articles (`[2024-zhang#013.1]`, vérifiables avec `bin/pdb verify`, outil de la base, hors dépôt).
-- **Export** (optionnel) : `build/article/article.pdf` et `.html` par pandoc ; rien
-  d'exporté n'est versionné.
-- **Outil** : `tools/article.py` (`python -m tools.article`), en Python pur, hors du paquet
-  `yolo` ([ADR 0001](../adr/0001-numpy-pur.md)).
+- **References**: `docs/article/refs.md`, taken from §12 of the specification; citations in
+  the format of the paper base (`[2024-zhang#013.1]`, checkable with `bin/pdb verify`, a
+  tool of the base, outside the repository).
+- **Export** (optional): `build/article/article.pdf` and `.html` by pandoc; nothing
+  exported is versioned.
+- **Tool**: `tools/article.py` (`python -m tools.article`), in pure Python, outside the
+  `yolo` package ([ADR 0001](../adr/0001-numpy-pur.md)).
 
-### Blocs générés
+### Generated blocks
 
-Un bloc est délimité par deux commentaires HTML, invisibles au rendu :
+A block is delimited by two HTML comments, invisible when rendered:
 
 ```markdown
 La mAP entière vaut <!-- article:n:map.voc.int8 -->55,66<!-- /article --> points.
@@ -101,301 +99,303 @@ La mAP entière vaut <!-- article:n:map.voc.int8 -->55,66<!-- /article --> point
 <!-- /article -->
 ```
 
-| Type | Contenu | Origine |
+| Type | Contents | Origin |
 |---|---|---|
-| `n` | un nombre, formaté à la française (virgule décimale, espace fine des milliers) | clé de `chiffres.json` |
-| `table` | une table Markdown | clé de `chiffres.json` (liste de lignes) |
-| `fig` | image, légende `Figure.caption`, commande en commentaire ; `fig:<nom>` ou `fig:<nom>/<fichier>` quand le générateur produit plusieurs images | registre `FIGURES` de [tools/figures/__init__.py](../../tools/figures/__init__.py) |
-| `etat` | avancement des jalons | table **Suivi** de [README.md](README.md) |
-| `rev` | révision git et date du dernier `render` | `git rev-parse --short HEAD` |
+| `n` | a number, in French format (decimal comma, thin space as the thousands separator) | key of `chiffres.json` |
+| `table` | a Markdown table | key of `chiffres.json` (list of rows) |
+| `fig` | image, caption `Figure.caption`, command in a comment; `fig:<name>` or `fig:<name>/<file>` when the generator produces several images | `FIGURES` registry of [tools/figures/__init__.py](../../tools/figures/__init__.py) |
+| `etat` | progress of the milestones | **Suivi** table of [README.md](README.md) |
+| `rev` | git revision and date of the last `render` | `git rev-parse --short HEAD` |
 
-Règles :
-- le contenu d'un bloc **n'est jamais édité à la main** : il est réécrit par `render` ;
-- tout ce qui est hors bloc (le récit) n'est **jamais touché** par l'outil ;
-- un nombre cité dans le récit hors bloc est une faute : `--check` signale les nombres
-  décimaux hors bloc dans les sections de résultats (liste blanche pour les constantes du
-  réseau : 416, 13×13, 0,1 de la leaky, etc.) ;
-- les figures sont citées **par nom de registre**, jamais par chemin : renommer une figure
-  dans `tools/figures` casse `--check`, pas l'article en silence.
+Rules:
+- the contents of a block are **never edited by hand**: they are rewritten by `render`;
+- everything outside a block (the narrative) is **never touched** by the tool;
+- a number cited in the narrative outside a block is a mistake: `--check` reports the
+  decimal numbers outside blocks in the result sections (allow list for the network
+  constants: 416, 13×13, 0.1 of the leaky, etc.);
+- the figures are cited **by registry name**, never by path: renaming a figure in
+  `tools/figures` breaks `--check`, not the article silently.
 
-### Collecte en deux temps
+### Two-step collection
 
-1. **`collect`** : un registre `CLES` dans `tools/article.py` associe chaque clé à un
-   lecteur, une source et un statut. Le lecteur lit la source (JSON de `build/`, CSV ou
-   table Markdown de `results/`). Si la source manque, la valeur de `chiffres.json` est
-   **gardée** et signalée, comme `MissingSource` des figures. `collect` réécrit
-   `chiffres.json` avec la révision courante pour chaque valeur qui a changé.
-2. **`render`** : réécrit les blocs de `article.md` depuis `chiffres.json` et le registre
-   des figures, sans lire `build/`.
+1. **`collect`**: a `CLES` registry in `tools/article.py` maps each key to a reader, a
+   source and a status. The reader reads the source (JSON from `build/`, CSV or Markdown
+   table from `results/`). If the source is missing, the value of `chiffres.json` is
+   **kept** and reported, like `MissingSource` of the figures. `collect` rewrites
+   `chiffres.json` with the current revision for each value that changed.
+2. **`render`**: rewrites the blocks of `article.md` from `chiffres.json` and the figure
+   registry, without reading `build/`.
 
-L'article se régénère donc partout (CI, Colab, machine sans `build/`), et le diff de
-`chiffres.json` montre exactement quels résultats ont bougé entre deux versions.
+The article can therefore be regenerated anywhere (CI, Colab, a machine without `build/`),
+and the diff of `chiffres.json` shows exactly which results moved between two versions.
 
-### Statut de chaque chiffre
+### Status of each number
 
-Chaque clé porte un statut, rendu en exposant ou en colonne « Statut » des tables :
+Each key carries a status, rendered as a superscript or in a "Status" column of the
+tables:
 
-| Statut | Sens | Exemple |
+| Status | Meaning | Example |
 |---|---|---|
-| `mesure` | mesuré sur la carte ou sur le jeu complet | mAP entière VOC2007 test |
-| `csim` | calculé par le noyau HLS en C-sim | mAP FPGA 55,66 |
-| `projection` | modèle de cycles ou de ressources, sans synthèse | 37,2 ms, 187,3 GOPS |
-| `estimation` | modèle analytique hors synthèse | ressources du streaming (M9.4) |
-| `palier-R` | sous-ensemble (50 images, règle M12) | balayages M15 |
-| `publie` | chiffre d'un article de la base | lignes de `benchmarks.csv` hors « ce travail » |
+| `mesure` | measured on the board or on the full dataset | integer mAP VOC2007 test |
+| `csim` | computed by the HLS kernel in C-sim | FPGA mAP 55.66 |
+| `projection` | cycle or resource model, without synthesis | 37.2 ms, 187.3 GOPS |
+| `estimation` | analytical model outside synthesis | resources of the streaming design (M9.4) |
+| `palier-R` | subset (50 images, M12 rule) | M15 sweeps |
+| `publie` | number from a paper of the base | rows of `benchmarks.csv` other than "this work" |
 
-L'article **ne présente jamais une projection comme une mesure** : le résumé et les
-conclusions citent le statut à côté de chaque chiffre clé.
+The article **never presents a projection as a measurement**: the abstract and the
+conclusions cite the status next to each key number.
 
-### Règles
+### Rules
 
-- `make article` = `collect` puis `render` ; `make article-pdf` exporte en plus.
-- `python -m tools.article --check` (dans `make ci`) échoue si :
-  - un bloc diffère de ce que produirait `render` ;
-  - un bloc cite une clé absente de `chiffres.json` ou une figure absente de `FIGURES` ;
-  - une image citée n'existe pas dans `results/figures/` ;
-  - une section de résultats contient un nombre hors bloc (liste blanche à part).
-- Les clés sont stables et hiérarchiques : `<jeu>.<grandeur>.<variante>`
-  (`map.voc.int8`, `perf.kv260.m10.ms`, `balayage.visdrone.meilleur.map`). Renommer une
-  clé se fait dans `CLES` et dans l'article dans le même commit.
-- Langue et typographie : celles de [conventions.md](../conventions.md) et de la
-  spécification (français, virgule décimale, « hors base » pour ce qui n'est pas sourcé).
+- `make article` = `collect` then `render`; `make article-pdf` also exports.
+- `python -m tools.article --check` (in `make ci`) fails if:
+  - a block differs from what `render` would produce;
+  - a block cites a key missing from `chiffres.json` or a figure missing from `FIGURES`;
+  - a cited image does not exist in `results/figures/`;
+  - a result section contains a number outside a block (allow list aside).
+- The keys are stable and hierarchical: `<dataset>.<quantity>.<variant>` (`map.voc.int8`,
+  `perf.kv260.m10.ms`, `balayage.visdrone.meilleur.map`). Renaming a key is done in `CLES`
+  and in the article in the same commit.
+- Language and typography: those of [conventions.md](../conventions.md) and of the
+  specification (French, decimal comma, "hors base" for what is not sourced).
 
-### Mise à jour à chaque jalon
+### Update at each milestone
 
-À la clôture d'une tâche qui produit un résultat (ou au moins à chaque jalon) :
+When a task that produces a result is closed (or at least at each milestone):
 
-1. `make article` ;
-2. relire le diff de `chiffres.json` et des blocs (`git diff docs/article/`) ;
-3. relire le récit des sections dont un chiffre ou un statut a changé (table **Sections**
-   ci-dessous) et le corriger ; passer leur état à « à jour à rév. X » ;
-4. ajouter une entrée au **journal des versions** (annexe de l'article) : révision, date,
-   ce qui a changé, en une ou deux lignes ;
-5. `--check` vert, commit `M17 : article à jour (<jalon>)`.
+1. `make article`;
+2. reread the diff of `chiffres.json` and of the blocks (`git diff docs/article/`);
+3. reread the narrative of the sections where a number or a status changed (**Sections**
+   table below) and correct it; set their state to "up to date at rev. X";
+4. add an entry to the **version log** (appendix of the article): revision, date, what
+   changed, in one or two lines;
+5. `--check` green, commit `M17 : article à jour (<milestone>)`.
 
-## Plan de l'article
+## Outline of the article
 
-Chaque section indique les jalons qu'elle raconte et ses blocs principaux. La table sert
-aussi à savoir **quelle section relire** quand un jalon avance.
+Each section gives the milestones it covers and its main blocks. The table also tells
+**which section to reread** when a milestone moves forward.
 
-| § | Section | Jalons | Blocs principaux (clés, figures) |
+| § | Section | Milestones | Main blocks (keys, figures) |
 |---|---|---|---|
-| 0 | Résumé | tous | `n` : mAP flottante / entière / C-sim, ms et GOPS projetés, MACs ; `rev` |
-| 1 | Introduction et contributions | — | liste des contributions ; `etat` résumé |
-| 2 | Travaux liés | §10.4 de la spec | `table:benchmarks` (`benchmarks.csv`), `fig:etat_art` |
-| 3 | Réseaux et briques NumPy | M0-M2 | `fig:graphe/graphe_tiny-yolov2-voc`, `fig:fiche/fiche_tiny-yolov2-voc`, `fig:convolution`, `fig:retropropagation`, `fig:perte` ; `n` : MACs, paramètres, gradcheck |
-| 4 | Inférence et évaluation | M3 | `table:map.voc.float` (prétraitements), `fig:pr/pr_variantes`, `fig:nms_map` |
-| 5 | Quantification INT8 | M4 | `table:map.voc.int8`, `fig:calibration/calibration_tiny-yolov2-voc`, `fig:erreur_couches/erreur_couches_tiny-yolov2-voc`, `fig:quantification`, `fig:entier` |
-| 6 | Golden C++ et chaîne de vérification | M5 | `fig:chaine_verif` ; `n` : écarts (0), nombre de dumps comparés |
-| 7 | Accélérateur HLS et intégration SoC | M6, M7, M10 | `fig:moteur`, `fig:tuilage`, `fig:soc`, `fig:roofline_couches`, `fig:cascade_m10`, `fig:cycles_couches` |
-| 8 | Résultats | M8 | `table:map.stades`, `table:perf.kv260`, `fig:map_stades`, `fig:ressources` ; statuts `csim` / `projection` |
-| 9 | Extensions | M9.1-M9.4 | `table:map.formats` (INT8, puissances de 2, 4 bits), `fig:map_formats`, `fig:hw_postproc`, `fig:streaming` |
-| 10 | Au-delà de VOC | M11, M15, M16 | `table:balayages.meilleurs` (par jeu), `fig:balayages/balayages_*`, `fig:detections` ; statut `palier-R` |
-| 11 | Limites et travaux futurs | tous | `etat` détaillé ; liste générée des chiffres encore `projection` / `estimation` |
-| 12 | Reproductibilité | M0, M12-M14 | commandes `make`, notebooks, `fig:tests`, `fig:code` ; `rev` |
-| — | Références | — | `refs.md` |
-| A | Annexe : journal des versions | — | écrit à la main, une entrée par mise à jour |
+| 0 | Abstract | all | `n`: float / integer / C-sim mAP, projected ms and GOPS, MACs; `rev` |
+| 1 | Introduction and contributions | — | list of contributions; summary `etat` |
+| 2 | Related work | §10.4 of the spec | `table:benchmarks` (`benchmarks.csv`), `fig:etat_art` |
+| 3 | Networks and NumPy building blocks | M0-M2 | `fig:graphe/graphe_tiny-yolov2-voc`, `fig:fiche/fiche_tiny-yolov2-voc`, `fig:convolution`, `fig:retropropagation`, `fig:perte`; `n`: MACs, parameters, gradcheck |
+| 4 | Inference and evaluation | M3 | `table:map.voc.float` (preprocessings), `fig:pr/pr_variantes`, `fig:nms_map` |
+| 5 | INT8 quantization | M4 | `table:map.voc.int8`, `fig:calibration/calibration_tiny-yolov2-voc`, `fig:erreur_couches/erreur_couches_tiny-yolov2-voc`, `fig:quantification`, `fig:entier` |
+| 6 | C++ golden model and verification chain | M5 | `fig:chaine_verif`; `n`: differences (0), number of dumps compared |
+| 7 | HLS accelerator and SoC integration | M6, M7, M10 | `fig:moteur`, `fig:tuilage`, `fig:soc`, `fig:roofline_couches`, `fig:cascade_m10`, `fig:cycles_couches` |
+| 8 | Results | M8 | `table:map.stades`, `table:perf.kv260`, `fig:map_stades`, `fig:ressources`; statuses `csim` / `projection` |
+| 9 | Extensions | M9.1-M9.4 | `table:map.formats` (INT8, powers of 2, 4 bits), `fig:map_formats`, `fig:hw_postproc`, `fig:streaming` |
+| 10 | Beyond VOC | M11, M15, M16 | `table:balayages.meilleurs` (per dataset), `fig:balayages/balayages_*`, `fig:detections`; status `palier-R` |
+| 11 | Limitations and future work | all | detailed `etat`; generated list of the numbers still `projection` / `estimation` |
+| 12 | Reproducibility | M0, M12-M14 | `make` commands, notebooks, `fig:tests`, `fig:code`; `rev` |
+| — | References | — | `refs.md` |
+| A | Appendix: version log | — | written by hand, one entry per update |
 
 ---
 
 ## A. Infrastructure
 
-### [x] T17.0 — Squelette de l'article
-- **Spec** : — · **Dépend de** : — · **Taille** : S
-- **Livrables** : `docs/article/article.md` (titre, auteurs, sections du plan, un bloc
-  vide par bloc prévu, annexe « journal des versions ») ; `docs/article/refs.md` ;
-  `docs/article/chiffres.json` vide (`{}`).
-- **Acceptation** : le squelette se lit en Markdown (GitHub et VS Code) ; chaque section
-  du plan y est, avec ses blocs balisés et une ligne « à rédiger ».
+### [x] T17.0 — Skeleton of the article
+- **Spec**: — · **Depends on**: — · **Size**: S
+- **Deliverables**: `docs/article/article.md` (title, authors, sections of the outline, one
+  empty block per planned block, "version log" appendix); `docs/article/refs.md`; empty
+  `docs/article/chiffres.json` (`{}`).
+- **Acceptance**: the skeleton reads as Markdown (GitHub and VS Code); each section of the
+  outline is there, with its tagged blocks and a "to write" line.
 
-### [x] T17.1 — Moteur de blocs `tools/article.py`
-- **Spec** : — · **Dépend de** : T17.0 · **Taille** : M
-- **Livrables** : `tools/article.py` (`parse`, `render`, `main`) ;
+### [x] T17.1 — Block engine `tools/article.py`
+- **Spec**: — · **Depends on**: T17.0 · **Size**: M
+- **Deliverables**: `tools/article.py` (`parse`, `render`, `main`);
   `python/tests/test_article.py`.
-- **Comportement attendu** :
-  - `parse` repère les blocs `<!-- article:<type>:<clé> -->…<!-- /article -->`, en ligne
-    ou sur plusieurs lignes ; un bloc mal fermé est une erreur avec numéro de ligne ;
-  - `render` remplace le contenu de chaque bloc et laisse le reste du fichier octet pour
-    octet ;
-  - formatage des nombres à la française (décimales fixées par clé) ;
-  - `--check` : voir **Règles** ; sortie lisible (ligne, clé, attendu, trouvé).
-- **Acceptation** :
-  - tests : idempotence (`render` deux fois = une fois), texte hors bloc inchangé, bloc
-    inconnu ou mal fermé refusé, `--check` rouge sur un bloc modifié à la main, nombre hors
-    bloc détecté ;
-  - aucune dépendance hors bibliothèque standard.
-- **Notes** : reprendre le schéma `--check` de `tools/notebooks/__main__.py`.
+- **Expected behaviour**:
+  - `parse` finds the blocks `<!-- article:<type>:<key> -->…<!-- /article -->`, inline or
+    over several lines; a block not closed properly is an error with a line number;
+  - `render` replaces the contents of each block and leaves the rest of the file byte for
+    byte;
+  - French number formatting (decimals fixed per key);
+  - `--check`: see **Rules**; readable output (line, key, expected, found).
+- **Acceptance**:
+  - tests: idempotence (`render` twice = once), text outside blocks unchanged, unknown or
+    unclosed block refused, `--check` red on a block edited by hand, number outside a block
+    detected;
+  - no dependency outside the standard library.
+- **Notes**: reuse the `--check` scheme of `tools/notebooks/__main__.py`.
 
-### [x] T17.2 — Collecte des chiffres (`collect`)
-- **Spec** : — · **Dépend de** : T17.1 · **Taille** : M
-- **Livrables** : registre `CLES` et lecteurs dans `tools/article.py` ; premier
+### [x] T17.2 — Collecting the numbers (`collect`)
+- **Spec**: — · **Depends on**: T17.1 · **Size**: M
+- **Deliverables**: `CLES` registry and readers in `tools/article.py`; first
   `docs/article/chiffres.json`.
-- **Lecteurs** (un par famille de sources, réutiliser les lecteurs existants plutôt que
-  relire les fichiers) :
-  - mAP aux stades : `build/m8/<net>/map_stades.json` (`tools/map_stades.py --json`),
-    repli sur la table de `results/map_stades.md` ;
-  - flottant / entier : `build/m8/<net>/eval_float_int.json`, tables de `map_float.md` et
-    `map_int8.md` ;
-  - formats : `build/m9/map_*.json`, tables de `quant_4bits.md` et `req_yolo.md` ;
-  - performance : `tools/perf_model.py` (projection) puis, quand ils existeront, mesures
-    de `results/mesures.md` ;
-  - état de l'art : `results/benchmarks.csv` ;
-  - balayages : `tools/notebooks/balayages.py` (sorties des notebooks `_sweep` et `_infer`) ;
-  - modèle : MACs et paramètres de `make count-macs`.
-- **Acceptation** :
-  - chaque clé a une source, une commande et un statut ;
-  - sans `build/`, `collect` garde les valeurs existantes et liste les clés non
-    rafraîchies, sans échouer ;
-  - test : une source modifiée change la valeur et la révision de sa seule clé.
+- **Readers** (one per family of sources, reusing the existing readers rather than
+  rereading the files):
+  - mAP at the stages: `build/m8/<net>/map_stades.json` (`tools/map_stades.py --json`),
+    fallback on the table of `results/map_stades.md`;
+  - float / integer: `build/m8/<net>/eval_float_int.json`, tables of `map_float.md` and
+    `map_int8.md`;
+  - formats: `build/m9/map_*.json`, tables of `quant_4bits.md` and `req_yolo.md`;
+  - performance: `tools/perf_model.py` (projection) then, when they exist, the
+    measurements of `results/mesures.md`;
+  - state of the art: `results/benchmarks.csv`;
+  - sweeps: `tools/notebooks/balayages.py` (outputs of the `_sweep` and `_infer`
+    notebooks);
+  - model: MACs and parameters from `make count-macs`.
+- **Acceptance**:
+  - each key has a source, a command and a status;
+  - without `build/`, `collect` keeps the existing values and lists the keys not
+    refreshed, without failing;
+  - test: a modified source changes the value and the revision of its key only.
 
-### [x] T17.3 — Blocs `fig`, `etat` et `rev`
-- **Spec** : — · **Dépend de** : T17.1 · **Taille** : S
-- **Livrables** : rendu des trois types dans `tools/article.py`.
-- **Acceptation** :
-  - `fig` : chemin relatif depuis `docs/article/`, légende = `Figure.caption`, commande
-    en commentaire ; une figure `subset=True` (dans `build/`) est refusée, l'article ne
-    cite que des figures publiées ;
-  - `etat` : table jalon / tâches / faites lue dans la table **Suivi** de
-    [README.md](README.md), variantes `etat` (complète) et `etat:resume` (une phrase) ;
-  - `rev` : révision courte et date, suffixe `+modifs` si l'arbre de travail est sale.
+### [x] T17.3 — `fig`, `etat` and `rev` blocks
+- **Spec**: — · **Depends on**: T17.1 · **Size**: S
+- **Deliverables**: rendering of the three types in `tools/article.py`.
+- **Acceptance**:
+  - `fig`: relative path from `docs/article/`, caption = `Figure.caption`, command in a
+    comment; a `subset=True` figure (in `build/`) is refused, the article only cites
+    published figures;
+  - `etat`: milestone / tasks / done table read from the **Suivi** table of
+    [README.md](README.md), variants `etat` (full) and `etat:resume` (one sentence);
+  - `rev`: short revision and date, suffix `+modifs` if the working tree is dirty.
 
-### [x] T17.4 — Cibles `make` et CI
-- **Spec** : — · **Dépend de** : T17.2, T17.3 · **Taille** : S
-- **Livrables** : cibles `article` et `article-pdf` du `Makefile` ; `--check` ajouté à
-  `ci` ; ligne dans `make help`.
-- **Acceptation** : `make article` puis `make ci` passent ; `make article-pdf` produit
-  `build/article/article.pdf` si pandoc est installé, sinon un message clair (pas
-  d'échec de `ci`).
+### [x] T17.4 — `make` targets and CI
+- **Spec**: — · **Depends on**: T17.2, T17.3 · **Size**: S
+- **Deliverables**: `article` and `article-pdf` targets of the `Makefile`; `--check` added
+  to `ci`; line in `make help`.
+- **Acceptance**: `make article` then `make ci` pass; `make article-pdf` produces
+  `build/article/article.pdf` if pandoc is installed, otherwise a clear message (no
+  failure of `ci`).
 
-## B. Rédaction
+## B. Writing
 
-Acceptation commune des tâches de rédaction :
-- la section est rédigée, au ton d'un article (récit de ce qui a été fait, choix et
-  résultats), pas d'une documentation ;
-- tous ses nombres de résultats sont dans des blocs, toutes ses figures sont citées par le
-  registre ;
-- les affirmations sur la méthode renvoient aux citations de la base, ou sont marquées
-  « hors base » comme dans la spécification ;
-- `--check` passe ; l'état de la section passe à « brouillon » dans la table **Sections**.
+Shared acceptance of the writing tasks:
+- the section is written in the tone of an article (an account of what was done, choices
+  and results), not of documentation;
+- all its result numbers are in blocks, all its figures are cited through the registry;
+- statements about the method point to citations of the base, or are marked "outside the
+  base" as in the specification;
+- `--check` passes; the state of the section moves to "draft" in the **Sections** table.
 
-### [x] T17.5 — §0 Résumé
-- **Dépend de** : T17.6-T17.16 · **Taille** : S
-- **Notes** : écrit en dernier ; 200 mots ; chaque chiffre avec son statut.
+### [x] T17.5 — §0 Abstract
+- **Depends on**: T17.6-T17.16 · **Size**: S
+- **Notes**: written last; 200 words; each number with its status.
 
-### [x] T17.6 — §1 Introduction et contributions
-- **Dépend de** : T17.0 · **Taille** : S
-- **Notes** : contributions candidates : chaîne complète sans bibliothèque
-  d'apprentissage ; bit-exact du flottant NumPy au noyau HLS (4 952 images identiques) ;
-  moteur unique paramétré pour v2 et v3 ; comparaison de formats (INT8, puissances de 2,
-  4 bits) sur le même modèle ; outillage reproductible (profils, figures, notebooks).
+### [x] T17.6 — §1 Introduction and contributions
+- **Depends on**: T17.0 · **Size**: S
+- **Notes**: candidate contributions: complete chain without a deep learning library;
+  bit-exact from the NumPy float model to the HLS kernel (4,952 identical images); a single
+  parameterised engine for v2 and v3; comparison of formats (INT8, powers of 2, 4 bits) on
+  the same model; reproducible tooling (profiles, figures, notebooks).
 
-### [x] T17.7 — §2 Travaux liés
-- **Dépend de** : T17.2 · **Taille** : M
-- **Notes** : s'appuyer sur §10.4 de la spécification et sur la colonne « ce qui empêche
-  la comparaison directe » de [rapport.md](../../results/rapport.md).
+### [x] T17.7 — §2 Related work
+- **Depends on**: T17.2 · **Size**: M
+- **Notes**: build on §10.4 of the specification and on the "what prevents a direct
+  comparison" column of [rapport.md](../../results/rapport.md).
 
-### [x] T17.8 — §3 Réseaux et briques NumPy
-- **Dépend de** : T17.3 · **Taille** : M
-- **Notes** : Tiny-YOLOv2/v3 couche par couche (spec §3), passes avant et arrière, gradcheck
-  ([M1](M1-briques-numpy.md)), perte et entraînement ([M2](M2-cibles-perte-entrainement.md)).
+### [x] T17.8 — §3 Networks and NumPy building blocks
+- **Depends on**: T17.3 · **Size**: M
+- **Notes**: Tiny-YOLOv2/v3 layer by layer (spec §3), forward and backward passes,
+  gradcheck ([M1](M1-briques-numpy.md)), loss and training
+  ([M2](M2-cibles-perte-entrainement.md)).
 
-### [x] T17.9 — §4 Inférence et évaluation
-- **Dépend de** : T17.2 · **Taille** : S
-- **Notes** : effet du prétraitement (stretch, letterbox, interpolation Darknet) sur la
-  mAP de référence ([M3](M3-inference-evaluation.md)).
+### [x] T17.9 — §4 Inference and evaluation
+- **Depends on**: T17.2 · **Size**: S
+- **Notes**: effect of the preprocessing (stretch, letterbox, Darknet interpolation) on the
+  reference mAP ([M3](M3-inference-evaluation.md)).
 
-### [x] T17.10 — §5 Quantification INT8
-- **Dépend de** : T17.2 · **Taille** : M
-- **Notes** : fusion BN, calibration, M0/décalage, leaky 13/128, LUT des têtes ; écart
-  sous 1 point, QAT non nécessaire ([M4](M4-quantification.md)).
+### [x] T17.10 — §5 INT8 quantization
+- **Depends on**: T17.2 · **Size**: M
+- **Notes**: BN folding, calibration, M0/shift, leaky 13/128, LUT of the heads; gap under
+  1 point, QAT not needed ([M4](M4-quantification.md)).
 
-### [x] T17.11 — §6 Golden C++ et chaîne de vérification
-- **Dépend de** : T17.3 · **Taille** : S
-- **Notes** : comment l'égalité est vérifiée à chaque passage ([M5](M5-golden-cpp.md),
+### [x] T17.11 — §6 C++ golden model and verification chain
+- **Depends on**: T17.3 · **Size**: S
+- **Notes**: how equality is checked at each step ([M5](M5-golden-cpp.md),
   `make golden-check`).
 
-### [x] T17.12 — §7 Accélérateur HLS et intégration SoC
-- **Dépend de** : T17.3 · **Taille** : L
-- **Notes** : choix de la carte ([ADR 0003](../adr/0003-choix-carte.md)), roofline,
-  tuilage, moteur unique, carte de registres, driver ARM ([M6](M6-accelerateur-hls.md),
-  [M7](M7-integration-soc.md)) ; cascade d'optimisations de [M10](M10-ameliorations.md).
+### [x] T17.12 — §7 HLS accelerator and SoC integration
+- **Depends on**: T17.3 · **Size**: L
+- **Notes**: choice of the board ([ADR 0003](../adr/0003-choix-carte.md)), roofline,
+  tiling, single engine, register map, ARM driver ([M6](M6-accelerateur-hls.md),
+  [M7](M7-integration-soc.md)); optimisation cascade of [M10](M10-ameliorations.md).
 
-### [x] T17.13 — §8 Résultats
-- **Dépend de** : T17.2 · **Taille** : M
-- **Notes** : la section la plus exposée aux mises à jour : les phrases ne reprennent
-  aucun chiffre, elles commentent les tables. Prévoir les deux formulations (avant et
-  après mesure carte) dans T17.19.
+### [x] T17.13 — §8 Results
+- **Depends on**: T17.2 · **Size**: M
+- **Notes**: the section most exposed to updates: the sentences repeat no number, they
+  comment on the tables. Plan both wordings (before and after the board measurement) in
+  T17.19.
 
 ### [x] T17.14 — §9 Extensions
-- **Dépend de** : T17.2 · **Taille** : M
-- **Notes** : post-traitement matériel ([M9.1](M9.1-postproc-materiel.md)), REQ-YOLO et
-  ADMM non convergé ([M9.2](M9.2-req-yolo.md)), 4 bits ([M9.3](M9.3-quant-4bits.md)),
-  streaming en estimation ([M9.4](M9.4-streaming.md)). Les résultats négatifs ou partiels
-  sont rapportés comme tels.
+- **Depends on**: T17.2 · **Size**: M
+- **Notes**: hardware post-processing ([M9.1](M9.1-postproc-materiel.md)), REQ-YOLO and
+  ADMM not converged ([M9.2](M9.2-req-yolo.md)), 4 bits ([M9.3](M9.3-quant-4bits.md)),
+  streaming as an estimate ([M9.4](M9.4-streaming.md)). Negative or partial results are
+  reported as such.
 
-### [x] T17.15 — §10 Au-delà de VOC
-- **Dépend de** : T17.2 · **Taille** : M
-- **Notes** : jeux de [M11](M11-jeux-de-donnees.md), balayages et inférences de
+### [x] T17.15 — §10 Beyond VOC
+- **Depends on**: T17.2 · **Size**: M
+- **Notes**: datasets of [M11](M11-jeux-de-donnees.md), sweeps and inferences of
   [M15](M15-campagne-entrainement.md) ([resultats-balayages.md](resultats-balayages.md)),
-  statistiques de [M16](M16-presentation-jeux.md) quand elles existeront. Section la plus
-  susceptible de grandir : une sous-section par jeu, dans l'ordre de M15.
+  statistics of [M16](M16-presentation-jeux.md) when they exist. The section most likely
+  to grow: one subsection per dataset, in the order of M15.
 
-### [x] T17.16 — §11 Limites et §12 Reproductibilité
-- **Dépend de** : T17.3 · **Taille** : S
-- **Notes** : §11 liste générée des clés encore `projection`, `estimation` ou `palier-R` ;
-  §12 : commandes `make`, profils R/M/N ([M12](M12-profils-pc.md)), notebooks
-  ([M14](M14-notebooks.md)), révision.
+### [x] T17.16 — §11 Limitations and §12 Reproducibility
+- **Depends on**: T17.3 · **Size**: S
+- **Notes**: §11 generated list of the keys still `projection`, `estimation` or
+  `palier-R`; §12: `make` commands, R/M/N profiles ([M12](M12-profils-pc.md)), notebooks
+  ([M14](M14-notebooks.md)), revision.
 
-### [ ] T17.17 — Références et relecture d'ensemble
-- **Dépend de** : T17.5-T17.16 · **Taille** : M
-- **Livrables** : `refs.md` complet ; relecture (cohérence des notations avec la
-  spécification, une seule définition par sigle, figures appelées dans le texte).
-- **Acceptation** : chaque citation `[chunk_id]` passe `bin/pdb verify` ; toutes les
-  sections à l'état « relu ».
-- **Reste** : `refs.md` is complete (§12 of the specification); the citations still have
-  to pass `bin/pdb verify` (tool of the base, outside the repository) and the sections a
-  full proofreading.
+### [ ] T17.17 — References and full proofreading
+- **Depends on**: T17.5-T17.16 · **Size**: M
+- **Deliverables**: complete `refs.md`; proofreading (consistency of the notation with the
+  specification, a single definition per acronym, figures called out in the text).
+- **Acceptance**: each `[chunk_id]` citation passes `bin/pdb verify`; all the sections in
+  the "proofread" state.
+- **Remaining**: `refs.md` is complete (§12 of the specification); the citations still
+  have to pass `bin/pdb verify` (tool of the base, outside the repository) and the sections
+  a full proofreading.
 
 ## C. Maintenance
 
-### [ ] T17.18 — Première version et journal
-- **Dépend de** : T17.17 · **Taille** : S
-- **Livrables** : entrée « v0 » du journal des versions ; procédure **Mise à jour à
-  chaque jalon** appliquée une fois de bout en bout.
-- **Acceptation** : un jalon qui avance (par exemple une ligne de M15) se répercute dans
-  l'article par `make article` et une relecture de la seule section concernée.
-- **Reste** : the v0 entry of the version log is written; the update procedure has not
+### [ ] T17.18 — First version and log
+- **Depends on**: T17.17 · **Size**: S
+- **Deliverables**: "v0" entry of the version log; procedure **Update at each milestone**
+  applied once end to end.
+- **Acceptance**: a milestone that moves (for example a row of M15) is reflected in the
+  article by `make article` and a proofreading of the relevant section only.
+- **Remaining**: the v0 entry of the version log is written; the update procedure has not
   yet been applied to a milestone that moved.
 
-### [ ] T17.19 — Bascule « projection → mesure » (carte)
-- **Dépend de** : T7.4, T8.1-T8.3 sur carte · **Taille** : M
-- **Livrables** : statuts des clés de performance et de mAP FPGA passés à `mesure` ;
-  récit de §0, §8 et §11 réécrit ; comparaison projection / mesure ajoutée en §8.
-- **Acceptation** : plus aucune clé `projection` citée dans le résumé.
+### [ ] T17.19 — Switch "projection → measurement" (board)
+- **Depends on**: T7.4, T8.1-T8.3 on the board · **Size**: M
+- **Deliverables**: statuses of the performance and FPGA mAP keys moved to `mesure`;
+  narrative of §0, §8 and §11 rewritten; projection / measurement comparison added in §8.
+- **Acceptance**: no `projection` key cited in the abstract any more.
 
-### [ ] T17.20 — Version figée pour soumission
-- **Dépend de** : T17.18 · **Taille** : S
-- **Livrables** : tag git `article-vN`, `build/article/article.pdf`, entrée du journal.
-- **Acceptation** : depuis le tag, `make article` ne change rien (`--check` vert) et
-  l'export PDF se reproduit.
+### [ ] T17.20 — Frozen version for submission
+- **Depends on**: T17.18 · **Size**: S
+- **Deliverables**: git tag `article-vN`, `build/article/article.pdf`, log entry.
+- **Acceptance**: from the tag, `make article` changes nothing (`--check` green) and the
+  PDF export is reproducible.
 
 ## Sections
 
-État de rédaction de chaque section, mis à jour par la procédure de mise à jour :
-*à rédiger*, *brouillon*, *relu*, *à jour à rév. X*.
+Writing state of each section, updated by the update procedure: *to write*, *draft*,
+*proofread*, *up to date at rev. X*.
 
-| § | Section | État |
+| § | Section | State |
 |---|---|---|
-| 0 | Résumé | brouillon |
-| 1 | Introduction et contributions | brouillon |
-| 2 | Travaux liés | brouillon |
-| 3 | Réseaux et briques NumPy | brouillon |
-| 4 | Inférence et évaluation | brouillon |
-| 5 | Quantification INT8 | brouillon |
-| 6 | Golden C++ et chaîne de vérification | brouillon |
-| 7 | Accélérateur HLS et intégration SoC | brouillon |
-| 8 | Résultats | brouillon |
-| 9 | Extensions | brouillon |
-| 10 | Au-delà de VOC | brouillon |
-| 11 | Limites et travaux futurs | brouillon |
-| 12 | Reproductibilité | brouillon |
+| 0 | Abstract | draft |
+| 1 | Introduction and contributions | draft |
+| 2 | Related work | draft |
+| 3 | Networks and NumPy building blocks | draft |
+| 4 | Inference and evaluation | draft |
+| 5 | INT8 quantization | draft |
+| 6 | C++ golden model and verification chain | draft |
+| 7 | HLS accelerator and SoC integration | draft |
+| 8 | Results | draft |
+| 9 | Extensions | draft |
+| 10 | Beyond VOC | draft |
+| 11 | Limitations and future work | draft |
+| 12 | Reproducibility | draft |
