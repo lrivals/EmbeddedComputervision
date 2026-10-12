@@ -1,68 +1,68 @@
-# Quantification 4 bits — Tiny-YOLOv2 VOC (M9.3)
+# 4-bit quantization — Tiny-YOLOv2 VOC (M9.3)
 
-Schéma « w4a4 » (`python/yolo/quant/lowbit.py`) :
+"w4a4" scheme (`python/yolo/quant/lowbit.py`):
 
-- **Poids** : toutes les convs sur 4 bits, symétriques par canal, entiers dans [−7, 7].
-- **Activations** : sorties des convs sur 4 bits (`qmax` = 7 dans le manifest), avec un
-  **pas puissance de 2** [2024-yan#006.0].
-- **Exceptions** :
-  - la tête reste sur 8 bits au pas 1/8 des LUT (§9.4) ;
-  - l'entrée reste sur 8 bits (pixels).
-- **Première couche** : elle est calculable par deux convolutions à entrées 4 bits,
-  x = 16·(x ≫ 4) + (x & 15) [2024-yan#007.3]. L'égalité est vérifiée exhaustivement
+- **Weights**: all the convs on 4 bits, symmetric per channel, integers in [−7, 7].
+- **Activations**: conv outputs on 4 bits (`qmax` = 7 in the manifest), with a **power-of-2
+  step** [2024-yan#006.0].
+- **Exceptions**:
+  - the head stays on 8 bits at the 1/8 step of the LUTs (§9.4);
+  - the input stays on 8 bits (pixels).
+- **First layer**: it can be computed by two convolutions with 4-bit inputs,
+  x = 16·(x ≫ 4) + (x & 15) [2024-yan#007.3]. The equality is checked exhaustively
   (`golden::mul_split4`, `int_layers.conv_acc_split4`).
 
-VOC2007 test, 4 952 images, prétraitement stretch, seuil 0,005, mAP VOC07 sur 11 points.
+VOC2007 test, 4,952 images, stretch preprocessing, threshold 0.005, 11-point VOC07 mAP.
 
-## Résultats
+## Results
 
-| Modèle | mAP | Écart à INT8 |
+| Model | mAP | Gap to INT8 |
 |---|---|---|
-| INT8 PTQ (référence, `results/map_int8.md`) | 55,66 | — |
-| w4a4 PTQ (pas 2^j calibrés, minimum d'erreur quadratique, 500 images trainval) | 17,06 | −38,6 |
-| **w4a4 QAT, 600 itérations** | **36,38** | −19,3 |
+| INT8 PTQ (reference, `results/map_int8.md`) | 55.66 | — |
+| w4a4 PTQ (calibrated 2^j steps, minimum squared error, 500 trainval images) | 17.06 | −38.6 |
+| **w4a4 QAT, 600 iterations** | **36.38** | −19.3 |
 
-**Conditions du QAT** (`tools/train.py --qat w4a4`, `python/yolo/quant/fake_quant.py`) :
+**QAT conditions** (`tools/train.py --qat w4a4`, `python/yolo/quant/fake_quant.py`):
 
-- réseau à BN fusionnée, initialisé depuis les poids Darknet, avec les pas de la PTQ ;
-- SGD avec lr 1e-4 [2026-fata#015.3], montée en 50 itérations, lots de 8 à 416 ;
-- VOC07+12 trainval, **600 itérations seulement** (4 800 images, ≈ 0,3 époque, ≈ 1 h sur
-  CPU) : le budget de temps a été réduit volontairement.
-- La perte moyenne passe de 16,0 (50 premières itérations) à 10,1 (50 dernières). Elle
-  décroît encore : un QAT plus long devrait améliorer la mAP.
+- network with folded BN, initialised from the Darknet weights, with the steps of the PTQ;
+- SGD with lr 1e-4 [2026-fata#015.3], ramp over 50 iterations, batches of 8 at 416;
+- VOC07+12 trainval, **only 600 iterations** (4,800 images, ≈ 0.3 epoch, ≈ 1 h on CPU):
+  the time budget was cut on purpose.
+- The mean loss goes from 16.0 (first 50 iterations) to 10.1 (last 50). It is still
+  decreasing: a longer QAT should improve the mAP.
 
-Le QAT récupère 19 points sur la PTQ (17,1 → 36,4), mais reste loin de l'INT8 : avec
-0,3 époque, ce n'est qu'un début d'affinage. 2024-yan atteint le 4 bits sur YOLOv5s avec un
-entraînement complet [2024-yan#006.0].
+The QAT recovers 19 points over the PTQ (17.1 → 36.4), but stays far from INT8: with 0.3
+epoch, it is only the start of a fine-tuning. 2024-yan reaches 4 bits on YOLOv5s with a
+full training [2024-yan#006.0].
 
-**Fidélité au matériel.** Le fake-quant suit l'ordre du modèle entier : arrondi au pas,
-puis leaky entière (13r + 64) ≫ 7, puis écrêtage. Les gradients passent par l'estimateur
-straight-through, et par LSQ pour le pas.
+**Faithfulness to the hardware.** The fake-quant follows the order of the integer model:
+rounding to the step, then integer leaky (13r + 64) ≫ 7, then clipping. The gradients go
+through the straight-through estimator, and through LSQ for the step.
 
-- Gradcheck de la fonction de substitution : `test_fake_quant.py`.
-- Sur un réseau aléatoire, plus de 95 % des sorties sont égales à l'entier du modèle exporté.
-- L'exposant du pas est appris sans le facteur 1/√(n·qmax) de LSQ : avec lui, il ne bougeait
-  pas (|δk| ~ 1e-8 par itération).
+- Gradcheck of the surrogate function: `test_fake_quant.py`.
+- On a random network, more than 95 % of the outputs are equal to the integer of the
+  exported model.
+- The exponent of the step is learned without the 1/√(n·qmax) factor of LSQ: with it, it
+  did not move (|δk| ~ 1e-8 per iteration).
 
-**Chaîne entière vérifiée.** Le modèle 4 bits exporté
-(`tools/quant_lowbit.py --scheme w4a4 [--checkpoint …]`) a un `qmax` par couche dans le
-manifest. Le golden C++ et la C-sim HLS (`tb_net`) le reproduisent **à l'octet**
-(0 écart sur 3 images).
+**Integer chain checked.** The exported 4-bit model
+(`tools/quant_lowbit.py --scheme w4a4 [--checkpoint …]`) has a `qmax` per layer in the
+manifest. The C++ golden model and the HLS C-sim (`tb_net`) reproduce it **to the byte**
+(0 differences on 3 images).
 
-## Gains matériels estimés (hors base, synthèse à faire)
+## Estimated hardware gains (outside the base, synthesis to do)
 
 | | INT8 | 4 bits |
 |---|---|---|
-| mémoire des poids | 15,9 Mo | 7,9 Mo (paquetage de 2 poids par octet, pas encore fait dans le moteur) |
-| MAC par DSP | 1 | 2 (deux produits 4 bits par DSP48, comme le packing de 2024-zhang) |
-| moteur unique Tm·Tn = 768 | 768 DSP | 384 DSP, ou Tm·Tn doublé à DSP constant |
-| streaming KV260 (`results/streaming.md`) | 32,1 img/s | 64,2 img/s |
+| weight memory | 15.9 MB | 7.9 MB (packing of 2 weights per byte, not done in the engine yet) |
+| MACs per DSP | 1 | 2 (two 4-bit products per DSP48, like the packing of 2024-zhang) |
+| single engine Tm·Tn = 768 | 768 DSP | 384 DSP, or Tm·Tn doubled at constant DSP |
+| KV260 streaming (`results/streaming.md`) | 32.1 img/s | 64.2 img/s |
 
-## Reste
+## Remaining
 
-- Un QAT plus long : plusieurs époques, ou une montée progressive 8 → 6 → 4 bits.
-- Le paquetage 4 bits dans le moteur : conteneur int8 aujourd'hui, donc pas de gain de
-  bande passante.
-- Le packing de 2 MAC par DSP dans le HLS, puis la synthèse.
+- A longer QAT: several epochs, or a progressive ramp 8 → 6 → 4 bits.
+- 4-bit packing in the engine: int8 container today, hence no bandwidth gain.
+- Packing of 2 MACs per DSP in the HLS, then synthesis.
 
-Figures : `results/figures/resultats/map_formats.png` (T13.14) et `entrainement_qat-w4a4.png` (T13.26), `python -m tools.figures map_formats entrainement`.
+Figures: `results/figures/resultats/map_formats.png` (T13.14) and `entrainement_qat-w4a4.png` (T13.26), `python -m tools.figures map_formats entrainement`.

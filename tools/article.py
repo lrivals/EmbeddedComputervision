@@ -404,13 +404,18 @@ def _rel(p):
     return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)
 
 
-def num(cell):
-    """First number of a Markdown cell: `**56,30**`, `−0,64 point`, `4 952`, `26.87`."""
+def num(cell, en=False):
+    """First number of a Markdown cell: `**56,30**`, `−0,64 point`, `4 952`, `26.87`; with
+    `en`, English format: `**56.30**`, `4,952` (the results translated by M19)."""
     s = cell.replace("**", "").replace("−", "-").replace(" ", " ").replace("\xa0", " ")
-    m = re.search(r"-?\d+(?: \d{3})*(?:[.,]\d+)?", s)
-    if not m:
+    if en:
+        m = re.search(r"-?\d+(?:,\d{3})*(?:\.\d+)?", s)
+        t = m.group().replace(",", "") if m else None
+    else:
+        m = re.search(r"-?\d+(?: \d{3})*(?:[.,]\d+)?", s)
+        t = m.group().replace(" ", "").replace(",", ".") if m else None
+    if t is None:
         return None
-    t = m.group().replace(" ", "").replace(",", ".")
     return float(t) if "." in t else int(t)
 
 
@@ -524,7 +529,8 @@ def images(root):
 
 EN = [  # phrases of the French result tables → English (M19 glossary)
     ("redimensionnement direct", "direct resize"), ("Pillow bilinéaire", "Pillow bilinear"),
-    ("référence T3.4, ", ""), ("celui de l'entraînement", "the training one"),
+    ("référence T3.4, ", ""), ("reference T3.4, ", ""),
+    ("celui de l'entraînement", "the training one"),
     ("canaux valides seulement", "valid channels only"),
     ("requantification", "requantization"), ("pliage de L00", "L00 folding"),
     ("tuiles 14 pour les convs poolées (noyau M10)", "14×14 tiles for pooled convs (M10 kernel)"),
@@ -546,33 +552,34 @@ def en(s):
 
 
 def t_float(root):
-    _, rows = table_with(_results("map_float.md", root), "Prétraitement", "Interpolation")
+    _, rows = table_with(_results("map_float.md", root), "Preprocessing", "Interpolation")
     return {"header": ["Preprocessing", "Interpolation", "mAP"],
-            "rows": [[en(r[0]), en(r[1]), num(r[2])] for r in rows], "nd": [None, None, 2]}
+            "rows": [[en(r[0]), en(r[1]), num(r[2], True)] for r in rows],
+            "nd": [None, None, 2]}
 
 
 def darknet_published(root):
-    m = re.search(r"publiée par Darknet[^*]*\*\*(\d+,\d+)\*\*",
+    m = re.search(r"published by Darknet[^*]*\*\*(\d+\.\d+)\*\*",
                   need(_results("map_float.md", root)).read_text())
     if not m:
         raise MissingSource("published Darknet mAP not found in map_float.md")
-    return num(m.group(1))
+    return num(m.group(1), True)
 
 
 def t_int8(root):
-    _, rows = table_with(_results("map_int8.md", root), "Prétraitement", "Écart")
+    _, rows = table_with(_results("map_int8.md", root), "Preprocessing", "Gap")
     return {"header": ["Preprocessing", "Float (fused BN)", "Integer INT8", "Gap"],
-            "rows": [[en(r[0]), num(r[1]), num(r[2]), round(num(r[2]) - num(r[1]), 2)]
-                     for r in rows],
+            "rows": [[en(r[0]), num(r[1], True), num(r[2], True),
+                      round(num(r[2], True) - num(r[1], True), 2)] for r in rows],
             "nd": [None, 2, 2, 2], "sign": [False, False, False, True]}
 
 
 def sensitivity(root):
     """(layer, gap) of the most sensitive layer of map_int8.md."""
-    _, rows = table_with(_results("map_int8.md", root), "Couche quantifiée")
+    _, rows = table_with(_results("map_int8.md", root), "Quantized layer")
     rows = [r for r in rows if re.match(r"\**L\d", r[0])]
-    r = min(rows, key=lambda r: num(r[2]))
-    return r[0].replace("*", ""), num(r[2])
+    r = min(rows, key=lambda r: num(r[2], True))
+    return r[0].replace("*", ""), num(r[2], True)
 
 
 FORMATS = [  # (label, method, file, row words, column of mAP)
@@ -583,7 +590,7 @@ FORMATS = [  # (label, method, file, row words, column of mAP)
     ("w4a4", "PTQ (power-of-2 steps)", "quant_4bits.md", ("w4a4 PTQ",)),
     ("w4a4", "QAT, 600 iterations", "quant_4bits.md", ("w4a4 QAT",)),
     ("INT8 + hardware post-processing", "unsorted NMS, Q4 boxes", "postproc_hw.md",
-     ("matériel : tout entier",)),
+     ("hardware: all integer",)),
 ]
 
 
@@ -599,7 +606,7 @@ def formats(root):
             r = next((r for r in rows if all(w in " ".join(r[:2]) for w in words)), None)
             if r is None:
                 raise MissingSource(f"{name}: no row {words}")
-            m = num(r[col])
+            m = num(r[col], True)
         out.append((label, method, m, round(m - ref, 2)))
     return out
 
@@ -631,9 +638,8 @@ def t_perf(root):
 
 
 def cascade(root):
-    _, rows = table_with(_results("rapport.md", root), "Scénario", "Mcycles")
-    return [[en(r[0]).replace("… ", "... "), num(r[1]), num(r[2]), num(r[3]), num(r[4]),
-             num(r[5])] for r in rows]
+    _, rows = table_with(_results("rapport.md", root), "Scenario", "Mcycles")
+    return [[en(r[0]).replace("… ", "... ")] + [num(c, True) for c in r[1:6]] for r in rows]
 
 
 def t_cascade(root):
@@ -653,7 +659,7 @@ def cascade_row(words, col):
 
 def streaming(root):
     text = need(_results("streaming.md", root)).read_text()
-    plans = re.findall(r"\*\*([\d.]+) img/s\*\*.*?latence ≈ ([\d.]+) ms\s*\n- DSP (\d+) /",
+    plans = re.findall(r"\*\*([\d.]+) img/s\*\*.*?latency ≈ ([\d.]+) ms\s*\n- DSP (\d+) /",
                        text)
     if len(plans) < 2:
         raise MissingSource("streaming.md: 8-bit and 4-bit plans not found")
@@ -738,11 +744,11 @@ def makefile_dumps(root):
 
 
 def hwpp_cases(root):
-    m = re.search(r"\(`tb_post`[^:]*: ([\d ]+) cas",
+    m = re.search(r"\(`tb_post`[^:]*: ([\d,]+) cases",
                   need(_results("postproc_hw.md", root)).read_text())
     if not m:
         raise MissingSource("postproc_hw.md: number of tb_post cases not found")
-    return num(m.group(1))
+    return num(m.group(1), True)
 
 
 # ------------------------------------------------------------------------- registry

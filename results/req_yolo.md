@@ -1,93 +1,92 @@
-# REQ-YOLO : poids sur des puissances de 2 — Tiny-YOLOv2 VOC (M9.2)
+# REQ-YOLO: weights on powers of 2 — Tiny-YOLOv2 VOC (M9.2)
 
-Reproduction de la quantification de 2019-ding [2019-ding#008.1, #009.1, #009.4]. Les
-activations restent en **INT8 calibré**, comme le modèle de référence : seul l'effet des
-poids est mesuré.
+Reproduction of the quantization of 2019-ding [2019-ding#008.1, #009.1, #009.4]. The
+activations stay in **calibrated INT8**, like the reference model: only the effect of the
+weights is measured.
 
-**Niveaux** (`python/yolo/quant/pow2.py`) :
+**Levels** (`python/yolo/quant/pow2.py`):
 
-- `mixed6` : poids de 6 bits, |q| ∈ {0, 2^a, 2^a + 2^{a−k}}, avec a ≤ 6 (3 bits primaires)
-  et k ∈ {1, 2, 3} (2 bits secondaires). Cela fait 45 niveaux signés, |q| ≤ 96. Le produit
-  q·x vaut ±((x ≪ a) + (x ≪ (a − k))) : **deux décalages et une addition**.
-- `uniform6` : niveaux équidistants ±31.
+- `mixed6`: 6-bit weights, |q| ∈ {0, 2^a, 2^a + 2^{a−k}}, with a ≤ 6 (3 primary bits) and
+  k ∈ {1, 2, 3} (2 secondary bits). That makes 45 signed levels, |q| ≤ 96. The product q·x
+  is ±((x ≪ a) + (x ≪ (a − k))): **two shifts and an addition**.
+- `uniform6`: equidistant levels ±31.
 
-Dans les deux cas, α est choisi par canal de sortie : erreur quadratique minimale sur
-32 échelles.
+In both cases, α is chosen per output channel: minimum squared error over 32 scales.
 
-## Résultats (VOC2007 test, 4 952 images, stretch)
+## Results (VOC2007 test, 4,952 images, stretch)
 
-| Poids | Méthode | mAP | Écart à INT8 |
+| Weights | Method | mAP | Gap to INT8 |
 |---|---|---|---|
-| INT8 par canal (référence) | PTQ | 55,66 | — |
-| uniform6 (±31) | PTQ | 54,35 | −1,31 |
-| **mixed6 (puissances de 2)** | PTQ, projection directe | 52,46 | −3,20 |
-| mixed6 | ADMM, 600 itérations, puis projection | 43,07 | −12,59 |
+| INT8 per channel (reference) | PTQ | 55.66 | — |
+| uniform6 (±31) | PTQ | 54.35 | −1.31 |
+| **mixed6 (powers of 2)** | PTQ, direct projection | 52.46 | −3.20 |
+| mixed6 | ADMM, 600 iterations, then projection | 43.07 | −12.59 |
 
-**ADMM** (`python/yolo/train/admm.py`, `tools/train.py --admm`) :
+**ADMM** (`python/yolo/train/admm.py`, `tools/train.py --admm`):
 
-- poids fusionnés, mixed6 sur toutes les convs ;
-- ρ = 1e-3 au départ, × 1,3 à chaque pas Z/U (toutes les 50 itérations) ;
-- lr 1e-4, lots de 8, 600 itérations.
+- folded weights, mixed6 on all the convs;
+- ρ = 1e-3 at the start, × 1.3 at each Z/U step (every 50 iterations);
+- lr 1e-4, batches of 8, 600 iterations.
 
-**L'ADMM n'a pas convergé.** Le résidu ‖W − Z‖/‖W‖ par couche (`build/train/admm-mixed6/admm.csv`)
-devrait tendre vers 0. Il passe au contraire de 0,05-0,06 (itération 50) à 0,07-0,09
-(itération 600). ρ final : 0,023, trop faible face au gradient de la perte de détection, et
-les poids ne sont pas attirés vers les niveaux.
+**The ADMM did not converge.** The per-layer residual ‖W − Z‖/‖W‖
+(`build/train/admm-mixed6/admm.csv`) should tend to 0. Instead, it goes from 0.05-0.06
+(iteration 50) to 0.07-0.09 (iteration 600). Final ρ: 0.023, too weak against the gradient
+of the detection loss, and the weights are not attracted to the levels.
 
-**Le résultat est pire que la projection directe** : 43,07 contre 52,46. La perte de
-détection est elle-même montée pendant l'affinage, de 7,3 à 8,1 en moyenne sur 50
-itérations : les 600 itérations ont dégradé le réseau au lieu de le rapprocher des niveaux.
+**The result is worse than the direct projection**: 43.07 against 52.46. The detection
+loss itself rose during the fine-tuning, from 7.3 to 8.1 on average over 50 iterations:
+the 600 iterations degraded the network instead of bringing it closer to the levels.
 
-Causes probables, **non vérifiées** (la mAP flottante du checkpoint n'a pas été mesurée) :
+Probable causes, **not verified** (the float mAP of the checkpoint was not measured):
 
-- affinage du réseau **à BN fusionnée**, sans BN, avec les augmentations du loader, depuis
-  des poids Darknet déjà convergés ;
-- lots de 8, trop petits pour ce réseau sans BN ;
-- ρ trop faible pour compenser.
+- fine-tuning of the network **with folded BN**, without BN, with the augmentations of the
+  loader, from Darknet weights that had already converged;
+- batches of 8, too small for this network without BN;
+- ρ too weak to compensate.
 
-L'algorithme lui-même est validé sur un problème quadratique (`test_admm.py` : résidu
-< 1e-3). En l'état, la meilleure option puissances de 2 reste la PTQ à 52,46.
+The algorithm itself is validated on a quadratic problem (`test_admm.py`: residual
+< 1e-3). As things stand, the best powers-of-2 option remains the PTQ at 52.46.
 
-Corrections prévues :
+Planned fixes:
 
-- mesurer d'abord la mAP flottante d'un affinage sans ADMM, pour isoler l'effet de
-  l'affinage ;
+- first measure the float mAP of a fine-tuning without ADMM, to isolate the effect of the
+  fine-tuning;
 
-- ρ de départ 10 à 100 fois plus grand (0,05 → 1) ;
-- davantage d'itérations ;
-- choix du schéma par couche d'après la sensibilité de chaque couche (étude préparée,
-  annulée faute de temps).
+- a starting ρ 10 to 100 times larger (0.05 → 1);
+- more iterations;
+- choice of the scheme per layer from the sensitivity of each layer (study prepared,
+  cancelled for lack of time).
 
-## Matériel (T9.2.4)
+## Hardware (T9.2.4)
 
-**Bit-exactitude.** Les poids mixed6 tiennent dans l'int8 du moteur. Le golden et le noyau
-existants restent exacts sans modification : `tb_net`, 0 écart sur 3 images.
+**Bit-exactness.** The mixed6 weights fit in the int8 of the engine. The existing golden
+model and kernel stay exact without changes: `tb_net`, 0 differences on 3 images.
 
-**Variante `ACC_WMODE_POW2`** (`hls/kernels/accel.hpp`, `mul_w`) : la PE remplace chaque
-multiplication par deux décalages et une addition.
+**Variant `ACC_WMODE_POW2`** (`hls/kernels/accel.hpp`, `mul_w`): the PE replaces each
+multiplication by two shifts and an addition.
 
-- C-sim (`tb_net_pow2`, ctest) : **0 écart** avec le golden sur les 3 images du modèle
-  mixed6.
-- Économie de DSP **estimée** sur le moteur unique KV260 (Tm·Tn = 768) :
+- C-sim (`tb_net_pow2`, ctest): **0 differences** with the golden model on the 3 images of
+  the mixed6 model.
+- DSP savings **estimated** on the single KV260 engine (Tm·Tn = 768):
 
-| | INT8 | mixed6 (décalages) |
+| | INT8 | mixed6 (shifts) |
 |---|---|---|
-| DSP des MAC | 768 | **0** |
-| DSP de requantification | 128 (4·Tm) | 128 |
-| LUT par MAC (ordre de grandeur, hors base) | ≈ 0 (DSP) | ≈ 40 (2 décaleurs 7:1 sur 8 bits + additionneur 15 bits) |
-| LUT des MAC | — | ≈ 31 000, soit 26 % des 117 120 LUT du XCK26 |
+| MAC DSPs | 768 | **0** |
+| requantization DSPs | 128 (4·Tm) | 128 |
+| LUTs per MAC (order of magnitude, outside the base) | ≈ 0 (DSP) | ≈ 40 (2 7:1 shifters on 8 bits + 15-bit adder) |
+| MAC LUTs | — | ≈ 31,000, i.e. 26 % of the 117,120 LUTs of the XCK26 |
 
-Les 768 DSP libérés peuvent servir à doubler Tm·Tn, ou être laissés libres sur une plus
-petite puce. 2019-ding (Virtex-7, FFT + puissances de 2) annonce 314 images/s
-[2019-ding, Tables 1-2], mais sur une autre architecture.
+The 768 freed DSPs can serve to double Tm·Tn, or be left free on a smaller chip.
+2019-ding (Virtex-7, FFT + powers of 2) reports 314 images/s [2019-ding, Tables 1-2], but
+on another architecture.
 
-## Reste
+## Remaining
 
-- ADMM convergé (ρ plus grand, plus d'itérations, plan par couche), sans dégrader le
-  réseau flottant.
-- Synthèse des deux variantes de PE : DSP, LUT et timing mesurés (`make hls-synth` et
-  `make hls-synth-pow2` ; la figure `results/figures/resultats/ressources.png`, T13.24,
-  passe alors de l'estimation à la mesure).
-- Codes 6 bits stockés en mémoire au lieu de l'int8 (gain de 25 % sur les poids).
+- A converged ADMM (larger ρ, more iterations, per-layer plan), without degrading the
+  float network.
+- Synthesis of both PE variants: DSP, LUT and timing measured (`make hls-synth` and
+  `make hls-synth-pow2`; the figure `results/figures/resultats/ressources.png`, T13.24,
+  then moves from estimate to measurement).
+- 6-bit codes stored in memory instead of int8 (25 % gain on the weights).
 
-Figures : `results/figures/resultats/map_formats.png` (T13.14) et `entrainement_admm-mixed6.png` (T13.26, résidus ADMM), `python -m tools.figures map_formats entrainement`.
+Figures: `results/figures/resultats/map_formats.png` (T13.14) and `entrainement_admm-mixed6.png` (T13.26, ADMM residuals), `python -m tools.figures map_formats entrainement`.

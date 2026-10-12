@@ -1,122 +1,122 @@
-# Protocole de mesure (T8.1, T8.2)
+# Measurement protocol (T8.1, T8.2)
 
-Ce protocole fixe ce que recouvre chaque chiffre de [`benchmarks.csv`](benchmarks.csv),
-[`mesures.md`](mesures.md) et [`map_stades.md`](map_stades.md), pour que la comparaison avec
-la base (§10.4) se fasse à périmètre connu. Les commandes de la carte supposent l'étape 3 de
-[`hw/boards/kv260/README.md`](../hw/boards/kv260/README.md) faite (overlay chargé, 0 écart
-avec `run_compare`).
+This protocol fixes what each figure of [`benchmarks.csv`](benchmarks.csv),
+[`mesures.md`](mesures.md) and [`map_stades.md`](map_stades.md) covers, so that the
+comparison with the base (§10.4) is made with a known scope. The board commands assume
+step 3 of [`hw/boards/kv260/README.md`](../hw/boards/kv260/README.md) is done (overlay
+loaded, 0 differences with `run_compare`).
 
-## Système mesuré
+## Measured system
 
 | | |
 |---|---|
-| Carte | Kria KV260 (SOM K26, XCK26-SFVC784-2LV-C), Ubuntu Kria 22.04 |
-| Accélérateur | IP `yolo_conv` (Vitis HLS), moteur unique couche par couche, Tm = 32, Tn = 24, Tr = Tc = 13 ([ADR 0003](../docs/adr/0003-choix-carte.md)) |
-| Horloge PL | `pl_clk0` = 200 MHz (vérifier `timing.rpt` : WNS ≥ 0) |
-| Réseau | Tiny-YOLOv2 VOC 416×416, INT8 (poids par canal, activations par couche) ; Tiny-YOLOv3 COCO en second |
-| MACs | 3,486 GMAC (v2), 2,782 GMAC (v3), convolutions seulement (`tools/perf_model.py`, `tools/count_macs.py`) |
-| Logiciel | `sw/app/yolo_bench`, build natif `make sw-board` (`-O2`, Release), backend `uio`, interruption (pas `--poll`) |
-| Lot | 1 image ; images traitées l'une après l'autre, sans recouvrement des étages |
+| Board | Kria KV260 (SOM K26, XCK26-SFVC784-2LV-C), Kria Ubuntu 22.04 |
+| Accelerator | IP `yolo_conv` (Vitis HLS), single engine layer by layer, Tm = 32, Tn = 24, Tr = Tc = 13 ([ADR 0003](../docs/adr/0003-choix-carte.md)) |
+| PL clock | `pl_clk0` = 200 MHz (check `timing.rpt`: WNS ≥ 0) |
+| Network | Tiny-YOLOv2 VOC 416×416, INT8 (per-channel weights, per-layer activations); Tiny-YOLOv3 COCO second |
+| MACs | 3.486 GMAC (v2), 2.782 GMAC (v3), convolutions only (`tools/perf_model.py`, `tools/count_macs.py`) |
+| Software | `sw/app/yolo_bench`, native build `make sw-board` (`-O2`, Release), `uio` backend, interrupt (not `--poll`) |
+| Batch | 1 image; images processed one after the other, without overlap of the stages |
 
-## Étages chronométrés
+## Timed stages
 
-`std::chrono::steady_clock` sur l'ARM, une valeur par image et par étage
-(`yolo_bench --times`) :
+`std::chrono::steady_clock` on the ARM, one value per image and per stage
+(`yolo_bench --times`):
 
-| Étage | Contenu | Hors périmètre |
+| Stage | Contents | Out of scope |
 |---|---|---|
-| `pre` | `--images` : lecture du fichier, décodage JPEG (stb_image), redimensionnement `stretch` (interpolation Darknet), quantification int8 | caméra, acquisition |
-| `load` | mise à zéro de l'arène et copie de l'entrée dans le u-dma-buf (non caché, `O_SYNC`) | chargement des poids (une fois, au démarrage) |
-| `acc` | pour chaque conv : écriture des registres AXI-Lite, `ap_start`, attente de l'interruption ; somme sur les 9 (v2) ou 13 (v3) convs | — |
-| `post` | têtes lues en place dans l'arène, décodage par tables, seuil, NMS par classe | dessin des boîtes |
+| `pre` | `--images`: file reading, JPEG decoding (stb_image), `stretch` resize (Darknet interpolation), int8 quantization | camera, acquisition |
+| `load` | zeroing of the arena and copy of the input into the u-dma-buf (uncached, `O_SYNC`) | loading of the weights (once, at start-up) |
+| `acc` | for each conv: writing the AXI-Lite registers, `ap_start`, waiting for the interrupt; sum over the 9 (v2) or 13 (v3) convs | — |
+| `post` | heads read in place in the arena, decoding by tables, threshold, per-class NMS | drawing the boxes |
 
-Avec `--hw-post`, le CSV a cinq colonnes de plus pour `yolo_post` : `overflow` (candidates
-perdues par la sélection) et, sur le backend sim seulement, `post_cycles`, `nms_cycles`,
-`candidates` et `survivors` (estimation de la C-sim, T11.6).
+With `--hw-post`, the CSV has five more columns for `yolo_post`: `overflow` (candidates
+lost by the selection) and, on the sim backend only, `post_cycles`, `nms_cycles`,
+`candidates` and `survivors` (estimate of the C-sim, T11.6).
 
-- **Latence** = `pre + load + acc + post` ; moyenne et **p99** (rang le plus proche :
-  990e valeur triée sur 1 000) par étage et de bout en bout.
-- **FPS** = 1 000 / latence moyenne (débit séquentiel ; un recouvrement `pre` / `acc` sur deux
-  cœurs ARM est une piste de T8.3, pas une mesure).
-- **GOPS** = 2 × MACs / `acc` moyen (accélérateur seul, comme 2024-zhang).
-- **Efficacité** = cycles théoriques / cycles mesurés = (MACs / (Tm·Tn)) / (`acc` × 200 MHz).
-  Par couche : `run_compare --csv` (temps par conv) comparé au modèle de cycles.
+- **Latency** = `pre + load + acc + post`; mean and **p99** (nearest rank: 990th sorted
+  value out of 1,000) per stage and end to end.
+- **FPS** = 1,000 / mean latency (sequential throughput; a `pre` / `acc` overlap on two ARM
+  cores is a direction of T8.3, not a measurement).
+- **GOPS** = 2 × MACs / mean `acc` (accelerator only, as in 2024-zhang).
+- **Efficiency** = theoretical cycles / measured cycles = (MACs / (Tm·Tn)) / (`acc` ×
+  200 MHz). Per layer: `run_compare --csv` (time per conv) compared with the cycle model.
 
 ## Conditions
 
-- **Images** : les 1 000 premières de VOC2007 test (ordre de `ImageSets/Main/test.txt`),
-  JPEG copiés sur la carte (`--images`) ; **5 passes de chauffe** sur la première image,
-  non comptées (`--warmup 5`).
-- CPU : gouverneur `performance` (`sudo cpupower frequency-set -g performance`), processus
-  épinglé sur un cœur (`taskset -c 3`), aucune autre charge (pas de bureau graphique).
-- Seuil de détection : 0,005 (celui de la mAP, `--conf 0.005`) : le post-traitement est
-  mesuré dans le cas le plus chargé. La démo (0,25) est plus rapide.
-- Fichiers de sortie sur la carte en `tmpfs` ou carte SD ; l'écriture JSONL est hors étages.
+- **Images**: the first 1,000 of VOC2007 test (order of `ImageSets/Main/test.txt`), JPEGs
+  copied onto the board (`--images`); **5 warm-up passes** on the first image, not counted
+  (`--warmup 5`).
+- CPU: `performance` governor (`sudo cpupower frequency-set -g performance`), process
+  pinned to one core (`taskset -c 3`), no other load (no graphical desktop).
+- Detection threshold: 0.005 (that of the mAP, `--conf 0.005`): the post-processing is
+  measured in the busiest case. The demo (0.25) is faster.
+- Output files on the board in `tmpfs` or on the SD card; the JSONL writing is outside the
+  stages.
 
-## Puissance : deux périmètres
+## Power: two scopes
 
-| Périmètre | Source | Ce qui est inclus |
+| Scope | Source | What is included |
 |---|---|---|
-| **Puce, estimée** | `build/vivado/kv260/power.rpt` (`report_power` après implémentation, activité par défaut) | PL + PS du XCK26 ; on reporte aussi la part PS8 |
-| **SOM, mesuré** | INA260 du SOM K26 lu par hwmon (`yolo_bench --power`), comme `platformstats` | rail 5 V du SOM : XCK26, DDR4, eMMC, régulateurs ; **pas** la carte porteuse (ventilateur, USB, Ethernet, carte SD) |
+| **Chip, estimated** | `build/vivado/kv260/power.rpt` (`report_power` after implementation, default activity) | PL + PS of the XCK26; the PS8 share is also reported |
+| **SOM, measured** | INA260 of the K26 SOM read through hwmon (`yolo_bench --power`), like `platformstats` | 5 V rail of the SOM: XCK26, DDR4, eMMC, regulators; **not** the carrier board (fan, USB, Ethernet, SD card) |
 
 ```bash
-grep . /sys/class/hwmon/hwmon*/name            # repérer l'INA260 du SOM (ina260_u14)
+grep . /sys/class/hwmon/hwmon*/name            # find the INA260 of the SOM (ina260_u14)
 P=/sys/class/hwmon/hwmonN/power1_input           # µW
 ```
 
-`yolo_bench --power $P --idle-s 10` mesure 10 s **au repos** (overlay chargé, accélérateur
-inactif) puis pendant toute la boucle ; on reporte la puissance en charge, le repos et la
-différence. Une mesure à la prise (wattmètre sur l'alimentation 12 V) peut compléter :
-périmètre « carte entière », à indiquer comme tel.
+`yolo_bench --power $P --idle-s 10` measures 10 s **at idle** (overlay loaded, accelerator
+inactive) then during the whole loop; the power under load, the idle power and the
+difference are reported. A measurement at the wall socket (wattmeter on the 12 V supply)
+can complement it: "whole board" scope, to be stated as such.
 
-Comparaison avec la base (§10.4) : 2024-zhang distingue puce estimée (7,8 W) et carte
-mesurée (12,3 W) ; les autres travaux sont *unspec.* : ne comparer que des périmètres
-identiques.
+Comparison with the base (§10.4): 2024-zhang distinguishes estimated chip (7.8 W) and
+measured board (12.3 W); the other works are *unspec.*: only compare identical scopes.
 
-## Ressources
+## Resources
 
-`build/vivado/kv260/utilization.rpt` (après implémentation) : `CLB LUTs`, `DSPs`,
-`Block RAM Tile` (BRAM36) ; design complet (IP + interconnexions + reset), pas l'IP seule.
+`build/vivado/kv260/utilization.rpt` (after implementation): `CLB LUTs`, `DSPs`,
+`Block RAM Tile` (BRAM36); full design (IP + interconnects + reset), not the IP alone.
 
-## Commandes sur la carte
+## Commands on the board
 
 ```bash
 make sw-board
-N=$(ls /sys/class/uio | head -1)                 # celui dont name == yolo_conv
+N=$(ls /sys/class/uio | head -1)                 # the one whose name == yolo_conv
 head -n 1000 data/VOCdevkit/VOC2007/ImageSets/Main/test.txt \
   | sed 's|^|data/VOCdevkit/VOC2007/JPEGImages/|; s|$|.jpg|' > /tmp/voc1000.txt
 mkdir -p build/m8/tiny-yolov2-voc/board
 
-# T8.1 : latence, puissance (1 000 images JPEG, prétraitement ARM)
+# T8.1: latency, power (1,000 JPEG images, ARM preprocessing)
 sudo taskset -c 3 build/sw-board/yolo_bench --uio /dev/$N --model model/tiny-yolov2-voc \
   --images /tmp/voc1000.txt --warmup 5 --power $P --idle-s 10 \
   --times build/m8/tiny-yolov2-voc/board/times_0.csv | tee build/m8/tiny-yolov2-voc/board/bench.txt
-# temps par couche (3 images de référence) et contrôle 0 écart
+# time per layer (3 reference images) and 0-difference check
 sudo build/sw-board/run_compare --uio /dev/$N --net tiny-yolov2-voc \
   --csv build/m8/tiny-yolov2-voc/board/layers.csv
 
-# T8.2 : stade FPGA de la mAP (entrées int8 de make m8-inputs, 2,6 Go, copiées sur la carte)
+# T8.2: FPGA stage of the mAP (int8 inputs from make m8-inputs, 2.6 GB, copied onto the board)
 sudo build/sw-board/yolo_bench --uio /dev/$N --model model/tiny-yolov2-voc \
   --inputs build/m8/tiny-yolov2-voc/inputs.bin --ids build/m8/tiny-yolov2-voc/ids.txt \
   --dets build/m8/tiny-yolov2-voc/board/dets_0.jsonl
 ```
 
-Puis, sur le PC (fichiers de `board/` rapatriés) :
+Then, on the PC (files of `board/` brought back):
 
 ```bash
 make map-stades
 python tools/bench_report.py --net tiny-yolov2-voc \
   --layer-csv build/m8/tiny-yolov2-voc/board/layers.csv --vivado build/vivado/kv260 \
-  --board-power <W en charge> --idle-power <W au repos>
+  --board-power <W under load> --idle-power <W at idle>
 ```
 
-## Sans la carte (état actuel)
+## Without the board (current state)
 
-- Stade FPGA de la mAP : même `yolo_bench`, backend `sim` (registres émulés devant le noyau
-  C-sim), `make bench-sim` ; valide le driver, le post-traitement et le bit-exact sur les
-  4 952 images, pas le temps.
-- Performance : projection du modèle de cycles (`tools/perf_model.py`, égal cycle pour cycle
-  aux compteurs C-sim), marquée « projection C-sim » dans `benchmarks.csv`. C'est une borne
-  basse du temps accélérateur : II = 1, profondeurs de pipeline, latence DDR et pilotage ARM
-  ignorés.
+- FPGA stage of the mAP: the same `yolo_bench`, `sim` backend (emulated registers in front
+  of the C-sim kernel), `make bench-sim`; it validates the driver, the post-processing and
+  bit-exactness on the 4,952 images, not the time.
+- Performance: projection of the cycle model (`tools/perf_model.py`, equal cycle for cycle
+  to the C-sim counters), marked "projection C-sim" in `benchmarks.csv`. It is a lower
+  bound of the accelerator time: II = 1, pipeline depths, DDR latency and ARM control
+  ignored.

@@ -1,27 +1,27 @@
-# mAP du modèle entier — Tiny-YOLOv2 VOC (T4.5)
+# mAP of the integer model — Tiny-YOLOv2 VOC (T4.5)
 
-Poids Darknet `yolov2-tiny-voc.weights`, VOC2007 test (4 952 images), 416×416 (PIL),
-seuil 0,005, NMS 0,45, AP 11 points (`tools/eval_voc.py`, T3.3). Modèle entier : BN fusionnée
-(T4.1), poids int8 par canal, activations int8 calibrées sur 500 images VOC2007 trainval
-(p99,99, critère MSE, `results/calibration_tiny-yolov2-voc.md`), têtes au pas 1/8,
-requantification M0/décalage, leaky 13/128 arrondie, décodage par LUT (T4.3, T4.4),
-moteur `IntNetwork` bit-exact (`tools/eval_quant.py`, `make eval-int`).
+Darknet weights `yolov2-tiny-voc.weights`, VOC2007 test (4,952 images), 416×416 (PIL),
+threshold 0.005, NMS 0.45, 11-point AP (`tools/eval_voc.py`, T3.3). Integer model: folded
+BN (T4.1), per-channel int8 weights, int8 activations calibrated on 500 VOC2007 trainval
+images (p99.99, MSE criterion, `results/calibration_tiny-yolov2-voc.md`), heads at step
+1/8, M0/shift requantization, rounded leaky 13/128, LUT decoding (T4.3, T4.4), bit-exact
+`IntNetwork` engine (`tools/eval_quant.py`, `make eval-int`).
 
-## Résultat
+## Result
 
-| Prétraitement | Flottant (BN fusionnée) | **Entier INT8** | Écart |
+| Preprocessing | Float (fused BN) | **Integer INT8** | Gap |
 |---|---|---|---|
-| stretch (référence T3.4, `make eval-float`) | 56,30 | **55,66** | **−0,64 point** |
-| letterbox (celui de l'entraînement) | 54,18 | **53,68** | **−0,50 point** |
+| stretch (reference T3.4, `make eval-float`) | 56.30 | **55.66** | **−0.64 point** |
+| letterbox (the training one) | 54.18 | **53.68** | **−0.50 point** |
 
-Les mAP flottantes sont exactement celles de `results/map_float.md` (la fusion BN ne change
-rien). La calibration est faite en letterbox ; elle tient aussi en stretch. L'écart est sous
-la cible de 1 point (conventions.md) dans les deux cas : **le QAT (T4.6) n'est pas
-nécessaire**. `make eval-int` mesure le cas stretch.
+The float mAPs are exactly those of `results/map_float.md` (BN folding changes nothing).
+The calibration is done in letterbox; it also holds in stretch. The gap is under the
+1-point target (conventions.md) in both cases: **QAT (T4.6) is not needed**.
+`make eval-int` measures the stretch case.
 
-## Par classe (letterbox)
+## Per class (letterbox)
 
-| Classe | Flottant | Entier | Écart |
+| Class | Float | Integer | Gap |
 |---|---|---|---|
 | aeroplane | 57.9 | 57.9 | -0.0 |
 | bicycle | 67.8 | 66.7 | -1.1 |
@@ -44,15 +44,15 @@ nécessaire**. `make eval-int` mesure le cas stretch.
 | train | 68.1 | 67.5 | -0.6 |
 | tvmonitor | 58.1 | 56.3 | -1.8 |
 
-## Sensibilité par couche
+## Per-layer sensitivity
 
-Une seule convolution quantifiée à la fois (poids fake-quantifiés par canal, leaky 13/128,
-sortie fake-quantifiée à s_y), les autres en flottant ; 1 000 premières images de VOC2007
-test (simulation flottante `fake_quant_forward`, plus rapide que le modèle entier).
+A single convolution quantized at a time (weights fake-quantized per channel, leaky 13/128,
+output fake-quantized at s_y), the others in float; first 1,000 images of VOC2007 test
+(float simulation `fake_quant_forward`, faster than the integer model).
 
-| Couche quantifiée | mAP | Écart au flottant |
+| Quantized layer | mAP | Gap to float |
 |---|---|---|
-| aucune (flottant) | 56.19 | — |
+| none (float) | 56.19 | — |
 | L00 | 56.12 | -0.07 |
 | L02 | 56.21 | +0.02 |
 | L04 | 55.94 | -0.25 |
@@ -62,35 +62,35 @@ test (simulation flottante `fake_quant_forward`, plus rapide que le modèle enti
 | L12 | 56.13 | -0.06 |
 | L13 | 56.06 | -0.13 |
 | L14 | 56.38 | +0.19 |
-| toutes (simulation) | 55.64 | -0.55 |
+| all (simulation) | 55.64 | -0.55 |
 
-Couche la plus sensible : **L10** (−0,61 point seule), puis L08 et L04. Les écarts par
-couche (≤ 0,6 point) sont du même ordre que le bruit d'un sous-ensemble de 1 000 images
-(L14 seule *gagne* 0,19) : aucune couche ne domine la perte, qui se répartit sur le réseau.
+Most sensitive layer: **L10** (−0.61 point alone), then L08 and L04. The per-layer gaps
+(≤ 0.6 point) are of the same order as the noise of a 1,000-image subset (L14 alone
+*gains* 0.19): no layer dominates the loss, which is spread over the network.
 
-## Échelle des têtes
+## Head scale
 
-500 premières images de VOC2007 test, modèle entier (`IntNetwork`) ; seule l'échelle de la
-tête (L14) change.
+First 500 images of VOC2007 test, integer model (`IntNetwork`); only the scale of the head
+(L14) changes.
 
-| Échelle de tête | Plage de t | Sorties écrêtées | mAP entière |
+| Head scale | Range of t | Clipped outputs | Integer mAP |
 |---|---|---|---|
-| 1/16 (pas de la LUT du §9.4) | ±7,94 | 2,5 % | 49.66 |
-| **1/8 (retenue)** | ±15,9 | 0,03 % | **57.26** |
-| calibrée p99,99 (0,149) | ±18,9 | 0,01 % | 56.59 |
-| flottant | — | — | 57.24 |
+| 1/16 (LUT step of §9.4) | ±7.94 | 2.5 % | 49.66 |
+| **1/8 (selected)** | ±15.9 | 0.03 % | **57.26** |
+| calibrated p99.99 (0.149) | ±18.9 | 0.01 % | 56.59 |
+| float | — | — | 57.24 |
 
-Au pas 1/16, les logits de classe de Tiny-YOLOv2 (|t| jusqu'à ~19) saturent ; plusieurs
-classes atteignent le même maximum et le softmax s'aplatit : les scores plafonnent vers
-0,45 et la mAP perd ~7,5 points. Au pas 1/8 la table de 256 entrées couvre ±15,9 ; l'erreur
-de σ due au pas d'entrée passe de 1/128 à 1/64, sans effet mesurable sur la mAP. La table
-exponentielle est alors en Q12 (`exp_frac`) pour tenir sur 32 bits.
+At step 1/16, the class logits of Tiny-YOLOv2 (|t| up to ~19) saturate; several classes
+reach the same maximum and the softmax flattens: the scores cap around 0.45 and the mAP
+loses ~7.5 points. At step 1/8 the 256-entry table covers ±15.9; the error of σ due to the
+input step goes from 1/128 to 1/64, with no measurable effect on the mAP. The exponential
+table is then in Q12 (`exp_frac`) to fit in 32 bits.
 
-## Choix d'arithmétique qui comptent
+## Arithmetic choices that matter
 
-- **Leaky arrondie.** `(13·y + 64) >> 7` plutôt que `(13·y) >> 7` (§9.3) : le plancher
-  biaise chaque valeur négative de −½ pas et le biais se cumule de couche en couche
-  (écart moyen aux têtes ×1,7 sur une image test).
-- **Têtes au pas 1/8** (ci-dessus).
-- Activations à p99,99 de |x| : p90-p99 écrêtent trop (MSE ×10 à ×1000), le max gaspille la
-  plage (MSE ×2 à ×5).
+- **Rounded leaky.** `(13·y + 64) >> 7` rather than `(13·y) >> 7` (§9.3): the floor biases
+  each negative value by −½ step and the bias accumulates from layer to layer (mean gap at
+  the heads ×1.7 on a test image).
+- **Heads at step 1/8** (above).
+- Activations at p99.99 of |x|: p90-p99 clip too much (MSE ×10 to ×1000), the max wastes
+  range (MSE ×2 to ×5).
