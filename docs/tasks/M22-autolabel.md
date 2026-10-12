@@ -20,7 +20,8 @@ to any class that can be named.
 v1 runs on the PC (CPU, CUDA if present). The open-vocabulary model is a large PyTorch
 network: it is a labelling tool, never something that goes on the FPGA.
 
-**State**: 0 of 10 tasks done (2026-10-12). Document written; no code yet.
+**State**: 9 of 10 tasks done (2026-10-12): T22.0-T22.8. T22.9 (closing the loop with an
+M15 fine-tuning) remains; the editor's mouse interactions are still to be tried in a browser.
 
 ## User guide (target behaviour)
 
@@ -129,7 +130,7 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 
 ## Tasks
 
-### [ ] T22.0 — Dependencies and `--list`
+### [x] T22.0 — Dependencies and `--list`
 - **Spec**: — · **Depends on**: M0 · **Size**: S
 - **Deliverables**: `autolabel = ["gradio>=4.44", "gradio_image_annotation",
   "transformers>=4.44", "torch", "pillow>=10"]` in the optional dependencies of
@@ -140,8 +141,12 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   `cv2` in M20 and matplotlib in M13). Install the CPU wheel of torch on a PC without GPU
   (`--index-url https://download.pytorch.org/whl/cpu`, ≈ 200 MB instead of ≈ 2 GB).
   Pin the versions found to work in the `Done` line.
+- **Done** (2026-10-12): extra `autolabel` in `python/pyproject.toml`; `--list` prints
+  the labellers, licence, cached weights, device and the missing extras. Versions that
+  work: torch 2.11.0 (CPU), transformers 5.19.0, gradio 6.30.0,
+  gradio_image_annotation 0.5.6, huggingface_hub 2.2.0, pillow 12.0.0, Python 3.12.
 
-### [ ] T22.1 — Labeller interface and registry
+### [x] T22.1 — Labeller interface and registry
 - **Spec**: §8.1 · **Depends on**: T22.0, T20.1 · **Size**: M
 - **Deliverables**: `tools/autolabel_models.py`: `Labeller.predict(pil, classes, conf)
   -> (boxes, scores, labels)` with `boxes` as normalised `(cx, cy, w, h)`, the convention
@@ -155,8 +160,20 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   prompt is capped at 256 tokens: split the 80 COCO names into several calls. Large
   photos are downscaled for inference (longest side ≤ 1333) and the boxes are written in
   normalised coordinates, so the original size is kept. Optional per-class thresholds.
+- **Done** (2026-10-12): `GroundingDino` (class score = max token probability over the
+  span of the class in the prompt; prompts split under 256 tokens), `Owlv2` (boxes
+  renormalised from the padded square), `YoloLabeller` (model classes matched to the
+  session's by name, alias-aware), `parse_classes` (`name=prompt`), `ALIASES`,
+  `agnostic_nms` (IoU 0.7), raw floor 0.05. Per-class thresholds: `labels_of` takes a
+  list of thresholds.
+- **Result**: on `000004.jpg` (`car`), tiny-yolov2-voc finds 6 cars; 4 are matched by a
+  Grounding DINO box with IoU ≥ 0.5, so the acceptance as written is **not met**. The two
+  misses are loose tiny-yolo boxes (IoU 0.34 and 0.45 with the VOC ground truth); against
+  the ground truth, Grounding DINO finds 6 of the 7 cars at IoU ≥ 0.85 (tiny-yolo: 4 at
+  ≥ 0.5). The ground truth is the better reference: `test_grounding_dino_finds_the_cars`
+  (slow) checks it. About 5 s per image on this PC's CPU for one class.
 
-### [ ] T22.2 — Label I/O
+### [x] T22.2 — Label I/O
 - **Spec**: — · **Depends on**: — · **Size**: S
 - **Deliverables**: `tools/autolabel_io.py`: write / read YOLO txt, `classes.txt`,
   `autolabel.json`, zip of a folder result.
@@ -165,8 +182,11 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **Notes**: `autolabel.json` keeps the **raw** predictions with their scores, separate
   from the exported labels, so the threshold can be changed later without re-running the
   model. Key the cache by image hash (SHA-1 of the bytes), not by file name.
+- **Done** (2026-10-12): `tools/autolabel_io.py`. A record keeps the raw predictions,
+  the hand corrections (`removed` raw indices, `manual` boxes) and `edited`; `labels_of`
+  applies threshold and corrections, used by the CLI, both tabs and the zip export.
 
-### [ ] T22.3 — Headless folder batch (CLI)
+### [x] T22.3 — Headless folder batch (CLI)
 - **Spec**: — · **Depends on**: T22.1, T22.2 · **Size**: S
 - **Deliverables**: `--folder`, `--classes`, `--out`, `--conf`, `--resume`, `--recursive`
   in `tools/autolabel.py`.
@@ -176,8 +196,11 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **Notes**: same function as the "Folder" tab (T22.6), so both give the same files.
   Names that collide in a recursive run (`a/img.jpg`, `b/img.jpg`) keep their relative
   path under `labels/`.
+- **Done** (2026-10-12): `label_folder` (a generator yielding progress). 5 VOC images +
+  1 broken file → 5 txt, `classes.txt`, `autolabel.json`, the broken file listed; the
+  `--resume` run labels nothing. `--resume` with another class list or model is refused.
 
-### [ ] T22.4 — Gradio tab "Image"
+### [x] T22.4 — Gradio tab "Image"
 - **Spec**: — · **Depends on**: T22.1, T22.2 · **Size**: M
 - **Deliverables**: Gradio app in `tools/autolabel.py`: class field and presets, model
   choice, drag & drop, annotated preview, confidence slider, download of `<stem>.txt`
@@ -186,8 +209,10 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   downloaded txt equals the CLI output for the same image.
 - **Notes**: the model is loaded once and shared by both tabs; the slider filters the
   kept raw predictions, it does not call the model.
+- **Done** (2026-10-12): checked through `gradio_client`: `000004.jpg` with `car` gives
+  8 boxes at 0.3, and the downloaded txt is identical to the CLI output.
 
-### [ ] T22.5 — Manual correction
+### [x] T22.5 — Manual correction
 - **Spec**: — · **Depends on**: T22.4 · **Size**: M
 - **Deliverables**: box editor (`gradio_image_annotation`): add, move, resize, delete,
   change class; "Re-run" with a new prompt; edited images marked `edited: true` in
@@ -197,8 +222,14 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **Notes**: a re-run must not silently drop the manual boxes: keep them and add the new
   predictions, then NMS. If the component turns out to be too limited, the fallback is a
   small HTML canvas page served by the same process (`gr.HTML` + JS).
+- **Done** (2026-10-12): `gradio_image_annotation` was enough (no fallback). An edit is
+  diffed against the shown boxes (`apply_edit`): unchanged raw boxes stay raw, missing
+  ones are `removed`, the others are `manual`. Re-run keeps the manual boxes and drops new
+  predictions that overlap them or a deleted box of the same class. Checked through
+  `gradio_client` (one box deleted, one drawn: both reflected in the txt, `edited: true`);
+  the mouse interactions themselves are still to be tried in a browser.
 
-### [ ] T22.6 — Gradio tab "Folder"
+### [x] T22.6 — Gradio tab "Folder"
 - **Spec**: — · **Depends on**: T22.3, T22.5 · **Size**: M
 - **Deliverables**: multi-file / zip / local path input, progress bar, gallery sorted by
   "needs review", per-image editor, "Download all" zip.
@@ -207,8 +238,12 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **Notes**: work on a copy under `build/autolabel/<session>/`, never write into the
   user's photo folder. Large folders: process in a generator (`yield` progress) so the
   page stays responsive.
+- **Done** (2026-10-12): through `gradio_client` on 20 VOC images: zip with 20 txt,
+  `classes.txt`, `autolabel.json`; a correction (`folder_edit`, the code path of the
+  gallery editor) is in the next zip; the source folder is unchanged. "Download all"
+  re-exports at the slider threshold, hand edits kept.
 
-### [ ] T22.7 — Quality and speed measurement
+### [x] T22.7 — Quality and speed measurement
 - **Spec**: §8.3 · **Depends on**: T22.3 · **Size**: M
 - **Deliverables**: a table in this document: mAP@0.5 and seconds per image of each
   labeller on a VOC 2007 test subset (e.g. 500 images, prompt = the 20 VOC names with the
@@ -220,8 +255,32 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   **precision-oriented** threshold is the right default (a wrong box costs more to fix
   than a missing one costs to draw). Open-vocabulary models are zero-shot on VOC, so
   their mAP shows the labelling quality, not a training result.
+- **Done** (2026-10-12): `python tools/autolabel_eval.py` → `results/autolabel_voc.md`, on
+  the first **200** images of VOC 2007 test (not 500, to keep the CPU time near 40 min;
+  `--n 500` reuses the cached predictions). 20 VOC names as prompts with the alias map,
+  raw predictions ≥ 0.05, mAP@0.5 VOC07 11 points, difficult objects ignored. CPU only
+  (no CUDA on this PC); the first Grounding DINO minutes shared the CPU with test runs.
 
-### [ ] T22.8 — Tests, `make autolabel`, user guide
+| labeller | mAP@0.5 | s / image | P / R @ 0.3 | P / R @ 0.4 | P / R @ 0.5 | P / R @ 0.55 | P / R @ 0.6 |
+|---|---|---|---|---|---|---|---|
+| `grounding-dino-tiny` | 0.832 | 6.73 | 0.44 / 0.92 | 0.65 / 0.88 | 0.79 / 0.79 | **0.84 / 0.73** | 0.88 / 0.67 |
+| `owlv2-base` | **0.862** | 4.80 | 0.67 / 0.52 | **0.81 / 0.38** | 0.90 / 0.26 | | |
+| `yolo:tiny-yolov2-voc` | 0.569 | 0.32 | 0.68 / 0.53 | 0.79 / 0.48 | **0.87 / 0.42** | | |
+
+- **Result**: both open-vocabulary labellers, zero-shot, are far above the VOC-trained
+  Tiny-YOLOv2 (+0.26 to +0.29 mAP). OWLv2 has the best mAP (its weak classes: boat 0.43;
+  Grounding DINO's: dining table 0.30, potted plant 0.47), but its scores are low and
+  spread: at a precision of about 0.8 it keeps only 38 % of the objects. Grounding DINO
+  keeps 73 % at a precision of 0.84, and stays the default labeller.
+- **Default `conf`, by labeller** (`DEFAULT_CONF` of `tools/autolabel_models.py`): the
+  threshold nearest a precision of 0.85, as a wrong box costs more to fix than a missing
+  one costs to draw: **0.55** for `grounding-dino-tiny`, **0.4** for `owlv2-base`, **0.5**
+  for `yolo:*`. One threshold for all would be wrong: the score scales differ (0.3 gives
+  P = 0.44 with Grounding DINO, 0.67 with OWLv2). The app moves the slider when the
+  labeller changes. Speed: 5 to 7 s per image with 20 prompts on CPU (≈ 5 s with one
+  prompt), 15 to 20 times Tiny-YOLO; a folder of 500 photos takes about an hour.
+
+### [x] T22.8 — Tests, `make autolabel`, user guide
 - **Spec**: — · **Depends on**: T22.6 · **Size**: S
 - **Deliverables**: `python/tests/test_autolabel.py` (label I/O round trip, NMS across
   prompts, alias map, folder batch with a fake labeller, `--resume`); `make autolabel`
@@ -230,6 +289,9 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   that need torch or gradio are skipped without them).
 - **Notes**: the fake labeller returns fixed boxes, so the tests need no weights and
   no network.
+- **Done** (2026-10-12): 21 tests (20 + 1 slow on the real Grounding DINO); with torch,
+  transformers and gradio blocked: 19 passed, 2 skipped, and `--list` / the app exit with
+  the install hint. User guide: [docs/autolabel.md](../autolabel.md).
 
 ### [ ] T22.9 — Outlook: closing the loop
 - **Spec**: — · **Depends on**: T22.7, M15 · **Size**: L

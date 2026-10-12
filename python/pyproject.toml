@@ -13,6 +13,9 @@ notebooks = ["jupyter", "matplotlib>=3.7", "pillow>=10"]  # M14 (notebooks/), ja
 coco = ["pycocotools>=2"]  # vérification de yolo.infer.coco_eval seulement (T11.1)
 webcam = ["opencv-python>=4.8", "pillow>=10"]  # tools/webcam.py (M20), never imported by yolo/
 asl = ["mediapipe>=0.10.14", "pillow>=10"]  # hand pseudo-boxes, tools/prep_datasets.py asl (M21)
+# tools/autolabel.py (M22), never imported by yolo/; CPU torch: --index-url https://download.pytorch.org/whl/cpu
+autolabel = ["gradio>=4.44", "gradio_image_annotation>=0.5", "transformers>=4.44", "torch",
+             "pillow>=10"]
 
 [build-system]
 requires = ["setuptools>=61"]
