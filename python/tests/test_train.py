@@ -1,10 +1,10 @@
-"""T2.7 : SGD (problème quadratique), taux d'apprentissage, trainer et checkpoints."""
+"""T2.7 : SGD et AdamW (problème quadratique), taux d'apprentissage, trainer et checkpoints."""
 
 import numpy as np
 import pytest
 
 from yolo.models.graph import Network
-from yolo.train.optim import SGD
+from yolo.train.optim import SGD, AdamW
 from yolo.train.schedule import StepSchedule, lr_at
 from yolo.train.trainer import MULTISCALE_SIZES, Trainer, copy_matching, multiscale_size
 
@@ -47,6 +47,63 @@ def test_sgd_no_decay_on_gamma_beta_bias():
     np.testing.assert_allclose(params[0]["W"], 0.9)
     for k in ("gamma", "beta", "b"):
         np.testing.assert_array_equal(params[0][k], 1.0)
+
+
+def test_adamw_matches_recurrence_on_quadratic():
+    a, c = _quadratic()
+    b1, b2, eps, wd, lr = 0.9, 0.999, 1e-8, 1e-2, 0.01
+    x0 = np.ones(5)
+    params = [{"W": x0.copy()}]
+    opt = AdamW(params, betas=(b1, b2), eps=eps, weight_decay=wd)
+    x, m, v = x0.copy(), np.zeros(5), np.zeros(5)
+    for t in range(1, 201):
+        opt.step([{"W": a @ (params[0]["W"] - c)}], lr)
+        # récurrence écrite à la main (decay découplé, corrections de biais)
+        g = a @ (x - c)
+        m = b1 * m + (1 - b1) * g
+        v = b2 * v + (1 - b2) * g * g
+        m_hat, v_hat = m / (1 - b1 ** t), v / (1 - b2 ** t)
+        x = x - lr * wd * x - lr * m_hat / (np.sqrt(v_hat) + eps)
+        np.testing.assert_allclose(params[0]["W"], x, rtol=1e-12, atol=1e-14)
+    # Point fixe (g → 0 aux erreurs près) : la décroissance découplée tire vers 0, sans
+    # normalisation, d'où un minimum décalé de c mais proche (wd petit devant la courbure).
+    for _ in range(3000):
+        opt.step([{"W": a @ (params[0]["W"] - c)}], 1e-3)
+    assert np.linalg.norm(params[0]["W"] - c) < 0.05 * np.linalg.norm(c)
+
+
+def test_adamw_no_decay_on_gamma_beta_bias():
+    params = [{"W": np.ones(3), "gamma": np.ones(3), "beta": np.ones(3), "b": np.ones(3)}]
+    opt = AdamW(params, weight_decay=0.1)
+    zero = {k: np.zeros(3) for k in params[0]}
+    opt.step([zero], lr=1.0)
+    np.testing.assert_allclose(params[0]["W"], 0.9)
+    for k in ("gamma", "beta", "b"):
+        np.testing.assert_array_equal(params[0][k], 1.0)
+
+
+def test_adamw_state_roundtrip():
+    rng = np.random.default_rng(0)
+    p0 = {"W": rng.standard_normal((2, 3)), "b": rng.standard_normal(2)}
+    grads = [[{k: rng.standard_normal(a.shape) for k, a in p0.items()}] for _ in range(6)]
+    ref = AdamW([{k: a.copy() for k, a in p0.items()}])
+    for g in grads:
+        ref.step(g, 1e-2)
+    params = [{k: a.copy() for k, a in p0.items()}]
+    opt = AdamW(params)
+    for g in grads[:3]:
+        opt.step(g, 1e-2)
+    state = {k: np.array(a) for k, a in opt.state_dict().items()}
+    resumed = AdamW(params)
+    resumed.load_state_dict(state)
+    for g in grads[3:]:
+        resumed.step(g, 1e-2)
+    for k in p0:
+        np.testing.assert_array_equal(params[0][k], ref.params[0][k])
+    with pytest.raises(ValueError, match="SGD"):
+        SGD(params).load_state_dict(state)
+    with pytest.raises(ValueError, match="AdamW"):
+        AdamW(params).load_state_dict(SGD(params).state_dict())
 
 
 def test_schedule():
@@ -109,9 +166,9 @@ class _Loader:
             yield imgs, [self.boxes[i] for i in idx], [self.labels[i] for i in idx]
 
 
-def _trainer(log_path=None, size=32):
+def _trainer(log_path=None, size=32, optim=SGD):
     net = Network(TINY, dtype=np.float64, rng=0)
-    return Trainer(net, SGD(net.params), StepSchedule(1e-2, burn_in=3), size=size,
+    return Trainer(net, optim(net.params), StepSchedule(1e-2, burn_in=3), size=size,
                    log_path=log_path)
 
 
@@ -124,14 +181,15 @@ def test_trainer_reduces_loss():
     assert np.mean(losses[-6:]) < 0.5 * np.mean(losses[:6])
 
 
-def test_checkpoint_resume_is_exact(tmp_path):
+@pytest.mark.parametrize("optim", [SGD, AdamW])
+def test_checkpoint_resume_is_exact(tmp_path, optim):
     loader = _Loader()
-    ref = _trainer()
+    ref = _trainer(optim=optim)
     ref.fit(loader, 5)
 
-    first = _trainer()
+    first = _trainer(optim=optim)
     first.fit(loader, 4, checkpoint=tmp_path / "ck.npz")   # s'arrête au milieu de l'époque 1
-    resumed = _trainer()
+    resumed = _trainer(optim=optim)
     resumed.net.init_he(rng=123)                           # état de départ différent
     resumed.load_checkpoint(tmp_path / "ck.npz")
     assert resumed.it == 4
