@@ -8,8 +8,9 @@ import sys
 from pathlib import Path
 
 from tools.notebooks import NB_DIR, ROLES, ROOT
-from tools.notebooks.gabarits import (ANALYSIS, COLAB, ROLE_TITLES, SUBSET_FIRST, VIEWER,
-                                      analysis, dumps, render, viewer)
+from tools.notebooks.gabarits import (ANALYSIS, COLAB, ROLE_TITLES, STATS_ANALYSIS,
+                                      SUBSET_FIRST, VIEWER, analysis, dumps, render,
+                                      stats_analysis, viewer)
 from tools.notebooks.matrice import NOTEBOOKS, how_to_get, palier_of, palier_stats, prerequis
 from tools.notebooks.commandes import M11_TRAIN
 
@@ -61,6 +62,9 @@ def index():
              "les range par famille, avec leur contexte.", "",
              f"Analyse : [{ANALYSIS}]({ANALYSIS}) compare les balayages lot × sous-ensemble "
              "de tous les jeux (relit les `_sweep` exécutés, sans GPU ni données).", "",
+             f"Dataset analysis: [{STATS_ANALYSIS}]({STATS_ANALYSIS}) compares the dataset "
+             "statistics of all datasets (reads the executed `_stats` notebooks, no data or "
+             "GPU).", "",
              "| Jeu | Modèle | Rôle | Palier | Prérequis | Colab |", "|---|---|---|---|---|---|"]
     for nb in NOTEBOOKS.values():
         pal = _palier(nb)
@@ -78,6 +82,7 @@ def generate(nbs, out_dir=NB_DIR):
     files = {Path(out_dir) / nb.path: dumps(render(nb)) for nb in nbs}
     files[Path(out_dir) / VIEWER] = dumps(viewer())
     files[Path(out_dir) / ANALYSIS] = dumps(analysis())
+    files[Path(out_dir) / STATS_ANALYSIS] = dumps(stats_analysis())
     files[Path(out_dir) / "README.md"] = index()
     return files
 
@@ -252,7 +257,8 @@ def main(argv=None):
         if st != "archivé":
             archives.pop(rel(p), None)  # à jour ou réécrit : l'archive ne sert plus
     save_archives(args.out, archives)
-    print(f"{len(files) - 3} notebooks + {VIEWER}, {ANALYSIS}, index {_rel(args.out / 'README.md')}")
+    print(f"{len(files) - 4} notebooks + {VIEWER}, {ANALYSIS}, {STATS_ANALYSIS}, "
+          f"index {_rel(args.out / 'README.md')}")
     return 0
 
 

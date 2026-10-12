@@ -1543,3 +1543,172 @@ def analysis():
         """),
     ]
     return notebook(cells)
+
+
+# ------------------------------------------- cross-dataset analysis of the statistics
+
+STATS_ANALYSIS = "analyse_jeux.ipynb"  # outside the model × dataset × role registry
+
+# (key of tools.figures.jeux.PLOTS, title, what the figure shows and how to read it)
+STATS_SECTIONS = [
+    ("taille", "1. Scale and density",
+     "Images and objects per dataset (log scale), then objects per image: median (●) and "
+     "maximum (○). The dashed line is the 256 slots of the hardware post-processing "
+     "(`yolo_post`, M9.1): an image to its right loses detections on the board. Green: "
+     "ground views; indigo: drone views (same colours in every figure)."),
+    ("objets", "2. Object size seen by the network",
+     "COCO size categories (small < 32², medium < 96², large) at the original resolution "
+     "(pale bar) and after letterbox to 416 (dark bar). The shift between the two bars is "
+     "what the resize costs: a dataset with wide or large images (KITTI, VisDrone, UAVDT, "
+     "AU-AIR) turns most of its objects into small ones."),
+    ("cellules", "3. Objects smaller than a grid cell",
+     "Share of objects whose longest side is below the stride of each Tiny-YOLOv3 head "
+     "(32 px for 13×13, 16 px for 26×26), with letterbox (●, aspect kept) and stretch "
+     "(○, aspect lost); right, objects less than 8 px high. A long bar between ○ and ● "
+     "says that stretching the image would recover many objects."),
+    ("densite", "4. Lost training targets: anchors or crowding?",
+     "Share of non-difficult objects that `build_targets` drops, split by cause. Grey: the "
+     "best anchor of the box belongs to no head (with the Tiny-YOLOv3 COCO masks 3,4,5 / "
+     "1,2,3, anchor 0 = 10×14 px is unused, so the smallest boxes are never trained). "
+     "Colour: two objects on the same cell and anchor (only one is kept). The grey part is "
+     "fixed by dataset anchors and masks (M11 cfg); the coloured part needs a finer grid."),
+    ("classes", "5. Class balance",
+     "Share of each class, sorted, one panel per dataset (log scale). Below each panel: the "
+     "most frequent class, the most / least frequent ratio and the normalised entropy "
+     "(1 = all classes equally frequent). A steep staircase means rare classes the "
+     "fine-tuning will barely see."),
+    ("images", "6. Pixels against the INT8 calibration images",
+     "Mean luminance (bar) and per-channel means (R, G, B ticks), then contrast (mean "
+     "channel standard deviation), against VOC (dashed), whose images calibrated the INT8 "
+     "scales (M4). Right: the letterbox factor 416 / longest side of the main resolution; "
+     "small factors shrink objects the most."),
+    ("ancres", "7. Anchors",
+     "Left: mean IoU between the training boxes and their best anchor, for the anchors in "
+     "use (○), k-means anchors computed on the dataset (●) and the Tiny-YOLOv2 VOC anchors "
+     "(×). The gain written on the right is what re-clustering the anchors brings. Right: "
+     "the k-means anchors (k = 6) of every dataset against the COCO anchors (□); anchor 0 "
+     "(×) is the one no COCO head uses."),
+    ("ecart", "8. Train ↔ test gap",
+     "Total variation distance between the train and test distributions of each quantity "
+     "(0: same histogram, 1: disjoint). Above about 0.1, scores on the test split say less "
+     "about the training split, and the reverse."),
+    ("couverture", "9. What the published weights can name",
+     "Share of objects whose class has an equivalent among the VOC (20) or COCO (80) "
+     "classes (`MAPPINGS`): only these objects are scored in the out-of-domain notebooks "
+     "(T14.5) of `tiny-yolov2-voc` and `tiny-yolov3-coco`."),
+    ("qualite", "10. Annotation quality",
+     "Boxes clipped to the image, removed by the loader, under 2 px at the input, "
+     "duplicates (IoU > 0.95) and ignore regions (DontCare…) removed by the loader. "
+     "Colour: share of the column maximum, to spot the outlier of each column."),
+    ("difficulte", "11. Overview: which dataset is hardest for the embedded Tiny-YOLO?",
+     "Seven indicators, each normalised from 0 (easiest dataset) to 1 (hardest), and their "
+     "mean; datasets sorted by that mean. Raw values are written in the cells. The weights "
+     "are equal by choice: the ranking is a reading aid, not a score to optimise."),
+]
+
+
+def stats_analysis():
+    """Cross-dataset analysis notebook: reads the executed `_stats` notebooks (versioned
+    outputs), without data or GPU; parsing is in `tools.notebooks.jeux`, plots in
+    `tools.figures.jeux`."""
+    from tools.notebooks.matrice import NOTEBOOKS
+
+    stats = [nb for nb in NOTEBOOKS.values() if nb.role == "stats"]
+    links = ", ".join(f"[{nb.dataset}]({nb.path.as_posix()})" for nb in stats)
+    cells = [
+        md(f"""\
+        # Cross-dataset comparison of the dataset statistics
+
+        Each `<ds>_stats` notebook describes one dataset from the point of view of
+        Tiny-YOLO and the embedded target (input 416, 13×13 and 26×26 grids, 256 slots of
+        `yolo_post`, INT8). This notebook puts them side by side: how many objects and how
+        dense, how small once resized, how many training targets are lost and why, how
+        balanced the classes are, how far the pixels are from the INT8 calibration images,
+        how well the anchors fit, and which dataset is hardest overall.
+
+        **Source.** The versioned outputs of the statistics notebooks ({links}), read by
+        `tools/notebooks/jeux.py`; the figures come from `tools/figures/jeux.py`. Nothing
+        is recomputed or typed by hand: a statistics notebook re-run and committed shows up
+        here after `Run All`. No data, no GPU.
+
+        **Caution.** Annotation counts cover whole splits; pixel statistics cover 200
+        images per split. A notebook run without its M11 cfg (`build/m11/cfg/`, absent on
+        a fresh Colab runtime) uses the Tiny-YOLOv3 COCO anchors and masks for the lost
+        targets and the "anchors in use": the provenance table below says which. A run that
+        stopped after its tables without error is used and marked `partial`.
+        Synthesis of each dataset: [stats-jeux.md](../docs/tasks/stats-jeux.md).
+
+        Generated by `python -m tools.notebooks`: edit
+        `tools/notebooks/gabarits.py:stats_analysis`, not this file.
+        """),
+        md("## Parameters"),
+        code("""\
+        DATASETS = None  # datasets analysed (e.g. ['voc', 'kitti']); None: every executed _stats notebook
+        OUT      = 'build/notebooks/jeux'  # PNG files (relative to the repository root)
+        """, tags=("parameters",)),
+        md("## Environment"),
+        code("""\
+        import os
+        import sys
+        from pathlib import Path
+
+        from IPython.display import Image, Markdown, display
+
+        CANDIDATES = (Path.cwd(), *Path.cwd().parents, Path("/content/EmbeddedComputervision"))
+        ROOT = next((d for d in CANDIDATES if (d / "tools" / "notebooks").is_dir()), None)
+        if ROOT is None:
+            raise SystemExit(f"repository not found from {Path.cwd()}")
+        os.chdir(ROOT)
+        sys.path[:0] = [str(ROOT), str(ROOT / "python")]
+
+        from tools.figures import jeux as FJ
+        from tools.notebooks import jeux as J
+
+        data, pending = J.load_all(datasets=DATASETS)
+        if not data:
+            raise SystemExit("no executed notebook in notebooks/*/*_stats.ipynb")
+        OBS = J.observations(data)
+
+
+        def show(paths):
+            for p in paths:
+                display(Image(data=Path(p).read_bytes(), format="png"))
+
+
+        print(f"repository: {ROOT}")
+        print(f"{len(data)} datasets loaded: {', '.join(d['label'] for d in data.values())}")
+        for ds, why in pending.items():
+            print(f"  not analysed: {ds} — {why}")
+        display(Markdown(J.provenance_table(data)))
+        """),
+        md("""\
+        ## Overview
+
+        One row per dataset (whole dataset, all splits). Sizes are seen by the network
+        (letterbox 416); "< fine cell" is the share of objects under the 16 px stride of the
+        26×26 head; "of which collisions" is the part of the lost targets due to two objects
+        on the same cell and anchor (the rest is anchors, section 4).
+        """),
+        code("""\
+        display(Markdown(J.summary_table(data)))
+        """),
+    ]
+    for key, title, text in STATS_SECTIONS:
+        cells += [md(f"## {title}\n\n{text}"),
+                  code(f"""\
+                  show(FJ.PLOTS[{key!r}](data, OUT))
+                  display(Markdown("**Finding.** " + OBS[{key!r}]))
+                  """)]
+    cells += [
+        md("""\
+        ## Conclusions
+
+        Computed on the loaded datasets; they update with them.
+        """),
+        code("""\
+        display(Markdown(J.conclusions(data, pending)))
+        print("equivalent command:")
+        print(f"  python -m tools.notebooks.jeux --json {OUT}/jeux.json --figures {OUT}")
+        """),
+    ]
+    return notebook(cells)

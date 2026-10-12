@@ -307,6 +307,20 @@ jeu ([Questions par jeu](#questions-par-jeu)).
 - **Acceptation** : 15 000 + 4 370 images ; part des images au-delà de 256 et de 1 024
   objets ; part des boîtes en `difficult` (`ignore`, `mask`).
 
+### [x] T16.19 — Cross-dataset comparison
+- **Depends on**: T16.12 to T16.18 · **Size**: M
+- **Acceptance**: `notebooks/analyse_jeux.ipynb` reads the executed `_stats` notebooks (no
+  data, no GPU) and compares every dataset: scale and density, object size after
+  letterbox, objects under a grid cell, lost targets split into "best anchor in no head"
+  and real cell collisions, class balance, pixels against VOC, anchors (in use vs
+  k-means), train ↔ test gap, VOC / COCO coverage, annotation quality and a difficulty
+  overview. Parsing: `tools/notebooks/jeux.py`; figures: `tools/figures/jeux.py`; tests:
+  `python/tests/test_jeux.py`.
+- **Notes**: with the Tiny-YOLOv3 COCO masks (3,4,5 / 1,2,3), anchor 0 is in no head: most
+  "lost targets" of the small-object datasets come from it, not from crowding. The
+  statistics notebooks run on Colab without `build/m11/cfg/` fall back to these anchors;
+  the notebook says which.
+
 ---
 
 ## Hors périmètre

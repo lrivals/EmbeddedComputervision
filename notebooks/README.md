@@ -8,6 +8,8 @@ Affichage seul : [figures_live.ipynb](figures_live.ipynb) montre les figures (M1
 
 Analyse : [analyse_balayages.ipynb](analyse_balayages.ipynb) compare les balayages lot × sous-ensemble de tous les jeux (relit les `_sweep` exécutés, sans GPU ni données).
 
+Dataset analysis: [analyse_jeux.ipynb](analyse_jeux.ipynb) compares the dataset statistics of all datasets (reads the executed `_stats` notebooks, no data or GPU).
+
 | Jeu | Modèle | Rôle | Palier | Prérequis | Colab |
 |---|---|---|---|---|---|
 | voc | [voc](voc/voc_stats.ipynb) | statistiques du jeu | R/M | données : `data/VOCdevkit/VOC2007/ImageSets/Main/test.txt` (tools/get_voc.sh) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main/notebooks/voc/voc_stats.ipynb) |
