@@ -1,89 +1,91 @@
-# Jeux de données sur Google Drive
+# Datasets on Google Drive
 
-Les jeux ne passent pas par git (`data/` fait 33 Go). Pour les retrouver sur une autre
-machine ou sur Colab, chaque jeu prêt est archivé en un tar et copié sur Google Drive, dans
-`MyDrive/EmbeddedCV/data/`. Les notebooks et `tools/notebooks/colab.py:prepare_data` savent
-le reprendre de là (section « Accès » ci-dessous).
+The datasets do not go through git (`data/` is 33 GB). To find them on another machine or
+on Colab, each ready dataset is archived as a tar and copied to Google Drive, in
+`MyDrive/EmbeddedCV/data/`. The notebooks and `tools/notebooks/colab.py:prepare_data` know
+how to fetch it from there ("Access" section below).
 
 ```
 MyDrive/EmbeddedCV/
-  data/   <jeu>.tar   un tar non compressé par jeu, liens suivis (arborescence de data/)
-  runs/               sorties et checkpoints des notebooks (colab.sync_outputs ; M14, T14.8)
+  data/   <dataset>.tar   one uncompressed tar per dataset, links followed (tree of data/)
+  runs/                   outputs and checkpoints of the notebooks (colab.sync_outputs; M14, T14.8)
 ```
 
-Les runs d'entraînement suivent le même chemin que dans le dépôt (section « Runs
-d'entraînement » plus bas).
+The training runs follow the same path as in the repository ("Training runs" section
+below).
 
-## Mise en place de rclone (une fois par PC)
+## Setting up rclone (once per PC)
 
 ```bash
 sudo apt install rclone
-rclone config create gdrive drive scope=drive   # ouvre le navigateur : connexion Google
-rclone lsd gdrive:                              # liste les dossiers du Drive
-rclone about gdrive:                            # place libre
+rclone config create gdrive drive scope=drive   # opens the browser: Google sign-in
+rclone lsd gdrive:                              # lists the folders of the Drive
+rclone about gdrive:                            # free space
 ```
 
-Le remote s'appelle `gdrive`, et les archives vont dans `gdrive:EmbeddedCV/data`. Pour en
-changer, définir la variable d'environnement `DRIVE_REMOTE` (par exemple
-`DRIVE_REMOTE=autre:Dossier/data`), lue par `tools/get_datasets.sh` et `colab.prepare_data`.
+The remote is called `gdrive`, and the archives go into `gdrive:EmbeddedCV/data`. To change
+it, set the environment variable `DRIVE_REMOTE` (for example
+`DRIVE_REMOTE=other:Folder/data`), read by `tools/get_datasets.sh` and
+`colab.prepare_data`.
 
-## Exporter un jeu
+## Exporting a dataset
 
-Sur le PC qui a le jeu (témoin présent, `tools/get_datasets.sh check`) :
+On the PC that has the dataset (marker file present, `tools/get_datasets.sh check`):
 
 ```bash
 tools/get_datasets.sh push voc visdrone crowdhuman exdark
 ```
 
-`push` lance `pack` (`data/<racine>` → `data_archives/<jeu>.tar`, liens symboliques suivis,
-`*.zip`, `*.tar` et `*.part` exclus), puis `rclone copy` vers `gdrive:EmbeddedCV/data`. L'archive
-reste dans `data_archives/`, qui est ignoré par git, et peut être supprimée une fois
-l'envoi vérifié :
+`push` runs `pack` (`data/<root>` → `data_archives/<dataset>.tar`, symbolic links followed,
+`*.zip`, `*.tar` and `*.part` excluded), then `rclone copy` to `gdrive:EmbeddedCV/data`. The
+archive stays in `data_archives/`, which git ignores, and can be deleted once the upload is
+checked:
 
 ```bash
-rclone ls gdrive:EmbeddedCV/data     # tailles sur le Drive
-ls -l data_archives/                 # doivent être identiques
+rclone ls gdrive:EmbeddedCV/data     # sizes on the Drive
+ls -l data_archives/                 # must be identical
 ```
 
-| Jeu | Taille | Témoin (`data/…`) | Sur le Drive | Remarque |
+| Dataset | Size | Marker file (`data/…`) | On the Drive | Remark |
 |---|---|---|---|---|
-| voc | 2,9 Go | `VOCdevkit/VOC2007/ImageSets/Main/test.txt` | ✓ (6 oct. 2026) | aussi par `tools/get_voc.sh` |
-| exdark | 1,5 Go | `exdark/imageclasslist.txt` | ✓ (6 oct. 2026) | seule voie : annotations absentes de Kaggle |
-| visdrone | 1,9 Go | `visdrone/VisDrone2019-DET-val/annotations` | ✓ (6 oct. 2026) | aussi par l'API Kaggle |
-| crowdhuman | 11 Go | `crowdhuman/annotation_val.odgt` | ✓ (6 oct. 2026) | aussi par l'API Kaggle ; le plus long à envoyer |
-| coco | ≈ 1,3 Go | `coco/annotations/instances_val2017.json` | — | absent du PC ; se retélécharge (`get_datasets.sh coco`) |
-| kitti | ≈ 12 Go | `kitti/training/image_2/000000.png` | — | absent du PC ; se retélécharge (`get_datasets.sh kitti`) |
-| auair | 2,5 Go | `auair/annotations.json` | ✓ (8 oct. 2026) | M18 : lien vers `AU-AIR dataset/` (`get_datasets.sh kaggle`) |
-| dronevehicle | 2,2 Go | `dronevehicle/test/labels` | ✓ (8 oct. 2026) | M18 : sortie de `tools/prep_datasets.py dronevehicle` (recadrée) |
-| hituav | 0,2 Go | `hituav/labels/test` | ✓ (8 oct. 2026) | M18 : lien vers `HIT-UAV: …/hit-uav` |
-| uavdt | 6,5 Go | `uavdt/annotations_test.json` | ✓ (8 oct. 2026) | M18 : sortie de `tools/prep_datasets.py uavdt` (séquences M seules) |
-| flir | 12 Go | `flir/images_thermal_val/coco.json` | ✓ (7 oct. 2026) | aussi par l'API Kaggle (miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2`) ; RGB et vidéos compris (images thermiques seules : 4,9 Go) |
+| voc | 2.9 GB | `VOCdevkit/VOC2007/ImageSets/Main/test.txt` | ✓ (2026-10-06) | also through `tools/get_voc.sh` |
+| exdark | 1.5 GB | `exdark/imageclasslist.txt` | ✓ (2026-10-06) | the only way: annotations missing from Kaggle |
+| visdrone | 1.9 GB | `visdrone/VisDrone2019-DET-val/annotations` | ✓ (2026-10-06) | also through the Kaggle API |
+| crowdhuman | 11 GB | `crowdhuman/annotation_val.odgt` | ✓ (2026-10-06) | also through the Kaggle API; the longest to upload |
+| coco | ≈ 1.3 GB | `coco/annotations/instances_val2017.json` | — | missing from the PC; can be downloaded again (`get_datasets.sh coco`) |
+| kitti | ≈ 12 GB | `kitti/training/image_2/000000.png` | — | missing from the PC; can be downloaded again (`get_datasets.sh kitti`) |
+| auair | 2.5 GB | `auair/annotations.json` | ✓ (2026-10-08) | M18: link to `AU-AIR dataset/` (`get_datasets.sh kaggle`) |
+| dronevehicle | 2.2 GB | `dronevehicle/test/labels` | ✓ (2026-10-08) | M18: output of `tools/prep_datasets.py dronevehicle` (cropped) |
+| hituav | 0.2 GB | `hituav/labels/test` | ✓ (2026-10-08) | M18: link to `HIT-UAV: …/hit-uav` |
+| uavdt | 6.5 GB | `uavdt/annotations_test.json` | ✓ (2026-10-08) | M18: output of `tools/prep_datasets.py uavdt` (M sequences only) |
+| flir | 12 GB | `flir/images_thermal_val/coco.json` | ✓ (2026-10-07) | also through the Kaggle API (mirror `samdazel/teledyne-flir-adas-thermal-dataset-v2`); RGB and videos included (thermal images alone: 4.9 GB) |
 
-Les tailles sont celles de `du -shL` sur le PC. Ensemble, les neuf jeux envoyés font environ 42 Go.
-C'est plus que le Drive gratuit (15 Go), mais le compte du projet a 100 Go. Vérifier la place
-avec `rclone about gdrive:` avant un gros envoi. Après un nouvel envoi, mettre à jour la
-colonne « Sur le Drive ».
+The sizes are those of `du -shL` on the PC. Together, the nine datasets uploaded make about
+42 GB. That is more than the free Drive (15 GB), but the project account has 100 GB. Check
+the space with `rclone about gdrive:` before a large upload. After a new upload, update the
+"On the Drive" column.
 
-Le 2026-10-08, les tailles des neuf archives du Drive ont été comparées à celles de
-`data_archives/`, qui a ensuite été vidé. crowdhuman, exdark et flir ne sont plus que sur
-le Drive (absents de `data/`) : `tools/get_datasets.sh pull <jeu>` les reprend.
+On 2026-10-08, the sizes of the nine archives of the Drive were compared with those of
+`data_archives/`, which was then emptied. crowdhuman, exdark and flir are now only on the
+Drive (missing from `data/`): `tools/get_datasets.sh pull <dataset>` fetches them.
 
-## Accès
+## Access
 
-La règle est la même partout : **un jeu présent est utilisé tel quel ; sinon, il est repris du
-Drive** ; en dernier recours, il est téléchargé, mais seulement sur Colab.
+The rule is the same everywhere: **a dataset that is present is used as it is; otherwise,
+it is fetched from the Drive**; as a last resort, it is downloaded, but only on Colab.
 
-| Où | Jeu présent | Jeu absent |
+| Where | Dataset present | Dataset missing |
 |---|---|---|
-| PC, ligne de commande | rien à faire | `tools/get_datasets.sh pull <jeu>` |
-| PC, notebook | utilisé tel quel | `env.prepare` lance `pull` (rclone) ; à défaut, `Prerequis` avec les commandes |
-| Colab | utilisé tel quel | Drive monté + `unpack` ; à défaut, téléchargement direct (VOC, COCO, KITTI, Kaggle : CrowdHuman, VisDrone, FLIR) |
+| PC, command line | nothing to do | `tools/get_datasets.sh pull <dataset>` |
+| PC, notebook | used as it is | `env.prepare` runs `pull` (rclone); otherwise, `Prerequis` with the commands |
+| Colab | used as it is | Drive mounted + `unpack`; otherwise, direct download (VOC, COCO, KITTI, Kaggle: CrowdHuman, VisDrone, FLIR) |
 
-`pull` ne fait rien si le témoin est présent. Sinon, il copie `gdrive:EmbeddedCV/data/<jeu>.tar`
-dans `data_archives/`, puis l'extrait dans `data/` (`unpack`). Le code de retour est différent de 0 si rclone,
-le remote ou l'archive manque, et le message dit quoi faire.
+`pull` does nothing if the marker file is present. Otherwise, it copies
+`gdrive:EmbeddedCV/data/<dataset>.tar` into `data_archives/`, then extracts it into `data/`
+(`unpack`). The exit code is non-zero if rclone, the remote or the archive is missing, and
+the message says what to do.
 
-Dans le code, `colab.prepare_data` essaie les voies dans l'ordre et rend celle qui a abouti :
+In the code, `colab.prepare_data` tries the ways in order and returns the one that worked:
 
 ```python
 from tools.notebooks import colab
@@ -91,65 +93,66 @@ from tools.notebooks import colab
 colab.prepare_data("exdark")   # "ready" | "drive" | "rclone" | "download"
 ```
 
-1. `ready` : le témoin est présent ;
-2. `drive` : `<drive_dir>/data/<jeu>.tar` sur le Drive monté (Colab, `/content/drive`) ;
-3. `rclone` : la même archive par `get_datasets.sh pull` (PC avec rclone ; `remote=None`
-   désactive cette voie) ;
-4. `download` : le téléchargement direct (`download=False` le désactive).
+1. `ready`: the marker file is present;
+2. `drive`: `<drive_dir>/data/<dataset>.tar` on the mounted Drive (Colab,
+   `/content/drive`);
+3. `rclone`: the same archive through `get_datasets.sh pull` (PC with rclone;
+   `remote=None` disables this way);
+4. `download`: the direct download (`download=False` disables it).
 
-Si aucune voie n'aboutit, la fonction lève `RuntimeError` avec la commande `push` à lancer sur
-le PC qui a le jeu. En local, les notebooks appellent `prepare_data` sans téléchargement
-(`env.prepare`) : un téléchargement de plusieurs Go reste une commande explicite.
+If no way works, the function raises `RuntimeError` with the `push` command to run on the
+PC that has the dataset. Locally, the notebooks call `prepare_data` without a download
+(`env.prepare`): a download of several GB stays an explicit command.
 
-## Runs d'entraînement
+## Training runs
 
-Sur Colab, avec `DRIVE_DIR` (défaut `/content/drive/MyDrive/EmbeddedCV`), les notebooks
-`_train` et `_sweep` copient leur dossier toutes les 10 min, puis en fin de cellule
-(`colab.sync_outputs`). La copie va dans `runs/` sous le même chemin relatif que dans le
-dépôt :
+On Colab, with `DRIVE_DIR` (default `/content/drive/MyDrive/EmbeddedCV`), the `_train` and
+`_sweep` notebooks copy their folder every 10 min, then at the end of the cell
+(`colab.sync_outputs`). The copy goes into `runs/` under the same relative path as in the
+repository:
 
 ```
-MyDrive/EmbeddedCV/runs/build/notebooks/<jeu>/<modèle>/
-  final.weights, loss.csv, run.json …   run « train » (notebook _train)
-  runs/b16-sall/, runs/b8-s500/ …       balayage lot × sous-ensemble (notebook _sweep)
-  eval/<run>/                           évaluations des notebooks d'inférence
+MyDrive/EmbeddedCV/runs/build/notebooks/<dataset>/<model>/
+  final.weights, loss.csv, run.json …   "train" run (_train notebook)
+  runs/b16-sall/, runs/b8-s500/ …       batch × subset sweep (_sweep notebook)
+  eval/<run>/                           evaluations of the inference notebooks
 ```
 
-En début de session, `colab.restore_outputs` les recopie dans `build/notebooks/`. Un
-entraînement coupé reprend ainsi au dernier checkpoint copié (`--resume`), et le notebook
-d'inférence retrouve les runs (`RUN`, `COMPARE` ; M14, T14.11). Pour récupérer les runs
-entraînés sur Colab sur le PC :
+At the start of a session, `colab.restore_outputs` copies them back into
+`build/notebooks/`. An interrupted training thus resumes from the last copied checkpoint
+(`--resume`), and the inference notebook finds the runs (`RUN`, `COMPARE`; M14, T14.11). To
+get the runs trained on Colab onto the PC:
 
 ```bash
-rclone copy gdrive:EmbeddedCV/runs/build/notebooks build/notebooks   # tous les runs
+rclone copy gdrive:EmbeddedCV/runs/build/notebooks build/notebooks   # all the runs
 rclone copy gdrive:EmbeddedCV/runs/build/notebooks/kitti build/notebooks/kitti
 ```
 
-Les notebooks d'inférence en local lisent ensuite ces runs comme ceux entraînés sur le PC.
-Un run entraîné sur GPU l'indique dans `run.json` (`device`).
+The local inference notebooks then read these runs like those trained on the PC. A run
+trained on GPU says so in `run.json` (`device`).
 
-## Pièges
+## Pitfalls
 
-- Seul le tar est lu sur le Drive, d'une traite. Les images ne sont jamais lues à
-  travers le montage de Drive, qui est lent pour des milliers de petits fichiers.
-- `pack` écrit d'abord `<jeu>.tar.part`, puis le renomme : un tar présent est complet. Un
-  `.part` qui reste après une interruption peut être supprimé.
-- ExDark : le lien `data/exdark/ExDark` pointe vers tout `data/ExDark Dataset/`. L'archive
-  contient donc aussi les annotations sous `exdark/ExDark/ExDark_Annno/`. Elles font
-  quelques Mo et ne sont pas lues.
-- FLIR sur le PC : le téléchargement manuel arrive dans `data/Teledyne FLIR ADAS Thermal
-  Dataset v2/FLIR_ADAS_v2/`. Le relier à la main, comme `kaggle` le fait pour le miroir :
+- Only the tar is read on the Drive, in one go. The images are never read through the Drive
+  mount, which is slow for thousands of small files.
+- `pack` first writes `<dataset>.tar.part`, then renames it: a tar that is present is
+  complete. A `.part` left after an interruption can be deleted.
+- ExDark: the link `data/exdark/ExDark` points to the whole of `data/ExDark Dataset/`. The
+  archive therefore also contains the annotations under `exdark/ExDark/ExDark_Annno/`. They
+  weigh a few MB and are not read.
+- FLIR on the PC: the manual download lands in `data/Teledyne FLIR ADAS Thermal Dataset
+  v2/FLIR_ADAS_v2/`. Link it by hand, as `kaggle` does for the mirror:
   `ln -s "Teledyne FLIR ADAS Thermal Dataset v2/FLIR_ADAS_v2" data/flir`.
-- Gros envoi (> 10 Go) : le fichier part en entier, puis Drive met plusieurs minutes à le
-  finaliser. rclone peut alors abandonner et tout renvoyer sans message d'erreur : le total
-  de `--progress` grossit d'une taille d'archive à chaque essai (23,8 puis 35,7 Gio pour
-  les 11,9 Gio de FLIR), et il arrive que l'envoi se fige (`0/s`). Ne pas relancer `push`,
-  qui refait l'archive : renvoyer celle de `data_archives/` (`--timeout 30m` pour laisser
-  Drive finir, option non testée), puis comparer les tailles.
+- Large upload (> 10 GB): the file goes up in full, then Drive takes several minutes to
+  finalise it. rclone may then give up and resend everything without an error message: the
+  `--progress` total grows by one archive size at each attempt (23.8 then 35.7 GiB for the
+  11.9 GiB of FLIR), and the upload sometimes freezes (`0/s`). Do not rerun `push`, which
+  rebuilds the archive: resend the one in `data_archives/` (`--timeout 30m` to let Drive
+  finish, an untested option), then compare the sizes.
 
   ```bash
   rclone copy data_archives/flir.tar gdrive:EmbeddedCV/data --progress --timeout 30m
   ```
 
-- Un jeu modifié en local (nouvelles annotations, sous-ensemble) doit être renvoyé
-  avec `push`. `pull` ne remplace jamais un jeu déjà présent.
+- A dataset modified locally (new annotations, subset) must be sent again with `push`.
+  `pull` never replaces a dataset that is already present.
