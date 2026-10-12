@@ -61,7 +61,7 @@ VisDrone (T15.8, T15.10, T15.15, T15.16): tooling ready, runs to start.
 - A gap between two runs only counts if it exceeds the noise measured in T15.2.
 - **Harvest**: on Colab, each `tools/train.py` and `tools/eval_voc.py` started by a
   notebook writes its `summary.json` and goes to the Drive as soon as it ends
-  (`colab.autosync`, [colab-vscode.md](colab-vscode.md#coupure-de-session)); at the end of
+  (`colab.autosync`, [colab-vscode.md](colab-vscode.md#session-disconnect)); at the end of
   a session, nothing is lost beyond the command in progress. On the PC, `make harvest`
   brings back logs, summaries, tables and figures into `build/notebooks/` (without
   weights), then `python -m tools.notebooks.balayages --runs` redoes the summary; only then

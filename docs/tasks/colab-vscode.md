@@ -1,113 +1,111 @@
-# Entraîner sur un kernel Colab depuis VS Code
+# Training on a Colab kernel from VS Code
 
-Les notebooks `_train` et `_sweep` (M14) s'ouvrent dans VS Code et s'exécutent sur un
-runtime Colab à GPU grâce à l'extension Google Colab (`google.colab`). Le notebook reste
-le fichier du dépôt ; seul le kernel est distant. Les sorties partent sur Google Drive
-(`colab.sync_outputs`) et se récupèrent sur le PC par rclone
-([donnees-drive.md](donnees-drive.md)).
+The `_train` and `_sweep` notebooks (M14) open in VS Code and run on a Colab GPU runtime
+through the Google Colab extension (`google.colab`). The notebook stays the repository
+file; only the kernel is remote. The outputs go to Google Drive (`colab.sync_outputs`) and
+are fetched on the PC through rclone ([donnees-drive.md](donnees-drive.md)).
 
-## Qui fait quoi
+## Who does what
 
-| Étape | Qui | Comment |
+| Step | Who | How |
 |---|---|---|
-| connecter le kernel Colab, autoriser Google et Drive | utilisateur | VS Code (UI de l'extension) |
-| régler les paramètres d'un notebook | utilisateur ou Claude | cellule « Paramètres » (le fichier est généré : voir plus bas) |
-| lancer les cellules (« Run All ») | **utilisateur** | VS Code |
-| suivre la perte, voir les runs finis | utilisateur ou Claude | rclone sur `gdrive:EmbeddedCV/runs` |
-| récupérer les runs, évaluer, comparer | utilisateur ou Claude | `rclone copy`, notebooks d'inférence en local |
+| connect the Colab kernel, authorise Google and Drive | user | VS Code (extension UI) |
+| set the parameters of a notebook | user or Claude | "Paramètres" cell (the file is generated: see below) |
+| run the cells ("Run All") | **user** | VS Code |
+| follow the loss, see the finished runs | user or Claude | rclone on `gdrive:EmbeddedCV/runs` |
+| fetch the runs, evaluate, compare | user or Claude | `rclone copy`, inference notebooks locally |
 
-Claude (Claude Code) ne peut pas exécuter de cellules sur un kernel attaché à VS Code.
-L'extension Colab n'expose que des commandes d'interface (`colab.mountServer`,
-`colab.mountDrive`, `colab.openTerminal`…) et garde ses jetons dans le stockage secret de
-VS Code. Le PC n'a pas de GPU, donc pas d'exécution locale non plus (palier N : des heures
-sur CPU). Claude prépare les paramètres et suit les runs par rclone, et c'est l'utilisateur
-qui clique sur « Run All ».
+Claude (Claude Code) cannot run cells on a kernel attached to VS Code. The Colab extension
+only exposes UI commands (`colab.mountServer`, `colab.mountDrive`, `colab.openTerminal`…)
+and keeps its tokens in the VS Code secret storage. The PC has no GPU, so no local run
+either (tier N: hours on CPU). Claude prepares the parameters and follows the runs through
+rclone, and the user is the one who clicks "Run All".
 
-## Mise en place (une fois par session Colab)
+## Setup (once per Colab session)
 
-1. Ouvrir le notebook dans VS Code, par exemple
+1. Open the notebook in VS Code, for example
    [notebooks/kitti/tiny-yolov3-kitti_train.ipynb](../../notebooks/kitti/tiny-yolov3-kitti_train.ipynb).
-2. « Select Kernel » → « Colab » → **nouveau** serveur, type **GPU** (T4 ; L4 ou A100
-   avec Colab Pro), puis connexion Google. Un serveur créé en CPU ne change pas de type :
-   en créer un autre. Contrôle : `!nvidia-smi` dans une cellule affiche le GPU. Sur un
-   runtime CPU, la cellule « Environnement » s'arrête avec « runtime Colab sans GPU » (avant
-   ce contrôle, CuPy disait `cudaErrorInsufficientDriver`). La roue CuPy suit la version
-   CUDA du pilote (`cupy-cuda13x` à partir de 13, sinon `cupy-cuda12x`).
-3. Jeton Kaggle si le jeu se télécharge depuis Kaggle (crowdhuman, visdrone, flir sans
-   archive sur Drive) : le jeton `KGAT_…` (kaggle.com, Settings, API Tokens) dans le fichier
-   `MyDrive/EmbeddedCV/access_token`, par exemple
-   `printf %s "$KAGGLE_API_TOKEN" | rclone rcat gdrive:EmbeddedCV/access_token` (l'ancien
-   `kaggle.json` y est aussi lu).
-   Les secrets Colab ne marchent pas ici : sous VS Code, `userdata.get` n'a pas de page
-   pour demander l'accès et finit en `TimeoutException`.
+2. "Select Kernel" → "Colab" → **new** server, type **GPU** (T4; L4 or A100 with Colab
+   Pro), then Google sign-in. A server created as CPU does not change type: create another
+   one. Check: `!nvidia-smi` in a cell shows the GPU. On a CPU runtime, the "Environnement"
+   cell stops with "runtime Colab sans GPU" (before this check, CuPy said
+   `cudaErrorInsufficientDriver`). The CuPy wheel follows the CUDA version of the driver
+   (`cupy-cuda13x` from 13 on, otherwise `cupy-cuda12x`).
+3. Kaggle token if the dataset is downloaded from Kaggle (crowdhuman, visdrone, flir
+   without an archive on Drive): the `KGAT_…` token (kaggle.com, Settings, API Tokens) in
+   the file `MyDrive/EmbeddedCV/access_token`, for example
+   `printf %s "$KAGGLE_API_TOKEN" | rclone rcat gdrive:EmbeddedCV/access_token` (the old
+   `kaggle.json` is also read there). The Colab secrets do not work here: under VS Code,
+   `userdata.get` has no page to ask for access and ends in a `TimeoutException`.
 
-La cellule « Environnement » détecte Colab (`"google.colab" in sys.modules`). Le kernel
-tourne dans `/content`, hors du dépôt : elle clone donc
-`REPO_URL` dans `/content/EmbeddedComputervision`, le remet à `REV` (défaut `main`) à chaque
-exécution, installe `python[data,plots]` et CuPy (`DEVICE = 'gpu'`). **Le code exécuté
-est celui de `REV` sur GitHub, pas celui du PC** : pousser d'abord ce qui doit tourner.
+The "Environnement" cell detects Colab (`"google.colab" in sys.modules`). The kernel runs
+in `/content`, outside the repository: it therefore clones `REPO_URL` into
+`/content/EmbeddedComputervision`, resets it to `REV` (default `main`) at each run, and
+installs `python[data,plots]` and CuPy (`DEVICE = 'gpu'`). **The code that runs is that of
+`REV` on GitHub, not that of the PC**: push first whatever must run.
 
-Les données passent par `colab.prepare_data(DATASET, DRIVE_DIR)` (ordre : témoin, archive
-Drive, rclone, téléchargement direct ; [M14](M14-notebooks.md#data-on-colab)). Ce qui
-est sur Drive aujourd'hui :
+The data goes through `colab.prepare_data(DATASET, DRIVE_DIR)` (order: marker file, Drive
+archive, rclone, direct download; [M14](M14-notebooks.md#data-on-colab)). What is on the
+Drive today:
 
-| Jeu | Source sur Colab |
+| Dataset | Source on Colab |
 |---|---|
 | voc | `MyDrive/EmbeddedCV/data/voc.tar` |
 | visdrone | `MyDrive/EmbeddedCV/data/visdrone.tar` |
-| kitti | téléchargement direct (`get_datasets.sh kitti`) |
-| flir | API Kaggle (`get_datasets.sh kaggle-download flir`, miroir `samdazel/teledyne-flir-adas-thermal-dataset-v2` ; jeton dans `MyDrive/EmbeddedCV/access_token`), puis `push flir` pour les sessions suivantes |
+| kitti | direct download (`get_datasets.sh kitti`) |
+| flir | Kaggle API (`get_datasets.sh kaggle-download flir`, mirror `samdazel/teledyne-flir-adas-thermal-dataset-v2`; token in `MyDrive/EmbeddedCV/access_token`), then `push flir` for the following sessions |
 
-À vérifier au premier essai : `drive.mount()` (`colab.mount_drive`) demande une
-autorisation dans le notebook. Si elle ne s'affiche pas sous VS Code, monter Drive par la
-commande de l'extension « Colab: Mount Google Drive to Server… », puis relancer la cellule.
+To check on the first try: `drive.mount()` (`colab.mount_drive`) asks for an
+authorisation in the notebook. If it does not show under VS Code, mount Drive with the
+extension command "Colab: Mount Google Drive to Server…", then rerun the cell.
 
-## Lancer
+## Running
 
-`DEVICE` vaut `'gpu'` par défaut dans `_train` et `_sweep` (`'cpu'` pour les lancer sur
-un PC sans GPU). Paramètres à régler dans la cellule « Paramètres », avant « Run All » :
+`DEVICE` is `'gpu'` by default in `_train` and `_sweep` (`'cpu'` to run them on a PC
+without a GPU). Parameters to set in the "Paramètres" cell, before "Run All":
 
-| Notebook | Paramètres |
+| Notebook | Parameters |
 |---|---|
-| `_train` | `ITERS` (4000), `BATCH` (16), `SUBSET` (50 ; 0 : split complet) |
-| `_sweep` | `BATCHES` (`[8, 16, 32]`), `TRAIN_SUBSETS` (`[500, 0]`), `ITERS` (600 par run), `SKIP_DONE` |
+| `_train` | `ITERS` (4000), `BATCH` (16), `SUBSET` (50; 0: full split) |
+| `_sweep` | `BATCHES` (`[8, 16, 32]`), `TRAIN_SUBSETS` (`[500, 0]`), `ITERS` (600 per run), `SKIP_DONE` |
 
-Ces changements ne se commitent pas : les notebooks sont générés depuis
-`tools/notebooks/gabarits.py` (`make notebooks`) et `--check` refuse une cellule
-retouchée. Pour changer une valeur par défaut, modifier le gabarit.
+These changes are not committed: the notebooks are generated from
+`tools/notebooks/gabarits.py` (`make notebooks`) and `--check` refuses an edited cell. To
+change a default value, change the template.
 
-Ordre conseillé, un notebook à la fois par runtime :
+Suggested order, one notebook at a time per runtime:
 
-1. `voc/tiny-yolov3-voc_train` (archive sur Drive, référence de M2) ;
-2. `kitti/tiny-yolov3-kitti_train`, puis `_sweep` ;
-3. `visdrone/tiny-yolov3-visdrone_train`, puis `_sweep` ;
-4. `flir/tiny-yolov3-flir_train` (premier lancement : téléchargement Kaggle).
+1. `voc/tiny-yolov3-voc_train` (archive on Drive, reference of M2);
+2. `kitti/tiny-yolov3-kitti_train`, then `_sweep`;
+3. `visdrone/tiny-yolov3-visdrone_train`, then `_sweep`;
+4. `flir/tiny-yolov3-flir_train` (first run: Kaggle download).
 
-## Coupure de session
+## Session disconnect
 
-Ce qui part sur le Drive (`MyDrive/EmbeddedCV/runs/build/notebooks/<jeu>/<modèle>/`), et
-quand :
+What goes to the Drive (`MyDrive/EmbeddedCV/runs/build/notebooks/<dataset>/<model>/`), and
+when:
 
-| Quoi | Quand | Par |
+| What | When | By |
 |---|---|---|
-| tout `OUT` (checkpoints, `loss.csv`, `log.txt`…) | toutes les 10 min pendant la cellule d'entraînement, et à sa fin (interruption comprise) | fil de la cellule, `colab.sync_outputs` |
-| dossier d'un run (`runs/<run>/` ou la racine de `_train`) + `summary.json` | dès la fin de chaque `tools/train.py`, ou à son interruption | `colab.autosync`, appelé par `commandes.run` |
-| dossier d'une évaluation (`map_float*.md`, `dets*/`, PR) + `summary.json` | dès la fin de chaque `tools/eval_voc.py` / `eval_quant.py`, balayages **et** `_infer` | idem |
+| the whole of `OUT` (checkpoints, `loss.csv`, `log.txt`…) | every 10 min during the training cell, and at its end (interruption included) | thread of the cell, `colab.sync_outputs` |
+| folder of a run (`runs/<run>/` or the root of `_train`) + `summary.json` | as soon as each `tools/train.py` ends, or is interrupted | `colab.autosync`, called by `commandes.run` |
+| folder of an evaluation (`map_float*.md`, `dets*/`, PR) + `summary.json` | as soon as each `tools/eval_voc.py` / `eval_quant.py` ends, sweeps **and** `_infer` | same |
 
-`summary.json` (`runs.write_summary`) résume le dossier sans le notebook : `run.json`,
-itérations faites, perte et composantes moyennes des 50 dernières itérations, durée (somme
-de `seconds` de `loss.csv`), s/image, mAP et AP par classe de chaque `map_float*.md`. Une
-session coupée ne perd donc que la commande en cours depuis sa dernière copie (au plus
-10 min d'entraînement), jamais une évaluation finie ; les chiffres restent sur le Drive
-même si les sorties du notebook ne sont pas enregistrées. `EMBEDDEDCV_AUTOSYNC=0` coupe la copie à la fin de chaque commande.
+`summary.json` (`runs.write_summary`) sums up the folder without the notebook: `run.json`,
+iterations done, mean loss and components over the last 50 iterations, duration (sum of
+`seconds` of `loss.csv`), s/image, mAP and AP per class of each `map_float*.md`. A
+disconnected session therefore only loses the command in progress since its last copy (at
+most 10 min of training), never a finished evaluation; the figures stay on the Drive even
+if the outputs of the notebook are not saved. `EMBEDDEDCV_AUTOSYNC=0` switches off the copy
+at the end of each command.
 
-Après une coupure : reconnecter un kernel Colab et relancer « Run All ».
-`colab.restore_outputs` recopie le dossier, l'entraînement reprend au dernier checkpoint
-(`--resume`), et `_sweep` saute les runs finis (`SKIP_DONE`) ; leur journal n'est alors
-plus dans les sorties du notebook, mais dans `loss.csv` sur le Drive (voir « Récupérer »).
-La reprise exacte suppose le même backend (T12.11).
+After a disconnect: reconnect a Colab kernel and rerun "Run All". `colab.restore_outputs`
+copies the folder back, the training resumes from the last checkpoint (`--resume`), and
+`_sweep` skips the finished runs (`SKIP_DONE`); their log is then no longer in the outputs
+of the notebook, but in `loss.csv` on the Drive (see "Fetching"). An exact resume assumes
+the same backend (T12.11).
 
-## Suivre depuis le PC
+## Following from the PC
 
 ```bash
 rclone lsd gdrive:EmbeddedCV/runs/build/notebooks/kitti/tiny-yolov3-kitti/runs
@@ -115,49 +113,50 @@ rclone cat gdrive:EmbeddedCV/runs/build/notebooks/kitti/tiny-yolov3-kitti/loss.c
 rclone lsl gdrive:EmbeddedCV/runs/build/notebooks/kitti/tiny-yolov3-kitti/ | grep weights
 ```
 
-Un run est fini quand son `final.weights` existe. Le `loss.csv` sur Drive date au plus de
-la dernière copie (10 min).
+A run is finished when its `final.weights` exists. The `loss.csv` on the Drive is at most as
+old as the last copy (10 min).
 
-## Récupérer et comparer
+## Fetching and comparing
 
-Récolte en fin de session, sur le PC (rclone configuré, [donnees-drive.md](donnees-drive.md)) :
+Harvest at the end of a session, on the PC (rclone configured,
+[donnees-drive.md](donnees-drive.md)):
 
 ```bash
-make harvest   # RUNS_REMOTE=gdrive:EmbeddedCV/runs/build/notebooks par défaut
+make harvest   # RUNS_REMOTE=gdrive:EmbeddedCV/runs/build/notebooks by default
 ```
 
-`make harvest` copie dans `build/notebooks/` les `summary.json`, `run.json`, `loss.csv`,
-`log.txt`, tables `map_float*.md` et figures PNG de tous les jeux, sans poids ni
-checkpoints (quelques Mo), puis affiche la synthèse des balayages
-(`python -m tools.notebooks.balayages --runs`). Le notebook d'analyse
-([analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb)) reprend ces journaux
-pour les runs absents des sorties de leur notebook. Pour évaluer en local, il faut aussi
-les poids :
+`make harvest` copies into `build/notebooks/` the `summary.json`, `run.json`, `loss.csv`,
+`log.txt`, `map_float*.md` tables and PNG figures of all the datasets, without weights or
+checkpoints (a few MB), then prints the summary of the sweeps
+(`python -m tools.notebooks.balayages --runs`). The analysis notebook
+([analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb)) picks up these logs
+for the runs missing from the outputs of their notebook. To evaluate locally, the weights
+are also needed:
 
 ```bash
 rclone copy gdrive:EmbeddedCV/runs/build/notebooks/kitti build/notebooks/kitti
 ```
 
-Ensuite, en local, le notebook d'inférence du modèle
+Then, locally, the inference notebook of the model
 ([kitti/tiny-yolov3-kitti_infer.ipynb](../../notebooks/kitti/tiny-yolov3-kitti_infer.ipynb))
-prend le run `RUN` (None : le plus récent), et `COMPARE = True` met les runs dans une même
-table (T14.11). `run.json` donne le backend (`device`). Une mAP sur `SUBSET` images classe
-les runs, elle n'est pas publiable (M12).
+takes the run `RUN` (None: the most recent), and `COMPARE = True` puts the runs in a single
+table (T14.11). `run.json` gives the backend (`device`). An mAP on `SUBSET` images ranks
+the runs, it is not publishable (M12).
 
-## Sorties des cellules et GitHub
+## Cell outputs and GitHub
 
-Sous VS Code, les sorties d'un kernel Colab (texte, figures) s'enregistrent dans le
-`.ipynb` du PC. GitHub les affiche si le fichier est poussé avec, les images comprises
-(PNG en base64), mais pas le JavaScript ni les widgets, et l'aperçu échoue sur les gros
-notebooks. Règle du dépôt ([M14](M14-notebooks.md#rules)) :
+Under VS Code, the outputs of a Colab kernel (text, figures) are saved in the `.ipynb` of
+the PC. GitHub shows them if the file is pushed with them, images included (PNG in
+base64), but not the JavaScript or the widgets, and the preview fails on large notebooks.
+Repository rule ([M14](M14-notebooks.md#rules)):
 
-- notebook **exécuté en entier sans erreur**, cellules du gabarit intactes : il se commite
-  avec ses sorties, et `make notebooks` le garde ;
-- exécution partielle ou en erreur (ex. jeu absent) : `make ci` la refuse ; vider les
-  sorties (« Clear All Outputs » dans VS Code, ou `make notebooks`) avant le commit, ou
-  relancer jusqu'au bout ;
-- les paramètres se changent sans commit, et une cellule ajoutée (ex. `!nvidia-smi`) se
-  retire avant le commit.
+- notebook **executed in full without error**, template cells intact: it is committed with
+  its outputs, and `make notebooks` keeps it;
+- partial or failed run (e.g. dataset missing): `make ci` refuses it; clear the outputs
+  ("Clear All Outputs" in VS Code, or `make notebooks`) before the commit, or rerun to the
+  end;
+- the parameters are changed without a commit, and an added cell (e.g. `!nvidia-smi`) is
+  removed before the commit.
 
-Les fichiers de `build/notebooks/<jeu>/<modèle>/` (copiés sur Drive) restent la trace des
-runs, et les chiffres publiables vont dans `results/` par les scripts de M12.
+The files of `build/notebooks/<dataset>/<model>/` (copied to the Drive) remain the record
+of the runs, and the publishable figures go into `results/` through the M12 scripts.

@@ -385,4 +385,4 @@ to the Drive as soon as it ends (`colab.autosync`), evaluations and `_infer` not
 included. On the PC, `make harvest` brings back logs, summaries, tables and figures
 (without weights) into `build/notebooks/`; the analysis notebook picks up there the runs
 without a log in their notebook (VisDrone: 4 runs from a previous session). Details:
-[colab-vscode.md](colab-vscode.md#coupure-de-session).
+[colab-vscode.md](colab-vscode.md#session-disconnect).
