@@ -31,6 +31,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M19](M19-english.md) | Switch to English (optional) | docs, specification, generated text and code comments in English, with a language check in `make ci`; new content in English from 2026-10-07 |
 | [M20](M20-webcam.md) | Live webcam demo (optional) | `make webcam`: pick a model, live camera image, continuous capture + inference, boxes and classes drawn on screen |
 | [M21](M21-asl-alphabet.md) | ASL Alphabet (optional) | hand pseudo-boxes for a classification dataset (`tools/prep_datasets.py asl`), loader and notebooks (stats, fine-tuning, sweep, inference); a sign-letter model for the webcam demo |
+| [M22](M22-autolabel.md) | Photo auto-labelling (optional) | `make autolabel`: drag & drop a photo or a folder, open-vocabulary boxes, manual correction, YOLO txt labels to download |
 
 Datasets outside git (export to Google Drive, local or Colab access):
 [donnees-drive.md](donnees-drive.md). Training on a Colab kernel from VS Code (who
@@ -74,6 +75,10 @@ graph LR
   M21 -.-> M20
   M4 -.-> M20
   M7 -.-> M20
+  M3 --> M22[M22]
+  M20 -.-> M22
+  M11 -.-> M22
+  M22 -.-> M15
 ```
 
 - **T1.9 → M3 shortcut**: with the pre-trained Darknet weights, the reference mAP is
@@ -127,3 +132,4 @@ progress per milestone here.
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
 | M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |
+| M22 | 10 | 0 (task document written; no code yet) |
