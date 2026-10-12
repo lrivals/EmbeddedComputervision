@@ -8,7 +8,7 @@ emplacements de `yolo_post`, INT8).
 
 Constat de départ :
 - seul VOC a des statistiques : `tools/voc_stats.py` (comptes face aux chiffres du devkit,
-  T0.6) et la figure `voc_stats.png` de [T13.7](M13-figures.md#x-t137--statistiques-du-jeu-voc) ;
+  T0.6) et la figure `voc_stats.png` de [T13.7](M13-figures.md#x-t137--voc-dataset-statistics) ;
 - les six autres jeux de `DATASETS` (`python/yolo/data/datasets.py`) n'ont que leur
   chargeur ; leurs effectifs viennent des pages des jeux, **à vérifier**
   ([M11, Synthèse](M11-jeux-de-donnees.md#summary)), et `SPLIT_IMAGES` de
