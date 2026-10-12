@@ -6,26 +6,47 @@ the project's loaders read (`parse_yolo_txt`, `_load_yolo_dir` in
 `python/yolo/data/datasets.py`). It is a labelling tool for the PC; the open-vocabulary
 models never go on the FPGA. Task list and measurements: [tasks/M22-autolabel.md](tasks/M22-autolabel.md).
 
+## Quick start
+
+```bash
+pip install -e "python[autolabel]"   # once: gradio, gradio_image_annotation, transformers, torch
+make get-weights                     # once, only for the yolo:* labellers (Darknet weights)
+make autolabel                       # starts the app; open http://127.0.0.1:7860 in a browser
+```
+
+Stop the app with `Ctrl+C` in its terminal. First session in the browser: type the
+classes (`cat, dog`), drop a photo in the **Image** tab, fix the boxes, click
+**Download labels**.
+
 ## 1. Install and launch
 
-```bash
-pip install -e "python[autolabel]"   # gradio, gradio_image_annotation, transformers, torch
-make autolabel                       # = python tools/autolabel.py → http://127.0.0.1:7860
-```
-
-On a PC without GPU, install the CPU wheel of torch first (≈ 200 MB instead of ≈ 2 GB):
-`pip install torch --index-url https://download.pytorch.org/whl/cpu`.
+On a PC without GPU, install the CPU wheel of torch before the extra (≈ 200 MB instead of
+≈ 2 GB): `pip install torch --index-url https://download.pytorch.org/whl/cpu`. Versions
+known to work: torch 2.11, transformers 5.19, gradio 6.30, gradio_image_annotation 0.5.6.
 
 The first use of a labeller downloads its weights into `weights/hf/` (`HF_HOME`,
-≈ 0.7 GB for Grounding DINO, ≈ 0.6 GB for OWLv2); later runs work offline. The server
-listens on `127.0.0.1` only and has no share link: the photos stay on the PC.
+≈ 0.7 GB for Grounding DINO, ≈ 0.6 GB for OWLv2); later runs work offline. The model is
+loaded at the first photo (a few seconds), then shared by both tabs. The server listens on
+`127.0.0.1` only and has no share link: the photos stay on the PC.
 
 ```bash
-python tools/autolabel.py --model owlv2-base     # another labeller (table below)
+python tools/autolabel.py                        # = make autolabel
+python tools/autolabel.py --model owlv2-base     # another default labeller (table below)
 python tools/autolabel.py --device cpu           # force the CPU even with CUDA
+python tools/autolabel.py --preset voc           # class field pre-filled with the 20 VOC names
+python tools/autolabel.py --classes "cat, dog" --conf 0.4 --port 7870
 python tools/autolabel.py --list                 # labellers, device, cached weights, then quit
-python tools/autolabel.py --preset voc --conf 0.4 --port 7870
 ```
+
+| Option | Default | Effect |
+|---|---|---|
+| `--model` | `grounding-dino-tiny` | labeller selected at start (the app has a menu too) |
+| `--device` | `auto` | `cpu` or `cuda`; `auto` takes CUDA when present |
+| `--classes` / `--preset` | `person, dog` | initial class list (`voc`, `coco`, `dataset:<name>`) |
+| `--conf` | by labeller (§3) | export threshold, the slider's start value |
+| `--port` | 7860 | port of the local server |
+| `--folder`, `--out`, `--resume`, `--recursive` | | batch without a display (§5) |
+| `--cfg`, `--dataset` | | config and class names of a `yolo:ckpt:` labeller |
 
 ## 2. Classes
 
@@ -109,3 +130,16 @@ by the size of the image **after** the EXIF transpose (the size a viewer shows).
 
 Labeller errors become training targets: review at least the "needs review" images, and
 keep a hand-checked val split to measure what a model trained on auto-labels is worth.
+
+## 7. Troubleshooting
+
+| Symptom | Cause, fix |
+|---|---|
+| `gradio, gradio_image_annotation missing: pip install …` | the extra is not installed: `pip install -e "python[autolabel]"` |
+| `Cannot find empty port in range: 7860-7860` | another app (or a previous run) uses it: `--port 7870`, or stop the other run |
+| first photo takes a long time | weights downloading (first use) or model loading; later photos ≈ 5 s on CPU |
+| no box at all | threshold too high for this labeller or class name not understood: lower the slider, try `name=other words`, or another labeller |
+| boxes around groups of objects | a Grounding DINO habit on crowded scenes: delete the group box, or try `owlv2-base` |
+| `--resume needs the same …` | the folder was labelled with another class list or labeller: same options, or a new `--out` |
+| `yolo:*` labeller unavailable | Darknet weights missing: `make get-weights` |
+| work files | `build/autolabel/image/` (Image tab), `build/autolabel/<session>/` (Folder tab: `images/` copies, `result/`, `labels.zip`); safe to delete |
