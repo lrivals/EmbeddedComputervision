@@ -23,7 +23,7 @@ Détails : [docs/architecture.md](docs/architecture.md) · conventions :
 
 ## Plan de travail
 
-Le travail est découpé en jalons M0 à M15 dans [docs/tasks/](docs/tasks/README.md). Chaque
+Le travail est découpé en jalons M0 à M20 dans [docs/tasks/](docs/tasks/README.md). Chaque
 tâche indique la section de la spec, ses dépendances, ses livrables et un critère
 d'acceptation mesurable.
 
@@ -50,6 +50,9 @@ d'acceptation mesurable.
   du balayage rapide au run long confirmé sur le split complet, jeu par jeu ; premiers
   résultats (VOC, VisDrone, KITTI) dans
   [resultats-balayages.md](docs/tasks/resultats-balayages.md).
+- **[M20](docs/tasks/M20-webcam.md)**: live webcam demo on the PC (`make webcam`): pick a
+  model, live camera image, continuous inference, boxes and classes on screen; user guide
+  in [docs/webcam.md](docs/webcam.md).
 
 ## Arborescence
 
@@ -61,7 +64,7 @@ d'acceptation mesurable.
 | `hls/` | noyaux Vitis HLS, testbenchs, scripts tcl, configurations par carte |
 | `sw/` | code ARM : driver de l'accélérateur, post-traitement, application |
 | `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
-| `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps |
+| `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps, démos `detect.py` (image) et `webcam.py` (caméra, [guide](docs/webcam.md)) |
 | `model/` | modèles exportés (non versionnés) |
 | `notebooks/` | notebooks Jupyter de M14 (générés par `tools/notebooks/`), versionnés vides ou exécutés en entier sans erreur |
 | `results/` | `benchmarks.csv` des mesures (format du §10.4), protocole, rapports mAP, roofline, rapport HLS, rapport comparatif (`rapport.md`) |
@@ -98,3 +101,20 @@ tools/get_datasets.sh kaggle        # relie les versions Kaggle (CrowdHuman, Vis
 tools/get_datasets.sh pack exdark   # data_archives/exdark.tar, à copier sur Drive pour Colab (M14)
 tools/m11.sh coco-float             # profils de M11 (liste : tools/m11.sh)
 ```
+
+## Live webcam demo
+
+Detection on the webcam image, on the PC (M20). Full guide: [docs/webcam.md](docs/webcam.md).
+
+```bash
+pip install -e "python[webcam]"     # opencv-python + pillow
+make get-weights                    # Darknet weights in weights/, once
+python tools/webcam.py --list       # cameras that open and models available
+make webcam                         # model menu, then the live window (q: quit)
+python tools/webcam.py --model tiny-yolov3-coco          # COCO classes (80)
+python tools/webcam.py --model int:tiny-yolov2-voc       # integer model (after make export)
+python tools/webcam.py --source clip.mp4 --sync          # a video instead of the camera
+```
+
+Keys: `q` quit, `Space` pause, `m` next model, `+` / `-` confidence threshold, `s` save
+the image, `d` boxes on / off.

@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf webcam
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -13,6 +13,7 @@ help:
 	@echo "get-weights poids Darknet pré-entraînés dans weights/ (T1.9)"
 	@echo "anchors     ancres k-means sur VOC → results/anchors.md (T2.2)"
 	@echo "detect      démo Tiny-YOLOv2 VOC sur une image → build/detect/ (T3.4)"
+	@echo "webcam      live webcam demo: model menu, camera, boxes on screen (M20)"
 	@echo "eval-float  mAP VOC2007 test de Tiny-YOLOv2 VOC, poids Darknet (T3.4)"
 	@echo "calibrate   échelles INT8 sur 500 images VOC trainval → build/quant/ (T4.2)"
 	@echo "eval-int    mAP VOC2007 test du modèle entier et du flottant (T4.5)"
@@ -153,6 +154,9 @@ anchors:
 
 detect:
 	python tools/detect.py data/VOCdevkit/VOC2007/JPEGImages/000004.jpg
+
+webcam:
+	python tools/webcam.py
 
 eval-float:
 	python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights --resize stretch

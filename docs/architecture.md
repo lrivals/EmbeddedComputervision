@@ -203,3 +203,11 @@ run_compare (sim puis uio)  ─► sortie DDR == golden == dumps (make sw-sim, p
 yolo_bench + map_stades     ─► mAP aux trois stades (§11), FPGA == entier image par image (M8)
 bench_report                ─► benchmarks.csv : mesures carte, ou projection perf_model (M8)
 ```
+
+## 6. Live webcam demo (`tools/webcam.py`, M20)
+
+On the PC, outside the four stages: it runs the float or integer NumPy model (stages 1
+and 2) on the camera image. Three threads share only the newest frame (capture, inference,
+display), so the display follows the camera while an inference takes ≈ 200 ms. Usage and
+internals: [webcam.md](webcam.md); tasks and measurements: [M20](tasks/M20-webcam.md). On
+the KV260, the FPGA takes the place of the inference thread (T20.9).

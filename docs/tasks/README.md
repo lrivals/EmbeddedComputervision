@@ -29,6 +29,7 @@ Le projet suit les six étapes de la feuille de route du §10.5 de la
 | [M17](M17-article.md) | Article (optionnel) | `make article` régénère les chiffres, tables, figures et l'état des jalons d'un article de type papier ([docs/article/](../article/)) ; `--check` dans `make ci` |
 | [M18](M18-jeux-drone.md) | Jeux drone et thermiques (optionnel) | AU-AIR, DroneVehicle, HIT-UAV et UAVDT prétraités, chargés et dotés de leurs notebooks (stats, hors domaine, affinage) |
 | [M19](M19-english.md) | Switch to English (optional) | docs, specification, generated text and code comments in English, with a language check in `make ci`; new content in English from 2026-10-07 |
+| [M20](M20-webcam.md) | Live webcam demo (optional) | `make webcam`: pick a model, live camera image, continuous capture + inference, boxes and classes drawn on screen |
 
 Jeux de données hors git (export sur Google Drive, accès local ou Colab) :
 [donnees-drive.md](donnees-drive.md).
@@ -66,6 +67,9 @@ graph LR
   M16 --> M18
   M18 -.-> M15
   M0 --> M19[M19]
+  M3 --> M20[M20]
+  M4 -.-> M20
+  M7 -.-> M20
 ```
 
 - **Raccourci T1.9 → M3** : avec les poids Darknet pré-entraînés, la mAP de référence est
@@ -117,3 +121,4 @@ reporter ici l'avancement par jalon.
 | M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; refs check, v0 procedure, board switch and frozen version remain) |
 | M18 | 11 | 8 (données prêtes, chargeurs, 24 notebooks générés ; restent stats exécutés, Drive, affinages) |
 | M19 | 12 | 0 (rule in force: new content in English since 2026-10-07) |
+| M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |

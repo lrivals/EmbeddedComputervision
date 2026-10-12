@@ -11,6 +11,7 @@ data = ["pillow>=10"]
 plots = ["matplotlib>=3.7"]  # figures M13 (tools/figures/), jamais importé par yolo/
 notebooks = ["jupyter", "matplotlib>=3.7", "pillow>=10"]  # M14 (notebooks/), jamais importé par yolo/
 coco = ["pycocotools>=2"]  # vérification de yolo.infer.coco_eval seulement (T11.1)
+webcam = ["opencv-python>=4.8", "pillow>=10"]  # tools/webcam.py (M20), never imported by yolo/
 
 [build-system]
 requires = ["setuptools>=61"]
