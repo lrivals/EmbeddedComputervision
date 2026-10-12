@@ -11,7 +11,7 @@ Constat de départ :
   T0.6) et la figure `voc_stats.png` de [T13.7](M13-figures.md#x-t137--statistiques-du-jeu-voc) ;
 - les six autres jeux de `DATASETS` (`python/yolo/data/datasets.py`) n'ont que leur
   chargeur ; leurs effectifs viennent des pages des jeux, **à vérifier**
-  ([M11, Synthèse](M11-jeux-de-donnees.md#synthèse)), et `SPLIT_IMAGES` de
+  ([M11, Synthèse](M11-jeux-de-donnees.md#summary)), et `SPLIT_IMAGES` de
   `tools/notebooks/matrice.py` vaut encore `None` pour ExDark et FLIR ;
 - les premiers balayages de [M15](M15-campagne-entrainement.md) donnent des mAP qu'on ne
   sait pas encore lire : sur VisDrone et KITTI, seule la classe voiture décolle. Il manque
