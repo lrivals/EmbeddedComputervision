@@ -283,7 +283,7 @@ complete; some data remains to be produced:
   Each arrow carries its criterion and its state (green = checked, grey = to do). Example
   criteria: "0 byte differences, 3 dumps"; "4,952 / 4,952 images identical".
 - **Acceptance**: the states are read from the progress table of the
-  [README](README.md#suivi), not hard-coded
+  [README](README.md#progress), not hard-coded
 - **Notes**: it is the figure that best sums up the project; put it at the top of
   `results/figures.md`.
 - **Done**: states read from the progress table of the README, mAP and "4952 / 4952 images
@@ -499,7 +499,7 @@ complete; some data remains to be produced:
   - the counts are parsed from the `### [x]` and `### [ ]` titles of the
     `docs/tasks/M*.md` files;
   - a test checks that they are equal to the progress table of the
-    [README](README.md#suivi), and reports the differences.
+    [README](README.md#progress), and reports the differences.
 - **Notes**: the category "checked on the PC, board pending" is read from the keywords of
   the notes of the progress table (C-sim, sim). If the rule is too fragile, add a column to
   the progress table.

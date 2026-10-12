@@ -110,7 +110,8 @@ def chronologie(out_dir):
 
 STATUS = {"x": "faite", "~": "partielle", " ": "ouverte"}
 CATEGORIES = ("faite", "partielle", "vérifiée sur PC, carte en attente", "ouverte")
-PC_WORDS = ("C-sim", "sim", "PC", "outillés", "estimations", "en attente")
+PC_WORDS = ("C-sim", "sim", "PC", "outillés", "estimations", "en attente",
+            "tooled", "estimates", "pending")
 
 
 def load_tasks(tasks=None):
@@ -135,11 +136,12 @@ def _expand(ids):
 
 
 def load_tracking(readme=None):
-    """Tableau `## Suivi` : {jalon: (tâches, faites, note)}."""
+    """Tableau `## Progress` (`## Suivi` avant M19) : {jalon: (tâches, faites, note)}."""
     readme = Path(readme or TASKS / "README.md")
     if not readme.exists():
         raise MissingSource(f"{readme} absent")
-    text = readme.read_text().split("## Suivi", 1)
+    text = readme.read_text()
+    text = text.split("## Progress" if "## Progress" in text else "## Suivi", 1)
     if len(text) < 2:
         raise MissingSource("README sans section Suivi")
     out = {}

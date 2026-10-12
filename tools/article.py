@@ -13,7 +13,7 @@ number, table, figure and the milestone status come from macros defined in
     \\chiffre{map.voc.int8}                     55.66, with a status superscript
     \\articletable{map.stades}                   a booktabs table from chiffres.json
     \\articlefig{graphe/graphe_tiny-yolov2-voc}  a figure of the tools/figures registry
-    \\articleetat, \\articleetatresume            Suivi table of docs/tasks/README.md
+    \\articleetat, \\articleetatresume            Progress table of docs/tasks/README.md
     \\articlestatuslist, \\articlerev              pending keys, revision of the last render
 
 `collect` reads each key of the `CLES` registry from its source (JSON of `build/`,
@@ -203,17 +203,18 @@ def render_fig(key, figures, article, root=ROOT):
 
 
 def suivi(path=SUIVI):
-    """Rows (milestone, tasks, done) of the **Suivi** table of docs/tasks/README.md."""
+    """Rows (milestone, tasks, done) of the **Progress** table of docs/tasks/README.md
+    (`## Suivi` before M19)."""
     rows, inside = [], False
     for line in Path(path).read_text().splitlines():
         if line.startswith("## "):
-            inside = line.strip() == "## Suivi"
+            inside = line.strip() in ("## Progress", "## Suivi")
             continue
         m = re.match(r"\|\s*(M[\d.]+)\s*\|\s*(\d+)[^|]*\|\s*(\d+)", line) if inside else None
         if m:
             rows.append((m.group(1), int(m.group(2)), int(m.group(3))))
     if not rows:
-        raise ArticleError(f"no Suivi table in {path}")
+        raise ArticleError(f"no Progress table in {path}")
     return rows
 
 

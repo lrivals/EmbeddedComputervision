@@ -13,8 +13,11 @@ Small edits inside a French document (a table cell, a checkbox) may stay in Fren
 match their surroundings. The first English documents are this milestone and the commit
 messages from M18 on.
 
-**State**: 0 of 12 tasks done. The rule above is in force; the translation itself has not
-started.
+**State**: 5 of 12 tasks done (T19.0 to T19.4, 2026-10-12). The specification, the
+top-level docs, the milestones and guides, and the hand-written results are in English.
+Still in French: everything a tool writes (the `data_stats` blocks of `stats-jeux.md`, the
+sweep and inference tables of `resultats-balayages.md`, the tool-written `results/*.md`),
+the notebook templates, the figure labels, the code text and the tests (T19.5 to T19.9).
 
 ## Inventory (measured on 2026-10-07)
 
@@ -94,7 +97,7 @@ thousands separator (56.30, 132,031).
   `docs/adr/*.md`.
 - **Acceptance**: all relative links still resolve (link check of T19.10).
 
-### [ ] T19.3 — Milestones and guides
+### [x] T19.3 — Milestones and guides
 - **Depends on**: T19.0 · **Size**: L
 - **Deliverables**: `docs/tasks/*.md`, one milestone per commit, the oldest (M0) first;
   `donnees-drive.md`, `colab-vscode.md`, `resultats-balayages.md`.
@@ -102,12 +105,28 @@ thousands separator (56.30, 132,031).
   change with the heading text, so links are updated in the same commit).
 - **Notes**: the blocks filled by tools (`stats-jeux.md` from `data_stats --report`, the
   sweep tables) are translated through their generator (T19.6), not by hand.
+- **Done**: one commit per file. The sweep and inference tables of
+  `resultats-balayages.md` and its `### Balayage …` headings stay in French: three readers
+  parse them (`tools/article.py`, `tools/figures/resultats.py`,
+  `tools/notebooks/balayages.py`), to be translated together in T19.6. The progress table
+  of `README.md` is now `## Progress`; `article.suivi` and `figures.projet` accept both
+  headings, and `PC_WORDS` has the English keywords. Headings that code or generated
+  notebooks still link to keep a legacy `<a id>` until T19.5 / T19.8 update the links:
+  `M12#paliers-de-coût`, `M14#données-sur-colab`, `M16#règles`, `M16#questions-par-jeu`,
+  `M18#prétraitements`, `M18#questions-par-jeu`. The `T12.x` links now use the GitHub slug
+  of a `### [ ] T…` heading (two leading dashes); the old ones did not resolve.
 
-### [ ] T19.4 — Hand-written results
+### [x] T19.4 — Hand-written results
 - **Depends on**: T19.0 · **Size**: S
 - **Deliverables**: the hand-written files of `results/` (protocol, report, comments
   around generated tables).
 - **Acceptance**: no number changes (diff limited to text).
+- **Done**: `protocole`, `rapport`, `map_float`, `map_int8`, `req_yolo`, `quant_4bits`,
+  `postproc_hw`, `streaming`, `elagage` and `precision_mixte`; the numbers of each file
+  were compared before and after (same values, English format). `tools/article.py` reads
+  these files in English: `num(cell, en=True)` for the decimal point and comma
+  thousands, kept apart from the French tool-written files (`mesures.md`,
+  `map_stades.md`) until T19.6; `article collect` gives 0 keys changed.
 
 ## B. Generators
 
