@@ -10,7 +10,7 @@ Constat de départ :
   `tools/m11.sh` et `tools/m12.sh` ;
 - le dépôt ne contient aucun `.ipynb` ;
 - les affinages hors VOC (T11.4, T11.5, T11.7) coûtent des heures sur CPU (≈ 0,45 s/image,
-  [M12](M12-profils-pc.md#paliers-de-coût)) ; un GPU distant (Colab) les rend praticables,
+  [M12](M12-profils-pc.md#cost-tiers)) ; un GPU distant (Colab) les rend praticables,
   à condition que la chaîne s'y installe en une cellule.
 
 Un notebook n'apporte **aucun calcul nouveau** : il enchaîne les outils existants, montre
@@ -114,7 +114,7 @@ mesure sur Colab ou l'exécution des notebooks `_train` (« Reste » de chaque t
 - **Commande équivalente** : chaque étape affiche la commande `python tools/… ` qu'elle
   exécute. Un résultat de notebook se reproduit donc en CLI, et inversement.
 - **Paramètres par défaut prudents** : `SUBSET` petit (palier R) pour un premier passage.
-  Les règles de [M12](M12-profils-pc.md#règles) s'appliquent : une mAP sur `--subset` n'est
+  Les règles de [M12](M12-profils-pc.md#rules) s'appliquent : une mAP sur `--subset` n'est
   jamais publiée dans `results/`.
 - **GPU** : `DEVICE = "gpu"` (défaut des notebooks `_train` et `_sweep`, faits pour
   Colab ; `"cpu"` sur un PC sans GPU) passe `--device gpu` à `tools/train.py` (T12.11). Pas de

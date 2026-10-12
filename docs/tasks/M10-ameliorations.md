@@ -9,7 +9,7 @@ The costed gains come from `tools/perf_model.py` (`make perf-model`) and from
 [rapport.md §3](../../results/rapport.md). Gains that do not appear there are marked "to
 estimate". M9 gathers the research extensions; M10 the optimisations and the tooling.
 Before taking up a direction, rank it by gain / effort with the PC profiles of
-[T12.8](M12-profils-pc.md#-t128--performance-estimée-m6-m8-m94-m10).
+[T12.8](M12-profils-pc.md#--t128--estimated-performance-m6-m8-m94-m10).
 
 ## A. Single-engine kernel
 

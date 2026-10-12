@@ -38,7 +38,7 @@ scope.
   (`make bench-sim`, ARM driver + C-sim kernel, 22 processes, ≈ 40 min): **mAP 55.66,
   4,952 / 4,952 images identical** to the integer model.
 - **Remaining**: the same `yolo_bench --inputs` on the KV260 (`board/dets_*.jsonl`).
-- **PC profiles**: simulated chain by tiers [T12.9](M12-profils-pc.md#-t129--chaîne-carte-simulée), rehearsal of the protocol [T12.10](M12-profils-pc.md#-t1210--répétition-générale-du-protocole-carte)
+- **PC profiles**: simulated chain by tiers [T12.9](M12-profils-pc.md#--t129--simulated-board-chain), rehearsal of the protocol [T12.10](M12-profils-pc.md#--t1210--dress-rehearsal-of-the-board-protocol)
 
 ### [ ] T8.3 — Comparative report
 - **Spec**: §10.4 · **Depends on**: T8.2 · **Size**: M

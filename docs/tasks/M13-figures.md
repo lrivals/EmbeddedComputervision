@@ -58,7 +58,7 @@ restent des données à produire :
 - **Projection ou mesure** : un chiffre qui n'a pas été mesuré sur la carte est marqué sur
   la figure (« projection C-sim », « estimation », « à mesurer »), avec un marqueur ou un
   trait distinct. Une figure ne mélange jamais projection et mesure sans légende.
-- **Sous-ensembles** : les règles de [M12](M12-profils-pc.md#règles) s'appliquent. Une figure
+- **Sous-ensembles** : les règles de [M12](M12-profils-pc.md#rules) s'appliquent. Une figure
   publiée dans `results/` montre des mAP sur les 4 952 images. Une figure sur `--subset`
   reste dans `build/figures/`.
 - **Coût** : les paliers R/M/N de M12 s'appliquent. `make figures` ne lance que des

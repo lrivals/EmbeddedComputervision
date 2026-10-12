@@ -58,7 +58,7 @@ VisDrone (T15.8, T15.10, T15.15, T15.16) : outillage prêt, runs à lancer.
   une section par jeu, avec la révision et les paramètres.
 - Une mAP sur `SUBSET` images classe les runs, elle ne se publie pas. Seule une mAP sur le
   split complet (palier N) peut aller dans `results/` (règles de
-  [M12](M12-profils-pc.md#règles)).
+  [M12](M12-profils-pc.md#rules)).
 - Un écart entre deux runs ne compte que s'il dépasse le bruit mesuré en T15.2.
 - **Récolte** : sur Colab, chaque `tools/train.py` et `tools/eval_voc.py` lancé par un
   notebook écrit son `summary.json` et part sur le Drive dès sa fin (`colab.autosync`,

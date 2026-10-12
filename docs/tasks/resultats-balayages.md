@@ -40,7 +40,7 @@ rien exécuter.
 | grille | `BATCHES = [8, 16, 32]` × `TRAIN_SUBSETS = [500, 0]` (500 premières images, ou tout le split) |
 
 Ces mAP **classent** les runs ; elles ne sont **pas publiables** (règles de
-[M12](M12-profils-pc.md#règles)) et ne vont pas dans `results/`. Avec 50 images, une
+[M12](M12-profils-pc.md#rules)) et ne vont pas dans `results/`. Avec 50 images, une
 classe peut n'avoir qu'une ou deux instances : son AP saute entre 0 et 100. Ordre de
 grandeur du biais : Tiny-YOLOv2 VOC fait 63,51 sur ces 50 images contre **56,30** sur le
 split complet ([results/map_float.md](../../results/map_float.md)).
