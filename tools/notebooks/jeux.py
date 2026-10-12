@@ -25,12 +25,13 @@ import numpy as np
 from tools.notebooks import NB_DIR
 from tools.notebooks.balayages import _cells, _executed, _rel
 
-GROUND = ("voc", "kitti", "crowdhuman", "exdark", "flir", "coco")
+GROUND = ("voc", "kitti", "crowdhuman", "exdark", "flir", "coco", "asl")
 AERIAL = ("visdrone", "auair", "dronevehicle", "hituav", "uavdt")
 ORDER = GROUND + AERIAL  # order of tables and figures: ground views, then drone views
 LABELS = {"voc": "VOC", "coco": "COCO", "visdrone": "VisDrone", "kitti": "KITTI",
           "flir": "FLIR", "exdark": "ExDark", "crowdhuman": "CrowdHuman", "auair": "AU-AIR",
-          "dronevehicle": "DroneVehicle", "hituav": "HIT-UAV", "uavdt": "UAVDT"}
+          "dronevehicle": "DroneVehicle", "hituav": "HIT-UAV", "uavdt": "UAVDT",
+          "asl": "ASL"}
 VOC = "voc"  # reference dataset: INT8 calibration images (M4) and published weights
 SLOTS = 256  # yolo_post slots (M9.1)
 VOC_LUMINANCE = 112.0  # VOC2007 mean luminance (INT8 calibration, M4) when VOC is not loaded

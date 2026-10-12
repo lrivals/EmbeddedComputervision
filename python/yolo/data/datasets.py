@@ -59,6 +59,9 @@ AUAIR_CLASSES = ("Human", "Car", "Truck", "Van", "Motorbike", "Bicycle", "Bus", 
 DRONEVEHICLE_CLASSES = ("small-vehicle", "large-vehicle")
 HITUAV_CLASSES = ("Person", "Car", "Bicycle", "OtherVehicle")  # DontCare (4) retiré
 UAVDT_CLASSES = ("car", "truck", "bus")
+# ASL Alphabet (M21, docs/tasks/M21-asl-alphabet.md): one hand pseudo-box per image;
+# `nothing` images are negatives (no box), so it is not a class.
+ASL_CLASSES = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ("del", "space")
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
 PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd")
@@ -398,6 +401,21 @@ def load_uavdt(root, split):
     return out
 
 
+ASL_VAL_FROM = 2551  # frames n° 2551-3000 of each class: val split (M21, no random split)
+
+
+def load_asl(root, split):
+    """Output of `tools/prep_datasets.py asl`: `root/annotations_<split>.json` (hand
+    pseudo-boxes; letter images where no hand was found are left out), image paths relative
+    to `root`."""
+    out = []
+    for a in json.loads((root / f"annotations_{split}.json").read_text()):
+        labels = [ASL_CLASSES.index(c) for c in a["labels"]]
+        out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
+                               a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
+    return out
+
+
 @dataclass(frozen=True)
 class Dataset:
     classes: tuple
@@ -430,6 +448,8 @@ DATASETS = {
     "hituav": Dataset(HITUAV_CLASSES, _splits(load_hituav), "hituav", "test", "train",
                       "train"),
     "uavdt": Dataset(UAVDT_CLASSES, _splits(load_uavdt), "uavdt", "test", "train", "train"),
+    # No VOC or COCO mapping (no hand class): fine-tuned models only.
+    "asl": Dataset(ASL_CLASSES, _splits(load_asl), "asl", "val", "train", "train"),
 }
 
 

@@ -30,6 +30,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M18](M18-jeux-drone.md) | Drone and thermal datasets (optional) | AU-AIR, DroneVehicle, HIT-UAV and UAVDT preprocessed, loaded and given their notebooks (stats, out-of-domain, fine-tuning) |
 | [M19](M19-english.md) | Switch to English (optional) | docs, specification, generated text and code comments in English, with a language check in `make ci`; new content in English from 2026-10-07 |
 | [M20](M20-webcam.md) | Live webcam demo (optional) | `make webcam`: pick a model, live camera image, continuous capture + inference, boxes and classes drawn on screen |
+| [M21](M21-asl-alphabet.md) | ASL Alphabet (optional) | hand pseudo-boxes for a classification dataset (`tools/prep_datasets.py asl`), loader and notebooks (stats, fine-tuning, sweep, inference); a sign-letter model for the webcam demo |
 
 Datasets outside git (export to Google Drive, local or Colab access):
 [donnees-drive.md](donnees-drive.md). Training on a Colab kernel from VS Code (who
@@ -67,6 +68,10 @@ graph LR
   M18 -.-> M15
   M0 --> M19[M19]
   M3 --> M20[M20]
+  M11 --> M21[M21]
+  M16 --> M21
+  M21 -.-> M15
+  M21 -.-> M20
   M4 -.-> M20
   M7 -.-> M20
 ```
@@ -121,3 +126,4 @@ progress per milestone here.
 | M18 | 11 | 8 (data ready, loaders, 24 notebooks generated; executed stats, Drive, fine-tunings remain) |
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
+| M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |

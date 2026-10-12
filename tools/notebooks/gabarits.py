@@ -989,6 +989,24 @@ QUESTIONS = {
                   f"{100 * g[mode]['h_under']['8']:.1f} %, < 16 px {100 * g[mode]['h_under']['16']:.1f} %")
         display(Markdown(DS.md_par_classe(STATS)))
         """),
+    # ASL Alphabet (M21, docs/tasks/M21-asl-alphabet.md#stats-question).
+    "asl": ("How much of the input does the hand cover, and which classes lose the most images "
+            "to the pseudo-box step?", "T21.1", """
+        import json
+        from collections import Counter
+        from pathlib import Path
+        from yolo.data.datasets import DATA_DIR
+        g = DS.whole(STATS)["geometrie"]
+        mode = STATS["params"]["resize"]
+        print(f"median hand side: {g['orig']['median_side']:.0f} px of 200, "
+              f"{g[mode]['median_side']:.0f} px at the {g['size'][1]}×{g['size'][0]} input")
+        rej = Path(DATA_ROOT or DATA_DIR / "asl") / "rejected.json"
+        if rej.exists():
+            lost = Counter(r["class"] for r in json.loads(rej.read_text()))
+            print(f"letter images left out (no hand found): {sum(lost.values())}; most: "
+                  + ", ".join(f"{c} {n}" for c, n in lost.most_common(8)))
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
 }
 
 

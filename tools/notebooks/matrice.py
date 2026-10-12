@@ -22,7 +22,7 @@ from yolo.data.datasets import DATASETS, FAMILIES, MAPPINGS
 from yolo.models.tiny_yolo import PRETRAINED, load_cfg
 
 TRAINABLE = ("voc", "kitti", "visdrone", "flir", "exdark", "crowdhuman", "auair",
-             "dronevehicle", "hituav", "uavdt")
+             "dronevehicle", "hituav", "uavdt", "asl")
 
 # Entrée des cfg d'affinage (options SIZE et CH de tools/m11.sh) : FLIR et HIT-UAV thermiques
 # à un canal.
@@ -33,7 +33,7 @@ TRAIN_INPUT = {"flir": {"channels": 1}, "hituav": {"channels": 1}}
 # chiffre officiel de val2017).
 SPLIT_IMAGES = {"voc": 4952, "coco": 5000, "kitti": 1496, "visdrone": 548,
                 "crowdhuman": 4370, "exdark": 2563, "flir": 1144, "auair": 4943,
-                "dronevehicle": 2608, "hituav": 571, "uavdt": 16592}
+                "dronevehicle": 2608, "hituav": 571, "uavdt": 16592, "asl": 6538}
 
 # Fichier témoin de chaque jeu (celui de `tools/get_datasets.sh check`, VOC : get_voc.sh).
 DATA_MARKERS = {"voc": "data/VOCdevkit/VOC2007/ImageSets/Main/test.txt",
@@ -46,7 +46,8 @@ DATA_MARKERS = {"voc": "data/VOCdevkit/VOC2007/ImageSets/Main/test.txt",
                 "auair": "data/auair/annotations.json",
                 "dronevehicle": "data/dronevehicle/test/labels",
                 "hituav": "data/hituav/labels/test",
-                "uavdt": "data/uavdt/annotations_test.json"}
+                "uavdt": "data/uavdt/annotations_test.json",
+                "asl": "data/asl/annotations_val.json"}
 
 # Jeux à inscription : ni get_voc.sh ni get_datasets.sh ne les téléchargent.
 REGISTRATION = ("visdrone", "crowdhuman", "exdark", "flir", "auair", "dronevehicle", "hituav",
@@ -62,7 +63,8 @@ TASKS = {("voc", "infer"): ("T3.4", "T4.5", "T11.0"), ("coco", "infer"): ("T11.1
          ("auair", "train"): ("T18.1", "T18.10"), ("dronevehicle", "train"): ("T18.2", "T18.10"),
          ("hituav", "train"): ("T18.3", "T18.10"), ("uavdt", "train"): ("T18.4", "T18.10"),
          ("auair", "infer"): ("T18.10",), ("dronevehicle", "infer"): ("T18.10",),
-         ("hituav", "infer"): ("T18.10",), ("uavdt", "infer"): ("T18.10",)}
+         ("hituav", "infer"): ("T18.10",), ("uavdt", "infer"): ("T18.10",),
+         ("asl", "train"): ("T21.2", "T21.9"), ("asl", "infer"): ("T21.9",)}
 
 # Tâche M11 de chaque jeu et tâche d'exécution M16 (en-tête des notebooks `stats`).
 STATS_TASKS = {"voc": ("T13.7", "T16.12"), "coco": ("T11.1", "T16.13"),
@@ -70,7 +72,7 @@ STATS_TASKS = {"voc": ("T13.7", "T16.12"), "coco": ("T11.1", "T16.13"),
                "flir": ("T11.7", "T16.16"), "exdark": ("T11.3", "T16.17"),
                "crowdhuman": ("T11.6", "T16.18"), "auair": ("T18.1", "T18.8"),
                "dronevehicle": ("T18.2", "T18.8"), "hituav": ("T18.3", "T18.8"),
-               "uavdt": ("T18.4", "T18.8")}
+               "uavdt": ("T18.4", "T18.8"), "asl": ("T21.2", "T21.7")}
 
 # Jeux dont le chargeur lit l'en-tête de chaque image (taille) : palier M pour les
 # annotations seules (docs/tasks/M16-presentation-jeux.md#règles).

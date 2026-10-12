@@ -239,6 +239,27 @@ FICHES = {
         "notes": ["séquences S du test (suivi d'un objet) écartées par `prep_datasets.py`",
                   "régions ignorées du jeu d'origine absentes de l'export"],
     },
+    # M21 (docs/tasks/M21-asl-alphabet.md): a classification dataset, boxes made on disk.
+    "asl": {
+        "name": "ASL Alphabet (hand pseudo-boxes)",
+        "source": "https://www.kaggle.com/datasets/grassknoted/asl-alphabet",
+        "version": "Kaggle, 2018; boxes from a MediaPipe hand landmarker "
+                   "(tools/prep_datasets.py asl)",
+        "license": "GPL-2.0 (Kaggle page, to confirm)",
+        "sensor": "webcam, one signer, a few indoor backgrounds, frames of short videos",
+        "resolution": "200×200",
+        "classes": D.ASL_CLASSES,
+        # Raw counts: 29 × 3 000 train images (val = frames ≥ ASL_VAL_FROM), 28 test images;
+        # the loaded counts are lower (letter images without a hand found are left out).
+        "official": {"train": (None, None), "val": (None, None), "test": (None, None)},
+        "objects": "one pseudo-box per letter image (hand only, not the forearm); `nothing` "
+                   "images are negatives",
+        "notes": ["letter images with no valid hand (none found, out of the frame, tiny "
+                  "box) left out (`data/asl/rejected.json`), never kept as negatives",
+                  "val: frames n° 2 551 to 3 000 of each class (consecutive frames are near "
+                  "duplicates); test: the 28 official images (no `del`), indicative only",
+                  "a 2 px blue frame surrounds every image (left in place)"],
+    },
 }
 
 
@@ -608,7 +629,7 @@ def _corners(s):
 def raw_annotations(dataset, root, samples, splits):
     """{id: (coins bruts (n, 4), {région retirée: nombre})} relus dans les fichiers du jeu,
     par les `parse_*` des chargeurs ; None pour un jeu sans retrait (VOC, COCO, FLIR,
-    DroneVehicle et UAVDT, déjà prétraités par tools/prep_datasets.py)."""
+    DroneVehicle, UAVDT et ASL, déjà prétraités par tools/prep_datasets.py)."""
     root = Path(root) if root is not None else None
     out = {}
     if dataset == "kitti":

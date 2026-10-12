@@ -59,6 +59,7 @@ ls -l data_archives/                 # must be identical
 | hituav | 0.2 GB | `hituav/labels/test` | ✓ (2026-10-08) | M18: link to `HIT-UAV: …/hit-uav` |
 | uavdt | 6.5 GB | `uavdt/annotations_test.json` | ✓ (2026-10-08) | M18: output of `tools/prep_datasets.py uavdt` (M sequences only) |
 | flir | 12 GB | `flir/images_thermal_val/coco.json` | ✓ (2026-10-07) | also through the Kaggle API (mirror `samdazel/teledyne-flir-adas-thermal-dataset-v2`); RGB and videos included (thermal images alone: 4.9 GB) |
+| asl | 1.2 GB | `asl/annotations_val.json` | — | M21: output of `tools/prep_datasets.py asl` (hand pseudo-boxes, hard links); to push (T21.8) |
 
 The sizes are those of `du -shL` on the PC. Together, the nine datasets uploaded make about
 42 GB. That is more than the free Drive (15 GB), but the project account has 100 GB. Check

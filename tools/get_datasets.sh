@@ -2,12 +2,12 @@
 # Jeux de données de M11 dans data/ (docs/tasks/M11-jeux-de-donnees.md).
 #
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
-#                                    | auair | dronevehicle | hituav | uavdt (M18)
+#                                    | auair | dronevehicle | hituav | uavdt (M18) | asl (M21)
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
 #                                    et les dossiers bruts de M18, puis lance leurs prétraitements
-#                                    (tools/prep_datasets.py : DroneVehicle, UAVDT)
-#   tools/get_datasets.sh kaggle-download <jeu>…   crowdhuman | visdrone | exdark | flir, par l'API
+#                                    (tools/prep_datasets.py : DroneVehicle, UAVDT, ASL)
+#   tools/get_datasets.sh kaggle-download <jeu>…   crowdhuman | visdrone | exdark | flir | asl, par l'API
 #                                    Kaggle (ExDark : images seules), puis kaggle
 #   tools/get_datasets.sh ready <jeu>…              code de retour 0 si tous sont prêts
 #   tools/get_datasets.sh pack <jeu>…               data/<racine> → data_archives/<jeu>.tar
@@ -23,7 +23,8 @@
 # attendue, puis vérifie qu'elle est en place. Licences et tailles à vérifier au
 # téléchargement (tableau de synthèse de M11). Jeux drone et thermiques de M18
 # (docs/tasks/M18-jeux-drone.md) : dossiers bruts déposés dans data/, reliés et prétraités
-# par `kaggle`.
+# par `kaggle`. ASL Alphabet (M21, docs/tasks/M21-asl-alphabet.md): hand pseudo-boxes made
+# by `kaggle` (tools/prep_datasets.py asl, needs `pip install -e "python[asl]"`).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -66,6 +67,7 @@ declare -A MARKER=(
   [dronevehicle]=dronevehicle/test/labels
   [hituav]=hituav/labels/test
   [uavdt]=uavdt/annotations_test.json
+  [asl]=asl/annotations_val.json
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
@@ -95,6 +97,10 @@ declare -A HOWTO=(
     dans data/UAVDT Dataset/{train,test}/{img,ann}, puis : $0 kaggle
     (séquences M seules : tools/prep_datasets.py uavdt)
     data/uavdt/annotations_{train,test}.json, data/uavdt/images/{train,test}/"
+  [asl]="https://www.kaggle.com/datasets/grassknoted/asl-alphabet ($0 kaggle-download asl)
+    in data/ASL Alphabet/asl_alphabet_{train,test}/, then: $0 kaggle
+    (hand pseudo-boxes: pip install -e \"python[asl]\"; tools/prep_datasets.py asl)
+    data/asl/annotations_{train,val,test}.json, data/asl/images/{train,val,test}/"
 )
 
 # Dossier de chaque jeu dans data/ (Dataset.root de python/yolo/data/datasets.py) : contenu
@@ -107,9 +113,10 @@ declare -A KAGGLE_ID=(
   [visdrone]=kushagrapandya/visdrone-dataset
   [exdark]=washingtongold/exdark-dataset
   [flir]=samdazel/teledyne-flir-adas-thermal-dataset-v2
+  [asl]=grassknoted/asl-alphabet
 )
 declare -A KAGGLE_DIR=([crowdhuman]=CrowdHuman [visdrone]="VisDrone Dataset" [exdark]="ExDark Dataset"
-  [flir]="FLIR Dataset")
+  [flir]="FLIR Dataset" [asl]="ASL Alphabet")
 
 known() {
   [[ -n "${MARKER[$1]:-}" ]] || { echo "jeu inconnu : $1" >&2; exit 1; }
@@ -222,6 +229,7 @@ kaggle() {
     if [[ -n $d ]]; then link "$(dirname "${d#"$DATA_DIR"/}")" flir; fi
   fi
   m18
+  m21
 }
 
 # Jeux de M18 : dossiers bruts (noms d'origine) reliés ou prétraités vers data/<jeu>.
@@ -234,6 +242,14 @@ m18() {
   [[ -d "$DATA_DIR/UAVDT Dataset" && ! -e "$DATA_DIR/${MARKER[uavdt]}" ]] && prep+=(uavdt)
   if [[ ${#prep[@]} -gt 0 ]]; then
     python "$ROOT/tools/prep_datasets.py" "${prep[@]}"
+  fi
+  return 0
+}
+
+# ASL Alphabet (M21): hand pseudo-boxes, once (the marker is written last).
+m21() {
+  if [[ -d "$DATA_DIR/ASL Alphabet" && ! -e "$DATA_DIR/${MARKER[asl]}" ]]; then
+    python "$ROOT/tools/prep_datasets.py" asl
   fi
   return 0
 }
@@ -294,7 +310,7 @@ for ds in "$@"; do
     kaggle
     ;&
   check)
-    for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt; do
+    for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl; do
       check "$d" || true
     done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \
@@ -311,7 +327,7 @@ for ds in "$@"; do
     fetch kitti $base/data_object_label_2.zip training/label_2
     fetch kitti $base/data_object_image_2.zip training/image_2
     ;;
-  visdrone|crowdhuman|exdark|flir|auair|dronevehicle|hituav|uavdt)
+  visdrone|crowdhuman|exdark|flir|auair|dronevehicle|hituav|uavdt|asl)
     if ! check "$ds"; then
       echo "  téléchargement manuel : ${HOWTO[$ds]}"
       status=1

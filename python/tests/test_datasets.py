@@ -237,6 +237,19 @@ def test_uavdt(tmp_path):
     assert s["image"] == tmp_path / "images" / "test" / "M0203_img000001.jpg"
 
 
+def test_asl(tmp_path):
+    rec = [{"image": "images/val/B2600.jpg", "width": 200, "height": 200, "class": "B",
+            "boxes": [[40.5, 30, 120, 150]], "labels": ["B"]},
+           {"image": "images/val/nothing2600.jpg", "width": 200, "height": 200,
+            "class": "nothing", "boxes": [], "labels": []}]
+    (tmp_path / "annotations_val.json").write_text(json.dumps(rec))
+    b, n = D.load("asl", tmp_path)  # default split: val
+    _check(b)
+    assert b["labels"].tolist() == [D.ASL_CLASSES.index("B")] and len(n["labels"]) == 0
+    assert b["image"] == tmp_path / "images" / "val" / "B2600.jpg"
+    assert "nothing" not in D.ASL_CLASSES and len(D.ASL_CLASSES) == 28
+
+
 @pytest.mark.parametrize("ds", ["auair", "dronevehicle", "hituav", "uavdt"])
 def test_m18_mappings(ds):
     for n in (20, 80):
@@ -293,6 +306,11 @@ def test_kitti_on_voc():
 @pytest.mark.parametrize("n", [20, 80])
 def test_mappings_valid(name, n):
     """Toute correspondance vise des classes existantes et ses sources sont des classes du jeu."""
+    fam = "voc" if n == 20 else "coco"
+    if name != fam and n != len(D.DATASETS[name].classes) and (name, fam) not in D.MAPPINGS:
+        with pytest.raises(ValueError):  # ASL: no hand class in VOC or COCO
+            D.eval_view(name, n)
+        return
     v = D.eval_view(name, n)
     assert len(v.names) >= 1 and len(v.gt_lut) == len(D.DATASETS[name].classes)
     m = D.MAPPINGS.get((name, "voc" if n == 20 else "coco"))
