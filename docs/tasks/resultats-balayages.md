@@ -1,17 +1,17 @@
-# Résultats des balayages et inférences (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman)
+# Sweep and inference results (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman)
 
-Premiers passages des notebooks `_sweep` (T14.10) et `_infer` (T14.3, T14.11) de
-`notebooks/<jeu>/` (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman), sur un runtime
-Colab à GPU ([colab-vscode.md](colab-vscode.md)), révision `1a967f4` (inférences KITTI :
-`9a76534` ; balayage FLIR : `4e47dbc` ; inférences FLIR : `1723925` pour les poids publiés,
-`29a058a` pour le run affiné ; balayages et inférences ExDark et CrowdHuman : `35e949b`). Les runs sont dans
-`build/notebooks/<jeu>/<modèle>/runs/` et sur Drive (`<DRIVE_DIR>/runs/`,
-[donnees-drive.md](donnees-drive.md)).
+First runs of the `_sweep` (T14.10) and `_infer` (T14.3, T14.11) notebooks of
+`notebooks/<dataset>/` (VOC, VisDrone, KITTI, FLIR, ExDark, CrowdHuman), on a Colab GPU
+runtime ([colab-vscode.md](colab-vscode.md)), revision `1a967f4` (KITTI inferences:
+`9a76534`; FLIR sweep: `4e47dbc`; FLIR inferences: `1723925` for the published weights,
+`29a058a` for the fine-tuned run; ExDark and CrowdHuman sweeps and inferences:
+`35e949b`). The runs are in `build/notebooks/<dataset>/<model>/runs/` and on the Drive
+(`<DRIVE_DIR>/runs/`, [donnees-drive.md](donnees-drive.md)).
 
-Les notebooks exécutés sont versionnés avec leurs sorties (règle de
-[M14](M14-notebooks.md#rules)) ; toutes les tables et courbes ci-dessous s'y relisent :
+The executed notebooks are versioned with their outputs (rule of
+[M14](M14-notebooks.md#rules)); all the tables and curves below can be reread there:
 
-| jeu | balayage | inférence |
+| dataset | sweep | inference |
 |---|---|---|
 | VOC | [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb) | [tiny-yolov3-voc](../../notebooks/voc/tiny-yolov3-voc_infer.ipynb), [tiny-yolov3-coco](../../notebooks/voc/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb) |
 | VisDrone | [tiny-yolov3-visdrone_sweep](../../notebooks/visdrone/tiny-yolov3-visdrone_sweep.ipynb) | [tiny-yolov3-visdrone](../../notebooks/visdrone/tiny-yolov3-visdrone_infer.ipynb), [tiny-yolov3-coco](../../notebooks/visdrone/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/visdrone/tiny-yolov2-voc_infer.ipynb) |
@@ -20,50 +20,56 @@ Les notebooks exécutés sont versionnés avec leurs sorties (règle de
 | ExDark | [tiny-yolov3-exdark_sweep](../../notebooks/exdark/tiny-yolov3-exdark_sweep.ipynb) | [tiny-yolov3-exdark](../../notebooks/exdark/tiny-yolov3-exdark_infer.ipynb), [tiny-yolov3-coco](../../notebooks/exdark/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/exdark/tiny-yolov2-voc_infer.ipynb) |
 | CrowdHuman | [tiny-yolov3-crowdhuman_sweep](../../notebooks/crowdhuman/tiny-yolov3-crowdhuman_sweep.ipynb) | [tiny-yolov3-crowdhuman](../../notebooks/crowdhuman/tiny-yolov3-crowdhuman_infer.ipynb), [tiny-yolov3-coco](../../notebooks/crowdhuman/tiny-yolov3-coco_infer.ipynb), [tiny-yolov2-voc](../../notebooks/crowdhuman/tiny-yolov2-voc_infer.ipynb) |
 
-Figures : `python -m tools.figures balayage` (T13.53) relit les tableaux de ce fichier et
-réécrit les PNG de [figures/resultats/](figures/resultats/). L'analyse transversale des six jeux (
-grilles, classements, effets du lot et du sous-ensemble, époques, courbes et composantes
-de la perte, AP par classe, poids publiés, coût) est dans
-[notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb) : elle relit
-directement les sorties des notebooks `_sweep` et `_infer` (`tools/notebooks/balayages.py`,
-figures `python -m tools.figures balayages`). Toutes les figures du dépôt
-s'affichent dans [notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb), sans
-rien exécuter.
+Figures: `python -m tools.figures balayage` (T13.53) rereads the tables of this file and
+rewrites the PNGs of [figures/resultats/](figures/resultats/). The cross-dataset analysis
+of the six datasets (grids, rankings, effects of the batch and of the subset, epochs, loss
+curves and components, AP per class, published weights, cost) is in
+[notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb): it rereads
+the outputs of the `_sweep` and `_infer` notebooks directly
+(`tools/notebooks/balayages.py`, figures `python -m tools.figures balayages`). All the
+figures of the repository are shown in
+[notebooks/figures_live.ipynb](../../notebooks/figures_live.ipynb), without running
+anything.
+
+The sweep and inference tables below are read by `tools/article.py`,
+`tools/figures/resultats.py` and `tools/notebooks/balayages.py`; their headers, their
+cells and the `### Balayage …` headings stay in French until those readers are translated
+(M19, T19.6).
 
 ## Conditions
 
 | | |
 |---|---|
-| palier | **R** : mAP sur les 50 premières images (`SUBSET = 50`) |
-| évaluation | split d'évaluation du jeu (VOC2007 test, val pour les autres), 416×416 `stretch` (Pillow), conf 0,005, NMS 0,45 ; AP 11 points, sauf FLIR : métrique COCO (AP@[.5:.95], 101 points) |
-| entraînement | 600 itérations par run, LR 0,001 (non ajusté au lot), burn-in 500, multi-échelle 320-608, init COCO (`weights/yolov3-tiny.weights`), `--device gpu` |
-| grille | `BATCHES = [8, 16, 32]` × `TRAIN_SUBSETS = [500, 0]` (500 premières images, ou tout le split) |
+| tier | **R**: mAP on the first 50 images (`SUBSET = 50`) |
+| evaluation | evaluation split of the dataset (VOC2007 test, val for the others), 416×416 `stretch` (Pillow), conf 0.005, NMS 0.45; 11-point AP, except FLIR: COCO metric (AP@[.5:.95], 101 points) |
+| training | 600 iterations per run, LR 0.001 (not adjusted to the batch), burn-in 500, multi-scale 320-608, COCO init (`weights/yolov3-tiny.weights`), `--device gpu` |
+| grid | `BATCHES = [8, 16, 32]` × `TRAIN_SUBSETS = [500, 0]` (first 500 images, or the whole split) |
 
-Ces mAP **classent** les runs ; elles ne sont **pas publiables** (règles de
-[M12](M12-profils-pc.md#rules)) et ne vont pas dans `results/`. Avec 50 images, une
-classe peut n'avoir qu'une ou deux instances : son AP saute entre 0 et 100. Ordre de
-grandeur du biais : Tiny-YOLOv2 VOC fait 63,51 sur ces 50 images contre **56,30** sur le
-split complet ([results/map_float.md](../../results/map_float.md)).
+These mAPs **rank** the runs; they are **not publishable** (rules of
+[M12](M12-profils-pc.md#rules)) and do not go into `results/`. With 50 images, a class can
+have only one or two instances: its AP jumps between 0 and 100. Order of magnitude of the
+bias: Tiny-YOLOv2 VOC gets 63.51 on these 50 images against **56.30** on the full split
+([results/map_float.md](../../results/map_float.md)).
 
-Le notebook [voc/tiny-yolov2-voc_infer](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb)
-est désormais réglé sur le split complet (`SUBSET = 0`, `INT8 = True`, T14.3 et T14.4) :
-il a redonné 56,30 (flottant) et 55,66 (entier) sur Colab le 2026-10-07, mais ses sorties
-n'ont pas été conservées ; il est versionné sans sorties jusqu'au prochain passage. Le
-63,51 ci-dessous vient du premier passage (révision `1a967f4`).
+The notebook [voc/tiny-yolov2-voc_infer](../../notebooks/voc/tiny-yolov2-voc_infer.ipynb)
+is now set to the full split (`SUBSET = 0`, `INT8 = True`, T14.3 and T14.4): it gave back
+56.30 (float) and 55.66 (integer) on Colab on 2026-10-07, but its outputs were not kept;
+it is versioned without outputs until the next run. The 63.51 below comes from the first
+run (revision `1a967f4`).
 
-## Vue d'ensemble
+## Overview
 
-![mAP par lot et sous-ensemble](figures/resultats/balayage_map.png)
+![mAP per batch and subset](figures/resultats/balayage_map.png)
 
-Chaque panneau a sa propre échelle : VOC plafonne à 36,27, VisDrone à 2,24, KITTI à 2,38,
-FLIR à 0,7 (AP@[.5:.95], qui ne se compare pas aux AP 11 points des autres jeux), ExDark à
-13,29 et CrowdHuman à 35,87.
+Each panel has its own scale: VOC tops out at 36.27, VisDrone at 2.24, KITTI at 2.38, FLIR
+at 0.7 (AP@[.5:.95], which does not compare with the 11-point APs of the other datasets),
+ExDark at 13.29 and CrowdHuman at 35.87.
 
-Comparaison entre jeux (score relatif au meilleur run de chaque jeu, classements,
-effets du lot et du sous-ensemble) :
+Comparison between datasets (score relative to the best run of each dataset, rankings,
+effects of the batch and of the subset):
 [notebooks/analyse_balayages.ipynb](../../notebooks/analyse_balayages.ipynb).
 
-![Grilles lot × sous-ensemble, score relatif](figures/resultats/balayages_grilles.png)
+![Batch × subset grids, relative score](figures/resultats/balayages_grilles.png)
 
 ## VOC
 
@@ -78,9 +84,9 @@ effets du lot et du sous-ensemble) :
 | b32-s500 | 32 | 500 | 38,40 | 11,95 | 24,01 |
 | b8-sall | 8 | tout | 0,29 | 18,29 | 12,41 |
 
-Durée : environ 10 min par run de lot 32 sur le GPU Colab (624 s pour b32-sall).
+Duration: about 10 min per batch-32 run on the Colab GPU (624 s for b32-sall).
 
-### Inférence sur les mêmes 50 images
+### Inference on the same 50 images
 
 | modèle | poids | classes évaluées | mAP |
 |---|---|---|---|
@@ -88,8 +94,8 @@ Durée : environ 10 min par run de lot 32 sur le GPU Colab (624 s pour b32-sall)
 | `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 20 | 63,51 |
 | `tiny-yolov3-voc` | run `b32-sall` | 20 | 36,27 |
 
-AP du run `b32-sall` : aeroplane et bicycle 100, cat 75,6, bus 59,1, tvmonitor 54,5,
-bird 50,6, person 47,2 ; bottle et sofa 0, boat 1,8, cow 2,1, pottedplant 1,3.
+AP of the `b32-sall` run: aeroplane and bicycle 100, cat 75.6, bus 59.1, tvmonitor 54.5,
+bird 50.6, person 47.2; bottle and sofa 0, boat 1.8, cow 2.1, pottedplant 1.3.
 
 ## VisDrone
 
@@ -104,40 +110,42 @@ bird 50,6, person 47,2 ; bottle et sofa 0, boat 1,8, cow 2,1, pottedplant 1,3.
 | b32-s500 | 32 | 500 | 38,40 | 200,33 | 0,78 |
 | b8-s500 | 8 | 500 | 9,60 | 252,11 | 0,56 |
 
-Seule la classe `car` décolle (AP 17,4 pour b32-sall) ; van 2,0, truck 1,7, les autres
-sous 0,5. Pertes de 186 à 252 : aucun run n'a convergé.
+Only the `car` class takes off (AP 17.4 for b32-sall); van 2.0, truck 1.7, the others
+under 0.5. Losses from 186 to 252: no run converged.
 
-### Split complet (T15.1, 548 images, Colab du 2026-10-06, rév. `17b4a47`)
+### Full split (T15.1, 548 images, Colab on 2026-10-06, rev. `17b4a47`)
 
-| run | mAP (50 images) | mAP (split complet) |
+| run | mAP (50 images) | mAP (full split) |
 |---|---|---|
-| **b16-sall** | 1,15 | **2,61** |
-| b8-sall | 1,24 | 1,70 |
-| b16-s500 | 1,35 | 1,46 |
-| b32-sall | 2,24 | 1,37 |
-| b32-s500 | 0,78 | 1,12 |
-| b8-s500 | 0,56 | 0,59 |
+| **b16-sall** | 1.15 | **2.61** |
+| b8-sall | 1.24 | 1.70 |
+| b16-s500 | 1.35 | 1.46 |
+| b32-sall | 2.24 | 1.37 |
+| b32-s500 | 0.78 | 1.12 |
+| b8-s500 | 0.56 | 0.59 |
 
-Le classement à 50 images ne tient pas : `b32-sall` passe de 1er à 4e, `b16-sall` de 4e
-à 1er. Tous les écarts restent sous 1,5 point, au niveau du bruit attendu pour des runs
-non convergés. Pour `b32-sall`, `car` tombe à 10,0 et les autres classes restent sous 1.
-Ces mAP comptent encore les détections des régions ignorées comme fausses (avant T15.10).
+The 50-image ranking does not hold: `b32-sall` drops from 1st to 4th, `b16-sall` rises
+from 4th to 1st. All the gaps stay under 1.5 points, at the noise level expected for runs
+that have not converged. For `b32-sall`, `car` drops to 10.0 and the other classes stay
+under 1. These mAPs still count the detections in the ignored regions as false (before
+T15.10).
 
-### Diagnostic et suite (M15, T15.8, T15.10, T15.15, T15.16)
+### Diagnosis and next steps (M15, T15.8, T15.10, T15.15, T15.16)
 
-- **Redimensionnement différent** : l'entraînement était en letterbox, l'éval en
-  stretch ; à l'éval, les objets sont 1,3 à 1,8 fois plus hauts → `train.py --resize`.
-- **Runs trop courts** : 600 itérations dont 500 de montée du LR → run long de 6 000
-  itérations.
-- **Objets minuscules** : 97 % sous 32² px à 416, 52,6 % sous 8 px de haut en letterbox,
-  32 % des cibles perdues par collision ([stats](../../notebooks/visdrone/visdrone_stats.ipynb))
-  → tuiles à 416 (`--crop`, `--tiles`) face à une entrée 608.
-- **Régions ignorées** comptées comme fausses détections → exclues de la mAP par défaut
-  (`eval_voc.py --no-ignore` pour l'ancien calcul).
+- **Different resizing**: training was in letterbox, evaluation in stretch; at evaluation,
+  the objects are 1.3 to 1.8 times taller → `train.py --resize`.
+- **Runs too short**: 600 iterations, 500 of them in the LR ramp → long run of 6,000
+  iterations.
+- **Tiny objects**: 97 % under 32² px at 416, 52.6 % under 8 px of height in letterbox,
+  32 % of the targets lost by collision
+  ([stats](../../notebooks/visdrone/visdrone_stats.ipynb)) → tiles at 416 (`--crop`,
+  `--tiles`) against a 608 input.
+- **Ignored regions** counted as false detections → excluded from the mAP by default
+  (`eval_voc.py --no-ignore` for the old computation).
 
-Procédure dans [M15](M15-campagne-entrainement.md#c-visdrone).
+Procedure in [M15](M15-campagne-entrainement.md#c-visdrone).
 
-### Inférence hors domaine (T11.2) sur les mêmes 50 images
+### Out-of-domain inference (T11.2) on the same 50 images
 
 | modèle | classes évaluées | mAP |
 |---|---|---|
@@ -145,10 +153,10 @@ Procédure dans [M15](M15-campagne-entrainement.md#c-visdrone).
 | `tiny-yolov2-voc` | 5 (person, bicycle, car, motorbike, bus) | 4,85 |
 | `tiny-yolov3-visdrone` `b32-sall` | 10 | 2,24 |
 
-Les mAP hors domaine portent sur les classes ayant un équivalent (`MAPPINGS` :
-pedestrian et people → person, van → car, motor → motorbike ; tricycle et
-awning-tricycle ignorés) : elles ne se comparent pas directement à la mAP à 10 classes.
-Par classe, `car` est à 21,5 pour COCO contre 17,4 pour le run affiné.
+The out-of-domain mAPs cover the classes that have an equivalent (`MAPPINGS`: pedestrian
+and people → person, van → car, motor → motorbike; tricycle and awning-tricycle ignored):
+they do not compare directly with the 10-class mAP. Per class, `car` is at 21.5 for COCO
+against 17.4 for the fine-tuned run.
 
 ## KITTI
 
@@ -163,16 +171,16 @@ Par classe, `car` est à 21,5 pour COCO contre 17,4 pour le run affiné.
 | b16-s500 | 16 | 500 | 19,20 | 20,39 | 0,50 |
 | b8-s500 | 8 | 500 | 9,60 | 21,49 | 0,49 |
 
-Même classement que sur VOC et VisDrone : `b32-sall` en tête, les runs sur tout le split
-devant ceux à 500 images. Les quatre premiers se tiennent en 0,4 point, dans le bruit à
-50 images. Seule `Car` décolle (AP 16,8 pour b32-sall) ; Truck et Pedestrian 1,1, les
-autres classes à 0. Durée : ≈ 10 min par run de lot 32 (604 s pour b32-sall).
+Same ranking as on VOC and VisDrone: `b32-sall` first, the runs on the whole split ahead
+of those on 500 images. The first four are within 0.4 point, within the noise at 50
+images. Only `Car` takes off (AP 16.8 for b32-sall); Truck and Pedestrian 1.1, the other
+classes at 0. Duration: ≈ 10 min per batch-32 run (604 s for b32-sall).
 
-Les images de KITTI (1242×375) sont écrasées en 416×416 par `stretch` : les objets
-perdent les deux tiers de leur hauteur relative. C'est l'argument pour l'entrée 640×192
-de T11.4 ([M15, T15.12](M15-campagne-entrainement.md)).
+The KITTI images (1242×375) are squashed to 416×416 by `stretch`: the objects lose two
+thirds of their relative height. This is the argument for the 640×192 input of T11.4
+([M15, T15.12](M15-campagne-entrainement.md)).
 
-### Inférence hors domaine (T11.2) sur les mêmes 50 images
+### Out-of-domain inference (T11.2) on the same 50 images
 
 | modèle | classes évaluées | mAP |
 |---|---|---|
@@ -180,11 +188,11 @@ de T11.4 ([M15, T15.12](M15-campagne-entrainement.md)).
 | `tiny-yolov2-voc` | 3 (car, person, train) | 17,50 |
 | `tiny-yolov3-kitti` `b32-sall` | 8 | 2,38 |
 
-Correspondances (`MAPPINGS`) : Car et Van → car, Pedestrian et Person_sitting → person,
-Tram → train, Truck → truck (COCO seulement) ; Cyclist et Misc ignorés. Par classe, `car`
-est à 49,7 pour COCO et 29,6 pour Tiny-YOLOv2 VOC, contre 16,8 pour le run affiné.
+Mappings (`MAPPINGS`): Car and Van → car, Pedestrian and Person_sitting → person, Tram →
+train, Truck → truck (COCO only); Cyclist and Misc ignored. Per class, `car` is at 49.7 for
+COCO and 29.6 for Tiny-YOLOv2 VOC, against 16.8 for the fine-tuned run.
 
-![Run affiné face aux poids publiés](figures/resultats/balayage_modeles.png)
+![Fine-tuned run against the published weights](figures/resultats/balayage_modeles.png)
 
 ## FLIR
 
@@ -199,18 +207,18 @@ est à 49,7 pour COCO et 29,6 pour Tiny-YOLOv2 VOC, contre 16,8 pour le run affi
 | b32-s500 | 32 | 500 | 38,40 | 52,19 | 0,3 | 1,4 |
 | b8-s500 | 8 | 500 | 9,60 | 63,55 | 0,3 | 1,3 |
 
-Aucun run n'apprend : AP50 au plus 2,9, tous les écarts sont dans le bruit à 50 images, et
-le classement des autres jeux (`b32-sall` en tête) ne se retrouve pas. Par classe, seules
-person (AP50 11,6 pour b8-sall, 2,9 pour b16-sall), bike (7,9 et 9,8) et car (3,2 et 6,6)
-sortent de zéro ; 7 des 15 classes n'ont aucune instance dans ces 50 images (AP -100 dans
-la table de `eval_voc.py`). Pertes finales de 52 à 67, trois fois celles de KITTI.
+No run learns: AP50 at most 2.9, all the gaps are within the noise at 50 images, and the
+ranking of the other datasets (`b32-sall` first) does not hold. Per class, only person
+(AP50 11.6 for b8-sall, 2.9 for b16-sall), bike (7.9 and 9.8) and car (3.2 and 6.6) get
+off zero; 7 of the 15 classes have no instance in these 50 images (AP -100 in the table
+of `eval_voc.py`). Final losses from 52 to 67, three times those of KITTI.
 
-Seules les têtes sont réinitialisées (couches 15 et 22) ; L00 vient des poids COCO, sommée
-sur les canaux RGB. Le réseau voit pourtant des images thermiques, loin du domaine COCO,
-et 600 itérations (moins de deux époques) ne suffisent pas à l'y adapter. Durée : ≈ 10 min par run de lot 32 (577 s pour b32-sall), comme sur
-les autres jeux.
+Only the heads are reinitialised (layers 15 and 22); L00 comes from the COCO weights,
+summed over the RGB channels. Yet the network sees thermal images, far from the COCO
+domain, and 600 iterations (fewer than two epochs) are not enough to adapt it. Duration:
+≈ 10 min per batch-32 run (577 s for b32-sall), as on the other datasets.
 
-### Inférence sur les mêmes 50 images
+### Inference on the same 50 images
 
 | modèle | classes évaluées | mAP AP@[.5:.95] | AP50 |
 |---|---|---|---|
@@ -218,20 +226,20 @@ les autres jeux.
 | `tiny-yolov2-voc` | 7 (dont 3 présentes : person, bicycle, car) | 2,3 | 8,3 |
 | `tiny-yolov3-flir` `b32-sall` | 15 (dont 8 présentes) | 0,4 | 1,7 |
 
-Les poids publiés tournent en RGB sur l'image thermique (trois fois le même canal) ; le
-run affiné prend un canal. Correspondances (`MAPPINGS`) : bike → bicycle, motor →
-motorbike, light → traffic light et hydrant → fire hydrant (COCO seulement) ; sign,
-stroller, scooter et other vehicle ignorés. Par classe, en AP50 : bicycle 23,1 pour COCO
-et 22,7 pour Tiny-YOLOv2 VOC ; car 12,7 pour COCO, 1,9 pour VOC, 1,6 pour le run affiné ;
-person 7,6 pour COCO, 0,2 pour VOC, 8,1 pour le run affiné, sa seule classe au niveau
-des poids publiés. Les poids publiés ne détectent bien que les grands objets (APl 49,0
-pour COCO, 11,9 pour VOC, 5,5 pour le run affiné).
+The published weights run in RGB on the thermal image (the same channel three times); the
+fine-tuned run takes one channel. Mappings (`MAPPINGS`): bike → bicycle, motor →
+motorbike, light → traffic light and hydrant → fire hydrant (COCO only); sign, stroller,
+scooter and other vehicle ignored. Per class, in AP50: bicycle 23.1 for COCO and 22.7 for
+Tiny-YOLOv2 VOC; car 12.7 for COCO, 1.9 for VOC, 1.6 for the fine-tuned run; person 7.6
+for COCO, 0.2 for VOC, 8.1 for the fine-tuned run, its only class at the level of the
+published weights. The published weights only detect the large objects well (APl 49.0 for
+COCO, 11.9 for VOC, 5.5 for the fine-tuned run).
 
-Le notebook d'inférence prend le run le plus récent (`RUN = None`), ici `b32-sall`, et
-retrouve exactement la mesure du balayage (0,4 et 1,7). La cfg à un canal a été
-reconstruite depuis la table d'ancres du run (`env.restore_cfg`, runtime Colab neuf sans
-`build/m11/cfg/`) : même cfg qu'à l'entraînement. Les deux runs en tête du balayage
-(`b8-sall`, `b16-sall`) ne sont pas évalués ici (`RUN = 'b8-sall'` ou `COMPARE = True`).
+The inference notebook takes the most recent run (`RUN = None`), here `b32-sall`, and
+gets back exactly the measurement of the sweep (0.4 and 1.7). The single-channel cfg was
+rebuilt from the anchor table of the run (`env.restore_cfg`, fresh Colab runtime without
+`build/m11/cfg/`): the same cfg as in training. The two runs at the top of the sweep
+(`b8-sall`, `b16-sall`) are not evaluated here (`RUN = 'b8-sall'` or `COMPARE = True`).
 
 ## ExDark
 
@@ -246,14 +254,14 @@ reconstruite depuis la table d'ancres du run (`env.restore_cfg`, runtime Colab n
 | b16-s500 | 16 | 500 | 19,20 | 15,23 | 6,68 |
 | b8-s500 | 8 | 500 | 9,60 | 18,11 | 2,75 |
 
-Images de nuit et en basse lumière, split d'entraînement petit (3 000 images) : à lot 32,
-600 itérations font déjà 6,4 époques. `b32-sall` est en tête, comme sur VOC, VisDrone et
-KITTI, avec 4 points d'avance sur `b32-s500`. Les ancres k-means ne gagnent presque rien
-sur celles de Darknet (IoU moyenne 0,615 contre 0,609). AP de
-`b32-sall` : Boat 55,3, Bus 36,4, People 23,7, Bicycle 19,6, Chair 18,5, Car 5,7 ; Bottle,
-Cat, Cup, Dog et Table à 0. Durée : 427 s pour `b32-sall`.
+Night and low-light images, a small training split (3,000 images): at batch 32, 600
+iterations already make 6.4 epochs. `b32-sall` is first, as on VOC, VisDrone and KITTI,
+4 points ahead of `b32-s500`. The k-means anchors gain almost nothing over Darknet's (mean
+IoU 0.615 against 0.609). AP of `b32-sall`: Boat 55.3, Bus 36.4, People 23.7, Bicycle
+19.6, Chair 18.5, Car 5.7; Bottle, Cat, Cup, Dog and Table at 0. Duration: 427 s for
+`b32-sall`.
 
-### Inférence sur les mêmes 50 images
+### Inference on the same 50 images
 
 | modèle | poids | classes évaluées | mAP |
 |---|---|---|---|
@@ -261,10 +269,10 @@ Cat, Cup, Dog et Table à 0. Durée : 427 s pour `b32-sall`.
 | `tiny-yolov3-exdark` | run `b32-sall` | 12 | 13,29 |
 | `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 11 (sans cup) | 11,84 |
 
-Correspondances (`MAPPINGS`) : People → person, Table → diningtable, les autres classes
-sous leur nom ; Cup n'existe pas dans VOC. Le run affiné dépasse Tiny-YOLOv2 VOC mais reste sous les
-poids COCO, qui voient bien les personnes (51,4) et les vélos (40,2) dans le noir. Le
-notebook d'inférence retrouve exactement la mesure du balayage (13,29).
+Mappings (`MAPPINGS`): People → person, Table → diningtable, the other classes under their
+own name; Cup does not exist in VOC. The fine-tuned run beats Tiny-YOLOv2 VOC but stays
+below the COCO weights, which see people (51.4) and bicycles (40.2) well in the dark. The
+inference notebook gets back exactly the measurement of the sweep (13.29).
 
 ## CrowdHuman
 
@@ -279,15 +287,15 @@ notebook d'inférence retrouve exactement la mesure du balayage (13,29).
 | b8-s500 | 8 | 500 | 9,60 | 52,35 | 27,06 |
 | b8-sall | 8 | tout | 0,32 | 67,22 | 17,67 |
 
-Une seule classe (`person`), des foules denses : le seul jeu où l'affiné approche les
-poids publiés. `b16-sall` passe devant `b32-sall` (5 points, dans le bruit à 50 images) ;
-les trois runs à 500 images se tiennent en 0,8 point ; `b8-sall` (0,32 époque) est
-dernier, comme `b8-sall` sur VOC (burn-in sur 500 des 600 itérations, LR qui n'atteint sa
-valeur qu'à la fin). Les ancres k-means sont bien plus petites que celles de Darknet
-(`6,16 … 136,227` contre `10,14 … 344,319`) et les couvrent mieux (IoU moyenne 0,68 contre
-0,53) : des personnes nombreuses et petites. Durée : 444 s pour `b32-sall`.
+A single class (`person`), dense crowds: the only dataset where the fine-tuned run gets
+close to the published weights. `b16-sall` moves ahead of `b32-sall` (5 points, within the
+noise at 50 images); the three runs on 500 images are within 0.8 point; `b8-sall` (0.32
+epoch) is last, like `b8-sall` on VOC (burn-in over 500 of the 600 iterations, an LR that
+only reaches its value at the end). The k-means anchors are much smaller than Darknet's
+(`6,16 … 136,227` against `10,14 … 344,319`) and cover them better (mean IoU 0.68 against
+0.53): many small people. Duration: 444 s for `b32-sall`.
 
-### Inférence sur les mêmes 50 images
+### Inference on the same 50 images
 
 | modèle | poids | classes évaluées | mAP |
 |---|---|---|---|
@@ -295,23 +303,22 @@ valeur qu'à la fin). Les ancres k-means sont bien plus petites que celles de Da
 | `tiny-yolov3-crowdhuman` | run `b32-sall` | 1 | 30,61 |
 | `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 1 (person) | 26,29 |
 
-Le notebook d'inférence prend le run le plus récent (`RUN = None`), ici `b32-sall`, et
-retrouve exactement la mesure du balayage (30,61). Le meilleur run du balayage,
-`b16-sall` (35,87), est à 2,5 points des poids COCO et 9,6 au-dessus de Tiny-YOLOv2 VOC ;
-il n'est pas évalué ici (`RUN = 'b16-sall'` ou `COMPARE = True`).
-Reste la question propre au jeu ([T11.6](M11-jeux-de-donnees.md)) : rappel de `person` et
-débordement des 256 emplacements de la NMS sur les images les plus denses.
+The inference notebook takes the most recent run (`RUN = None`), here `b32-sall`, and gets
+back exactly the measurement of the sweep (30.61). The best run of the sweep, `b16-sall`
+(35.87), is 2.5 points from the COCO weights and 9.6 above Tiny-YOLOv2 VOC; it is not
+evaluated here (`RUN = 'b16-sall'` or `COMPARE = True`). The question specific to the
+dataset remains ([T11.6](M11-jeux-de-donnees.md)): recall of `person` and overflow of the
+256 slots of the NMS on the densest images.
 
-## Meilleurs paramètres
+## Best parameters
 
-**Lot 32 sur tout le split d'entraînement (`b32-sall`)**, sur VOC, VisDrone, KITTI et
-ExDark ; deuxième sur CrowdHuman, à 5 points de `b16-sall` (dans le bruit à 50 images).
-FLIR ne départage aucun run, et tous restent sous les poids COCO hors domaine (voir plus
-haut). Sur les six jeux, `b32-sall` fait en moyenne 91 % du meilleur run de chaque jeu ;
-tout le split bat 500 images dans 15 cas sur 18 (jeu × lot)
-([analyse_balayages](../../notebooks/analyse_balayages.ipynb)). C'est le
-run par défaut des notebooks d'inférence (`RUN = None` prend le plus récent, ici
-`b32-sall`).
+**Batch 32 on the whole training split (`b32-sall`)**, on VOC, VisDrone, KITTI and ExDark;
+second on CrowdHuman, 5 points behind `b16-sall` (within the noise at 50 images). FLIR
+separates no run, and all stay below the out-of-domain COCO weights (see above). Over the
+six datasets, `b32-sall` reaches on average 91 % of the best run of each dataset; the whole
+split beats 500 images in 15 cases out of 18 (dataset × batch)
+([analyse_balayages](../../notebooks/analyse_balayages.ipynb)). It is the default run of
+the inference notebooks (`RUN = None` takes the most recent, here `b32-sall`).
 
 ```
 python tools/train.py --net tiny-yolov3-voc --init coco --iters 600 --batch 32 \
@@ -325,57 +332,57 @@ python tools/train.py --net build/m11/cfg/tiny-yolov3-kitti.cfg --dataset kitti 
     --workers 4 --device gpu --out build/notebooks/kitti/tiny-yolov3-kitti/runs/b32-sall
 ```
 
-Ce que montre la grille :
+What the grid shows:
 
-- **Tout le split plutôt que 500 images.** Sur VOC, les runs `s500` font 10 à 38 époques
-  sur les mêmes 500 images et surapprennent : `b32-s500` a la perte finale la plus basse
-  (11,95) mais une mAP de 24,01, contre 36,27 pour `b32-sall` (écart de 12 points à lot
-  32, de 9 points à lot 16). Seul le lot 8 fait exception, voir le point suivant.
-- **Un grand lot.** À 600 itérations, le lot fixe le nombre d'images vues. `b8-sall`
-  (0,29 époque) est le pire run VOC, et `b8-sall` (0,32 époque) le pire de CrowdHuman : le burn-in occupe 500 des 600 itérations, le LR
-  n'atteint sa valeur qu'à la fin et le gradient d'un lot de 8 est bruité.
-- **Écarts faibles entre les deux meilleurs.** `b32-sall` et `b16-sall` (1,6 point sur
-  VOC, 0,15 sur KITTI) ne se départagent pas sur 50 images ; sur VisDrone, tous les runs
-  sauf `b32-sall` restent dans le bruit (0,6 à 1,4).
+- **The whole split rather than 500 images.** On VOC, the `s500` runs make 10 to 38 epochs
+  over the same 500 images and overfit: `b32-s500` has the lowest final loss (11.95) but an
+  mAP of 24.01, against 36.27 for `b32-sall` (a gap of 12 points at batch 32, 9 points at
+  batch 16). Only batch 8 is an exception, see the next point.
+- **A large batch.** At 600 iterations, the batch sets the number of images seen.
+  `b8-sall` (0.29 epoch) is the worst VOC run, and `b8-sall` (0.32 epoch) the worst of
+  CrowdHuman: the burn-in takes up 500 of the 600 iterations, the LR only reaches its value
+  at the end and the gradient of a batch of 8 is noisy.
+- **Small gaps between the two best.** `b32-sall` and `b16-sall` (1.6 points on VOC, 0.15
+  on KITTI) cannot be told apart on 50 images; on VisDrone, all the runs except `b32-sall`
+  stay within the noise (0.6 to 1.4).
 
-![Perte finale face à la mAP](figures/resultats/balayage_perte.png)
+![Final loss against mAP](figures/resultats/balayage_perte.png)
 
-Sur VOC, les runs à 500 images (marques creuses) ont les pertes les plus basses et les mAP
-les plus faibles : ils surapprennent.
+On VOC, the runs on 500 images (hollow marks) have the lowest losses and the lowest mAPs:
+they overfit.
 
-## Limites et suite
+## Limitations and next steps
 
-Exécutions et améliorations planifiées : [M15](M15-campagne-entrainement.md).
+Planned runs and improvements: [M15](M15-campagne-entrainement.md).
 
-- **Entraînement trop court.** L'affinage de 600 itérations part des poids COCO, qui
-  font 68,45 sur VOC avec la table de correspondance, et tombe à 36,27 : les têtes à
-  20 classes repartent de zéro et n'ont vu qu'une époque. Sur les six jeux, le meilleur
-  run affiné reste sous les poids COCO hors domaine ; CrowdHuman en est le plus près
-  (35,87 contre 38,37, une seule classe), ExDark à mi-chemin (13,29 contre 24,61).
-- **Pistes**, dans l'ordre :
-  1. allonger `ITERS` sur la configuration retenue (lot 32, tout le split ; palier N) ;
-     l'exemple de `tools/train.py` pour VOC est à 20 000 itérations ;
-  2. raccourcir `BURN_IN` (100 à 200) ou ajuster le LR au lot pour les runs courts ;
-  3. VisDrone : entrée plus grande (`SIZE`, ex. `608` ou non carrée) pour les petits
-     objets, avec les ancres k-means recalculées à cette taille ; KITTI : entrée
+- **Training too short.** The 600-iteration fine-tuning starts from the COCO weights,
+  which get 68.45 on VOC with the mapping table, and falls to 36.27: the 20-class heads
+  start from scratch and have only seen one epoch. Over the six datasets, the best
+  fine-tuned run stays below the out-of-domain COCO weights; CrowdHuman is the closest
+  (35.87 against 38.37, a single class), ExDark halfway (13.29 against 24.61).
+- **Directions**, in order:
+  1. lengthen `ITERS` on the selected configuration (batch 32, whole split; tier N); the
+     example of `tools/train.py` for VOC is at 20,000 iterations;
+  2. shorten `BURN_IN` (100 to 200) or adjust the LR to the batch for short runs;
+  3. VisDrone: a larger input (`SIZE`, e.g. `608` or non-square) for the small objects,
+     with the k-means anchors recomputed at that size; KITTI: input
      `SIZE = '640x192'`.
-- **Confirmer le classement** sur le split complet : notebook `_infer` avec
-  `COMPARE = True` et `SUBSET = 0` (palier N), puis volet entier (`INT8 = True`, T14.4)
-  sur le run retenu.
-- FLIR : le balayage a tourné mais n'apprend pas (AP50 ≤ 2,9), loin des poids COCO hors
-  domaine (AP 3,7, AP50 9,9), qui gardent la L00 RGB d'origine. Avant un run long,
-  comparer à 3 canaux (`CHANNELS = None`), pour savoir si la L00 sommée sur un canal
-  coûte la différence ([M15, T15.13](M15-campagne-entrainement.md)).
-- ExDark et CrowdHuman : split complet (palier N) et, pour CrowdHuman, l'inférence de
-  `b16-sall` (`COMPARE = True` dans `tiny-yolov3-crowdhuman_infer`)
+- **Confirm the ranking** on the full split: `_infer` notebook with `COMPARE = True` and
+  `SUBSET = 0` (tier N), then the integer part (`INT8 = True`, T14.4) on the selected run.
+- FLIR: the sweep ran but does not learn (AP50 ≤ 2.9), far from the out-of-domain COCO
+  weights (AP 3.7, AP50 9.9), which keep the original RGB L00. Before a long run, compare
+  with 3 channels (`CHANNELS = None`), to find out whether the L00 summed onto one channel
+  costs the difference ([M15, T15.13](M15-campagne-entrainement.md)).
+- ExDark and CrowdHuman: full split (tier N) and, for CrowdHuman, the inference of
+  `b16-sall` (`COMPARE = True` in `tiny-yolov3-crowdhuman_infer`)
   ([M15, T15.14](M15-campagne-entrainement.md)).
 
-## Récolte des runs
+## Harvesting the runs
 
-Depuis la révision qui suit `35e949b`, chaque commande `tools/train.py` ou
-`tools/eval_voc.py` lancée par un notebook sur Colab écrit un `summary.json` dans son
-dossier de sortie et le copie sur le Drive dès sa fin (`colab.autosync`), évaluations et
-notebooks `_infer` compris. Sur le PC, `make harvest` rapatrie journaux, résumés, tables
-et figures (sans poids) dans `build/notebooks/` ; le notebook d'analyse y reprend les runs
-sans journal dans leur notebook (VisDrone : 4 runs d'une session précédente). Détail :
+Since the revision after `35e949b`, each `tools/train.py` or `tools/eval_voc.py` command
+started by a notebook on Colab writes a `summary.json` in its output folder and copies it
+to the Drive as soon as it ends (`colab.autosync`), evaluations and `_infer` notebooks
+included. On the PC, `make harvest` brings back logs, summaries, tables and figures
+(without weights) into `build/notebooks/`; the analysis notebook picks up there the runs
+without a log in their notebook (VisDrone: 4 runs from a previous session). Details:
 [colab-vscode.md](colab-vscode.md#coupure-de-session).
