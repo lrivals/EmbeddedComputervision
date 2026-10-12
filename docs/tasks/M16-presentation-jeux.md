@@ -1,311 +1,314 @@
-# M16 — Notebooks de présentation des jeux de données (optionnel)
+# M16 — Dataset presentation notebooks (optional)
 
-Objectif : un notebook Jupyter par jeu de données qui le **présente** (origine, licence,
-capteur, splits, classes) et en donne l'**analyse statistique** (comptes, classes,
-géométrie des boîtes, densité, images, ancres, qualité des annotations), lue du point de
-vue de Tiny-YOLO et de la cible embarquée (entrée 416, grilles 13×13 et 26×26, 256
-emplacements de `yolo_post`, INT8).
+Goal: one Jupyter notebook per dataset that **presents** it (origin, licence, sensor,
+splits, classes) and gives its **statistical analysis** (counts, classes, box geometry,
+density, images, anchors, annotation quality), read from the point of view of Tiny-YOLO and
+of the embedded target (416 input, 13×13 and 26×26 grids, 256 slots of `yolo_post`, INT8).
 
-Constat de départ :
-- seul VOC a des statistiques : `tools/voc_stats.py` (comptes face aux chiffres du devkit,
-  T0.6) et la figure `voc_stats.png` de [T13.7](M13-figures.md#x-t137--voc-dataset-statistics) ;
-- les six autres jeux de `DATASETS` (`python/yolo/data/datasets.py`) n'ont que leur
-  chargeur ; leurs effectifs viennent des pages des jeux, **à vérifier**
-  ([M11, Synthèse](M11-jeux-de-donnees.md#summary)), et `SPLIT_IMAGES` de
-  `tools/notebooks/matrice.py` vaut encore `None` pour ExDark et FLIR ;
-- les premiers balayages de [M15](M15-campagne-entrainement.md) donnent des mAP qu'on ne
-  sait pas encore lire : sur VisDrone et KITTI, seule la classe voiture décolle. Il manque
-  la part des petits objets après redimensionnement, le déséquilibre des classes et le
-  nombre de cibles perdues par collision dans la grille ;
-- `tools/kmeans_anchors.py` calcule les ancres d'un jeu, mais rien ne les compare à celles
-  du cfg sur le jeu lui-même.
+Starting point:
+- only VOC has statistics: `tools/voc_stats.py` (counts against the devkit figures, T0.6)
+  and the figure `voc_stats.png` of [T13.7](M13-figures.md#x-t137--voc-dataset-statistics);
+- the six other datasets of `DATASETS` (`python/yolo/data/datasets.py`) only have their
+  loader; their counts come from the dataset pages, **to be checked**
+  ([M11, Summary](M11-jeux-de-donnees.md#summary)), and `SPLIT_IMAGES` of
+  `tools/notebooks/matrice.py` is still `None` for ExDark and FLIR;
+- the first sweeps of [M15](M15-campagne-entrainement.md) give mAPs we cannot read yet: on
+  VisDrone and KITTI, only the car class takes off. What is missing is the share of small
+  objects after resizing, the class imbalance and the number of targets lost by collision
+  in the grid;
+- `tools/kmeans_anchors.py` computes the anchors of a dataset, but nothing compares them
+  with those of the cfg on the dataset itself.
 
-Comme en [M14](M14-notebooks.md), un notebook n'apporte **aucun calcul propre** : les
-statistiques sont calculées par un outil du dépôt (`tools/data_stats.py`) et tracées par
-un générateur de figures (`tools/figures/donnees.py`). Le notebook les enchaîne, les
-affiche et les commente. Tout résultat du notebook se reproduit en ligne de commande.
+As in [M14](M14-notebooks.md), a notebook brings **no computation of its own**: the
+statistics are computed by a repository tool (`tools/data_stats.py`) and plotted by a
+figure generator (`tools/figures/donnees.py`). The notebook chains them, shows them and
+comments on them. Every result of the notebook can be reproduced from the command line.
 
-**État** : 17 tâches faites sur 19. Outil, figures, fiches, gabarit et analyses en place ;
-notebooks VOC, VisDrone, FLIR, ExDark et CrowdHuman exécutés et versionnés avec leurs
-sorties, synthèse dans [stats-jeux.md](stats-jeux.md). Restent T16.13 (COCO : `data/coco`
-absent du PC) et T16.14 (KITTI : images `training/` absentes, archive
-`data_object_image_2.zip` incomplète) ; leurs notebooks sont générés et passeront tels quels
-une fois les données là.
+**State**: 17 tasks done out of 19. Tool, figures, datasheets, template and analyses in
+place; VOC, VisDrone, FLIR, ExDark and CrowdHuman notebooks executed and versioned with
+their outputs, summary in [stats-jeux.md](stats-jeux.md). Remaining: T16.13 (COCO:
+`data/coco` missing from the PC) and T16.14 (KITTI: `training/` images missing, archive
+`data_object_image_2.zip` incomplete); their notebooks are generated and will pass as they
+are once the data is there.
 
-## Conventions communes
+## Shared conventions
 
-### Outillage
+### Tooling
 
-- **Calcul** : `tools/data_stats.py`, en NumPy pur, sur la liste d'échantillons des
-  chargeurs (`DATASETS[jeu].load`). Il ne lit les pixels que pour les statistiques
-  d'images (T16.8), sur un échantillon (`--sample`).
+- **Computation**: `tools/data_stats.py`, in pure NumPy, on the list of samples of the
+  loaders (`DATASETS[dataset].load`). It only reads the pixels for the image statistics
+  (T16.8), on a sample (`--sample`).
   ```
   python tools/data_stats.py --dataset kitti --split train,val --size 416 \
       --out build/notebooks/kitti/stats [--sample 500] [--markdown]
   ```
-  Sorties : `stats.json` (toutes les grandeurs, une clé par analyse), `stats.md` (tables
-  de la synthèse), `figures/` (si `--figures`).
-- **Figures** : `tools/figures/donnees.py`, une fonction par panneau, appelée depuis
-  `stats.json`. `plot_voc_stats` de `tools/figures/modeles.py` (T13.7) devient le cas VOC
-  de ce module : `make figures` produit toujours `voc_stats.png`.
-- **Notebooks** : rôle `stats` ajouté au registre de `tools/notebooks/matrice.py` et
-  gabarit `stats_body` dans `tools/notebooks/gabarits.py`. Un notebook par jeu de
-  `DATASETS`, sans modèle : `notebooks/<jeu>/<jeu>_stats.ipynb`. Ajouter un jeu à
-  `DATASETS` ajoute son notebook sans toucher au générateur.
-- **Fiche** : `FICHES` dans `tools/data_stats.py`, la seule partie écrite à la main (source,
-  version, licence, capteur, effectifs officiels par split), comme `OFFICIAL` de
+  Outputs: `stats.json` (all the quantities, one key per analysis), `stats.md` (summary
+  tables), `figures/` (if `--figures`).
+- **Figures**: `tools/figures/donnees.py`, one function per panel, called from
+  `stats.json`. `plot_voc_stats` of `tools/figures/modeles.py` (T13.7) becomes the VOC case
+  of this module: `make figures` still produces `voc_stats.png`.
+- **Notebooks**: `stats` role added to the registry of `tools/notebooks/matrice.py` and
+  template `stats_body` in `tools/notebooks/gabarits.py`. One notebook per dataset of
+  `DATASETS`, without a model: `notebooks/<dataset>/<dataset>_stats.ipynb`. Adding a
+  dataset to `DATASETS` adds its notebook without touching the generator.
+- **Datasheet**: `FICHES` in `tools/data_stats.py`, the only hand-written part (source,
+  version, licence, sensor, official counts per split), like `OFFICIAL` of
   `tools/voc_stats.py`.
 
-### Sorties
+### Outputs
 
-- **Notebooks** : `notebooks/<jeu>/<jeu>_stats.ipynb`, listés dans `notebooks/README.md`
-  (palier, données requises, badge Colab).
-- **Résultats d'exécution** : `build/notebooks/<jeu>/stats/` (`stats.json`, `stats.md`,
-  `figures/`, galerie). Rien dans `results/`.
-- **Synthèse** : [stats-jeux.md](stats-jeux.md), une section par jeu (révision, splits,
-  table de synthèse), et une table comparative des sept jeux. Ce document se remplit
-  depuis `stats.md` ; il sert de référence aux tâches de M11 et M15.
+- **Notebooks**: `notebooks/<dataset>/<dataset>_stats.ipynb`, listed in
+  `notebooks/README.md` (tier, required data, Colab badge).
+- **Run results**: `build/notebooks/<dataset>/stats/` (`stats.json`, `stats.md`,
+  `figures/`, gallery). Nothing in `results/`.
+- **Summary**: [stats-jeux.md](stats-jeux.md), one section per dataset (revision, splits,
+  summary table), and a comparative table of the seven datasets. This document is filled
+  from `stats.md`; it serves as the reference for the tasks of M11 and M15.
 
-### Règles
+<a id="règles"></a>
 
-- Les règles de [M14](M14-notebooks.md#rules) s'appliquent : notebooks versionnés sans
-  sorties ou exécutés en entier sans erreur, `--check`, commande CLI équivalente affichée
-  à chaque étape.
-- **Structure fixe** de chaque notebook, dans cet ordre :
-  1. titre, fiche du jeu (T16.2), liens vers la tâche M11 et les notebooks du jeu ;
-  2. **cellule de paramètres** (tag `parameters`) : `DATASET`, `SPLITS` (défaut : `train`
-     et `test` du `Dataset`), `SIZE` (défaut : entrée du cfg du jeu, 416 sinon),
-     `RESIZE` (`letterbox` ou `stretch`), `SAMPLE` (images lues pour les pixels, défaut
-     200), `GALLERY` (images de la galerie, défaut 8), `SEED` ;
-  3. **cellule d'environnement** de T14.1, sans poids ni cfg à vérifier ;
-  4. corps du gabarit `stats` (sections B) ;
-  5. résumé : table de synthèse, chemins des sorties, commande CLI équivalente.
-- **Statistiques exactes ou échantillonnées, toujours dit** : tout ce qui vient des
-  annotations porte sur le split entier ; ce qui demande les pixels porte sur `SAMPLE`
-  images tirées avec `SEED`, et le titre de la table ou de la figure le dit.
-- **Taille d'entrée explicite** : les grandeurs « vues par le réseau » (taille des boîtes
-  en pixels d'entrée, cellules, collisions) sont calculées après `letterbox` ou `stretch`
-  à `SIZE`, par `yolo.data.letterbox`, jamais par une réécriture.
-- **Palier** : annotations seules → palier R ou M selon le nombre d'images (lecture des
-  en-têtes d'image pour KITTI, VisDrone, CrowdHuman et ExDark) ; pixels → palier selon
-  `SAMPLE`. Le notebook affiche le palier avant de lancer.
-- **Acceptation commune** :
-  - le notebook est produit par `make notebooks` et listé dans `notebooks/README.md` ;
-  - `--check` passe ;
-  - la fumée de T14.9 l'exécute avec `SAMPLE = 8` et `GALLERY = 2` ;
-  - les totaux d'images et d'objets égalent ceux de la fiche, ou l'écart est expliqué
-    dans la fiche (boîtes retirées par `make_sample`, régions `DontCare`, etc.).
+### Rules
 
-### Questions par jeu
+- The rules of [M14](M14-notebooks.md#rules) apply: notebooks versioned without outputs or
+  executed in full without error, `--check`, equivalent CLI command printed at each step.
+- **Fixed structure** of each notebook, in this order:
+  1. title, datasheet of the dataset (T16.2), links to the M11 task and to the notebooks of
+     the dataset;
+  2. **parameter cell** (tag `parameters`): `DATASET`, `SPLITS` (default: `train` and
+     `test` of the `Dataset`), `SIZE` (default: input of the dataset's cfg, otherwise
+     416), `RESIZE` (`letterbox` or `stretch`), `SAMPLE` (images read for the pixels,
+     default 200), `GALLERY` (gallery images, default 8), `SEED`;
+  3. **environment cell** of T14.1, without weights or cfg to check;
+  4. body of the `stats` template (sections B);
+  5. summary: summary table, output paths, equivalent CLI command.
+- **Exact or sampled statistics, always stated**: everything that comes from the
+  annotations covers the whole split; what needs the pixels covers `SAMPLE` images drawn
+  with `SEED`, and the title of the table or of the figure says so.
+- **Explicit input size**: the quantities "seen by the network" (box size in input pixels,
+  cells, collisions) are computed after `letterbox` or `stretch` to `SIZE`, by
+  `yolo.data.letterbox`, never by a rewrite.
+- **Tier**: annotations only → tier R or M depending on the number of images (image
+  headers read for KITTI, VisDrone, CrowdHuman and ExDark); pixels → tier depending on
+  `SAMPLE`. The notebook prints the tier before starting.
+- **Shared acceptance**:
+  - the notebook is produced by `make notebooks` and listed in `notebooks/README.md`;
+  - `--check` passes;
+  - the smoke run of T14.9 executes it with `SAMPLE = 8` and `GALLERY = 2`;
+  - the image and object totals equal those of the datasheet, or the gap is explained in
+    the datasheet (boxes removed by `make_sample`, `DontCare` regions, etc.).
 
-Chaque notebook répond aux analyses communes, plus une question propre au jeu, qui
-renvoie à l'axe de M11 ou M15.
+<a id="questions-par-jeu"></a>
 
-| Jeu | Question propre | Renvoi |
+### Questions per dataset
+
+Each notebook answers the shared analyses, plus a question specific to the dataset, which
+points to the axis of M11 or M15.
+
+| Dataset | Specific question | Pointer |
 |---|---|---|
-| voc | les classes à faible AP (bottle, pottedplant) sont-elles rares ou petites ? | T13.7, T13.13 |
-| coco | quelle part des objets est petite (< 32²) une fois réduite à 416 ? | T11.1 |
-| kitti | `letterbox` ou `stretch` : combien d'objets passent sous 8 px de haut ? | T11.4, T15 |
-| visdrone | part des objets plus petits qu'une cellule 26×26 ; collisions de cibles | T11.5, T15 |
-| flir | distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00 | T11.7 |
-| exdark | luminosité par type d'éclairage, et écart aux images de calibration VOC | T11.3 |
-| crowdhuman | objets par image face aux 256 emplacements ; part d'objets occultés | T11.6 |
+| voc | are the classes with a low AP (bottle, pottedplant) rare or small? | T13.7, T13.13 |
+| coco | what share of the objects is small (< 32²) once reduced to 416? | T11.1 |
+| kitti | `letterbox` or `stretch`: how many objects fall under 8 px of height? | T11.4, T15 |
+| visdrone | share of objects smaller than a 26×26 cell; target collisions | T11.5, T15 |
+| flir | distribution of the thermal levels, and what the INT8 of L00 keeps of it | T11.7 |
+| exdark | luminance per lighting type, and gap to the VOC calibration images | T11.3 |
+| crowdhuman | objects per image against the 256 slots; share of occluded objects | T11.6 |
 
 ---
 
 ## A. Infrastructure
 
-### [x] T16.0 — Outil `tools/data_stats.py`
-- **Spec** : — · **Dépend de** : T11.0 · **Taille** : M
-- **Livrables** : `tools/data_stats.py` (fonctions pures + `main()`) ;
+### [x] T16.0 — `tools/data_stats.py` tool
+- **Spec**: — · **Depends on**: T11.0 · **Size**: M
+- **Deliverables**: `tools/data_stats.py` (pure functions + `main()`);
   `python/tests/test_data_stats.py`.
-- **Comportement attendu** :
-  - une fonction par analyse de la section B, qui prend la liste d'échantillons et rend un
-    dict sérialisable ; `main()` les appelle toutes et écrit `stats.json` et `stats.md` ;
-  - `--split` accepte plusieurs splits séparés par des virgules ; chaque analyse est
-    donnée par split, et pour l'ensemble ;
-  - la lecture des pixels (T16.8) est la seule à ouvrir les images, et seulement si
-    `--sample` est non nul.
-- **Acceptation** :
-  - tests sur des échantillons synthétiques (comptes, aires, collisions connues) ;
-  - sur VOC, les comptes égalent `OFFICIAL` de `tools/voc_stats.py`, que l'outil
-    remplace (`voc_stats.py` reste comme raccourci et appelle `data_stats`).
-- **Notes** : pas de pandas ; le paquet `yolo` reste en NumPy pur
-  ([ADR 0001](../adr/0001-numpy-pur.md)) et l'outil vit dans `tools/`.
+- **Expected behaviour**:
+  - one function per analysis of section B, which takes the list of samples and returns a
+    serialisable dict; `main()` calls them all and writes `stats.json` and `stats.md`;
+  - `--split` accepts several splits separated by commas; each analysis is given per split,
+    and for the whole;
+  - the pixel reading (T16.8) is the only one that opens the images, and only if
+    `--sample` is non-zero.
+- **Acceptance**:
+  - tests on synthetic samples (counts, areas, known collisions);
+  - on VOC, the counts equal `OFFICIAL` of `tools/voc_stats.py`, which the tool replaces
+    (`voc_stats.py` remains as a shortcut and calls `data_stats`).
+- **Notes**: no pandas; the `yolo` package stays pure NumPy
+  ([ADR 0001](../adr/0001-numpy-pur.md)) and the tool lives in `tools/`.
 
-### [x] T16.1 — Figures `tools/figures/donnees.py`
-- **Spec** : — · **Dépend de** : T16.0, T13.7 · **Taille** : M
-- **Livrables** : `tools/figures/donnees.py` ; option `--figures` de `data_stats.py`.
-- **Acceptation** :
-  - chaque panneau de la section B se trace depuis `stats.json`, sans relire le jeu ;
-  - `voc_stats.png` (T13.7) est produite par ce module et garde ses trois panneaux et ses
-    totaux ;
-  - style commun de `tools/figures/style.py`.
+### [x] T16.1 — `tools/figures/donnees.py` figures
+- **Spec**: — · **Depends on**: T16.0, T13.7 · **Size**: M
+- **Deliverables**: `tools/figures/donnees.py`; `--figures` option of `data_stats.py`.
+- **Acceptance**:
+  - each panel of section B is plotted from `stats.json`, without rereading the dataset;
+  - `voc_stats.png` (T13.7) is produced by this module and keeps its three panels and its
+    totals;
+  - shared style of `tools/figures/style.py`.
 
-### [x] T16.2 — Fiche de chaque jeu
-- **Spec** : — · **Dépend de** : T16.0 · **Taille** : S
-- **Livrables** : `FICHES` dans `tools/data_stats.py`, une entrée par jeu de `DATASETS`.
-- **Contenu** : source (URL), version, licence, capteur et conditions de prise de vue,
-  résolution typique, splits utilisés par le dépôt (`test`, `calib`, `train`), effectifs
-  officiels (images, objets) par split, particularités du chargeur (classes retirées,
-  objets en `difficult`, découpage maison de KITTI).
-- **Acceptation** :
-  - un test vérifie que chaque jeu de `DATASETS` a une fiche, et que ses classes sont
-    celles du `Dataset` ;
-  - `SPLIT_IMAGES` de `matrice.py` est rempli pour tous les jeux (ExDark et FLIR compris),
-    depuis les comptes mesurés, et le tableau Synthèse de M11 est corrigé si besoin.
+### [x] T16.2 — Datasheet of each dataset
+- **Spec**: — · **Depends on**: T16.0 · **Size**: S
+- **Deliverables**: `FICHES` in `tools/data_stats.py`, one entry per dataset of
+  `DATASETS`.
+- **Contents**: source (URL), version, licence, sensor and capture conditions, typical
+  resolution, splits used by the repository (`test`, `calib`, `train`), official counts
+  (images, objects) per split, peculiarities of the loader (classes removed, objects in
+  `difficult`, in-house split of KITTI).
+- **Acceptance**:
+  - a test checks that each dataset of `DATASETS` has a datasheet, and that its classes are
+    those of the `Dataset`;
+  - `SPLIT_IMAGES` of `matrice.py` is filled for all the datasets (ExDark and FLIR
+    included), from the measured counts, and the Summary table of M11 is corrected if
+    needed.
 
-### [x] T16.3 — Rôle `stats` dans le registre et gabarit
-- **Spec** : — · **Dépend de** : T14.0, T14.1, T16.0 · **Taille** : M
-- **Livrables** : rôle `stats` dans `tools/notebooks/matrice.py` ; `stats_body` dans
-  `tools/notebooks/gabarits.py` ; 7 notebooks `notebooks/<jeu>/<jeu>_stats.ipynb`.
-- **Acceptation** :
-  - un test vérifie que chaque jeu de `DATASETS` a exactement un notebook `stats` ;
-  - l'index range ces notebooks en tête de chaque jeu ;
-  - les commandes affichées sont celles de `data_stats.py`, option par option.
-- **Notes** : pas de poids ni de cfg dans les prérequis ; sur Colab, les données passent
-  par `colab.prepare_data` comme en M14.
+### [x] T16.3 — `stats` role in the registry and template
+- **Spec**: — · **Depends on**: T14.0, T14.1, T16.0 · **Size**: M
+- **Deliverables**: `stats` role in `tools/notebooks/matrice.py`; `stats_body` in
+  `tools/notebooks/gabarits.py`; 7 notebooks `notebooks/<dataset>/<dataset>_stats.ipynb`.
+- **Acceptance**:
+  - a test checks that each dataset of `DATASETS` has exactly one `stats` notebook;
+  - the index puts these notebooks at the top of each dataset;
+  - the commands printed are those of `data_stats.py`, option by option.
+- **Notes**: no weights or cfg in the prerequisites; on Colab, the data goes through
+  `colab.prepare_data` as in M14.
 
-## B. Analyses (sections du gabarit)
+## B. Analyses (sections of the template)
 
-### [x] T16.4 — Présentation et galerie
-- **Spec** : — · **Dépend de** : T16.2, T16.3 · **Taille** : S
-- **Contenu** :
-  - la fiche (T16.2) en tableau, puis la liste des classes avec leurs correspondances VOC
-    et COCO (`MAPPINGS`) ;
-  - galerie : `GALLERY` images tirées avec `SEED` par split, boîtes dessinées par
-    `tools/detect.py:draw` ;
-  - une image par classe, au moins une boîte de la classe.
-- **Acceptation** : à `SEED` fixé, la galerie ne change pas d'une exécution à l'autre.
+### [x] T16.4 — Presentation and gallery
+- **Spec**: — · **Depends on**: T16.2, T16.3 · **Size**: S
+- **Contents**:
+  - the datasheet (T16.2) as a table, then the list of classes with their VOC and COCO
+    correspondences (`MAPPINGS`);
+  - gallery: `GALLERY` images drawn with `SEED` per split, boxes drawn by
+    `tools/detect.py:draw`;
+  - one image per class, at least one box of the class.
+- **Acceptance**: with a fixed `SEED`, the gallery does not change from one run to the
+  next.
 
-### [x] T16.5 — Comptes et classes
-- **Spec** : §8.3 · **Dépend de** : T16.0 · **Taille** : S
-- **Contenu** :
-  - images, objets, objets `difficult` ou `crowd`, images sans objet, par split ;
-  - objets par classe et images contenant la classe, par split ; rapport entre classe la
-    plus et la moins fréquente ;
-  - matrice de co-occurrence des classes (images où deux classes apparaissent ensemble).
-- **Acceptation** : totaux égaux à la fiche (voir Acceptation commune).
+### [x] T16.5 — Counts and classes
+- **Spec**: §8.3 · **Depends on**: T16.0 · **Size**: S
+- **Contents**:
+  - images, objects, `difficult` or `crowd` objects, images without objects, per split;
+  - objects per class and images containing the class, per split; ratio between the most
+    and the least frequent class;
+  - class co-occurrence matrix (images where two classes appear together).
+- **Acceptance**: totals equal to the datasheet (see Shared acceptance).
 
-### [x] T16.6 — Géométrie des boîtes et taille d'entrée
-- **Spec** : §5.1, §8.3 · **Dépend de** : T16.0 · **Taille** : M
-- **Contenu** :
-  - largeur, hauteur, aire relative et rapport d'aspect des boîtes, en pixels d'origine et
-    en pixels d'entrée à `SIZE` ;
-  - catégories COCO (petit < 32², moyen < 96², grand) avant et après redimensionnement ;
-  - part des objets plus petits qu'une cellule de chaque tête (32 px pour 13×13, 16 px
-    pour 26×26) ;
-  - carte de chaleur des centres de boîtes (position dans l'image) ;
-  - comparaison `letterbox` / `stretch` pour les jeux à image non carrée.
-- **Acceptation** : un test vérifie le passage aux pixels d'entrée contre
+### [x] T16.6 — Box geometry and input size
+- **Spec**: §5.1, §8.3 · **Depends on**: T16.0 · **Size**: M
+- **Contents**:
+  - width, height, relative area and aspect ratio of the boxes, in original pixels and in
+    input pixels at `SIZE`;
+  - COCO categories (small < 32², medium < 96², large) before and after resizing;
+  - share of objects smaller than a cell of each head (32 px for 13×13, 16 px for 26×26);
+  - heat map of the box centres (position in the image);
+  - `letterbox` / `stretch` comparison for the datasets with non-square images.
+- **Acceptance**: a test checks the conversion to input pixels against
   `yolo.data.letterbox.boxes_to_letterbox`.
 
-### [x] T16.7 — Densité et collisions de cibles
-- **Spec** : §5.1, §10.3 · **Dépend de** : T16.6 · **Taille** : M
-- **Contenu** :
-  - objets par image (histogramme, médiane, maximum) ;
-  - **collisions** : objets qui tombent sur la même cellule et la même ancre d'une tête,
-    donc dont un seul reçoit une cible ; comptés par `yolo.data.targets.build_targets`
-    avec les ancres du cfg du jeu ;
-  - images au-delà des 256 emplacements de `yolo_post` (et de 1 024, comme en T11.6).
-- **Acceptation** : le nombre de cibles perdues égale, sur un lot, l'écart entre objets et
-  cibles positives de `build_targets`.
+### [x] T16.7 — Density and target collisions
+- **Spec**: §5.1, §10.3 · **Depends on**: T16.6 · **Size**: M
+- **Contents**:
+  - objects per image (histogram, median, maximum);
+  - **collisions**: objects that fall on the same cell and the same anchor of a head, so
+    that only one of them receives a target; counted by
+    `yolo.data.targets.build_targets` with the anchors of the dataset's cfg;
+  - images beyond the 256 slots of `yolo_post` (and 1,024, as in T11.6).
+- **Acceptance**: the number of lost targets equals, on a batch, the gap between objects
+  and positive targets of `build_targets`.
 
-### [x] T16.8 — Images : résolution, canaux, intensité
-- **Spec** : §9 · **Dépend de** : T16.0 · **Taille** : S · **Palier** : selon `SAMPLE`
-- **Contenu** :
-  - résolutions et rapports d'aspect (depuis les en-têtes, split entier) ;
-  - sur `SAMPLE` images : nombre de canaux, moyenne et écart type par canal,
-    histogramme d'intensité, luminance moyenne par image ;
-  - comparaison à VOC (même calcul sur `SAMPLE` images de VOC2007 test), qui a servi aux
-    échelles INT8 de M4.
-- **Notes** : pour FLIR, les images 8 bits du jeu ; une analyse 16 bits sort du
-  périmètre.
+### [x] T16.8 — Images: resolution, channels, intensity
+- **Spec**: §9 · **Depends on**: T16.0 · **Size**: S · **Tier**: depending on `SAMPLE`
+- **Contents**:
+  - resolutions and aspect ratios (from the headers, whole split);
+  - on `SAMPLE` images: number of channels, mean and standard deviation per channel,
+    intensity histogram, mean luminance per image;
+  - comparison with VOC (same computation on `SAMPLE` images of VOC2007 test), which was
+    used for the INT8 scales of M4.
+- **Notes**: for FLIR, the 8-bit images of the dataset; a 16-bit analysis is out of scope.
 
-### [x] T16.9 — Ancres du jeu
-- **Spec** : §5.2 · **Dépend de** : T16.6 · **Taille** : S
-- **Contenu** :
-  - nuage (largeur, hauteur) des boîtes en pixels d'entrée, avec les ancres du cfg et
-    celles de `tools/kmeans_anchors.py --dataset` ;
-  - IoU moyenne de meilleure ancre (`yolo.data.anchors.mean_best_iou`) pour les ancres
-    VOC, COCO et du jeu ;
-  - courbe IoU moyenne selon k (comme `ancres_k` de T13).
-- **Acceptation** : les ancres affichées sont celles qu'écrit `kmeans_anchors.py` aux
-  mêmes `--size` et `--seed`.
+### [x] T16.9 — Anchors of the dataset
+- **Spec**: §5.2 · **Depends on**: T16.6 · **Size**: S
+- **Contents**:
+  - (width, height) cloud of the boxes in input pixels, with the anchors of the cfg and
+    those of `tools/kmeans_anchors.py --dataset`;
+  - mean best-anchor IoU (`yolo.data.anchors.mean_best_iou`) for the VOC, COCO and
+    dataset anchors;
+  - mean IoU curve as a function of k (like `ancres_k` of T13).
+- **Acceptance**: the anchors shown are those that `kmeans_anchors.py` writes with the
+  same `--size` and `--seed`.
 
-### [x] T16.10 — Qualité des annotations
-- **Spec** : — · **Dépend de** : T16.0 · **Taille** : S
-- **Contenu** :
-  - boîtes retirées ou rognées par `make_sample` (hors image, vides) ;
-  - boîtes dégénérées (côté < 2 px), doublons (IoU > 0,95, même classe) ;
-  - régions retirées par le chargeur (`DontCare` de KITTI, régions ignorées et `others`
-    de VisDrone), comptées depuis les fichiers bruts ;
-  - liste des 10 images les plus suspectes, affichées dans le notebook.
-- **Notes** : l'analyse signale, elle ne corrige pas ; une correction de chargeur passe
-  par une tâche de M11.
+### [x] T16.10 — Annotation quality
+- **Spec**: — · **Depends on**: T16.0 · **Size**: S
+- **Contents**:
+  - boxes removed or clipped by `make_sample` (outside the image, empty);
+  - degenerate boxes (side < 2 px), duplicates (IoU > 0.95, same class);
+  - regions removed by the loader (`DontCare` of KITTI, ignored regions and `others` of
+    VisDrone), counted from the raw files;
+  - list of the 10 most suspicious images, shown in the notebook.
+- **Notes**: the analysis reports, it does not correct; a loader correction goes through
+  an M11 task.
 
-### [x] T16.11 — Écart entre splits et couverture hors domaine
-- **Spec** : §8.3 · **Dépend de** : T16.5, T16.6 · **Taille** : S
-- **Contenu** :
-  - distributions train et test superposées (classes, tailles, densité), avec une
-    distance simple par grandeur (écart des parts par classe, distance entre
-    histogrammes) ;
-  - couverture de `MAPPINGS` : part des objets du jeu qui ont une classe VOC ou COCO,
-    c'est-à-dire ce qu'évaluent les notebooks hors domaine de T14.5.
-- **Acceptation** : la couverture donnée égale le nombre d'objets évalués par
-  `eval_voc.py` hors domaine sur le même split.
+### [x] T16.11 — Gap between splits and out-of-domain coverage
+- **Spec**: §8.3 · **Depends on**: T16.5, T16.6 · **Size**: S
+- **Contents**:
+  - train and test distributions overlaid (classes, sizes, density), with a simple distance
+    per quantity (gap of the shares per class, distance between histograms);
+  - coverage of `MAPPINGS`: share of the objects of the dataset that have a VOC or COCO
+    class, that is what the out-of-domain notebooks of T14.5 evaluate.
+- **Acceptance**: the coverage given equals the number of objects evaluated by
+  `eval_voc.py` out of domain on the same split.
 
-## C. Exécution par jeu
+## C. Run per dataset
 
-Chaque tâche lance le notebook du jeu sur les splits complets (`SAMPLE` par défaut),
-remplit sa section de [stats-jeux.md](stats-jeux.md), et répond à la question propre au
-jeu ([Questions par jeu](#questions-par-jeu)).
+Each task runs the notebook of the dataset on the full splits (default `SAMPLE`), fills its
+section of [stats-jeux.md](stats-jeux.md), and answers the question specific to the
+dataset ([Questions per dataset](#questions-per-dataset)).
 
 ### [x] T16.12 — VOC
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : comptes de VOC2007 test, VOC2007 trainval et VOC2012 trainval égaux
-  aux chiffres du devkit (`OFFICIAL`) ; AP par classe de T13.13 mise en regard du nombre
-  et de la taille des objets.
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: counts of VOC2007 test, VOC2007 trainval and VOC2012 trainval equal to
+  the devkit figures (`OFFICIAL`); AP per class of T13.13 set against the number and the
+  size of the objects.
 
 ### [ ] T16.13 — COCO val2017
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : 5 000 images, 36 781 objets (dont `iscrowd`) ; parts petit, moyen,
-  grand avant et après réduction à 416.
-- **Notes** : train2017 se limite aux annotations (pas de lecture de pixels) ; le split
-  `calib2017` de `tools/coco_subset.py` est comparé à val2017.
-- **Reste** : `data/coco` absent du PC ; lancer `tools/get_datasets.sh coco` puis le
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: 5,000 images, 36,781 objects (including `iscrowd`); small, medium and
+  large shares before and after reduction to 416.
+- **Notes**: train2017 is limited to the annotations (no pixel reading); the `calib2017`
+  split of `tools/coco_subset.py` is compared with val2017.
+- **Remaining**: `data/coco` missing from the PC; run `tools/get_datasets.sh coco` then the
   notebook `notebooks/coco/coco_stats.ipynb`.
 
 ### [ ] T16.14 — KITTI
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : comptes du découpage `kitti_ids` (5 985 train, 1 496 val) ; tailles
-  d'objets en `letterbox` et `stretch` à 416, et à l'entrée non carrée de T11.4.
-- **Reste** : seules les images `testing/` sont sur le PC (`data/kitti dataset/`), et
-  `data/kitti/data_object_image_2.zip.part` est incomplet ; finir le téléchargement de
-  `training/image_2`, puis lancer `notebooks/kitti/kitti_stats.ipynb` (la question propre
-  refait la géométrie à 640x192).
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: counts of the `kitti_ids` split (5,985 train, 1,496 val); object sizes
+  in `letterbox` and `stretch` at 416, and at the non-square input of T11.4.
+- **Remaining**: only the `testing/` images are on the PC (`data/kitti dataset/`), and
+  `data/kitti/data_object_image_2.zip.part` is incomplete; finish the download of
+  `training/image_2`, then run `notebooks/kitti/kitti_stats.ipynb` (the specific question
+  redoes the geometry at 640x192).
 
 ### [x] T16.15 — VisDrone
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : 6 471 + 548 images ; part des objets sous 16 px à 416 et cibles
-  perdues par collision, mises en regard des mAP par classe de M15.
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: 6,471 + 548 images; share of objects under 16 px at 416 and targets lost
+  by collision, set against the per-class mAPs of M15.
 
 ### [x] T16.16 — FLIR
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : effectifs mesurés de la version v2 (le dépôt n'en a pas encore) ;
-  histogramme thermique sur un canal, face à l'échelle d'entrée INT8 de L00.
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: measured counts of version v2 (the repository does not have them yet);
+  thermal histogram on one channel, against the INT8 input scale of L00.
 
 ### [x] T16.17 — ExDark
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : effectifs par split du découpage officiel ; luminance moyenne par
-  type d'éclairage (colonne de `imageclasslist.txt`), face à VOC.
-- **Notes** : le type d'éclairage n'est pas lu par le chargeur ; `data_stats.py` le lit
-  dans `imageclasslist.txt` sans changer `load_exdark`.
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: counts per split of the official split; mean luminance per lighting type
+  (column of `imageclasslist.txt`), against VOC.
+- **Notes**: the lighting type is not read by the loader; `data_stats.py` reads it from
+  `imageclasslist.txt` without changing `load_exdark`.
 
 ### [x] T16.18 — CrowdHuman
-- **Dépend de** : T16.4 à T16.11 · **Taille** : S
-- **Acceptation** : 15 000 + 4 370 images ; part des images au-delà de 256 et de 1 024
-  objets ; part des boîtes en `difficult` (`ignore`, `mask`).
+- **Depends on**: T16.4 to T16.11 · **Size**: S
+- **Acceptance**: 15,000 + 4,370 images; share of images beyond 256 and 1,024 objects;
+  share of the boxes in `difficult` (`ignore`, `mask`).
 
 ### [x] T16.19 — Cross-dataset comparison
 - **Depends on**: T16.12 to T16.18 · **Size**: M
@@ -323,18 +326,18 @@ jeu ([Questions par jeu](#questions-par-jeu)).
 
 ---
 
-## Hors périmètre
+## Out of scope
 
-- Nettoyage ou réannotation des jeux.
-- Statistiques sur les détections d'un modèle (elles relèvent de `eval_voc.py` et de M14).
-- Analyse des images thermiques 16 bits de FLIR, et des images RGB appariées.
-- Toute dépendance à pandas, seaborn ou une bibliothèque d'analyse de jeux.
+- Cleaning or re-annotating the datasets.
+- Statistics on the detections of a model (they belong to `eval_voc.py` and M14).
+- Analysis of the 16-bit thermal images of FLIR, and of the paired RGB images.
+- Any dependency on pandas, seaborn or a dataset analysis library.
 
-## Ordre conseillé
+## Suggested order
 
-T16.0 → T16.2 et T16.1 → T16.3 → sections B dans l'ordre, chacune vérifiée sur VOC ;
-puis T16.12 (VOC, où tout est vérifiable contre le devkit), T16.15 et T16.14 (jeux
-balayés en M15), et les autres jeux à mesure qu'ils sont sur le Drive.
+T16.0 → T16.2 and T16.1 → T16.3 → sections B in order, each checked on VOC; then T16.12
+(VOC, where everything can be checked against the devkit), T16.15 and T16.14 (datasets
+swept in M15), and the other datasets as they reach the Drive.
 
 ```mermaid
 graph LR
@@ -347,5 +350,5 @@ graph LR
   T160 --> T165[T16.5] & T166[T16.6] & T168[T16.8] & T1610[T16.10]
   T166 --> T167[T16.7] & T169[T16.9]
   T165 & T166 --> T1611[T16.11]
-  T164 & T165 & T167 & T168 & T169 & T1610 & T1611 --> C[T16.12 à T16.18]
+  T164 & T165 & T167 & T168 & T169 & T1610 & T1611 --> C[T16.12 to T16.18]
 ```
