@@ -75,20 +75,20 @@ thousands separator (56.30, 132,031).
 
 ## A. Rules and hand-written documents
 
-### [ ] T19.0 — Rules and glossary
+### [x] T19.0 — Rules and glossary
 - **Depends on**: — · **Size**: S
 - **Deliverables**: this document's conventions moved into `docs/conventions.md`
   (a "Language" section) once that file is translated; the glossary kept here.
 - **Acceptance**: every later task follows the glossary; new docs since 2026-10-07 are in
   English.
 
-### [ ] T19.1 — Specification
+### [x] T19.1 — Specification
 - **Depends on**: T19.0 · **Size**: M
 - **Deliverables**: `yolo-embarque-de-zero.md` in English, keeping its section numbers
   (§4.1, §10.5…), which the tasks cite.
 - **Acceptance**: every `§` reference in `docs/tasks/` still points to the right section.
 
-### [ ] T19.2 — README, architecture, conventions, ADRs
+### [x] T19.2 — README, architecture, conventions, ADRs
 - **Depends on**: T19.0 · **Size**: S
 - **Deliverables**: `README.md`, `docs/architecture.md`, `docs/conventions.md`,
   `docs/adr/*.md`.

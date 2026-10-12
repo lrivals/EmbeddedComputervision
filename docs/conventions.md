@@ -1,149 +1,170 @@
 # Conventions
 
-## Tenseurs
+## Language
 
-- Format **NCHW** partout : lot, canaux, hauteur, largeur (spec §0).
-- Poids de convolution : `(F, C, k, k)`.
-- Tête YOLO : sortie `(N, A·(5+C), S, S)`, réorganisée en `(N, A, 5+C, S, S)` ; ordre des
-  5 premiers canaux : `t_x, t_y, t_w, t_h, t_o`, puis les classes.
-- Python : `float64` pour les gradchecks, `float32` pour l'entraînement ; entier : `int8`
-  pour les activations et les poids, `int32` pour les accumulateurs et les biais.
+English is the project's only language (M19,
+[M19-english.md](tasks/M19-english.md)).
 
-## Boîtes et ancres
+- **Everything new** is written in English: documents, milestones, tasks, commit messages,
+  notebook text, generated text, docstrings, comments and messages. French text that remains
+  is translated by its M19 task; until then, a small edit inside a French passage may stay
+  in French to match its surroundings.
+- **Glossary**: one English term for each project term, used everywhere (dataset, tier,
+  sweep, fine-tuning, template, datasheet…). The reference list is the glossary of
+  [M19-english.md](tasks/M19-english.md#conventions).
+- **What changes and what stays**: prose, generated text, labels, docstrings, comments and
+  messages are translated. Identifiers, file names and paths are kept (`gabarits.py`,
+  `M11-jeux-de-donnees.md`, `palier_of`, `FICHES`…), as are dataset class names and the
+  names of upstream files.
+- **Numbers and dates**: decimal point and comma as the thousands separator (56.30,
+  132,031), ISO dates (2026-10-07), units with a space (416 px, 0.45 s). A translation never
+  changes a measured value, only its formatting.
 
-- Vérités terrain normalisées dans `[0, 1]` : `(cx, cy, w, h)` relatifs à l'image après
+## Tensors
+
+- **NCHW** layout everywhere: batch, channels, height, width (spec §0).
+- Convolution weights: `(F, C, k, k)`.
+- YOLO head: output `(N, A·(5+C), S, S)`, reorganised into `(N, A, 5+C, S, S)`; order of the
+  first 5 channels: `t_x, t_y, t_w, t_h, t_o`, then the classes.
+- Python: `float64` for the gradchecks, `float32` for training; integer: `int8` for
+  activations and weights, `int32` for accumulators and biases.
+
+## Boxes and anchors
+
+- Ground truths normalised to `[0, 1]`: `(cx, cy, w, h)` relative to the image after
   letterbox.
-- Ancres stockées **en pixels pour une entrée de 416** (comme les `.cfg` Darknet) et
-  converties en fraction de l'image au moment de l'utilisation.
-- Ordre des ancres croissant par aire ; Tiny-YOLOv3 : indices 3-5 → tête 13×13,
-  0-2 → tête 26×26.
-- Conversion en fraction : **toujours /416** (`yolo.data.targets.ANCHOR_REF`), y compris en
-  multi-échelle : une ancre couvre la même part de l'image à toutes les tailles d'entrée.
-- Réseau **non carré** (T11.4, cfg `width ≠ height`) : ancres en pixels de l'entrée
-  `width × height` de la cfg, converties par `/width` et `/height`
-  (`yolo.data.targets.anchor_ref`, `hwpp::anchor_ref_w/_h` en C++). Un réseau carré garde la
-  référence 416 × 416 quelle que soit sa taille. Le pas des têtes doit être le même sur les
-  deux axes (`width / S_w = height / S_h`, puissance de 2 pour `yolo_post`) ; les coins du
-  post-traitement matériel sont en pixels Q4 de ce repère.
-- Taille d'entrée des outils : `--size S` ou `--size LxH` (largeur × hauteur, ex.
-  `640x192`) ; défaut : l'entrée de la cfg. En interne, `(H, W)`
-  (`yolo.data.letterbox.as_hw`). En multi-échelle, un réseau non carré garde son rapport
-  d'aspect (`yolo.train.trainer.scaled_input`).
-- Entrée à **un canal** (T11.7, cfg `channels=1`) : luminance PIL (`convert("L")`) en Python,
-  luminance de stb (`stbi_load(…, 1)`) sur l'ARM ; augmentation sans teinte ni saturation.
-- Perte : somme sur le lot dans `yolo_loss`, divisée par N dans le trainer ; seuil *ignore*
-  0,5 par défaut (§2.3 ; les `.cfg` Darknet utilisent 0,7).
+- Anchors stored **in pixels for a 416 input** (as in the Darknet `.cfg` files) and
+  converted to a fraction of the image when used.
+- Anchors in increasing order of area; Tiny-YOLOv3: indices 3-5 → 13×13 head,
+  0-2 → 26×26 head.
+- Conversion to a fraction: **always /416** (`yolo.data.targets.ANCHOR_REF`), multi-scale
+  included: an anchor covers the same share of the image at every input size.
+- **Non-square** network (T11.4, cfg `width ≠ height`): anchors in pixels of the cfg's
+  `width × height` input, converted by `/width` and `/height`
+  (`yolo.data.targets.anchor_ref`, `hwpp::anchor_ref_w/_h` in C++). A square network keeps
+  the 416 × 416 reference whatever its size. The stride of the heads must be the same on
+  both axes (`width / S_w = height / S_h`, a power of 2 for `yolo_post`); the corners of the
+  hardware post-processing are in Q4 pixels of this frame.
+- Input size of the tools: `--size S` or `--size WxH` (width × height, e.g. `640x192`);
+  default: the cfg input. Internally, `(H, W)` (`yolo.data.letterbox.as_hw`). In
+  multi-scale, a non-square network keeps its aspect ratio
+  (`yolo.train.trainer.scaled_input`).
+- **Single-channel** input (T11.7, cfg `channels=1`): PIL luminance (`convert("L")`) in
+  Python, stb luminance (`stbi_load(…, 1)`) on the ARM; augmentation without hue or
+  saturation.
+- Loss: sum over the batch in `yolo_loss`, divided by N in the trainer; *ignore* threshold
+  0.5 by default (§2.3; the Darknet `.cfg` files use 0.7).
 
-## Inférence et évaluation
+## Inference and evaluation
 
-- Seuils : démo `conf = 0,25`, mAP `conf = 0,005` (toute la courbe P/R) ; NMS par classe
-  `iou = 0,45`, suppression si IoU > seuil (§8.2).
-- mAP : AP 11 points VOC2007, pixels VOC (largeur `x2 − x1 + 1`), apparié si IoU ≥ 0,5
-  (`VOCevaldet.m`), `difficult` ignorés (§8.3).
-- Référence flottante (T3.4) : Tiny-YOLOv2 VOC, poids Darknet, **redimensionnement direct**
-  416×416 (`--resize stretch`, sans letterbox) : mAP 56,30. M4 et M8 se comparent à elle
-  avec le même prétraitement.
+- Thresholds: demo `conf = 0.25`, mAP `conf = 0.005` (the whole P/R curve); per-class NMS
+  `iou = 0.45`, suppression if IoU > threshold (§8.2).
+- mAP: VOC2007 11-point AP, VOC pixels (width `x2 − x1 + 1`), matched if IoU ≥ 0.5
+  (`VOCevaldet.m`), `difficult` ignored (§8.3).
+- Float reference (T3.4): Tiny-YOLOv2 VOC, Darknet weights, **direct resize** to 416×416
+  (`--resize stretch`, no letterbox): mAP 56.30. M4 and M8 compare against it with the same
+  preprocessing.
 
-## Nommage
+## Naming
 
-- Couches numérotées comme dans les tableaux du §3 (`L00` … `L23`), identiques au `.cfg`
-  Darknet. Les dumps et le manifest utilisent ces numéros.
-- Tâches : `T<jalon>.<n>` ; branche git suggérée : `t1.2-conv`.
+- Layers numbered as in the tables of §3 (`L00` … `L23`), identical to the Darknet `.cfg`.
+  The dumps and the manifest use these numbers.
+- Tasks: `T<milestone>.<n>`; suggested git branch: `t1.2-conv`.
 
-## Format d'échange (`model/<nom>/`)
+## Exchange format (`model/<name>/`)
 
-Schéma : [manifest.schema.json](manifest.schema.json) ; exemple complet :
-`model/example_manifest.json`, généré par `tools/make_example_manifest.py` (valeurs fictives).
-Validation : `pytest python/tests/test_manifest.py`.
+Schema: [manifest.schema.json](manifest.schema.json); full example:
+`model/example_manifest.json`, generated by `tools/make_example_manifest.py` (dummy
+values). Validation: `pytest python/tests/test_manifest.py`.
 
-- **Blobs** little-endian, chaque tableau commence sur une frontière de **64 octets** ;
-  `w_offset`, `b_offset`, `m0_offset` sont en **octets** depuis le début du fichier.
-  - `weights.bin` : int8, ordre `(F, C, k, k)` contigu, poids après fusion BN (§9.1).
-  - `bias.bin` : int32, un par canal de sortie, $q_b = \text{round}(b'/(s_x s_w))$ (§9.3).
-  - `requant.bin` : int32, $M_0$ par canal de sortie ; `shift` = $n$ de la couche (§9.3).
-- **Tampons** (`buffers`) : zones DDR nommées, taille en octets. Une activation est un tenseur
-  `(C, H, W)` int8 contigu à `{buf, offset}` (offset en octets) ; le lot vaut 1.
-  Concaténer sur les canaux revient donc à écrire les sources bout à bout.
-- **Échelles** : symétriques, `valeur réelle = q × scale`. Une conv a `in_scale` et
-  `out_scale` ; maxpool, upsample et route conservent l'échelle de leur entrée.
-- **Couches** : les 24 couches du §3.2 sont toutes listées, avec leur numéro (`id`).
-  - Maxpool fusionné : la conv porte `fused_pool = {layer, k, s}` et écrit directement la carte
-    poolée (son `out_shape` est celui après pooling) ; le maxpool reste listé avec
-    `fused_into`. Stride 1 : complétion par réplication à droite et en bas (§4.4).
-  - `prepool_out` : seconde sortie d'une conv à pool fusionné, carte **avant** pooling, pour une
-    route (couche 8 → route 20).
-  - Route `layout: "contiguous"` : les sources sont déjà bout à bout dans le même tampon, dans
-    l'ordre de `from` ; `out` pointe sur la première, la route ne copie rien (§10.3). Les
-    sources doivent partager la **même échelle** (contrainte pour la quantification, T4).
-  - Upsample : `out` réserve la place d'une copie ×2 (début du tampon de la route 20). Le
-    golden C++ (M5) ne fait **aucune copie** : la conv suivante lit la source par division
-    d'adresse `(r >> 1, c >> 1)` ; son entrée est une vue à segments (`golden::InView`) et la
-    route 20 se lit en deux segments, L18 vue ×2 puis le prépool de L08 à `R + 128·26·26`.
-    `R:[0, 128·26·26)` n'est jamais écrit.
-  - `yolo` : `mask` = indices dans `anchors` ; lit la tête à `in`.
-- `region` (YOLOv2) : `num` ancres, classes par softmax ; les ancres v2 ne sont pas entières
-  (34,56 px).
-- `luts.bin` (export réel) : pour chaque tête, à `lut_offset`, trois tables uint32 de 256
-  entrées : σ(q·s) en Q16 et e^{q·s} en Q`exp_frac` (≤ 16, pour tenir sur 32 bits)
-  indexées par `q + 128`, puis e^{d·s} en Q16 indexée par `d + 255`,
-  d = q_c − q_max ∈ [−255, 0] (softmax v2), avec s = `scale` de la tête.
-- Export réel : `model/<net>/` (`tools/export_model.py`), dumps `dumps/<id>/input.npy`,
-  `Lxx.npy` (sortie int8 de chaque couche) et `detections.json` pour 3 images de VOC2007 test.
-- **Allocation** (`yolo.io.export.layout`, commune à l'exemple et à l'export) : ping-pong
-  A/B ; `S` garde la couche 13 (lue par 14 et par la route 17) ; `R` reçoit 19 puis 8 ;
-  `H13`/`H26` reçoivent les têtes. Aucune écriture ne
-  recouvre un tenseur encore à lire (vérifié par le test).
+- **Blobs** in little-endian, each array starts on a **64-byte** boundary; `w_offset`,
+  `b_offset`, `m0_offset` are in **bytes** from the start of the file.
+  - `weights.bin`: int8, contiguous `(F, C, k, k)` order, weights after BN folding (§9.1).
+  - `bias.bin`: int32, one per output channel, $q_b = \text{round}(b'/(s_x s_w))$ (§9.3).
+  - `requant.bin`: int32, $M_0$ per output channel; `shift` = $n$ of the layer (§9.3).
+- **Buffers** (`buffers`): named DDR areas, size in bytes. An activation is a contiguous
+  int8 `(C, H, W)` tensor at `{buf, offset}` (offset in bytes); the batch is 1.
+  Concatenating on the channels therefore means writing the sources end to end.
+- **Scales**: symmetric, `real value = q × scale`. A conv has `in_scale` and `out_scale`;
+  maxpool, upsample and route keep the scale of their input.
+- **Layers**: the 24 layers of §3.2 are all listed, with their number (`id`).
+  - Fused maxpool: the conv carries `fused_pool = {layer, k, s}` and writes the pooled map
+    directly (its `out_shape` is the one after pooling); the maxpool stays listed with
+    `fused_into`. Stride 1: padding by replication on the right and at the bottom (§4.4).
+  - `prepool_out`: second output of a conv with a fused pool, the map **before** pooling,
+    for a route (layer 8 → route 20).
+  - Route `layout: "contiguous"`: the sources are already end to end in the same buffer, in
+    the order of `from`; `out` points to the first one, the route copies nothing (§10.3).
+    The sources must share the **same scale** (a constraint for the quantization, T4).
+  - Upsample: `out` reserves room for a ×2 copy (start of the buffer of route 20). The C++
+    golden model (M5) makes **no copy**: the next conv reads the source by address division
+    `(r >> 1, c >> 1)`; its input is a segmented view (`golden::InView`) and route 20 is
+    read in two segments, L18 seen ×2 then the prepool of L08 at `R + 128·26·26`.
+    `R:[0, 128·26·26)` is never written.
+  - `yolo`: `mask` = indices into `anchors`; reads the head at `in`.
+- `region` (YOLOv2): `num` anchors, classes by softmax; the v2 anchors are not integers
+  (34.56 px).
+- `luts.bin` (real export): for each head, at `lut_offset`, three 256-entry uint32 tables:
+  σ(q·s) in Q16 and e^{q·s} in Q`exp_frac` (≤ 16, to fit in 32 bits) indexed by `q + 128`,
+  then e^{d·s} in Q16 indexed by `d + 255`, d = q_c − q_max ∈ [−255, 0] (v2 softmax), with
+  s = `scale` of the head.
+- Real export: `model/<net>/` (`tools/export_model.py`), dumps `dumps/<id>/input.npy`,
+  `Lxx.npy` (int8 output of each layer) and `detections.json` for 3 images of VOC2007 test.
+- **Allocation** (`yolo.io.export.layout`, shared by the example and the export): A/B
+  ping-pong; `S` keeps layer 13 (read by 14 and by route 17); `R` receives 19 then 8;
+  `H13`/`H26` receive the heads. No write overlaps a tensor that is still to be read
+  (checked by the test).
 
-## Arithmétique entière (contrat Python ↔ C++ ↔ HLS)
+## Integer arithmetic (Python ↔ C++ ↔ HLS contract)
 
-Référence : `python/yolo/quant/int_layers.py` ; tout entier signé, décalages **arithmétiques**.
+Reference: `python/yolo/quant/int_layers.py`; all integers signed, **arithmetic** shifts.
 
-- Entrée : `q = ⌊x·127 + ½⌋` (x ∈ [0, 1], échelle 1/127), fait par l'hôte.
-- Accumulateur : `acc = Σ q_w·q_x + q_b` sur 32 bits signés (int8 × int8, biais int32).
-- Requantification : `y = (acc·M0 + 2ⁿ⁻¹) >> n`, produit sur **64 bits**, `M0 < 2³¹` par
-  canal, `n ≤ 31` par couche (`shift`). Arrondi au plus proche, demis vers +∞
-  (−2,5 → −2, −0,5 → 0).
-- Leaky : `y > 0 ? y : (13·y + 64) >> 7` (pente 13/128, **arrondie** de la même façon ;
-  le plancher `(13·y) >> 7` du §9.3 biaise les négatifs de −½ pas par couche).
-- Saturation : `clip(y, −qmax, qmax)` après la leaky, `qmax = 127` sauf champ `qmax` de la
-  conv dans le manifest (activations à b bits : 2^{b−1} − 1, T9.3) ; −128 n'est jamais
-  produit.
-- Maxpool, upsample, route : exacts (max et copies) ; maxpool stride 1 par réplication.
-- Têtes : `M0`/`shift` comme les autres convs, sans leaky.
+- Input: `q = ⌊x·127 + ½⌋` (x ∈ [0, 1], scale 1/127), done by the host.
+- Accumulator: `acc = Σ q_w·q_x + q_b` on 32 signed bits (int8 × int8, int32 bias).
+- Requantization: `y = (acc·M0 + 2ⁿ⁻¹) >> n`, product on **64 bits**, `M0 < 2³¹` per
+  channel, `n ≤ 31` per layer (`shift`). Round to nearest, halves towards +∞
+  (−2.5 → −2, −0.5 → 0).
+- Leaky: `y > 0 ? y : (13·y + 64) >> 7` (slope 13/128, **rounded** the same way; the
+  floor `(13·y) >> 7` of §9.3 biases the negatives by −½ step per layer).
+- Saturation: `clip(y, −qmax, qmax)` after the leaky, `qmax = 127` unless the conv has a
+  `qmax` field in the manifest (b-bit activations: 2^{b−1} − 1, T9.3); −128 is never
+  produced.
+- Maxpool, upsample, route: exact (max and copies); stride-1 maxpool by replication.
+- Heads: `M0`/`shift` like the other convs, without leaky.
 
-## Tolérances de test
+## Test tolerances
 
-| Comparaison | Tolérance |
+| Comparison | Tolerance |
 |---|---|
-| gradcheck (différences centrées, h = 1e-6, float64) | erreur relative ≤ 1e-7 (norme max du tenseur, `yolo.testing.gradcheck`) |
-| implémentation optimisée vs naïve (float64) | ≤ 1e-12 |
-| fusion BN vs conv + BN | ≤ 1e-12 |
-| entier Python vs golden C++ vs HLS vs carte | **égalité exacte** |
-| mAP entière vs flottante | écart à documenter ; cible ≤ 1 point (sinon QAT, T4.6) |
+| gradcheck (centred differences, h = 1e-6, float64) | relative error ≤ 1e-7 (max norm of the tensor, `yolo.testing.gradcheck`) |
+| optimised vs naive implementation (float64) | ≤ 1e-12 |
+| BN folding vs conv + BN | ≤ 1e-12 |
+| Python integer vs C++ golden vs HLS vs board | **exact equality** |
+| integer vs float mAP | gap to be documented; target ≤ 1 point (otherwise QAT, T4.6) |
 
 ## Code
 
-- Python : fonctions `forward(x) -> (y, cache)` et `backward(dy, cache) -> (dx, grads)`.
-  Pas de dépendance hors NumPy dans `python/yolo/` (Pillow toléré dans `data/` pour lire les
-  images). CuPy est optionnel : importé seulement par `tools/train.py --device gpu`
-  ou par les tests GPU (`YOLO_DEVICE=gpu`, `make test-slow-gpu`)
-  (`yolo.backend`, T12.11) ; les couches prennent le module de leurs entrées
-  (`backend.get_xp`), si bien qu'un tableau NumPy reste calculé par NumPy.
-- C++ : C++17, en-têtes dans `cpp/golden/include/golden/` ; le code partagé avec HLS ne
-  fait pas d'allocation dynamique.
-- HLS (`hls/kernels/`) : le noyau compile en C++14 (défaut Vitis), sans allocation ni
-  bibliothèque non synthétisable ; il réutilise l'arithmétique de `golden/conv.hpp`
-  (`requantize`, `leaky_int`, `clip8`). Tuiles en macros `ACC_TM`, `ACC_TN`, `ACC_TR`,
-  `ACC_TC` (défauts KV260). Boucles nommées (`mac:`, `load_in:`…) pour lire leur II dans
-  les rapports. Le top est à portée globale (`set_top yolo_conv`). Testbenchs et driver :
-  C++17 ; code de sortie 0 = aucun écart.
-- Logiciel ARM (`sw/`) : C++17, bibliothèque standard + POSIX ; tout accès matériel passe
-  par `driver::Device` (backends `sim` et `uio`), jamais par des pointeurs bruts ailleurs.
-  Les offsets de registres de `sw/driver/regmap.hpp` doivent égaler ceux de l'en-tête
-  généré `xyolo_conv_hw.h` (`make check-regmap`) : en cas d'écart, l'en-tête fait foi.
-- Mesures (M8) : les périmètres de [results/protocole.md](../results/protocole.md) font foi.
-  FPS = 1 000 / latence moyenne de bout en bout (séquentiel) ; GOPS = 2 × MACs (convs) /
-  temps accélérateur ; p99 au rang le plus proche ; puissance toujours avec son périmètre
-  (puce estimée Vivado, SOM mesuré, carte entière). Une valeur non mesurée est marquée
-  « projection » ou laissée vide, jamais estimée sans le dire.
-- Chaque formule implémentée cite sa section de la spec en commentaire (`# §6.2`).
+- Python: functions `forward(x) -> (y, cache)` and `backward(dy, cache) -> (dx, grads)`.
+  No dependency other than NumPy in `python/yolo/` (Pillow tolerated in `data/` to read
+  the images). CuPy is optional: imported only by `tools/train.py --device gpu` or by the
+  GPU tests (`YOLO_DEVICE=gpu`, `make test-slow-gpu`) (`yolo.backend`, T12.11); the layers
+  take the module of their inputs (`backend.get_xp`), so a NumPy array stays computed by
+  NumPy.
+- C++: C++17, headers in `cpp/golden/include/golden/`; the code shared with HLS does no
+  dynamic allocation.
+- HLS (`hls/kernels/`): the kernel compiles as C++14 (Vitis default), without allocation or
+  non-synthesizable library; it reuses the arithmetic of `golden/conv.hpp` (`requantize`,
+  `leaky_int`, `clip8`). Tiles in the macros `ACC_TM`, `ACC_TN`, `ACC_TR`, `ACC_TC` (KV260
+  defaults). Named loops (`mac:`, `load_in:`…) to read their II in the reports. The top is
+  at global scope (`set_top yolo_conv`). Testbenches and driver: C++17; exit code 0 = no
+  difference.
+- ARM software (`sw/`): C++17, standard library + POSIX; every hardware access goes through
+  `driver::Device` (`sim` and `uio` backends), never through raw pointers elsewhere. The
+  register offsets of `sw/driver/regmap.hpp` must equal those of the generated header
+  `xyolo_conv_hw.h` (`make check-regmap`): if they differ, the header wins.
+- Measurements (M8): the scopes of [results/protocole.md](../results/protocole.md) are
+  authoritative. FPS = 1,000 / mean end-to-end latency (sequential); GOPS = 2 × MACs
+  (convs) / accelerator time; p99 at the nearest rank; power always with its scope (chip
+  estimated by Vivado, SOM measured, whole board). An unmeasured value is marked
+  "projection" or left empty, never estimated without saying so.
+- Each implemented formula cites its section of the spec in a comment (`# §6.2`).

@@ -1,19 +1,19 @@
-# ADR 0001 — Modèle de référence en Python + NumPy seul
+# ADR 0001 — Reference model in Python + NumPy only
 
-- Statut : **accepté** (2026-10-04)
+- Status: **accepted** (2026-10-04)
 
-## Contexte
+## Context
 
-La spec vise une réécriture « sans bibliothèque d'apprentissage » : chaque passe avant et
-arrière doit être écrite à la main et vérifiée (§4, §11).
+The spec aims at a rewrite "with no deep learning library": every forward and backward
+pass must be written by hand and checked (§4, §11).
 
-## Décision
+## Decision
 
-`python/yolo/` dépend uniquement de NumPy. Les gradients sont validés par différences finies
-(T1.1), pas par comparaison avec PyTorch.
+`python/yolo/` depends on NumPy only. The gradients are validated by finite differences
+(T1.1), not by comparison with PyTorch.
 
-## Conséquences
+## Consequences
 
-- Contrôle total des formules, réutilisable telles quelles pour le modèle entier.
-- Entraînement lent : la convolution passe par im2col (T1.2). La mAP de référence peut être
-  obtenue avec des poids Darknet pré-entraînés (T1.9), sans entraînement complet.
+- Full control of the formulas, reusable as they are for the integer model.
+- Slow training: the convolution goes through im2col (T1.2). The reference mAP can be
+  obtained with pre-trained Darknet weights (T1.9), without a full training.

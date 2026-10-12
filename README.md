@@ -1,105 +1,105 @@
-# YOLO embarqué de zéro
+# Embedded YOLO from scratch
 
 [![ci](https://github.com/lrivals/EmbeddedComputervision/actions/workflows/ci.yml/badge.svg)](https://github.com/lrivals/EmbeddedComputervision/actions/workflows/ci.yml)
 
-Réécriture à la main de **Tiny-YOLOv2** et **Tiny-YOLOv3** sans bibliothèque d'apprentissage
-(NumPy), puis quantification entière bit-exacte et accélérateur **FPGA en Vitis HLS**.
+A hand-written rewrite of **Tiny-YOLOv2** and **Tiny-YOLOv3** with no deep learning library
+(NumPy), followed by a bit-exact integer quantization and an **FPGA accelerator in Vitis
+HLS**.
 
-La spécification technique complète est [yolo-embarque-de-zero.md](yolo-embarque-de-zero.md) ;
-la documentation du projet y renvoie par numéro de section (§4.1, §9.3…).
+The full technical specification is [yolo-embarque-de-zero.md](yolo-embarque-de-zero.md);
+the project documentation refers to it by section number (§4.1, §9.3…).
 
-## Chaîne de développement
+## Development chain
 
 ```
-python/  modèle flottant ──► modèle entier bit-exact ──export──► model/ (manifest + blobs + dumps)
-                                                                     │
-cpp/golden/  moteur C++ tuilé, bit-exact ◄───────────────────────────┤ comparaison couche par couche
-hls/         accélérateur Vitis HLS (testbench = golden) ◄───────────┤ C-sim / co-sim
-sw/          driver ARM + post-traitement ◄──────────────────────────┘ test sur carte
+python/  float model ──► bit-exact integer model ──export──► model/ (manifest + blobs + dumps)
+                                                                  │
+cpp/golden/  tiled C++ engine, bit-exact ◄────────────────────────┤ layer-by-layer comparison
+hls/         Vitis HLS accelerator (testbench = golden) ◄─────────┤ C-sim / co-sim
+sw/          ARM driver + post-processing ◄───────────────────────┘ test on the board
 ```
 
-Détails : [docs/architecture.md](docs/architecture.md) · conventions :
-[docs/conventions.md](docs/conventions.md) · décisions : [docs/adr/](docs/adr/).
+Details: [docs/architecture.md](docs/architecture.md) · conventions:
+[docs/conventions.md](docs/conventions.md) · decisions: [docs/adr/](docs/adr/).
 
-## Plan de travail
+## Work plan
 
-Le travail est découpé en jalons M0 à M20 dans [docs/tasks/](docs/tasks/README.md). Chaque
-tâche indique la section de la spec, ses dépendances, ses livrables et un critère
-d'acceptation mesurable.
+The work is split into milestones M0 to M20 in [docs/tasks/](docs/tasks/README.md). Each
+task gives the section of the spec, its dependencies, its deliverables and a measurable
+acceptance criterion.
 
-- **M0 à M8** : la chaîne de base, du NumPy aux mesures sur carte.
-- **M9.1 à M9.4** : extensions de recherche (post-traitement matériel, REQ-YOLO, 4 bits,
+- **M0 to M8**: the base chain, from NumPy to measurements on the board.
+- **M9.1 to M9.4**: research extensions (hardware post-processing, REQ-YOLO, 4 bits,
   streaming).
-- **[M10](docs/tasks/M10-ameliorations.md)** : améliorations d'ingénierie chiffrées par
-  `tools/perf_model.py` (ports m_axi larges, requantification parallèle, pipeline ARM),
-  streaming synthétisable, précision mixte, élagage, CI (`.github/workflows/ci.yml`).
-- **[M11](docs/tasks/M11-jeux-de-donnees.md)** : jeux de données au-delà de VOC (COCO,
-  ExDark, KITTI, VisDrone, CrowdHuman, FLIR), chacun choisi pour éprouver une partie de la
-  chaîne.
-- **[M12](docs/tasks/M12-profils-pc.md)** : profils de test sur PC (R/M/N), avec un critère
-  et une décision par évaluation, avant de passer sur la carte.
-- **[M13](docs/tasks/M13-figures.md)** : figures régénérables par `make figures`
-  (architecture des modèles et de l'accélérateur, résultats, suivi du projet,
-  réimplémentation de zéro expliquée par ses formules, réseaux couche par couche) ;
-  galerie dans [results/figures.md](results/figures.md).
-- **[M14](docs/tasks/M14-notebooks.md)** : notebooks Jupyter d'inférence, d'entraînement et
-  de balayage (lot × sous-ensemble), un par modèle × jeu, générés par `make notebooks` et
-  exécutables en local comme sur Colab (GPU) ; l'inférence choisit ou compare les runs
-  entraînés ; index dans [notebooks/README.md](notebooks/README.md).
-- **[M15](docs/tasks/M15-campagne-entrainement.md)** : campagne d'entraînement sur Colab,
-  du balayage rapide au run long confirmé sur le split complet, jeu par jeu ; premiers
-  résultats (VOC, VisDrone, KITTI) dans
+- **[M10](docs/tasks/M10-ameliorations.md)**: engineering improvements costed by
+  `tools/perf_model.py` (wide m_axi ports, parallel requantization, ARM pipeline),
+  synthesizable streaming, mixed precision, pruning, CI (`.github/workflows/ci.yml`).
+- **[M11](docs/tasks/M11-jeux-de-donnees.md)**: datasets beyond VOC (COCO, ExDark, KITTI,
+  VisDrone, CrowdHuman, FLIR), each chosen to stress one part of the chain.
+- **[M12](docs/tasks/M12-profils-pc.md)**: test profiles on the PC (R/M/N), with a
+  criterion and a decision per evaluation, before moving to the board.
+- **[M13](docs/tasks/M13-figures.md)**: figures regenerated by `make figures` (architecture
+  of the models and of the accelerator, results, project tracking, the from-scratch
+  reimplementation explained by its formulas, networks layer by layer); gallery in
+  [results/figures.md](results/figures.md).
+- **[M14](docs/tasks/M14-notebooks.md)**: Jupyter notebooks for inference, training and
+  sweeps (batch × subset), one per model × dataset, generated by `make notebooks` and
+  runnable locally as well as on Colab (GPU); inference picks or compares the trained runs;
+  index in [notebooks/README.md](notebooks/README.md).
+- **[M15](docs/tasks/M15-campagne-entrainement.md)**: training campaign on Colab, from the
+  quick sweep to the long run confirmed on the full split, dataset by dataset; first
+  results (VOC, VisDrone, KITTI) in
   [resultats-balayages.md](docs/tasks/resultats-balayages.md).
 - **[M20](docs/tasks/M20-webcam.md)**: live webcam demo on the PC (`make webcam`): pick a
   model, live camera image, continuous inference, boxes and classes on screen; user guide
   in [docs/webcam.md](docs/webcam.md).
 
-## Arborescence
+## Layout
 
-| Dossier | Contenu |
+| Folder | Contents |
 |---|---|
-| `python/yolo/` | couches, modèles, données, entraînement, inférence, quantification, export |
-| `python/tests/` | tests pytest, dont les vérifications de gradients |
-| `cpp/golden/` | golden model C++17 bit-exact (bibliothèque + tests Catch2) |
-| `hls/` | noyaux Vitis HLS, testbenchs, scripts tcl, configurations par carte |
-| `sw/` | code ARM : driver de l'accélérateur, post-traitement, application |
-| `hw/boards/` | ressources des cartes candidates (yaml, roofline) — carte retenue : KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)) ; `kv260/` : block design Vivado, overlay, [procédure carte](hw/boards/kv260/README.md) |
-| `tools/` | scripts : comptage des MACs, roofline, comparaison des dumps, démos `detect.py` (image) et `webcam.py` (caméra, [guide](docs/webcam.md)) |
-| `model/` | modèles exportés (non versionnés) |
-| `notebooks/` | notebooks Jupyter de M14 (générés par `tools/notebooks/`), versionnés vides ou exécutés en entier sans erreur |
-| `results/` | `benchmarks.csv` des mesures (format du §10.4), protocole, rapports mAP, roofline, rapport HLS, rapport comparatif (`rapport.md`) |
-| `data/`, `weights/` | jeux de données et poids (non versionnés) |
+| `python/yolo/` | layers, models, data, training, inference, quantization, export |
+| `python/tests/` | pytest tests, including the gradient checks |
+| `cpp/golden/` | bit-exact C++17 golden model (library + Catch2 tests) |
+| `hls/` | Vitis HLS kernels, testbenches, tcl scripts, per-board configurations |
+| `sw/` | ARM code: accelerator driver, post-processing, application |
+| `hw/boards/` | resources of the candidate boards (yaml, roofline) — selected board: KV260 ([ADR 0003](docs/adr/0003-choix-carte.md)); `kv260/`: Vivado block design, overlay, [board procedure](hw/boards/kv260/README.md) |
+| `tools/` | scripts: MAC count, roofline, dump comparison, demos `detect.py` (image) and `webcam.py` (camera, [guide](docs/webcam.md)) |
+| `model/` | exported models (not versioned) |
+| `notebooks/` | M14 Jupyter notebooks (generated by `tools/notebooks/`), versioned empty or fully executed without error |
+| `results/` | `benchmarks.csv` of the measurements (format of §10.4), protocol, mAP reports, roofline, HLS report, comparative report (`rapport.md`) |
+| `data/`, `weights/` | datasets and weights (not versioned) |
 
-## Démarrage rapide
+## Quick start
 
 ```bash
-pip install -e "python[dev,data]"   # numpy ; dev : pytest, ruff, jsonschema ; data : pillow
-make test-py                        # tests NumPy
-make test-cpp                       # build + tests du golden model (télécharge Catch2)
-make golden-check                   # golden C++ == dumps Python de model/ (après make export)
-make roofline                       # tuiles et ms/image par carte → results/roofline.md
-make csim-gcc                       # C-sim du noyau HLS avec g++ : noyau == golden == dumps
-make hls-cycles hls-report          # cycles par couche (C-sim) → results/hls_report.md
-make csim hls-synth hls-cosim       # même chose dans Vitis HLS (BOARD=kv260 par défaut)
-make sw-sim                         # driver ARM sur PC (registres émulés) : DDR == dumps, détections
-make vivado-build fpga-firmware     # bitstream + overlay KV260 (Vivado), puis make sw-board sur la carte
-make perf-model                     # modèle de cycles == C-sim, pistes d'optimisation (M8)
-make m8-inputs m8-int bench-sim map-stades   # mAP flottant / entier / FPGA (C-sim) → results/map_stades.md
-make bench-report                   # results/benchmarks.csv, results/mesures.md (protocole : results/protocole.md)
-make ci-model ci                    # CI (T10.13) : export synthétique, sans VOC ni poids Darknet
-make count-macs                     # tableaux du §3 (paramètres, MACs)
-make figures                        # figures M13 → results/figures/, galerie results/figures.md
-make notebooks                      # notebooks M14 et M16 → notebooks/<jeu>/, index notebooks/README.md
-make notebooks-smoke                # fumée des notebooks dont les données sont là (T14.9)
-make test-durations                 # suite complète (slow compris) : durées des tests pour la figure T13.30
-tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 dans data/ (~3,6 Go)
-python tools/voc_stats.py --show 10 # comptes par split + images annotées dans build/
-python tools/data_stats.py --dataset visdrone --sample 200 --figures  # statistiques d'un jeu (M16)
-python tools/data_stats.py --report docs/tasks/stats-jeux.md         # synthèse des jeux (M16)
-tools/get_datasets.sh check         # jeux de M11 (COCO, KITTI… ; tools/get_datasets.sh coco)
-tools/get_datasets.sh kaggle        # relie les versions Kaggle (CrowdHuman, VisDrone, ExDark)
-tools/get_datasets.sh pack exdark   # data_archives/exdark.tar, à copier sur Drive pour Colab (M14)
-tools/m11.sh coco-float             # profils de M11 (liste : tools/m11.sh)
+pip install -e "python[dev,data]"   # numpy; dev: pytest, ruff, jsonschema; data: pillow
+make test-py                        # NumPy tests
+make test-cpp                       # build + golden model tests (downloads Catch2)
+make golden-check                   # C++ golden == Python dumps of model/ (after make export)
+make roofline                       # tiles and ms/image per board → results/roofline.md
+make csim-gcc                       # C-sim of the HLS kernel with g++: kernel == golden == dumps
+make hls-cycles hls-report          # cycles per layer (C-sim) → results/hls_report.md
+make csim hls-synth hls-cosim       # the same in Vitis HLS (BOARD=kv260 by default)
+make sw-sim                         # ARM driver on the PC (emulated registers): DDR == dumps, detections
+make vivado-build fpga-firmware     # KV260 bitstream + overlay (Vivado), then make sw-board on the board
+make perf-model                     # cycle model == C-sim, optimisation directions (M8)
+make m8-inputs m8-int bench-sim map-stades   # float / integer / FPGA (C-sim) mAP → results/map_stades.md
+make bench-report                   # results/benchmarks.csv, results/mesures.md (protocol: results/protocole.md)
+make ci-model ci                    # CI (T10.13): synthetic export, without VOC or Darknet weights
+make count-macs                     # tables of §3 (parameters, MACs)
+make figures                        # M13 figures → results/figures/, gallery results/figures.md
+make notebooks                      # M14 and M16 notebooks → notebooks/<dataset>/, index notebooks/README.md
+make notebooks-smoke                # smoke run of the notebooks whose data is present (T14.9)
+make test-durations                 # full suite (slow included): test durations for figure T13.30
+tools/get_voc.sh                    # PASCAL VOC 2007 + 2012 in data/ (~3.6 GB)
+python tools/voc_stats.py --show 10 # counts per split + annotated images in build/
+python tools/data_stats.py --dataset visdrone --sample 200 --figures  # statistics of a dataset (M16)
+python tools/data_stats.py --report docs/tasks/stats-jeux.md         # summary of the datasets (M16)
+tools/get_datasets.sh check         # M11 datasets (COCO, KITTI…; tools/get_datasets.sh coco)
+tools/get_datasets.sh kaggle        # links the Kaggle versions (CrowdHuman, VisDrone, ExDark)
+tools/get_datasets.sh pack exdark   # data_archives/exdark.tar, to copy to Drive for Colab (M14)
+tools/m11.sh coco-float             # M11 profiles (list: tools/m11.sh)
 ```
 
 ## Live webcam demo
