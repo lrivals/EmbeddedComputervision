@@ -1,90 +1,91 @@
-# M6 — Accélérateur Vitis HLS
+# M6 — Vitis HLS accelerator
 
-Objectif : un noyau HLS « moteur unique couche par couche » (§10.1), validé en C-sim puis en
-co-simulation RTL contre le golden model, avec des rapports de synthèse exploitables.
+Goal: an HLS kernel "single engine, layer by layer" (§10.1), validated in C-sim then in RTL
+co-simulation against the golden model, with usable synthesis reports.
 
-### [ ] T6.0 — Choix de la carte
-- **Spec** : §10.1, §10.4 · **Dépend de** : T5.6 · **Taille** : S
-- **Livrables** : [ADR 0003](../adr/0003-choix-carte.md) complété ;
-  `hls/configs/<carte>.tcl` (part, horloge, tuiles retenues)
-- **Acceptation** : décision argumentée selon les critères de l'ADR ; installation des
-  outils Vivado/Vitis correspondants vérifiée
-- **Fait** : ADR 0003 accepté : **KV260**, tuiles 32, 24, 13, 13 à 200 MHz (point
-  roofline de T5.6, 6× plus rapide que les Zynq-7020 au même prix) ;
-  `hls/configs/kv260.tcl`, plus `zybo-z7-20.tcl` (8, 16, 13, 13) pour tester des tuiles
-  plus petites.
-- **Reste** : Vitis/Vivado absent de la machine de développement — installation à faire et
-  à vérifier (`which vitis_hls`).
+### [ ] T6.0 — Choice of the board
+- **Spec**: §10.1, §10.4 · **Depends on**: T5.6 · **Size**: S
+- **Deliverables**: [ADR 0003](../adr/0003-choix-carte.md) completed;
+  `hls/configs/<board>.tcl` (part, clock, selected tiles)
+- **Acceptance**: decision argued along the criteria of the ADR; installation of the
+  corresponding Vivado/Vitis tools checked
+- **Done**: ADR 0003 accepted: **KV260**, tiles 32, 24, 13, 13 at 200 MHz (roofline point
+  of T5.6, 6× faster than the Zynq-7020 boards at the same price); `hls/configs/kv260.tcl`,
+  plus `zybo-z7-20.tcl` (8, 16, 13, 13) to test smaller tiles.
+- **Remaining**: Vitis/Vivado missing from the development machine — installation to do and
+  to check (`which vitis_hls`).
 
-### [ ] T6.1 — PE de convolution
-- **Spec** : §10.2 · **Dépend de** : T6.0, T5.2 · **Taille** : L
-- **Livrables** : `hls/kernels/conv_pe.cpp`, `hls/tb/tb_conv.cpp`, `hls/scripts/csim.tcl`
-- **Acceptation** : C-sim == golden pour toutes les couches conv ; boucle interne
-  `PIPELINE II=1`, `UNROLL` de Tm × Tn, II atteint dans le rapport de synthèse
-- **Notes** : `ap_int<8>` / `ap_int<32>` ; arbre d'additions sur Tn ; partition des
-  tampons alignée sur le déroulage
-- **Fait** : `hls/kernels/conv_pe.cpp` (+ `accel.hpp`, `layer_desc.hpp`) : même parcours
-  de tuiles que `golden::conv_layer` ; boucle (i, j, trr, tcc) aplatie en `PIPELINE II=1`,
-  too et tii `UNROLL`, somme sur Tn en `acc_t` ; `in_buf` partitionné dim 1, `w_buf` dims 1-2,
-  `out_buf` dim 1, `DEPENDENCE inter false`. Tailles des tampons vérifiées contre B_in, B_w,
-  B_out. `hls/tb/tb_conv.cpp` : chaque conv des deux réseaux, 3 images, sortie == golden ==
-  dump (carte poolée et carte avant pooling), tuiles KV260 et Zybo. C-sim avec g++ et les
-  en-têtes `ap_int` open source (`hls/CMakeLists.txt`, `make csim-gcc`) ;
-  `hls/scripts/csim.tcl` (`make csim`) prêt pour Vitis.
-- **Reste** : II = 1 atteint dans le rapport de synthèse (`make hls-synth`, Vitis requis).
+### [ ] T6.1 — Convolution PE
+- **Spec**: §10.2 · **Depends on**: T6.0, T5.2 · **Size**: L
+- **Deliverables**: `hls/kernels/conv_pe.cpp`, `hls/tb/tb_conv.cpp`,
+  `hls/scripts/csim.tcl`
+- **Acceptance**: C-sim == golden for all the conv layers; inner loop `PIPELINE II=1`,
+  `UNROLL` of Tm × Tn, II reached in the synthesis report
+- **Notes**: `ap_int<8>` / `ap_int<32>`; adder tree on Tn; buffer partitioning aligned on
+  the unrolling
+- **Done**: `hls/kernels/conv_pe.cpp` (+ `accel.hpp`, `layer_desc.hpp`): same tile order as
+  `golden::conv_layer`; loop (i, j, trr, tcc) flattened in `PIPELINE II=1`, too and tii
+  `UNROLL`, sum over Tn in `acc_t`; `in_buf` partitioned on dim 1, `w_buf` on dims 1-2,
+  `out_buf` on dim 1, `DEPENDENCE inter false`. Buffer sizes checked against B_in, B_w,
+  B_out. `hls/tb/tb_conv.cpp`: each conv of both networks, 3 images, output == golden ==
+  dump (pooled map and pre-pooling map), KV260 and Zybo tiles. C-sim with g++ and the
+  open-source `ap_int` headers (`hls/CMakeLists.txt`, `make csim-gcc`);
+  `hls/scripts/csim.tcl` (`make csim`) ready for Vitis.
+- **Remaining**: II = 1 reached in the synthesis report (`make hls-synth`, Vitis
+  required).
 
-### [ ] T6.2 — Interfaces mémoire et contrôle
-- **Spec** : §10.2 (double tampon) · **Dépend de** : T6.1 · **Taille** : L
-- **Livrables** : `m_axi` pour poids, activations et requant ; `s_axilite` pour les
-  paramètres de couche (forme, offsets, échelle, options) ; ping-pong
-  chargement/calcul/stockage
-- **Acceptation** : co-sim == golden ; recouvrement transferts/calcul visible dans les
-  traces ; débit mesuré en cycles par couche
-- **Fait** : top `yolo_conv` : `m_axi` `gmem_in` / `gmem_out` (même arène d'activations,
-  deux bundles pour recouvrir chargement et stockage), `gmem_w` (poids), `gmem_p` (biais puis
-  M0) ; `s_axilite` : `LayerDesc` à plat (forme, 2 segments d'entrée, offsets, décalage,
-  options). Ping-pong `in_buf`/`w_buf` (chargement de ti + 1 pendant le calcul de ti) et
-  `out_buf` (stockage de la tuile k − 1 pendant la tuile k). C-sim toujours == golden.
-  Estimation de cycles par couche en C-sim (`accel::sim_cycles`, `make hls-cycles`) :
-  ≈ 210 ms/image Tiny-YOLOv2 à 200 MHz contre 41 ms de calcul pur — le noyau est limité par
-  les chargements octet par octet (`results/hls_report.md`).
-- **Reste** : co-sim, traces et cycles réels (`make hls-cosim`, Vitis requis).
+### [ ] T6.2 — Memory interfaces and control
+- **Spec**: §10.2 (double buffering) · **Depends on**: T6.1 · **Size**: L
+- **Deliverables**: `m_axi` for weights, activations and requant; `s_axilite` for the
+  layer parameters (shape, offsets, scale, options); load/compute/store ping-pong
+- **Acceptance**: co-sim == golden; transfer/compute overlap visible in the traces;
+  throughput measured in cycles per layer
+- **Done**: top `yolo_conv`: `m_axi` `gmem_in` / `gmem_out` (same activation arena, two
+  bundles to overlap load and store), `gmem_w` (weights), `gmem_p` (biases then M0);
+  `s_axilite`: flat `LayerDesc` (shape, 2 input segments, offsets, shift, options).
+  `in_buf`/`w_buf` ping-pong (load of ti + 1 during the compute of ti) and `out_buf` (store
+  of tile k − 1 during tile k). C-sim still == golden. Cycle estimate per layer in C-sim
+  (`accel::sim_cycles`, `make hls-cycles`): ≈ 210 ms/image for Tiny-YOLOv2 at 200 MHz
+  against 41 ms of pure compute — the kernel is limited by the byte-by-byte loads
+  (`results/hls_report.md`).
+- **Remaining**: co-sim, traces and real cycles (`make hls-cosim`, Vitis required).
 
-### [ ] T6.3 — Étage de sortie fusionné
-- **Spec** : §9.3, §10.3 · **Dépend de** : T6.1 · **Taille** : M
-- **Livrables** : biais + requantification M0/décalage + leaky 13/128 + maxpool 2×2 en
-  stride 2 **et 1**
-- **Acceptation** : couches 0 à 11 == golden en C-sim ; coût DSP de la requantification
-  rapporté
-- **Fait** : `hls/kernels/output_stage.hpp` : `golden::requantize` / `leaky_int` / `clip8`
-  réutilisés tels quels, maxpool 2×2 s2 et s1 (réplication du bord), carte avant pooling en
-  DDR (L08 → R). Couches 0 à 11 (et toutes les autres) == golden en C-sim, v2 et v3. Un seul
-  multiplieur acc·M0 (64 bits) partagé par les Tm canaux : 4 DSP48 attendus.
-- **Reste** : coût DSP mesuré dans le rapport de synthèse (`store_tile`, `make hls-report`).
+### [ ] T6.3 — Fused output stage
+- **Spec**: §9.3, §10.3 · **Depends on**: T6.1 · **Size**: M
+- **Deliverables**: bias + M0/shift requantization + leaky 13/128 + 2×2 maxpool with
+  stride 2 **and 1**
+- **Acceptance**: layers 0 to 11 == golden in C-sim; DSP cost of the requantization
+  reported
+- **Done**: `hls/kernels/output_stage.hpp`: `golden::requantize` / `leaky_int` / `clip8`
+  reused as they are, 2×2 s2 and s1 maxpool (border replication), pre-pooling map in DDR
+  (L08 → R). Layers 0 to 11 (and all the others) == golden in C-sim, v2 and v3. A single
+  acc·M0 multiplier (64 bits) shared by the Tm channels: 4 DSP48 expected.
+- **Remaining**: DSP cost measured in the synthesis report (`store_tile`,
+  `make hls-report`).
 
-### [x] T6.4 — Upsample et route par adressage
-- **Spec** : §10.3 · **Dépend de** : T6.2 · **Taille** : M
-- **Livrables** : modes d'adressage dans le chargeur d'entrée (lecture à l'adresse / 2) ;
-  allocation contiguë par le driver
-- **Acceptation** : réseau Tiny-YOLOv3 complet == golden en C-sim, sans noyau dédié à
-  l'upsample ni à la route
-- **Fait** : chargeur à 2 segments `{offset, c, h, w, up}`, lecture à
-  `(c·h + (r >> up))·w + (col >> up)` ; `sw/driver/program.{hpp,cpp}` : arène DDR contiguë
-  (tampons du manifest bout à bout, alignés à 64), vues par couche (même logique que
-  `Engine::place_views`), un `LayerDesc` par conv. `hls/tb/tb_net.cpp` : Tiny-YOLOv2 (9
-  appels) et Tiny-YOLOv3 (13 appels) complets, chaque couche vérifiée juste après son appel
-  == golden == dump, 3 images, route 20 en deux segments (L18 vue ×2, prépool de L08).
+### [x] T6.4 — Upsample and route by addressing
+- **Spec**: §10.3 · **Depends on**: T6.2 · **Size**: M
+- **Deliverables**: addressing modes in the input loader (read at address / 2); contiguous
+  allocation by the driver
+- **Acceptance**: full Tiny-YOLOv3 network == golden in C-sim, without a kernel dedicated
+  to the upsample or the route
+- **Done**: loader with 2 segments `{offset, c, h, w, up}`, read at
+  `(c·h + (r >> up))·w + (col >> up)`; `sw/driver/program.{hpp,cpp}`: contiguous DDR arena
+  (buffers of the manifest end to end, aligned to 64), per-layer views (same logic as
+  `Engine::place_views`), one `LayerDesc` per conv. `hls/tb/tb_net.cpp`: full Tiny-YOLOv2
+  (9 calls) and Tiny-YOLOv3 (13 calls), each layer checked right after its call == golden
+  == dump, 3 images, route 20 in two segments (L18 seen ×2, prepool of L08).
 
-### [ ] T6.5 — Co-simulation et synthèse
-- **Spec** : §10.4 · **Dépend de** : T6.3, T6.4 · **Taille** : M
-- **Livrables** : `hls/scripts/{synth,cosim,export}.tcl` ; rapport `results/hls_report.md`
-  (LUT, FF, DSP, BRAM, fréquence, latence en cycles par couche)
-- **Acceptation** : co-sim RTL == golden sur une image complète ; timing tenu à la
-  fréquence cible ; IP exportée pour Vivado
-- **Fait** : `hls/scripts/{common,csim,synth,cosim,export}.tcl` (`make csim | hls-synth |
-  hls-cosim | hls-export BOARD=kv260`) ; `tools/hls_report.py` (`make hls-report`) →
-  `results/hls_report.md` : section cycles par couche (estimation C-sim) remplie ; sections
-  synthèse (LUT, FF, DSP, BRAM, période, II des boucles, DSP de `store_tile`) et co-sim
-  lues dans les rapports Vitis dès qu'ils existent.
-- **Reste** : tout ce qui demande Vitis : synthèse, co-sim d'une image (longue : ~4·10⁷
-  cycles estimés), timing à 200 MHz, export de l'IP.
+### [ ] T6.5 — Co-simulation and synthesis
+- **Spec**: §10.4 · **Depends on**: T6.3, T6.4 · **Size**: M
+- **Deliverables**: `hls/scripts/{synth,cosim,export}.tcl`; report
+  `results/hls_report.md` (LUT, FF, DSP, BRAM, frequency, latency in cycles per layer)
+- **Acceptance**: RTL co-sim == golden on a full image; timing met at the target
+  frequency; IP exported for Vivado
+- **Done**: `hls/scripts/{common,csim,synth,cosim,export}.tcl` (`make csim | hls-synth |
+  hls-cosim | hls-export BOARD=kv260`); `tools/hls_report.py` (`make hls-report`) →
+  `results/hls_report.md`: cycles-per-layer section (C-sim estimate) filled; synthesis
+  (LUT, FF, DSP, BRAM, period, II of the loops, DSP of `store_tile`) and co-sim sections
+  read from the Vitis reports as soon as they exist.
+- **Remaining**: everything that needs Vitis: synthesis, co-sim of one image (long:
+  ~4·10⁷ estimated cycles), timing at 200 MHz, IP export.
