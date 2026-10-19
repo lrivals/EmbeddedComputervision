@@ -21,7 +21,7 @@ Produced by the Python export (T4.7), read by the golden model (T5.1), the HLS t
 the ARM driver.
 
 ```
-model/tiny-yolov3-coco/        # make export: tiny-yolov2-voc, tiny-yolov3-coco
+model/tiny-yolov3-coco/        # make export: tiny-yolov2-voc, tiny-yolov3-coco, tiny-yolov4-coco
 ├── manifest.json              # description of the network (below)
 ├── weights.bin                # int8 weights, concatenated, aligned on 64 bytes
 ├── bias.bin                   # int32 biases
@@ -60,13 +60,25 @@ The `*_offset` fields point into the binary blobs. `in`/`out`/`prepool_out` plac
 tensor in a DDR buffer (ping-pong between layers, contiguous placement of 19 then 8 for
 route 20 of §10.3).
 
+YOLOv4-tiny (M24) adds three cases to the layout (`yolo.io.export.layout`):
+
+- a grouped route (CSP, `layout: "grouped"`) is its source shifted by
+  `group_id · (C/groups) · H · W`, with no copy;
+- a maxpool after a concat of convs is fused into **each** source, which writes its pooled
+  map end to end with the others (`fused_into` = the route);
+- a stride-2 conv keeps `s: 2` in the manifest; the driver and the golden model compute it
+  at stride 1 and decimate it in the output stage (a 1×1 "maxpool" of stride 2).
+
+`check_allocation` (`python/tests/test_export.py`) checks that no write overlaps a tensor
+that is still to be read, for the three networks.
+
 ## 3. Hardware engine: layer by layer
 
 Choice of §10.1: **a single engine** rather than a dataflow pipeline. It contains:
 
 - a parameterised conv PE (Tm × Tn MACs per cycle, loop nest of §10.2);
 - a fused output stage: bias, M0/shift requantization, leaky 13/128, 2×2 maxpool with
-  stride 2 or 1;
+  stride 2 or 1 (1×1 with stride 2: decimation of a stride-2 conv, M24);
 - upsample and route **by addressing**, without copies (§10.3);
 - an AXI-Lite controller that receives the layer parameters from the ARM driver.
 

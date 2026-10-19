@@ -68,7 +68,7 @@ match it: `voc` (20), `coco` (80), `dataset:<name>` (KITTI, VisDrone, ASL, …).
 |---|---|---|---|
 | `grounding-dino-tiny` (default) | Grounding DINO Swin-T, `IDEA-Research/grounding-dino-tiny` | Apache-2.0 | best boxes; prompt `person. dog.`, split in several calls past 256 tokens |
 | `owlv2-base` | OWLv2 base, `google/owlv2-base-patch16-ensemble` | Apache-2.0 | one query per class; lower scores than Grounding DINO for the same quality |
-| `yolo:tiny-yolov2-voc`, `yolo:tiny-yolov3-coco` | project networks (`load_model` of `tools/webcam.py`) | project | fixed vocabulary: only the session classes whose name matches a model class are kept; fast |
+| `yolo:tiny-yolov2-voc`, `yolo:tiny-yolov3-coco`, `yolo:tiny-yolov4-coco` | project networks (`load_model` of `tools/webcam.py`) | project | fixed vocabulary: only the session classes whose name matches a model class are kept; fast |
 | `yolo:ckpt:<run>/checkpoint.npz` | a fine-tuned project network | project | needs `--cfg` (and `--dataset` for the class names) |
 
 The default export threshold depends on the labeller, as their score scales differ:

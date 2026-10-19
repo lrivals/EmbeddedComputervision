@@ -4,7 +4,8 @@
 
 A hand-written rewrite of **Tiny-YOLOv2** and **Tiny-YOLOv3** with no deep learning library
 (NumPy), followed by a bit-exact integer quantization and an **FPGA accelerator in Vitis
-HLS**.
+HLS**. **YOLOv4-tiny** runs through the same chain (M24: grouped routes, `scale_x_y`,
+stride-2 convs computed by decimation in the accelerator).
 
 The full technical specification is [yolo-embarque-de-zero.md](yolo-embarque-de-zero.md);
 the project documentation refers to it by section number (§4.1, §9.3…).
@@ -118,6 +119,7 @@ make get-weights                    # Darknet weights in weights/, once
 python tools/webcam.py --list       # cameras that open and models available
 make webcam                         # model menu, then the live window (q: quit)
 python tools/webcam.py --model tiny-yolov3-coco          # COCO classes (80)
+python tools/webcam.py --model tiny-yolov4-coco          # YOLOv4-tiny, COCO (M24)
 python tools/webcam.py --model int:tiny-yolov2-voc       # integer model (after make export)
 python tools/webcam.py --source clip.mp4 --sync          # a video instead of the camera
 ```

@@ -40,8 +40,10 @@ Cameras:
 Models:
   tiny-yolov2-voc        Tiny-YOLOv2 float, VOC (20)
   tiny-yolov3-coco       Tiny-YOLOv3 float, COCO (80)
+  tiny-yolov4-coco       YOLOv4-tiny float, COCO (80)
   int:tiny-yolov2-voc    Tiny-YOLOv2 integer (M4), VOC (20)
   int:tiny-yolov3-coco   Tiny-YOLOv3 integer (M4), COCO (80)
+  int:tiny-yolov4-coco   YOLOv4-tiny integer (M24), COCO (80)
 ```
 
 A UVC camera often shows two nodes. The second one carries metadata only and "does not
@@ -72,8 +74,10 @@ python tools/webcam.py --conf 0.4                              # fewer, surer bo
 |---|---|---|---|
 | `tiny-yolov2-voc` | Tiny-YOLOv2, float | `weights/yolov2-tiny-voc.weights` | VOC (20) |
 | `tiny-yolov3-coco` | Tiny-YOLOv3, float | `weights/yolov3-tiny.weights` | COCO (80) |
+| `tiny-yolov4-coco` | YOLOv4-tiny, float (M24) | `weights/yolov4-tiny.weights` | COCO (80) |
 | `int:tiny-yolov2-voc` | Tiny-YOLOv2, integer (M4) | `model/tiny-yolov2-voc/` | VOC (20) |
 | `int:tiny-yolov3-coco` | Tiny-YOLOv3, integer (M4) | `model/tiny-yolov3-coco/` | COCO (80) |
+| `int:tiny-yolov4-coco` | YOLOv4-tiny, integer (M24) | `model/tiny-yolov4-coco/` | COCO (80) |
 | `ckpt:<path>.npz` | fine-tuned network (M15, M18) | checkpoint + `--cfg` | `--dataset` |
 
 The integer models are the bit-exact `f64` emulation of M4. They show the boxes the FPGA

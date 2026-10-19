@@ -136,7 +136,7 @@ progress per milestone here.
 | M13 | 54 | 54 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
 | M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain, training, Colab GPU, smoke run) |
 | M15 | 16 | 1 (T15.3; T15.1 and T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
-| M16 | 20 | 18 (T16.13 COCO and T16.14 KITTI: data missing from the PC) |
+| M16 | 20 | 18 (T16.13 COCO: data on the PC since M24, notebook to run; T16.14 KITTI: data missing) |
 | M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; refs check, v0 procedure, board switch and frozen version remain) |
 | M18 | 11 | 9 (data ready, loaders, 24 notebooks generated, uploaded to the Drive; executed stats, fine-tunings remain) |
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
@@ -144,6 +144,6 @@ progress per milestone here.
 | M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |
 | M22 | 10 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.9 closing the loop remains) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
-| M24 | 6 | 0 |
+| M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
 | M25 | 6 | 0 |
 | M26 | 6 | 0 |
