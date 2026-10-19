@@ -39,6 +39,7 @@ std::vector<postproc::Head> make_heads(const golden::Model& m,
     h.sigmoid = m.head_lut(l, 0);
     h.exp = m.head_lut(l, 1);
     h.softmax_exp = m.head_lut(l, 2);
+    h.scale_xy = l.scale_xy;  // scale_x_y de YOLOv4-tiny (comme golden::make_heads)
     if (h.softmax)
       for (int a = 0; a < l.num; ++a) h.anchors.push_back(m.anchors[size_t(a)]);
     else
