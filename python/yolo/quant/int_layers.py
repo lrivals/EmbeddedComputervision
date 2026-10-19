@@ -52,12 +52,16 @@ def clip8(y):
     return clip_q(y)
 
 
-def conv_acc(qx, qW, qb, engine="int64"):
-    """Accumulateur int32 (rangé en int64) : Σ q_w q_x + q_b ; erreur s'il déborde."""
+def conv_acc(qx, qW, qb, engine="int64", s=1):
+    """Accumulateur int32 (rangé en int64) : Σ q_w q_x + q_b ; erreur s'il déborde.
+
+    Stride 2 (YOLOv4-tiny, T24.3) : la sortie de stride 1 prise une ligne et une colonne sur
+    deux, ce que fait le matériel (décimation dans l'étage de sortie).
+    """
     if engine == "int64":
-        acc, _ = conv_forward(np.asarray(qx, np.int64), np.asarray(qW, np.int64))
+        acc, _ = conv_forward(np.asarray(qx, np.int64), np.asarray(qW, np.int64), s=s)
     elif engine == "f64":
-        acc, _ = conv_forward(np.asarray(qx, np.float64), np.asarray(qW, np.float64))
+        acc, _ = conv_forward(np.asarray(qx, np.float64), np.asarray(qW, np.float64), s=s)
         acc = acc.astype(np.int64)
     else:
         raise ValueError(f"moteur inconnu : {engine!r}")
@@ -88,9 +92,9 @@ def requantize(acc, M0, n):
     return rshift_round(acc * np.asarray(M0, np.int64)[None, :, None, None], n)
 
 
-def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64", qmax=QMAX):
+def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64", qmax=QMAX, s=1):
     """Couche conv entière complète (§9.3) ; renvoie (y int64 dans [−qmax, qmax], acc)."""
-    acc = conv_acc(qx, qW, qb, engine)
+    acc = conv_acc(qx, qW, qb, engine, s)
     y = requantize(acc, M0, n)
     if act == "leaky":
         y = leaky_int(y)
@@ -105,5 +109,5 @@ def upsample_int(qx, s=2):
     return upsample_forward(np.asarray(qx, np.int64), s=s)[0]
 
 
-def route_int(qxs):
-    return route_forward([np.asarray(q, np.int64) for q in qxs])[0]
+def route_int(qxs, groups=1, group_id=0):
+    return route_forward([np.asarray(q, np.int64) for q in qxs], groups, group_id)[0]

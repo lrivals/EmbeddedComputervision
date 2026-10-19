@@ -1,4 +1,5 @@
-"""T4.7 : export du modèle entier — manifest valide, blobs relus == modèle, dumps rejoués."""
+"""T4.7 : export du modèle entier — manifest valide, blobs relus == modèle, dumps rejoués ;
+T24.3 : YOLOv4-tiny (routes groupées, maxpool après concaténation) et test d'allocation."""
 
 import json
 from pathlib import Path
@@ -7,8 +8,9 @@ import jsonschema
 import numpy as np
 import pytest
 
-from yolo.io.export import export_model, layout, load_luts, load_model
-from yolo.models.tiny_yolo import build
+from yolo.io.export import build_manifest, export_model, layout, load_luts, load_model
+from yolo.models.specs import NETWORKS, infer_shapes
+from yolo.models.tiny_yolo import build, load_cfg
 from yolo.quant.calibrate import ActStats, choose_scales
 from yolo.quant.fuse_bn import fuse_network
 from yolo.quant.int_model import IntNetwork, QuantModel, head_luts
@@ -28,7 +30,8 @@ def _qm(name, rng):
     return QuantModel.from_fused(fused, INPUT_SCALE, scales), quantize_input(x)
 
 
-@pytest.fixture(scope="module", params=["tiny-yolov2-voc", "tiny-yolov3-voc"])
+@pytest.fixture(scope="module", params=["tiny-yolov2-voc", "tiny-yolov3-voc",
+                                        "tiny-yolov4-coco"])
 def exported(request, tmp_path_factory):
     qm, qx = _qm(request.param, np.random.default_rng(0))
     d = tmp_path_factory.mktemp(request.param)
@@ -75,6 +78,122 @@ def test_layout_rejects_unfused_maxpool():
     net = {"input": (3, 32, 32), "layers": [{"type": "maxpool", "k": 2, "s": 2}]}
     with pytest.raises(ValueError):
         layout(net)
+
+
+def _tensors(m):
+    """Tenseurs écrits en DDR, dans le modèle d'exécution du matériel : [(couche qui l'écrit,
+    dernière couche qui le lit, [(tampon, début, fin)])]. Upsample et route sont des vues sans
+    copie (§10.3) ; une conv à maxpool fusionné écrit deux tenseurs, sa carte poolée et, s'il
+    le faut, sa carte avant pooling (`prepool_out`) ; les têtes vivent jusqu'à la fin.
+    """
+    layers = m["layers"]
+    n = len(layers)
+    cons = {i: [] for i in range(-1, n)}
+    for e in layers:
+        for j in (e["from"] if e["type"] == "route" else [e["id"] - 1]):
+            cons[j].append(e["id"])
+
+    def eff(c):  # dernière lecture « réelle » à travers une vue
+        t = layers[c]["type"]
+        if t == "conv":
+            return c
+        if t in ("yolo", "region"):
+            return n
+        return max([eff(d) for d in cons[c]], default=c)
+
+    def span(ref, size):
+        return [(ref["buf"], ref["offset"], ref["offset"] + size)]
+
+    out = [(-1, max(eff(c) for c in cons[-1]), span(m["input"]["buf"],
+                                                      int(np.prod(m["input"]["shape"]))))]
+    for e in layers:
+        if e["type"] != "conv":
+            continue
+        i = e["id"]
+        pool = e["fused_pool"]["layer"] if e["fused_pool"] else None
+        if pool is None:
+            out.append((i, max(eff(c) for c in cons[i]), span(e["out"],
+                                                            int(np.prod(e["out_shape"])))))
+            continue
+        out.append((i, eff(pool), span(e["out"], int(np.prod(e["out_shape"])))))
+        via = layers[pool]["fused_into"]  # la conv elle-même, ou la route poolée
+        others = [c for c in cons[i] if c not in (pool, via)]
+        if "prepool_out" in e:
+            _, h, w = e["out_shape"]
+            f = e["fused_pool"]["s"]
+            out.append((i, max([eff(c) for c in others], default=i),
+                        span(e["prepool_out"], e["cout"] * h * f * w * f)))
+        else:
+            assert not others, f"conv {i} : carte avant pooling lue mais jamais écrite"
+    return out
+
+
+def check_allocation(m):
+    """Aucune écriture ne recouvre un tenseur encore à lire (ni l'entrée de la couche)."""
+    tensors = _tensors(m)
+    for i, _, places in tensors:
+        for buf, a, b in places:
+            for j, end, other in tensors:
+                if j >= i or end < i:
+                    continue
+                for buf2, a2, b2 in other:
+                    assert not (buf == buf2 and a < b2 and a2 < b), (
+                        f"couche {i} écrit {buf}[{a}:{b}] sur la sortie de {j} ({buf2}[{a2}:{b2}],"
+                        f" lue jusqu'à {end})")
+
+
+@pytest.mark.parametrize("name", ["tiny-yolov2-voc", "tiny-yolov3-voc", "tiny-yolov4-coco"])
+def test_allocation_no_overlap(name):
+    net = load_cfg(name)  # avec les ancres (la table de specs de v2 n'a pas de [region])
+    m = build_manifest(net, 1.0 / 127, lambda i: 0.05, lambda i: 16)
+    jsonschema.Draft202012Validator(SCHEMA).validate(m)
+    check_allocation(m)
+
+
+def test_allocation_check_detects_overlap():
+    m = build_manifest(NETWORKS["tiny-yolov3-voc"], 1.0 / 127, lambda i: 0.05, lambda i: 16)
+    m["layers"][14]["out"] = dict(m["layers"][13]["out"])  # écrit sur l'entrée de la conv 14
+    with pytest.raises(AssertionError, match="couche 14"):
+        check_allocation(m)
+
+
+def test_v4_grouped_routes_and_pooled_concat():
+    net = NETWORKS["tiny-yolov4-coco"]
+    shapes = infer_shapes(net)
+    m = build_manifest(net, 1.0 / 127, lambda i: 0.05, lambda i: 16)
+    e = {x["id"]: x for x in m["layers"]}
+    # Route groupée : la seconde moitié des canaux de sa source, sans copie.
+    for r, src in ((3, 2), (11, 10), (19, 18)):
+        c, h, w = shapes[src][1]
+        assert e[r]["layout"] == "grouped" and (e[r]["groups"], e[r]["group_id"]) == (2, 1)
+        assert e[src]["prepool_out"]["buf"] == e[r]["out"]["buf"]
+        assert e[r]["out"]["offset"] == e[src]["prepool_out"]["offset"] + (c // 2) * h * w
+        assert e[r + 1]["in"] == e[r]["out"]
+    # Maxpool après concaténation : fusionné dans chaque source, écrites poolées bout à bout.
+    for route, pool in ((8, 9), (16, 17), (24, 25)):
+        assert e[pool]["fused_into"] == route
+        a, b = e[route]["from"]
+        assert e[a]["fused_pool"]["layer"] == e[b]["fused_pool"]["layer"] == pool
+        assert e[a]["out"]["buf"] == e[b]["out"]["buf"] == e[route]["out"]["buf"]
+        assert e[b]["out"]["offset"] == e[a]["out"]["offset"] + int(np.prod(e[a]["out_shape"]))
+        assert e[a]["out_shape"][1:] == list(shapes[pool][1][1:])
+        assert e[pool + 1]["in"] == e[route]["out"]
+    # La conv 23 : poolée dans la route 24, avant pooling dans la route 34.
+    assert e[23]["prepool_out"]["buf"] == e[34]["out"]["buf"]
+    assert [e[i]["s"] for i in (0, 1, 2)] == [2, 2, 1]
+    assert e[30]["scale_x_y"] == e[37]["scale_x_y"] == 1.05
+
+
+def test_v4_concat_sources_share_scale():
+    from yolo.quant.calibrate import unify_routes
+
+    layers = NETWORKS["tiny-yolov4-coco"]["layers"]
+    convs = [i for i, x in enumerate(layers) if x["type"] == "conv"]
+    scales, _ = unify_routes(layers, {i: 0.01 * (i + 1) for i in convs})
+    for r in (6, 8, 14, 16, 22, 24):
+        a, b = layers[r]["from"]
+        assert scales[a] == scales[b], r
+    assert scales[18] == scales[23] == scales[32]  # routes 24 et 34 (via l'upsample 33)
 
 
 @pytest.mark.parametrize("d", EXPORTS, ids=lambda p: p.name)

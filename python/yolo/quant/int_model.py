@@ -120,14 +120,14 @@ class IntNetwork:
             if t == "conv":
                 c = self.qm.convs[i]
                 y, acc = il.conv_int(src[0], c.qW, c.qb, c.M0, c.n, c.act, self.engine,
-                                     c.qmax)
+                                     c.qmax, c.s)
                 self.max_acc[i] = max(self.max_acc.get(i, 0), int(np.abs(acc).max()))
             elif t == "maxpool":
                 y = il.maxpool_int(src[0], k=layer["k"], s=layer["s"])
             elif t == "upsample":
                 y = il.upsample_int(src[0], s=layer["s"])
             elif t == "route":
-                y = il.route_int(src)
+                y = il.route_int(src, layer.get("groups", 1), layer.get("group_id", 0))
             elif t in OUTPUT_TYPES:
                 y = src[0]
             else:
@@ -172,7 +172,7 @@ def fake_quant_forward(fused, qm, x, layers=None, all_outputs=False):
         elif t == "upsample":
             y = il.upsample_forward(src[0], s=layer["s"])[0]
         elif t == "route":
-            y = il.route_forward(src)[0]
+            y = il.route_forward(src, layer.get("groups", 1), layer.get("group_id", 0))[0]
         else:
             y = src[0]
         outs.append(y)

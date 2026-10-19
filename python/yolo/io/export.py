@@ -7,6 +7,11 @@
   - les sources d'une route multiple sont écrites bout à bout dans `R` (`R1`…), la première
     au début : la concaténation est gratuite ; une conv à maxpool fusionné y écrit sa carte
     avant pooling (`prepool_out`) ;
+  - un maxpool qui suit une concaténation (YOLOv4-tiny) est fusionné dans chaque source, qui
+    écrit sa carte poolée bout à bout avec les autres ; une route groupée (CSP) est un
+    décalage de canaux dans sa source, sans copie ;
+  - une conv de stride 2 garde `s: 2` ; le driver et le golden la calculent en stride 1 et
+    décimée dans l'étage de sortie (maxpool 1×1 de stride 2, T24.3) ;
   - les têtes vont dans `H<grille>`.
 - `build_manifest(net, scales, …)` : manifest au format du schéma ; `export_model(qm, dir)`
   écrit `manifest.json`, `weights.bin`, `bias.bin`, `requant.bin` et `luts.bin` ;
@@ -45,6 +50,37 @@ def _consumers(layers):
     return cons
 
 
+def fused_pools(layers, cons=None):
+    """{maxpool: [convs dans lesquelles il est fusionné]} (§10.3).
+
+    Un maxpool suit une conv (fusion dans son étage de sortie), ou une concaténation de convs
+    qu'il est seul à lire (YOLOv4-tiny, T24.3) : le max d'une fenêtre 2×2 commute avec la
+    concaténation des canaux, il est fusionné dans **chaque** source.
+    """
+    cons = cons or _consumers(layers)
+    fused = {}
+    for i, layer in enumerate(layers):
+        if layer["type"] != "maxpool":
+            continue
+        prev = layers[i - 1] if i > 0 else {"type": None}
+        if prev["type"] == "conv":
+            fused[i] = [i - 1]
+        elif (prev["type"] == "route" and len(prev["from"]) > 1 and cons[i - 1] == [i]
+              and all(layers[j]["type"] == "conv" for j in prev["from"])):
+            fused[i] = list(prev["from"])
+        else:
+            raise ValueError(f"maxpool {i} non fusionnable (le matériel le fusionne à la conv)")
+    owner = {}
+    for pool, convs in fused.items():
+        for c in convs:
+            if c in owner:
+                raise ValueError(f"conv {c} : deux maxpools fusionnés")
+            if layers[c]["s"] != 1:
+                raise ValueError(f"conv {c} : maxpool fusionné à une conv de stride 2")
+            owner[c] = pool
+    return fused
+
+
 def layout(net):
     """Placement de chaque tenseur. Rend (entries, buffers) :
     entries[i] = dict des champs de tampon de la couche i (`in`, `out`, `prepool_out`,
@@ -54,28 +90,31 @@ def layout(net):
     shapes = infer_shapes(net)
     cons = _consumers(layers)
 
-    # Maxpool → conv qui le précède (fusion dans l'étage de sortie, §10.3) ; si une route
-    # lit aussi la conv, celle-ci écrit en plus sa carte avant pooling (`prepool_out`).
-    fused = {i: i - 1 for i, layer in enumerate(layers)
-             if layer["type"] == "maxpool" and i > 0 and layers[i - 1]["type"] == "conv"}
-    for i, layer in enumerate(layers):
-        if layer["type"] == "maxpool" and i not in fused:
-            raise ValueError(f"maxpool {i} non fusionnable (le matériel le fusionne à la conv)")
-    pool_of = {conv: pool for pool, conv in fused.items()}
+    # Maxpool → conv(s) qui le précède(nt) (fusion dans l'étage de sortie, §10.3) ; si une
+    # autre couche lit la carte avant pooling, la conv l'écrit en plus (`prepool_out`).
+    fused = fused_pools(layers, cons)
+    pool_of = {conv: pool for pool, convs in fused.items() for conv in convs}
+    pooled_route = {pool - 1: pool for pool, convs in fused.items()
+                    if layers[pool - 1]["type"] == "route"}
 
-    # Routes multiples : sources bout à bout dans un tampon dédié.
-    route_slot = {}  # source -> (tampon, offset)
+    def pooled_shape(i):  # sortie poolée de la conv i : ses canaux, la grille du maxpool
+        return (layers[i]["cout"],) + shapes[pool_of[i]][1][1:]
+
+    # Routes multiples : sources bout à bout dans un tampon dédié, cartes avant pooling
+    # (`plain_slot`) ou, si un maxpool suit la route, cartes poolées (`pool_slot`).
+    plain_slot, pool_slot = {}, {}  # source -> (tampon, offset)
     n_routes = 0
-    for layer in layers:
+    for r, layer in enumerate(layers):
         if layer["type"] == "route" and len(layer["from"]) > 1:
             buf = "R" if n_routes == 0 else f"R{n_routes}"
             n_routes += 1
+            slot = pool_slot if r in pooled_route else plain_slot
             off = 0
             for j in layer["from"]:
-                if j in route_slot or j < 0 or layers[j]["type"] in ("route", "maxpool"):
+                if j in slot or j < 0 or layers[j]["type"] in ("route", "maxpool"):
                     raise ValueError(f"source de route {j} non prise en charge")
-                route_slot[j] = (buf, off)
-                off += nbytes(shapes[j][1])
+                slot[j] = (buf, off)
+                off += nbytes(pooled_shape(j) if r in pooled_route else shapes[j][1])
 
     head_of = {}  # conv de tête -> grille
     for i, layer in enumerate(layers):
@@ -92,6 +131,13 @@ def layout(net):
     where = {-1: {"buf": INPUT_BUF, "offset": 0}}
     chain = INPUT_BUF
     n_keep = 0
+
+    def keep(shape):
+        nonlocal n_keep
+        out = reserve("S" if n_keep == 0 else f"S{n_keep}", 0, shape)
+        n_keep += 1
+        return out
+
     for i, layer in enumerate(layers):
         t = layer["type"]
         ins, outs = shapes[i]
@@ -99,33 +145,59 @@ def layout(net):
         if t in ("conv", "upsample"):
             e["in"] = where[i - 1]
             pool = pool_of.get(i)
-            final = shapes[pool][1] if pool is not None else outs
-            readers = cons[pool] if pool is not None else cons[i]
+            final = pooled_shape(i) if pool is not None else outs
+            if pool is None:
+                readers = cons[i]
+            elif pool - 1 in pooled_route:
+                readers = [pool - 1]
+            else:
+                readers = cons[pool]
             if t == "conv":
                 e["fused_pool"] = (None if pool is None else
                                    {"layer": pool, "k": layers[pool]["k"],
                                     "s": layers[pool]["s"]})
-            if i in route_slot and pool is not None:
-                e["prepool_out"] = reserve(*route_slot[i], outs)
-            if i in route_slot and pool is None:
-                out = reserve(*route_slot[i], final)
+            if pool is not None:
+                # Lecteurs de la carte avant pooling : tout sauf le maxpool (ou sa route).
+                prepool_readers = [c for c in cons[i] if c not in (pool, pool - 1)]
+                if i in plain_slot:
+                    e["prepool_out"] = reserve(*plain_slot[i], outs)
+                elif prepool_readers:
+                    e["prepool_out"] = keep(outs)
+            if i in pool_slot:
+                out = reserve(*pool_slot[i], final)
+            elif i in plain_slot and pool is None:
+                out = reserve(*plain_slot[i], final)
             elif i in head_of:
                 out = reserve(f"H{head_of[i]}", 0, final)
             elif len(readers) > 1:
-                out = reserve("S" if n_keep == 0 else f"S{n_keep}", 0, final)
-                n_keep += 1
+                out = keep(final)
             else:
                 chain = "B" if chain == "A" else "A"
                 out = reserve(chain, 0, final)
             e["out"] = out
-            where[i] = e.get("prepool_out", out)
-            if pool is not None:
+            where[i] = e.get("prepool_out", out if pool is None else None)
+            if pool is not None and pool - 1 not in pooled_route:
                 where[pool] = out
         elif t == "maxpool":
-            e["fused_into"] = fused[i]
+            e["fused_into"] = i - 1  # sa conv, ou la route de ses sources
+            if i - 1 in pooled_route:  # concaténation déjà poolée, au début du tampon R
+                where[i] = {"buf": pool_slot[fused[i][0]][0], "offset": 0}
         elif t == "route":
-            e["out"] = where[layer["from"][0]]
-            where[i] = e["out"]
+            if i in pooled_route:
+                # Jamais écrite avant pooling : `out` désigne la concaténation poolée.
+                e["out"] = {"buf": pool_slot[layer["from"][0]][0], "offset": 0}
+                where[i] = None
+            elif layer.get("groups", 1) > 1:
+                # Route groupée (CSP) : un groupe de canaux de sa source, sans copie.
+                src = where[layer["from"][0]]
+                c, h, w = shapes[layer["from"][0]][1]
+                e["out"] = {"buf": src["buf"],
+                            "offset": src["offset"] + layer["group_id"] * (c // layer["groups"])
+                            * h * w}
+                where[i] = e["out"]
+            else:
+                e["out"] = where[layer["from"][0]]
+                where[i] = e["out"]
         elif t in OUTPUT_TYPES:
             e["in"] = where[i - 1]
             where[i] = e["in"]
@@ -162,10 +234,11 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
             if "prepool_out" in p:
                 e["prepool_out"] = p["prepool_out"]
             src = i - 1
+            # Carte poolée de la conv seule (ses canaux) si un maxpool lui est fusionné.
+            out_shape = [cout, *shapes[pool["layer"]][1][1:]] if pool else list(outs)
             e.update(w_offset=w_off, b_offset=b_off, m0_offset=b_off, shift=shift_of(i),
                      in_scale=scale_of(src), out_scale=scale_of(i), **{"in": p["in"]},
-                     out=p["out"],
-                     out_shape=list(shapes[pool["layer"]][1] if pool else outs))
+                     out=p["out"], out_shape=out_shape)
             if qmax_of is not None and qmax_of(i) != 127:
                 e["qmax"] = int(qmax_of(i))
             wbits = 8 if wbits_of is None else wbits_of(i)
@@ -180,11 +253,17 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
             e.update(s=layer["s"], scale=scale_of(i), **{"in": p["in"]}, out=p["out"],
                      out_shape=list(outs))
         elif t == "route":
-            e.update(**{"from": list(layer["from"])}, layout="contiguous", scale=scale_of(i),
+            groups = layer.get("groups", 1)
+            e.update(**{"from": list(layer["from"])},
+                     layout="grouped" if groups > 1 else "contiguous", scale=scale_of(i),
                      out=p["out"], out_shape=list(outs))
+            if groups > 1:
+                e.update(groups=groups, group_id=layer["group_id"])
         elif t == "yolo":
             e.update(mask=list(layer["mask"]), scale=scale_of(i), **{"in": p["in"]},
                      out_shape=list(outs))
+            if layer.get("scale_x_y", 1.0) != 1.0:
+                e["scale_x_y"] = layer["scale_x_y"]
         elif t == "region":
             e.update(num=layer["num"], scale=scale_of(i), **{"in": p["in"]},
                      out_shape=list(outs))
@@ -316,9 +395,15 @@ def load_model(model_dir):
         elif t == "upsample":
             layers.append({"type": "upsample", "s": e["s"]})
         elif t == "route":
-            layers.append({"type": "route", "from": list(e["from"])})
+            route = {"type": "route", "from": list(e["from"])}
+            if e.get("groups", 1) > 1:
+                route.update(groups=e["groups"], group_id=e["group_id"])
+            layers.append(route)
         elif t == "yolo":
-            layers.append({"type": "yolo", "mask": list(e["mask"])})
+            yolo = {"type": "yolo", "mask": list(e["mask"])}
+            if "scale_x_y" in e:
+                yolo["scale_x_y"] = e["scale_x_y"]
+            layers.append(yolo)
         elif t == "region":
             layers.append({"type": "region", "num": e["num"]})
     net = {"name": m["network"], "input": tuple(m["input"]["shape"][1:]),
