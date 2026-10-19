@@ -14,18 +14,18 @@ that depend on them are marked *to measure*.
 
 ## 1. This work
 
-| | Tiny-YOLOv2 VOC | Tiny-YOLOv3 COCO |
-|---|---|---|
-| MACs (convolutions) | 3.486 G | 2.782 G |
-| Format | INT8 (per-channel weights, per-layer activations), 32-bit accumulator | same |
-| Tiles, MAC/cycle | Tm = 32, Tn = 24, Tr = Tc = 13 (14 for the convs pooled with stride 2) → 768 | same |
-| Clock | 200 MHz (timing to confirm, T7.1) | same |
-| Accelerator, projection (M10 kernel) | **37.2 ms**, 26.9 img/s, **187.3 GOPS**, efficiency 61.0 % | 36.1 ms, 27.7 img/s, 154.3 GOPS, 50.2 % |
-| Accelerator, projection (M6 kernel, 8-bit ports) | 206.5 ms, 4.8 img/s, 33.8 GOPS, 11.0 % | 203.2 ms, 4.9 img/s, 27.4 GOPS, 8.9 % |
-| ARM post-processing | < 0.02 ms on x86 (T7.3); A53 *to measure* | same |
-| Power | *to measure* (chip: `power.rpt`; SOM: INA260) | — |
-| LUT / DSP / BRAM | *after synthesis*; roofline model: 896 DSP, 112 BRAM18 | — |
-| mAP VOC2007 test | float 56.30, integer 55.66, **FPGA (C-sim) 55.66** ([map_stades.md](map_stades.md)) | (COCO, not evaluated) |
+| | Tiny-YOLOv2 VOC | Tiny-YOLOv3 COCO | YOLOv4-tiny COCO (M24) |
+|---|---|---|---|
+| MACs (convolutions) | 3.486 G | 2.782 G | 3.454 G (4.164 G computed: the two stride-2 convs run at stride 1 and are decimated, T24.3) |
+| Format | INT8 (per-channel weights, per-layer activations), 32-bit accumulator | same | same |
+| Tiles, MAC/cycle | Tm = 32, Tn = 24, Tr = Tc = 13 (14 for the convs pooled with stride 2) → 768 | same | same |
+| Clock | 200 MHz (timing to confirm, T7.1) | same | same |
+| Accelerator, projection (M10 kernel) | **37.2 ms**, 26.9 img/s, **187.3 GOPS**, efficiency 61.0 % | 36.1 ms, 27.7 img/s, 154.3 GOPS, 50.2 % | 51.8 ms, 19.3 img/s, 133.3 GOPS (network MACs), 52.3 % |
+| Accelerator, projection (M6 kernel, 8-bit ports) | 206.5 ms, 4.8 img/s, 33.8 GOPS, 11.0 % | 203.2 ms, 4.9 img/s, 27.4 GOPS, 8.9 % | 272.3 ms, 3.7 img/s, 25.4 GOPS, 10.0 % |
+| ARM post-processing | < 0.02 ms on x86 (T7.3); A53 *to measure* | same | same (`yolo_post` in hardware: not supported, `scale_x_y`) |
+| Power | *to measure* (chip: `power.rpt`; SOM: INA260) | — | — |
+| LUT / DSP / BRAM | *after synthesis*; roofline model: 896 DSP, 112 BRAM18 | — | — |
+| mAP VOC2007 test | float 56.30, integer 55.66, **FPGA (C-sim) 55.66** ([map_stades.md](map_stades.md)) | (COCO, not evaluated) | COCO val2017 AP50: float 41.4, integer 40.1, FPGA (C-sim) *to run* (notebook `coco/tiny-yolov4-coco_infer`, `HW = True`) ([map_coco.md](map_coco.md)) |
 
 Bit-exactness is checked end to end. On the **4,952 images** of VOC2007 test, the ARM
 driver driving the C-sim kernel produces detections **identical** to those of the Python
@@ -44,6 +44,7 @@ says otherwise.
 |---|---|---|---|---|---|---|---|---|
 | **this work** (projection, M10 kernel) | Tiny-YOLOv2 VOC 416 | KV260 (XCK26), 200 MHz | INT8 | 26.9 | 37.2 (accel.) | 187.3 | *to measure* | C-sim projection, accelerator only, no measurement; resources after synthesis |
 | **this work** (projection, M10 kernel) | Tiny-YOLOv3 COCO 416 | KV260 | INT8 | 27.7 | 36.1 (accel.) | 154.3 | *to measure* | same; COCO weights (80 classes) |
+| **this work** (projection, M10 kernel) | YOLOv4-tiny COCO 416 | KV260 | INT8 | 19.3 | 51.8 (accel.) | 133.3 | *to measure* | same; GOPS on the 3.45 G network MACs (4.16 G computed, stride 2 by decimation) |
 | 2024-zhang | YOLOv2-Tiny 416, batch 1 | Kintex-7 325T | INT8 | n/r | 14.49 | 406 | 12.3 (board); chip 7.8 (Vivado) | FPGA without an ARM, 687 DSP with two MACs per DSP (*packing*), hardware post-processing included; dataset to check; frequency not noted |
 | 2024-zhang | YOLOv3-Tiny 416, batch 1 | Kintex-7 325T | INT8 | n/r | 15.2 | 401 | 12.3 (board) | same |
 | 2023-zhai | **pruned** YOLOv3-tiny, 1 module | Zynq XC7Z035 | INT16 | 91.65 | — | 67.91 | 12.51 (unspecified) | pruned network (fewer MACs: GOPS and img/s do not convert), INT16, vehicle dataset (detection and tracking), unknown power scope |

@@ -26,8 +26,8 @@ comments on them. Every result of the notebook can be reproduced from the comman
 
 **State**: 17 tasks done out of 19. Tool, figures, datasheets, template and analyses in
 place; VOC, VisDrone, FLIR, ExDark and CrowdHuman notebooks executed and versioned with
-their outputs, summary in [stats-jeux.md](stats-jeux.md). Remaining: T16.13 (COCO:
-`data/coco` missing from the PC) and T16.14 (KITTI: `training/` images missing, archive
+their outputs, summary in [stats-jeux.md](stats-jeux.md). Remaining: T16.13 (COCO: data on
+the PC since M24, notebook to run) and T16.14 (KITTI: `training/` images missing, archive
 `data_object_image_2.zip` incomplete); their notebooks are generated and will pass as they
 are once the data is there.
 
@@ -276,8 +276,9 @@ dataset ([Questions per dataset](#questions-per-dataset)).
   large shares before and after reduction to 416.
 - **Notes**: train2017 is limited to the annotations (no pixel reading); the `calib2017`
   split of `tools/coco_subset.py` is compared with val2017.
-- **Remaining**: `data/coco` missing from the PC; run `tools/get_datasets.sh coco` then the
-  notebook `notebooks/coco/coco_stats.ipynb`.
+- **Remaining**: val2017, the 2017 annotations and the 500 `calib2017` images are on the PC
+  since 2026-10-19 (M24); run the notebook `notebooks/coco/coco_stats.ipynb` and fill its
+  section of [stats-jeux.md](stats-jeux.md).
 
 ### [ ] T16.14 — KITTI
 - **Depends on**: T16.4 to T16.11 · **Size**: S

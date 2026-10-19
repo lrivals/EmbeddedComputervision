@@ -88,6 +88,10 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   data (`test_coco_eval.py`, `coco` extra of `pyproject.toml`); `tools/coco_subset.py`
   (500 train2017 images → split `calib2017`). Profiles `tools/m11.sh coco-float |
   coco-int | coco-calib | coco-fpga`.
+- **Progress (2026-10-19, M24)**: COCO val2017 and `calib2017` on the PC. Float AP of
+  `tiny-yolov3-coco` in [map_coco.md](../../results/map_coco.md) (AP 16.7, AP50 37.2 in
+  stretch; 33.1 published, gap discussed there). Remaining: integer and FPGA stages of
+  `tiny-yolov3-coco`, and the VOC against COCO calibration study.
 - **Remaining**: download COCO (`tools/get_datasets.sh coco`), run the profiles, write
   `results/map_coco.md`.
 
