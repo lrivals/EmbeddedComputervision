@@ -42,7 +42,8 @@ def test_size_mismatch(tmp_path):
 
 
 @pytest.mark.parametrize("name,file", [("tiny-yolov3-coco", "yolov3-tiny.weights"),
-                                       ("tiny-yolov2-voc", "yolov2-tiny-voc.weights")])
+                                       ("tiny-yolov2-voc", "yolov2-tiny-voc.weights"),
+                                       ("tiny-yolov4-coco", "yolov4-tiny.weights")])
 def test_pretrained(name, file):
     path = WEIGHTS / file
     if not path.exists():

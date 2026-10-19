@@ -7,9 +7,9 @@ déduisent avec `infer_shapes`, les paramètres et les MACs avec `layer_cost`.
 VOC_CLASSES = 20
 
 
-def _conv(cout, k=3, act="leaky"):
+def _conv(cout, k=3, act="leaky", s=1):
     # §3 : « conv » = convolution + BN + leaky 0,1 ; la conv de sortie est linéaire avec biais.
-    return {"type": "conv", "k": k, "s": 1, "cout": cout, "act": act, "bn": act == "leaky"}
+    return {"type": "conv", "k": k, "s": s, "cout": cout, "act": act, "bn": act == "leaky"}
 
 
 def _pool(s=2):
@@ -64,7 +64,48 @@ TINY_YOLOV3_VOC = {
     ],
 }
 
-NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC)}
+
+
+def _csp(c, base):
+    """CSP block of YOLOv4-tiny starting at layer `base` (a conv of c channels): grouped
+    route (second half), two convs of c/2, concat, 1×1 conv, concat with `base`, maxpool."""
+    return [
+        _conv(c),                                                          # base
+        {"type": "route", "from": [base], "groups": 2, "group_id": 1},     # base + 1
+        _conv(c // 2),                                                     # base + 2
+        _conv(c // 2),                                                     # base + 3
+        {"type": "route", "from": [base + 3, base + 2]},                   # base + 4
+        _conv(c, k=1),                                                     # base + 5
+        {"type": "route", "from": [base, base + 5]},                       # base + 6
+        _pool(),                                                           # base + 7
+    ]
+
+
+# YOLOv4-tiny COCO (AlexeyAB yolov4-tiny.cfg, outside the base): two stride-2 convs, three
+# CSP blocks, two heads with scale_x_y = 1.05. The second head uses mask 1,2,3, as in the cfg.
+COCO_CLASSES = 80
+TINY_YOLOV4_COCO = {
+    "name": "tiny-yolov4-coco",
+    "input": (3, 416, 416),
+    "classes": COCO_CLASSES,
+    "anchors": [[10, 14], [23, 27], [37, 58], [81, 82], [135, 169], [344, 319]],
+    "layers": [_conv(32, s=2), _conv(64, s=2)] + _csp(64, 2) + _csp(128, 10) + _csp(256, 18) + [
+        _conv(512),                                                        # 26
+        _conv(256, k=1),                                                   # 27
+        _conv(512),                                                        # 28
+        _head(3, COCO_CLASSES),                                            # 29
+        {"type": "yolo", "mask": [3, 4, 5], "scale_x_y": 1.05},            # 30 : 13×13
+        {"type": "route", "from": [27]},                                   # 31
+        _conv(128, k=1),                                                   # 32
+        {"type": "upsample", "s": 2},                                      # 33
+        {"type": "route", "from": [33, 23]},                               # 34
+        _conv(256),                                                        # 35
+        _head(3, COCO_CLASSES),                                            # 36
+        {"type": "yolo", "mask": [1, 2, 3], "scale_x_y": 1.05},            # 37 : 26×26
+    ],
+}
+
+NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC, TINY_YOLOV4_COCO)}
 
 
 def infer_shapes(net):
@@ -89,6 +130,11 @@ def infer_shapes(net):
             if any(sh[1:] != srcs[0][1:] for sh in srcs):
                 raise ValueError(f"couche {i} : route de cartes de tailles différentes {srcs}")
             out = (sum(sh[0] for sh in srcs),) + srcs[0][1:]
+            groups = layer.get("groups", 1)
+            if groups > 1:  # CSP: one channel group of a single source
+                if len(srcs) != 1 or out[0] % groups:
+                    raise ValueError(f"couche {i} : route groupée invalide")
+                out = (out[0] // groups,) + out[1:]
             prev = out  # une route n'a pas d'entrée propre : elle lit ses sources
         elif t in ("yolo", "region"):  # sorties : identité, décodées hors du réseau (§8.1)
             out = (c, h, w)

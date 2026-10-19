@@ -112,7 +112,7 @@ class Network:
             elif t == "upsample":
                 y, cache = upsample_forward(src[0], s=layer["s"])
             elif t == "route":
-                y, cache = route_forward(src)
+                y, cache = route_forward(src, layer.get("groups", 1), layer.get("group_id", 0))
             elif t in OUTPUT_TYPES:
                 y, cache = src[0], None
             else:

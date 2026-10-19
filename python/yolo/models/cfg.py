@@ -1,7 +1,8 @@
 """Parser des fichiers `.cfg` Darknet (format hors base) vers le format de `yolo.models.specs`.
 
 Sections reconnues : [net], [convolutional], [maxpool], [route], [upsample], [yolo], [region].
-Les indices de route négatifs sont rendus absolus. Les ancres sont ramenées en pixels pour
+Les indices de route négatifs sont rendus absolus. Une route `groups`/`group_id` (CSP de
+YOLOv4-tiny) n'a qu'une source ; `scale_x_y` d'une [yolo] est gardé s'il diffère de 1. Les ancres sont ramenées en pixels pour
 une entrée de 416 (conventions.md) : celles de [region] (YOLOv2) sont en cellules de 32 px.
 """
 
@@ -79,13 +80,26 @@ def parse_cfg(source, name=None):
             src = [j if j >= 0 else i + j for j in _ints(opts["layers"])]
             if any(not 0 <= j < i for j in src):
                 raise ValueError(f"couche {i} : route vers {src} invalide")
-            layers.append({"type": "route", "from": src})
+            route = {"type": "route", "from": src}
+            groups = int(opts.get("groups", 1))
+            if groups > 1:
+                if len(src) != 1:
+                    raise ValueError(f"couche {i} : route groupée à plusieurs sources {src}")
+                group_id = int(opts.get("group_id", 0))
+                if not 0 <= group_id < groups:
+                    raise ValueError(f"couche {i} : group_id {group_id} hors de [0, {groups})")
+                route.update(groups=groups, group_id=group_id)
+            layers.append(route)
         elif kind == "upsample":
             layers.append({"type": "upsample", "s": int(opts.get("stride", 2))})
         elif kind == "yolo":
             net["classes"] = int(opts["classes"])
             net["anchors"] = _pairs(_ints(opts["anchors"]))
-            layers.append({"type": "yolo", "mask": _ints(opts["mask"])})
+            yolo = {"type": "yolo", "mask": _ints(opts["mask"])}
+            scale_xy = float(opts.get("scale_x_y", 1))
+            if scale_xy != 1:
+                yolo["scale_x_y"] = scale_xy
+            layers.append(yolo)
         elif kind == "region":
             net["classes"] = int(opts["classes"])
             net["anchors"] = [[a * REGION_STRIDE for a in pair]
