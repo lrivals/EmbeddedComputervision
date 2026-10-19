@@ -100,6 +100,9 @@ def make_heads(outputs, net, luts, image=0):
     out = []
     ref = anchor_ref(net)
     for hid, mask in heads(net):
+        if net["layers"][hid].get("scale_x_y", 1.0) != 1.0:
+            raise ValueError(f"tête {hid} : scale_x_y non pris en charge par le post-traitement "
+                             "matériel (YOLOv4-tiny, hors M24)")
         lut = luts[hid]
         out.append(HwHead(np.asarray(outputs[hid][image]), anchors_q8(np.asarray(
             net["anchors"], dtype=np.float64)[mask]), net["classes"],

@@ -48,7 +48,7 @@ GT_BOXES = [
 GT_LABELS = [np.array([0, 2]), np.array([1])]
 
 
-def _setup(out_type, class_mode, seed):
+def _setup(out_type, class_mode, seed, alpha=1.0):
     rng = np.random.default_rng(seed)
     desc = mini_net(out_type)
     net = Network(desc, dtype=np.float64, rng=rng)
@@ -64,7 +64,7 @@ def _setup(out_type, class_mode, seed):
 
     def run():
         return yolo_loss(net.forward(x), GT_BOXES, GT_LABELS, ANCHORS, hl, C,
-                         class_mode=class_mode, ignore_thresh=IGNORE)
+                         class_mode=class_mode, ignore_thresh=IGNORE, scale_x_y={6: alpha})
 
     def loss():
         return np.concatenate([t.ravel() for t in run().terms.values()])
@@ -74,12 +74,14 @@ def _setup(out_type, class_mode, seed):
     return net, x, res, loss, dx, grads
 
 
-CASES = [("yolo", "sigmoid"), ("region", "softmax")]
+# T24.2 : scale_x_y = 1,05 de YOLOv4-tiny.
+CASES = [("yolo", "sigmoid"), ("region", "softmax"), ("yolo", "sigmoid", 3, 1.05)]
 
 
-@pytest.fixture(scope="module", params=CASES, ids=["v3", "v2-softmax"])
+@pytest.fixture(scope="module", params=CASES, ids=["v3", "v2-softmax", "v4-scale-xy"])
 def setup(request):
-    return _setup(*request.param, seed=3)
+    out_type, class_mode, *rest = request.param
+    return _setup(out_type, class_mode, 3, *rest[1:])
 
 
 def test_masks_all_present(setup):

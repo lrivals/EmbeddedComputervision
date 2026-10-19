@@ -88,8 +88,11 @@ class Trainer:
         x = images.astype(self.net.dtype, copy=False)
         outputs = self.net.forward(x if xnp is np else xnp.asarray(x), train=True)
         outputs = {h: to_numpy(o) for h, o in outputs.items()}
+        layers = self.net.layers
         res = yolo_loss(outputs, boxes, labels, self.net.net["anchors"], self.head_list,
-                        self.net.net["classes"], **self.loss_kwargs)
+                        self.net.net["classes"],
+                        scale_x_y={h: layers[h].get("scale_x_y", 1.0) for h, _ in self.head_list},
+                        **self.loss_kwargs)
         douts = {h: d / n for h, d in res.douts.items()}
         if xnp is not np:
             douts = {h: xnp.asarray(d) for h, d in douts.items()}

@@ -132,3 +132,14 @@ def test_python_equals_golden(net):
             want = hp.run(hp.make_heads({h: heads[h][None] for h in ids}, spec, luts), conf, 0.45)
             got = _golden(model_dir, conf, 0.45, files)
             assert got == (want[0], want[1]), (n, conf)
+
+
+def test_scale_x_y_rejected():
+    # T24.2 : le post-traitement matériel ne connaît pas scale_x_y (YOLOv4-tiny, hors M24).
+    from yolo.models.tiny_yolo import load_cfg
+
+    net = load_cfg("tiny-yolov4-coco")
+    outputs = {30: np.zeros((1, 255, 13, 13), np.int8), 37: np.zeros((1, 255, 26, 26), np.int8)}
+    luts = {h: HeadLuts(0.125) for h in outputs}
+    with pytest.raises(ValueError, match="scale_x_y"):
+        hp.make_heads(outputs, net, luts)

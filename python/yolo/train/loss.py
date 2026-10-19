@@ -21,6 +21,7 @@ import numpy as np
 
 from yolo.data.targets import ANCHOR_REF, anchors_frac, build_targets
 from yolo.infer.boxes import iou
+from yolo.infer.decode import scale_xy
 from yolo.layers.activations import sigmoid
 
 
@@ -48,24 +49,25 @@ def _grid(sh, sw):
     return i, j
 
 
-def predicted_boxes(p, anchors):
+def predicted_boxes(p, anchors, alpha=1.0):
     """Boîtes prédites (N, A, S_h, S_w, 4) en `(cx, cy, w, h)` normalisés (§8.1).
 
-    `p` : (N, A, 5+C, S_h, S_w) ; `anchors` : (A, 2) en fraction de l'image.
+    `p` : (N, A, 5+C, S_h, S_w) ; `anchors` : (A, 2) en fraction de l'image ; `alpha` :
+    `scale_x_y` de la tête (YOLOv4-tiny).
     """
     sh, sw = p.shape[-2:]
     i, j = _grid(sh, sw)
-    bx = (sigmoid(p[:, :, 0]) + j) / sw
-    by = (sigmoid(p[:, :, 1]) + i) / sh
+    bx = (scale_xy(sigmoid(p[:, :, 0]), alpha) + j) / sw
+    by = (scale_xy(sigmoid(p[:, :, 1]), alpha) + i) / sh
     # e^{t} borné : seule l'IoU du masque ignore en dépend.
     bw = anchors[None, :, 0, None, None] * np.exp(np.clip(p[:, :, 2], -50, 50))
     bh = anchors[None, :, 1, None, None] * np.exp(np.clip(p[:, :, 3], -50, 50))
     return np.stack([bx, by, bw, bh], axis=-1)
 
 
-def ignore_mask(p, anchors, obj, gt_boxes, thresh):
+def ignore_mask(p, anchors, obj, gt_boxes, thresh, alpha=1.0):
     """(ignore, best_iou) de forme (N, A, S_h, S_w) — §5.1, 4."""
-    pred = predicted_boxes(p, anchors)
+    pred = predicted_boxes(p, anchors, alpha)
     best = np.zeros(obj.shape)
     for n, gt in enumerate(gt_boxes):
         gt = np.asarray(gt, dtype=np.float64).reshape(-1, 4)
@@ -76,14 +78,16 @@ def ignore_mask(p, anchors, obj, gt_boxes, thresh):
 
 def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
               class_mode="sigmoid", lambda_coord=1.0, ignore_thresh=0.5,
-              anchor_ref=ANCHOR_REF):
+              anchor_ref=ANCHOR_REF, scale_x_y=None):
     """Perte et gradients par rapport aux sorties brutes des têtes (§6.2).
 
     `outputs` : {id: (N, A·(5+C), S_h, S_w)} (sortie de `Network.forward`) ;
     `gt_boxes[n]` : (k, 4) `(cx, cy, w, h)` normalisés ; `gt_labels[n]` : (k,) ;
     `head_list` : `yolo.data.targets.heads(net)` ; `anchor_ref` :
-    `yolo.data.targets.anchor_ref(net)`.
+    `yolo.data.targets.anchor_ref(net)` ; `scale_x_y` : {id: α} des têtes YOLOv4-tiny (1 par
+    défaut), position prédite σ(t)·α − (α − 1)/2 et gradient ×α.
     """
+    scale_x_y = scale_x_y or {}
     if class_mode not in ("sigmoid", "softmax"):
         raise ValueError(f"class_mode inconnu : {class_mode!r}")
     grids = {hid: tuple(outputs[hid].shape[-2:]) for hid, _ in head_list}
@@ -101,7 +105,8 @@ def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
         p = out.reshape(n, a, c5, sh, sw).astype(np.float64)
         t = targets[hid]
         obj = t["obj"]
-        ignore, best = ignore_mask(p, all_anchors[mask], obj, gt_boxes, ignore_thresh)
+        alpha = scale_x_y.get(hid, 1.0)
+        ignore, best = ignore_mask(p, all_anchors[mask], obj, gt_boxes, ignore_thresh, alpha)
         noobj = ~obj & ~ignore
         objf, noobjf = obj.astype(np.float64), noobj.astype(np.float64)
 
@@ -112,9 +117,9 @@ def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
         w = lambda_coord * t["scale"] * objf
         for ch, key in ((0, "x"), (1, "y")):
             sg = sigmoid(p[:, :, ch])
-            d = sg - t[key]
+            d = scale_xy(sg, alpha) - t[key]
             term[:, :, ch] = w * d * d
-            grad[:, :, ch] = 2 * w * d * sg * (1 - sg)          # 2λω(σ−x*)σ(1−σ)
+            grad[:, :, ch] = 2 * w * d * alpha * sg * (1 - sg)  # 2λω(σ−x*)·α·σ(1−σ)
         for ch, key in ((2, "tw"), (3, "th")):
             d = p[:, :, ch] - t[key]
             term[:, :, ch] = w * d * d
