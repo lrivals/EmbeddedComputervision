@@ -34,7 +34,13 @@ struct Head {
   const uint32_t* exp = nullptr;          // e^{q s} en Q`exp_frac`
   const uint32_t* softmax_exp = nullptr;  // e^{d s} en Q16
   std::vector<std::pair<double, double>> anchors;  // pixels (repère ref_w × ref_h)
+  double scale_xy = 1.0;  // scale_x_y de Darknet (YOLOv4-tiny) : σ·α − (α − 1)/2
 };
+
+// Centre dans la cellule : σ, ou σ·α − (α − 1)/2 (même calcul que yolo.infer.decode).
+inline double scale_xy(double sig, double alpha) {
+  return alpha == 1.0 ? sig : sig * alpha - (alpha - 1) / 2;
+}
 
 // Boîte (cx, cy, w, h) normalisée dans l'image d'entrée.
 struct Candidate {
@@ -70,8 +76,8 @@ inline void decode_head(const Head& h, double obj_thr, std::vector<Candidate>& o
         if (t(4) < thr) continue;
         Candidate c;
         // §8.1 : b_x = (σ(t_x) + j)/S_w, b_w = p_w e^{t_w}
-        c.box[0] = (h.sigmoid[t(0) + LUT_OFFSET] / LUT_ONE + j) / gw;
-        c.box[1] = (h.sigmoid[t(1) + LUT_OFFSET] / LUT_ONE + i) / gh;
+        c.box[0] = (scale_xy(h.sigmoid[t(0) + LUT_OFFSET] / LUT_ONE, h.scale_xy) + j) / gw;
+        c.box[1] = (scale_xy(h.sigmoid[t(1) + LUT_OFFSET] / LUT_ONE, h.scale_xy) + i) / gh;
         const double ef = std::ldexp(1.0, h.exp_frac);
         c.box[2] = aw * (h.exp[t(2) + LUT_OFFSET] / ef);
         c.box[3] = ah * (h.exp[t(3) + LUT_OFFSET] / ef);

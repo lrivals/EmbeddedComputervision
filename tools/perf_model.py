@@ -36,7 +36,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 K_MAX = 3
 FREQ_HZ = 200e6
-NETS = ("tiny-yolov2-voc", "tiny-yolov3-coco")
+NETS = ("tiny-yolov2-voc", "tiny-yolov3-coco", "tiny-yolov4-coco")
 
 
 def kernel_config(path=ROOT / "hls" / "kernels" / "accel_config.hpp"):
@@ -68,6 +68,9 @@ def conv_layers(manifest):
         if t == "conv":
             src = prev
             pool = layer.get("fused_pool")
+            if pool is None and layer["s"] == 2:
+                # T24.3 : stride 2 = stride 1 décimée dans l'étage de sortie (driver::conv_desc).
+                pool = {"k": 1, "s": 2}
             d = {"layer": layer["id"], "k": layer["k"], "pad": layer["pad"], "cin": layer["cin"],
                  "cout": layer["cout"], "h": src[0], "w": src[1],
                  "pool_k": pool["k"] if pool else 0, "pool_s": pool["s"] if pool else 0,
@@ -160,6 +163,7 @@ def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc
 
 
 def macs(d):
+    """MACs calculés par le noyau (une conv de stride 2 l'est en stride 1, 4× plus)."""
     R = d["h"] + 2 * d["pad"] - d["k"] + 1
     C = d["w"] + 2 * d["pad"] - d["k"] + 1
     return d["k"] ** 2 * d["cin"] * d["cout"] * R * C

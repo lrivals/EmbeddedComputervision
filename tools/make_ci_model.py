@@ -1,6 +1,6 @@
 """Export synthétique de model/<net>/ pour la CI (T10.13), sans poids Darknet ni VOC.
 
-    python tools/make_ci_model.py                  # les deux réseaux → model/
+    python tools/make_ci_model.py                  # les trois réseaux → model/
     python tools/make_ci_model.py --out build/ci/model --net tiny-yolov2-voc
 
 Même chaîne que `make calibrate export` (calibration, `QuantModel`, `export_model`, dumps),
@@ -40,7 +40,7 @@ from yolo.quant.int_model import IntNetwork, QuantModel  # noqa: E402
 CALIB_IMAGES = 8
 DUMP_IDS = ["000001", "000002", "000003"]
 # Moyenne des biais de tête : softmax de 20 classes (v2) contre sigmoïdes de 80 (v3).
-HEAD_BIAS = {"tiny-yolov2-voc": 1.0, "tiny-yolov3-coco": -1.5}
+HEAD_BIAS = {"tiny-yolov2-voc": 1.0, "tiny-yolov3-coco": -1.5, "tiny-yolov4-coco": -1.5}
 
 
 def synthetic_net(name, seed):

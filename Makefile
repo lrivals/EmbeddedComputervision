@@ -180,7 +180,7 @@ autolabel:
 eval-float:
 	python tools/eval_voc.py --net tiny-yolov2-voc --weights weights/yolov2-tiny-voc.weights --resize stretch
 
-QNETS = tiny-yolov2-voc tiny-yolov3-coco
+QNETS = tiny-yolov2-voc tiny-yolov3-coco tiny-yolov4-coco
 
 calibrate:
 	for n in $(QNETS); do python tools/calibrate.py --net $$n || exit 1; done

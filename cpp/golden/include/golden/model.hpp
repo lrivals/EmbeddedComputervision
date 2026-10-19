@@ -44,6 +44,8 @@ struct Layer {
   // route, upsample, têtes
   std::vector<int> from;
   std::string layout;
+  int groups = 1, group_id = 0;  // route groupée (CSP de YOLOv4-tiny) : un groupe de canaux
+  double scale_xy = 1.0;         // yolo : scale_x_y de Darknet
   double scale = 0.0;
   std::vector<int> mask;  // yolo
   int num = 0;            // region

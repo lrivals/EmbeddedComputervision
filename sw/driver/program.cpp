@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <stdexcept>
 
 #include "golden/engine.hpp"
@@ -97,6 +98,34 @@ accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int6
   return d;
 }
 
+// Ajoute la vue `s` à la concaténation `v` (route, §10.3).
+static void concat(View& v, const View& s) {
+  if (s.nseg == 0) throw std::runtime_error("source de route sans sortie en DDR");
+  if (v.nseg > 0 && (s.h != v.h || s.w != v.w))
+    throw std::runtime_error("route : formes incompatibles");
+  v.h = s.h;
+  v.w = s.w;
+  for (int k = 0; k < s.nseg; ++k) {
+    const Segment& g = s.seg[k];
+    Segment* last = v.nseg ? &v.seg[v.nseg - 1] : nullptr;
+    if (last && last->up == 0 && g.up == 0 && last->h == g.h && last->w == g.w &&
+        last->off + int64_t(last->c) * last->h * last->w == g.off) {
+      last->c += g.c;  // placement contigu : concaténation gratuite
+    } else {
+      if (v.nseg == accel::MAX_SEGMENTS) throw std::runtime_error("route : trop de segments");
+      v.seg[v.nseg++] = g;
+    }
+    v.c += g.c;
+  }
+}
+
+// Route suivie d'un maxpool fusionné dans ses sources (YOLOv4-tiny) : jamais en DDR.
+static bool pooled_route(const golden::Model& m, const Layer& l) {
+  const size_t n = size_t(l.id) + 1;
+  return l.type == LayerType::Route && n < m.layers.size() &&
+         m.layers[n].type == LayerType::Maxpool && m.layers[n].fused_into == l.id;
+}
+
 Program build(const golden::Model& m) {
   Program p;
   for (const auto& kv : m.buffers) {
@@ -112,14 +141,16 @@ Program build(const golden::Model& m) {
 
   // Vues : même logique que golden::Engine::place_views (cpp/golden/src/engine.cpp).
   p.views.assign(m.layers.size(), View{});
+  std::map<int, View> pooled;  // conv → sa carte poolée, source d'une concaténation poolée
   for (const Layer& l : m.layers) {
     View& v = p.views[size_t(l.id)];
     switch (l.type) {
       case LayerType::Conv: {
         const Layer* dst = l.pool_layer >= 0 ? &m.layers[size_t(l.pool_layer)] : &l;
-        v = single_view(addr(l.out), dst->out_c, dst->out_h, dst->out_w);
+        v = single_view(addr(l.out), l.cout, dst->out_h, dst->out_w);
         if (l.pool_layer >= 0) {
-          p.views[size_t(l.pool_layer)] = v;
+          if (dst->fused_into == l.id) p.views[size_t(l.pool_layer)] = v;
+          else pooled[l.id] = v;
           v = l.prepool_out.valid() ? single_view(addr(l.prepool_out), l.cout,
                                                   golden::prepool_h(l), golden::prepool_w(l))
                                     : View{};
@@ -128,7 +159,9 @@ Program build(const golden::Model& m) {
       }
       case LayerType::Maxpool:
         if (l.fused_into < 0) throw std::runtime_error("maxpool non fusionné");
-        break;  // posée par sa conv
+        if (m.layers[size_t(l.fused_into)].type == LayerType::Route)
+          for (int j : m.layers[size_t(l.fused_into)].from) concat(v, pooled.at(j));
+        break;  // sinon posée par sa conv
       case LayerType::Upsample:
         v = p.views[size_t(l.id - 1)];
         if (v.nseg != 1 || l.s != 2) throw std::runtime_error("upsample ×2 d'une vue simple");
@@ -137,27 +170,17 @@ Program build(const golden::Model& m) {
         v.w *= 2;
         break;
       case LayerType::Route:
-        for (int j : l.from) {
-          const View& s = p.views[size_t(j)];
-          if (s.nseg == 0) throw std::runtime_error("source de route sans sortie en DDR");
-          if (v.nseg > 0 && (s.h != v.h || s.w != v.w))
-            throw std::runtime_error("route : formes incompatibles");
-          v.h = s.h;
-          v.w = s.w;
-          for (int k = 0; k < s.nseg; ++k) {
-            const Segment& g = s.seg[k];
-            Segment* last = v.nseg ? &v.seg[v.nseg - 1] : nullptr;
-            if (last && last->up == 0 && g.up == 0 && last->h == g.h && last->w == g.w &&
-                last->off + int64_t(last->c) * last->h * last->w == g.off) {
-              last->c += g.c;  // placement contigu : concaténation gratuite
-            } else {
-              if (v.nseg == accel::MAX_SEGMENTS)
-                throw std::runtime_error("route : trop de segments");
-              v.seg[v.nseg++] = g;
-            }
-            v.c += g.c;
-          }
+        if (pooled_route(m, l)) break;  // lue seulement par son maxpool
+        if (l.groups > 1) {
+          // Route groupée (CSP) : segment décalé de group_id·(C/groups)·H·W, sans copie.
+          const View& s = p.views[size_t(l.from[0])];
+          if (s.nseg != 1 || s.seg[0].up != 0)
+            throw std::runtime_error("route groupée d'une vue composée");
+          const int c = s.c / l.groups;
+          v = single_view(s.seg[0].off + int64_t(l.group_id) * c * s.h * s.w, c, s.h, s.w);
+          break;
         }
+        for (int j : l.from) concat(v, p.views[size_t(j)]);
         break;
       case LayerType::Yolo:
       case LayerType::Region:

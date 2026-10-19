@@ -119,6 +119,7 @@ Model Model::load(const std::string& dir) {
           l.pool_s = static_cast<int>(fp["s"].integer());
         }
         if (e.has("prepool_out")) l.prepool_out = parse_buf(e["prepool_out"]);
+        require(l.s == 1 || (l.s == 2 && l.pool_layer < 0), "stride 1, ou 2 sans maxpool");
         l.w_offset = e["w_offset"].integer();
         l.b_offset = e["b_offset"].integer();
         l.m0_offset = e["m0_offset"].integer();
@@ -148,10 +149,21 @@ Model Model::load(const std::string& dir) {
         l.from = ints(e["from"]);
         l.layout = e["layout"].str();
         l.scale = e["scale"].num();
+        require(l.layout == "contiguous" || l.layout == "grouped", "layout de route " + l.layout);
+        if (l.layout == "grouped") {
+          l.groups = static_cast<int>(e["groups"].integer());
+          l.group_id = static_cast<int>(e["group_id"].integer());
+          require(l.from.size() == 1 && l.groups >= 2 && l.group_id >= 0 &&
+                      l.group_id < l.groups,
+                  "route groupée invalide");
+        }
         break;
       case LayerType::Yolo:
       case LayerType::Region:
-        if (l.type == LayerType::Yolo) l.mask = ints(e["mask"]);
+        if (l.type == LayerType::Yolo) {
+          l.mask = ints(e["mask"]);
+          if (e.has("scale_x_y")) l.scale_xy = e["scale_x_y"].num();
+        }
         else l.num = static_cast<int>(e["num"].integer());
         l.scale = e["scale"].num();
         l.lut_offset = e["lut_offset"].integer();

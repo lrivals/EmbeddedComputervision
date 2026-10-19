@@ -10,6 +10,9 @@
 // - yolo / region : la vue de la tête (le décodage est fait par l'hôte, postproc.hpp).
 // Écart au manifest : la zone `out` de l'upsample (R:0, réservée pour une copie ×2) n'est
 // jamais écrite ; la route 20 est lue en deux segments (L18 vue ×2, puis prépool de L08).
+// YOLOv4-tiny (T24.3-T24.4) : une route groupée est un décalage dans sa source ; un maxpool
+// après une concaténation est fusionné dans chaque source (vue : les cartes poolées bout à
+// bout) ; une conv de stride 2 est calculée en stride 1 et décimée (maxpool 1×1, stride 2).
 #pragma once
 
 #include <map>
@@ -92,7 +95,7 @@ void Engine::run(const int8_t* input, bool record_all) {
                     tap, &stats_[size_t(l.id)]);
       if (recording_) {
         record(l.id);
-        if (p.pooled()) record(l.pool_layer);
+        if (l.pool_layer >= 0) record(l.pool_layer);
       }
     } else if (l.type == LayerType::Maxpool) {
       // Fusionné dans l'étage de sortie de la conv (enregistré avec elle).

@@ -1,4 +1,4 @@
-// Testbench par couche (T6.1, T6.3) : chaque conv des deux réseaux, seule, sur l'entrée
+// Testbench par couche (T6.1, T6.3) : chaque conv des réseaux exportés, seule, sur l'entrée
 // dumpée par Python. Sortie du noyau == golden::conv_layer (mêmes tuiles) == dump Python,
 // pour la carte poolée et la carte avant pooling (maxpool 2×2 stride 2 et 1).
 //
@@ -79,13 +79,27 @@ int main(int argc, char** argv) {
 
         std::printf("%s %s L%02d : ", net.c_str(), image.c_str(), l.id);
         size_t nd = tb::compare("golden", k_out, g_out.data(), size_t(n_out));
-        const int out_id = p.pooled() ? l.pool_layer : l.id;
+        // Référence Python : le dump du maxpool fusionné (pour une source d'une concaténation
+        // poolée, YOLOv4-tiny, sa part des canaux), sinon celui de la conv (une conv de
+        // stride 2 est décimée : sa carte de stride 1 n'a pas de dump).
+        const int out_id = l.pool_layer >= 0 ? l.pool_layer : l.id;
+        int64_t want_off = 0;
+        if (l.pool_layer >= 0) {
+          const Layer& pl = m.layers[size_t(l.pool_layer)];
+          if (pl.fused_into != l.id)
+            for (int j : m.layers[size_t(pl.fused_into)].from) {
+              if (j == l.id) break;
+              want_off += int64_t(m.layers[size_t(j)].cout) * p.pool_h() * p.pool_w();
+            }
+        }
         const NpyInt8 want = tb::dump(a, net, image, out_id);
-        nd += tb::compare("dump", k_out, want.data.data(), size_t(n_out));
+        nd += tb::compare("dump", k_out, want.data.data() + want_off, size_t(n_out));
         if (p.pooled()) {
           nd += tb::compare("golden prépool", k_pre, g_pre.data(), size_t(n_pre));
-          const NpyInt8 want_pre = tb::dump(a, net, image, l.id);
-          nd += tb::compare("dump prépool", k_pre, want_pre.data.data(), size_t(n_pre));
+          if (l.pool_layer >= 0) {
+            const NpyInt8 want_pre = tb::dump(a, net, image, l.id);
+            nd += tb::compare("dump prépool", k_pre, want_pre.data.data(), size_t(n_pre));
+          }
         }
         total_diff += nd;
         ++checked;

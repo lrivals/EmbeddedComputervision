@@ -1,5 +1,6 @@
 #include "golden/engine.hpp"
 
+#include <map>
 #include <stdexcept>
 
 #include "golden/hw_postproc.hpp"
@@ -7,7 +8,8 @@
 namespace golden {
 
 ConvParams conv_params(const Layer& l, int in_h, int in_w) {
-  if (l.s != S_CONV || l.k > K_MAX) throw std::runtime_error("conv hors du moteur (k, s)");
+  if ((l.s != S_CONV && l.s != 2) || l.k > K_MAX)
+    throw std::runtime_error("conv hors du moteur (k, s)");
   ConvParams p;
   p.k = l.k;
   p.pad = l.pad;
@@ -21,8 +23,41 @@ ConvParams conv_params(const Layer& l, int in_h, int in_w) {
   if (l.pool_layer >= 0) {
     p.pool_k = l.pool_k;
     p.pool_s = l.pool_s;
+  } else if (l.s == 2) {
+    // T24.3 : stride 2 = stride 1 décimée dans l'étage de sortie (maxpool 1×1 de stride 2).
+    p.pool_k = 1;
+    p.pool_s = 2;
   }
   return p;
+}
+
+// Route suivie d'un maxpool fusionné dans ses sources : jamais écrite avant pooling.
+static bool pooled_route(const Model& m, const Layer& l) {
+  const size_t n = size_t(l.id) + 1;
+  return l.type == LayerType::Route && n < m.layers.size() &&
+         m.layers[n].type == LayerType::Maxpool && m.layers[n].fused_into == l.id;
+}
+
+// Ajoute la vue `s` à la concaténation `v` (route, §10.3).
+static void concat(InView& v, const InView& s) {
+  if (s.nseg == 0) throw std::runtime_error("source de route sans sortie en DDR");
+  if (v.nseg > 0 && (s.h != v.h || s.w != v.w))
+    throw std::runtime_error("route : formes incompatibles");
+  v.h = s.h;
+  v.w = s.w;
+  for (int k = 0; k < s.nseg; ++k) {
+    Segment g = s.seg[k];
+    Segment* last = v.nseg ? &v.seg[v.nseg - 1] : nullptr;
+    // Placement contigu : fusion avec le segment précédent (concaténation gratuite).
+    if (last && last->up == 0 && g.up == 0 && last->h == g.h && last->w == g.w &&
+        last->base + int64_t(last->c) * last->h * last->w == g.base) {
+      last->c += g.c;
+    } else {
+      if (v.nseg == MAX_SEGMENTS) throw std::runtime_error("route : trop de segments");
+      v.seg[v.nseg++] = g;
+    }
+    v.c += g.c;
+  }
 }
 
 // Carte avant pooling d'une conv fusionnée (pooling 2×2 : s2 divise par 2, s1 conserve).
@@ -41,15 +76,17 @@ Engine::Engine(const Model& m) : m_(m) {
 }
 
 void Engine::place_views() {
+  std::map<int, InView> pooled;  // conv → sa carte poolée, source d'une concaténation poolée
   for (const Layer& l : m_.layers) {
     InView& v = views_[size_t(l.id)];
     switch (l.type) {
       case LayerType::Conv: {
         const Layer* dst = l.pool_layer >= 0 ? &m_.layers[size_t(l.pool_layer)] : &l;
-        v = single_view(addr(l.out), dst->out_c, dst->out_h, dst->out_w);
+        v = single_view(addr(l.out), l.cout, dst->out_h, dst->out_w);
         if (l.pool_layer >= 0) {
+          if (dst->fused_into == l.id) views_[size_t(l.pool_layer)] = v;
+          else pooled[l.id] = v;  // vue du maxpool posée par lui (concaténation poolée)
           // La conv elle-même : sa carte avant pooling si elle est en DDR (`prepool_out`).
-          views_[size_t(l.pool_layer)] = v;
           v = l.prepool_out.valid()
                   ? single_view(addr(l.prepool_out), l.cout, prepool_h(l), prepool_w(l))
                   : InView{};
@@ -57,7 +94,12 @@ void Engine::place_views() {
         break;
       }
       case LayerType::Maxpool:
-        break;  // posée par sa conv
+        // Après une route (YOLOv4-tiny) : les cartes poolées de ses sources, bout à bout.
+        if (l.fused_into >= 0 && m_.layers[size_t(l.fused_into)].type == LayerType::Route) {
+          v = InView{};
+          for (int j : m_.layers[size_t(l.fused_into)].from) concat(v, pooled.at(j));
+        }
+        break;  // sinon posée par sa conv
       case LayerType::Upsample: {
         v = views_[size_t(l.id - 1)];
         if (v.nseg != 1) throw std::runtime_error("upsample d'une vue composée");
@@ -69,27 +111,17 @@ void Engine::place_views() {
       }
       case LayerType::Route: {
         v = InView{};
-        for (int j : l.from) {
-          const InView& s = views_[size_t(j)];
-          if (s.nseg == 0) throw std::runtime_error("source de route sans sortie en DDR");
-          if (v.nseg > 0 && (s.h != v.h || s.w != v.w))
-            throw std::runtime_error("route : formes incompatibles");
-          v.h = s.h;
-          v.w = s.w;
-          for (int k = 0; k < s.nseg; ++k) {
-            Segment g = s.seg[k];
-            Segment* last = v.nseg ? &v.seg[v.nseg - 1] : nullptr;
-            // Placement contigu : fusion avec le segment précédent (concaténation gratuite).
-            if (last && last->up == 0 && g.up == 0 && last->h == g.h && last->w == g.w &&
-                last->base + int64_t(last->c) * last->h * last->w == g.base) {
-              last->c += g.c;
-            } else {
-              if (v.nseg == MAX_SEGMENTS) throw std::runtime_error("route : trop de segments");
-              v.seg[v.nseg++] = g;
-            }
-            v.c += g.c;
-          }
+        if (pooled_route(m_, l)) break;  // lue seulement par son maxpool (vue ci-dessus)
+        if (l.groups > 1) {
+          // Route groupée (CSP) : un groupe de canaux de la source, par décalage d'adresse.
+          const InView& s = views_[size_t(l.from[0])];
+          if (s.nseg != 1 || s.seg[0].up != 0)
+            throw std::runtime_error("route groupée d'une vue composée");
+          const int c = s.c / l.groups;
+          v = single_view(s.seg[0].base + int64_t(l.group_id) * c * s.h * s.w, c, s.h, s.w);
+          break;
         }
+        for (int j : l.from) concat(v, views_[size_t(j)]);
         break;
       }
       case LayerType::Yolo:
@@ -136,6 +168,17 @@ void Engine::record(int id) {
     rec_[size_t(id)] = Tensor{l.cout, prepool_h(l), prepool_w(l), taps_[size_t(id)]};
     return;
   }
+  if (pooled_route(m_, l)) {
+    // Jamais en DDR : concaténation des cartes avant pooling (sondes) de ses sources.
+    Tensor t{0, l.out_h, l.out_w, {}};
+    for (int j : l.from) {
+      const Tensor& s = rec_[size_t(j)];
+      t.c += s.c;
+      t.data.insert(t.data.end(), s.data.begin(), s.data.end());
+    }
+    rec_[size_t(id)] = std::move(t);
+    return;
+  }
   rec_[size_t(id)] = materialize(views_[size_t(id)]);
 }
 
@@ -159,6 +202,7 @@ std::vector<postproc::Head> make_heads(const Engine& e) {
     h.sigmoid = m.head_lut(l, 0);
     h.exp = m.head_lut(l, 1);
     h.softmax_exp = m.head_lut(l, 2);
+    h.scale_xy = l.scale_xy;
     if (h.softmax)
       for (int a = 0; a < l.num; ++a) h.anchors.push_back(m.anchors[size_t(a)]);
     else
