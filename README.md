@@ -94,6 +94,7 @@ make bench-report                   # results/benchmarks.csv, results/mesures.md
 make ci-model ci                    # CI (T10.13): synthetic export, without VOC or Darknet weights
 make count-macs                     # tables of §3 (parameters, MACs)
 make figures                        # M13 figures → results/figures/, gallery results/figures.md
+make presentation-pdf               # slides of the project → docs/presentation/presentation.pdf
 make notebooks                      # M14 and M16 notebooks → notebooks/<dataset>/, index notebooks/README.md
 make notebooks-smoke                # smoke run of the notebooks whose data is present (T14.9)
 make test-durations                 # full suite (slow included): test durations for figure T13.30
