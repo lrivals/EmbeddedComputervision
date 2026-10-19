@@ -70,6 +70,8 @@ def main():
     datasets.add_args(ap)
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
+    ap.add_argument("--subset", type=int, default=0,
+                    help="n premières images seulement (celles de make_inputs et eval_quant)")
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "map_stades.md")
     ap.add_argument("--json", type=Path, default=None,
                     help="stades en JSON pour les figures (défaut <dir>/map_stades.json, T13.13)")
@@ -90,7 +92,10 @@ def main():
             return res["ap_class"], res["AP"]
         return evaluate(per, samples, len(names), use_07=True)
 
-    samples = datasets.remap(datasets.load_args(args), view.gt_lut)
+    samples = datasets.load_args(args)
+    if args.subset:
+        samples = samples[:args.subset]
+    samples = datasets.remap(samples, view.gt_lut)
     ids = [s["id"] for s in samples]
     ev = json.loads((d / "eval_float_int.json").read_text())
     if ev["images"] != len(samples) or ev["resize"] != "stretch":

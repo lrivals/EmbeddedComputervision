@@ -16,7 +16,7 @@ Ajouter un jeu à `DATASETS` (avec ses `MAPPINGS`) ajoute ses notebooks d'infér
 domaine sans toucher au générateur.
 """
 
-from tools.notebooks import Notebook
+from tools.notebooks import OUT, Notebook
 from tools.notebooks.commandes import cfg_path
 from yolo.data.datasets import DATASETS, FAMILIES, MAPPINGS
 from yolo.models.tiny_yolo import PRETRAINED, load_cfg
@@ -65,6 +65,11 @@ TASKS = {("voc", "infer"): ("T3.4", "T4.5", "T11.0"), ("coco", "infer"): ("T11.1
          ("auair", "infer"): ("T18.10",), ("dronevehicle", "infer"): ("T18.10",),
          ("hituav", "infer"): ("T18.10",), ("uavdt", "infer"): ("T18.10",),
          ("asl", "train"): ("T21.2", "T21.9"), ("asl", "infer"): ("T21.9",)}
+
+# YOLOv4-tiny (M24) : cfg d'affinage tirée de yolov4-tiny.cfg, poids COCO de départ.
+V4_ARCH = "tiny-yolov4"
+V4_INIT_NET = "tiny-yolov4-coco"
+V4_TASKS = ("T24.6",)
 
 # Tâche M11 de chaque jeu et tâche d'exécution M16 (en-tête des notebooks `stats`).
 STATS_TASKS = {"voc": ("T13.7", "T16.12"), "coco": ("T11.1", "T16.13"),
@@ -130,6 +135,13 @@ def build_registry():
             model, cfg, inp = finetuned(ds)
             tasks = _tasks(ds, "train") + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
             out.append(Notebook(ds, model, role, cfg, init, ds, tasks, **inp))
+    # YOLOv4-tiny affiné sur VOC depuis ses poids COCO (T24.6) : affinage et évaluation.
+    v4, model = V4_ARCH, "tiny-yolov4-voc"
+    cfg = cfg_path(v4, "voc")
+    out.append(Notebook("voc", model, "infer", cfg, f"{OUT}/voc/{model}/final.weights", "voc",
+                        V4_TASKS, arch=v4))
+    out.append(Notebook("voc", model, "train", cfg, f"weights/{PRETRAINED[V4_INIT_NET]}",
+                        "voc", V4_TASKS, arch=v4))
     return {f"{nb.dataset}/{nb.name}": nb for nb in out}
 
 

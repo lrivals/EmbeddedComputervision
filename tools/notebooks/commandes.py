@@ -165,7 +165,7 @@ def cmd_calibrate(net, weights, dataset, out, markdown, images=500, split=None,
 
 def cmd_eval_quant(net, out, variants="float,int", subset=0, jobs=16, dataset="voc",
                    weights=None, calib=None, model_dir=None, metric=None, split=None,
-                   size=None, data_root=None):
+                   size=None, data_root=None, save_dets=None):
     """`tools/eval_quant.py` comme `evalq` de m11.sh et m12.sh (stretch, 1 fil BLAS) ;
     `jobs` None : `auto_jobs`."""
     cmd = ["python", "tools/eval_quant.py", "--net", str(net), "--resize", "stretch",
@@ -179,7 +179,8 @@ def cmd_eval_quant(net, out, variants="float,int", subset=0, jobs=16, dataset="v
     _opt(cmd, "--metric", metric)
     _opt(cmd, "--split", split)
     _opt(cmd, "--size", _size(size))
-    return _opt(cmd, "--data-root", data_root)
+    _opt(cmd, "--data-root", data_root)
+    return _opt(cmd, "--save-dets", save_dets)
 
 
 def cmd_quant_lowbit(net, checkpoint, out, qat="", admm=False):
@@ -211,6 +212,67 @@ def cmd_data_stats(dataset, out, splits=None, size=None, resize="letterbox", net
     return cmd + ["--out", str(out)]
 
 
+# ------------------------------------------- volet matériel (profil coco-v4 de m11.sh, M24)
+
+def cmd_export(net, weights, calib, out, dataset="voc", data_root=None):
+    """`tools/export_model.py` : manifest, blobs et dumps de 3 images du jeu dans `out`."""
+    cmd = ["python", "tools/export_model.py", "--net", str(net), "--weights", str(weights),
+           "--calib", str(calib)]
+    if dataset != "voc":
+        cmd += ["--dataset", dataset]
+    _opt(cmd, "--data-root", data_root)
+    return cmd + ["--out", str(out)]
+
+
+def cmd_cmake(src, build, target, flags=None, options=()):
+    """Configuration et construction d'une cible CMake : deux commandes. `flags` :
+    `CMAKE_CXX_FLAGS` (m11.sh les passe par `CXXFLAGS`)."""
+    conf = ["cmake", "-S", str(src), "-B", str(build), *options]
+    if flags:
+        conf.append(f"-DCMAKE_CXX_FLAGS={flags}")
+    return [conf, ["cmake", "--build", str(build), "-j", "--target", target]]
+
+
+def cmd_golden_run(model, inp, out):
+    """`golden_run run` (make golden-check) : golden C++ sur l'entrée d'un dump."""
+    return ["build/golden/golden_run", "run", str(model), str(inp), str(out)]
+
+
+def cmd_compare_dumps(ref, test):
+    """`tools/compare_dumps.py` : égalité à l'octet couche par couche, et des détections."""
+    return ["python", "tools/compare_dumps.py", str(ref), str(test)]
+
+
+def cmd_make_inputs(net, dataset, subset, out, data_root=None):
+    """`tools/make_inputs.py` : entrées int8 des stades entier et FPGA (m11.sh coco-fpga)."""
+    cmd = ["python", "tools/make_inputs.py", "--net", str(net), "--dataset", dataset,
+           "--subset", str(subset)]
+    _opt(cmd, "--data-root", data_root)
+    return cmd + ["--out", str(out)]
+
+
+BENCH_FAST = "build/sw-fast/yolo_bench"  # noyau sans ap_int (-DACC_NO_APINT), m11.sh
+
+
+def cmd_bench_sim(d, model, jobs=None):
+    """`tools/bench_sim.sh` : stade FPGA en C-sim ; à lancer avec `BENCH=BENCH_FAST`."""
+    return ["bash", "tools/bench_sim.sh", str(d), str(model), str(auto_jobs(jobs))]
+
+
+def cmd_map_stades(net, dataset, d, out, subset=0, data_root=None):
+    """`tools/map_stades.py` sur les `subset` premières images (0 : tout le split)."""
+    cmd = ["python", "tools/map_stades.py", "--net", str(net), "--dataset", dataset,
+           "--dir", str(d)]
+    _opt(cmd, "--subset", subset or None)
+    _opt(cmd, "--data-root", data_root)
+    return cmd + ["--out", str(out), "--no-figures"]
+
+
+def cmd_perf_model(manifest):
+    """`tools/perf_model.py --manifest` : projection du noyau actuel (cycles == C-sim)."""
+    return ["python", "tools/perf_model.py", "--manifest", str(manifest), "--no-figures"]
+
+
 def cmd_figures(kind, path):
     """Mode automatique de M13 : figures de `path` dans `<path>/figures/`."""
     return ["python", "-m", "tools.figures", "--run", kind, "--dir", str(path)]
@@ -239,16 +301,20 @@ def _autosync(cmd):
     colab.autosync(cmd)
 
 
-def run(cmd, log=None, check=True):
+def run(cmd, log=None, check=True, env=None):
     """Lance `cmd` depuis la racine du dépôt (le `python` du noyau), relaie sa sortie ligne à
-    ligne et rend son code de retour. Ctrl-C / interruption du noyau : SIGINT au processus,
-    qui s'arrête proprement ; l'exception est relancée."""
-    HISTORY.append(shlex.join(cmd))
-    print(show(cmd), flush=True)
+    ligne et rend son code de retour. `env` : variables ajoutées (ex. `BENCH`). Ctrl-C /
+    interruption du noyau : SIGINT au processus, qui s'arrête proprement ; l'exception est
+    relancée."""
+    prefix = "".join(f"{k}={shlex.quote(str(v))} " for k, v in (env or {}).items())
+    HISTORY.append(prefix + shlex.join(cmd))
+    print("$ " + prefix + shlex.join(cmd), flush=True)
     argv = [sys.executable if a == "python" and i == 0 else a for i, a in enumerate(cmd)]
     t0 = time.time()
     proc = subprocess.Popen(argv, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, bufsize=1)
+                            text=True, bufsize=1,
+                            env={**os.environ, **{k: str(v) for k, v in env.items()}}
+                            if env else None)
     f = open(log, "a") if log else None
     try:
         for line in proc.stdout:

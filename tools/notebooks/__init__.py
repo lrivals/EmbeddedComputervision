@@ -40,6 +40,7 @@ class Notebook:
     tasks: tuple          # tâches sources (T11.4…)
     channels: int = None  # canaux d'entrée de la cfg d'affinage (FLIR : 1, T11.7)
     size: str = None      # entrée LxH de la cfg d'affinage (défaut : 416 × 416)
+    arch: str = "tiny-yolov3"  # architecture affinée : tiny-yolov3, ou tiny-yolov4 (M24)
 
     @property
     def name(self):

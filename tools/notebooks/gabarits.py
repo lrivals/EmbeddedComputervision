@@ -13,7 +13,8 @@ import textwrap
 from tools.notebooks import ROOT
 from tools.notebooks.colab import DRIVE_DIR
 from tools.notebooks.commandes import M11_TRAIN
-from tools.notebooks.matrice import SPLIT_IMAGES, how_to_get, palier_of, prerequis
+from tools.notebooks.matrice import (SPLIT_IMAGES, V4_ARCH, V4_INIT_NET, how_to_get, palier_of,
+                                     prerequis)
 
 REPO_URL = "https://github.com/lrivals/EmbeddedComputervision.git"
 REV = "main"
@@ -249,14 +250,19 @@ def params(nb):
     if nb.role == "infer":
         p += [("INT8", False, "volet entier : calibration et mAP INT8 (T14.4)"),
               ("CALIB_IMAGES", 500, "images de calibration (split calib du jeu)"),
-              ("ACT_HIST", False, "histogrammes d'activations L00-L04 (T11.3)")]
+              ("ACT_HIST", False, "histogrammes d'activations L00-L04 (T11.3)"),
+              ("HW", False, "volet matériel (demande INT8) : export, golden C++, C-sim sur "
+               "SUBSET images, mAP aux trois stades (T8.2, T24.5)")]
     else:
-        base = "tiny-yolov3-voc"
+        v4 = nb.arch == V4_ARCH  # YOLOv4-tiny (T24.6) : base et poids COCO de yolov4-tiny
+        base = V4_INIT_NET if v4 else "tiny-yolov3-voc"
         p += [("BASE", base, "base de make_cfg.py"),
               ("CHANNELS", nb.channels, "canaux de la cfg (1 : thermique)"),
-              ("ANCHORS_K", 6, "ancres de la cfg (6 : Tiny-YOLOv3)"),
-              ("INIT", "coco", "coco | he | chemin d'un .weights"),
-              ("INIT_NET", None, "réseau des poids de INIT s'il diffère de NET")]
+              ("ANCHORS_K", 6, "ancres de la cfg (6 : YOLOv4-tiny)" if v4
+               else "ancres de la cfg (6 : Tiny-YOLOv3)"),
+              ("INIT", nb.weights if v4 else "coco", "coco | he | chemin d'un .weights"),
+              ("INIT_NET", V4_INIT_NET if v4 else None,
+               "réseau des poids de INIT s'il diffère de NET")]
         if nb.role == "sweep":
             p += [("BATCHES", SWEEP["batches"], "tailles de lot essayées"),
                   ("TRAIN_SUBSETS", SWEEP["subsets"],
@@ -546,9 +552,12 @@ def infer_body(nb):
             C.run(C.cmd_calibrate(NET, WEIGHTS, DATASET, calib, Path(OUT) / "calibration.md",
                                   CALIB_IMAGES, data_root=DATA_ROOT))
             map_int = Path(OUT) / f"map_{RESIZE}_{SUBSET or 'complet'}.json"
+            HW_DIR = Path(OUT) / "hw"  # détections entières par image, pour le volet matériel
+            HW_DIR.mkdir(parents=True, exist_ok=True)
             C.run(C.cmd_eval_quant(NET, map_int, "float,int", SUBSET, JOBS, DATASET,
                                    weights=WEIGHTS, calib=calib, metric=METRIC, split=SPLIT,
-                                   size=SIZE, data_root=DATA_ROOT))
+                                   size=SIZE, data_root=DATA_ROOT,
+                                   save_dets=HW_DIR / "int.jsonl" if HW else None))
             d = json.loads(map_int.read_text())
             fl, it = d["results"]["float"], d["results"]["int"]
             rows = ["| classe | flottant | entier | écart |", "|---|---|---|---|"]
@@ -565,12 +574,68 @@ def infer_body(nb):
                 display(Image.open(Path(OUT) / "act_hist" / "act_hist.png"))
         else:
             print("INT8 = False : volet entier sauté")
+        """), md("""
+        ## Volet matériel (T8.2, T24.5)
+
+        Activé par `HW = True` (avec `INT8 = True` : même calibration, détections entières
+        de la cellule précédente). Chaîne du profil `coco-v4` de `tools/m11.sh` :
+
+        1. `tools/export_model.py` : modèle entier (manifest, blobs) et dumps de 3 images du
+           jeu dans `OUT/model` ;
+        2. golden C++ (`golden_run`) == dumps Python à l'octet, couche par couche et
+           détections (`tools/compare_dumps.py`, comme `make golden-check`) ;
+        3. stade FPGA en C-sim : le noyau HLS compilé sans `ap_int` derrière le driver ARM
+           (`yolo_bench`, `tools/bench_sim.sh`), sur les entrées int8 du modèle entier
+           (`tools/make_inputs.py`), pour les `SUBSET` premières images ;
+        4. `tools/map_stades.py` : mAP aux trois stades et égalité image par image entier ==
+           C-sim ; `tools/perf_model.py` : cycles et ms du noyau actuel (projection).
+
+        Compter ≈ 1 s de C-sim par image et par cœur (C-sim interrompu : relancer la
+        cellule, les paquets finis sont gardés tant que le modèle exporté ne change pas).
+        """), code("""
+        import hashlib
+        import shutil
+
+        map_hw = None
+        if HW:
+            if not INT8:
+                raise ValueError("HW = True demande INT8 = True (calibration et détections "
+                                 "entières)")
+            model = Path(OUT) / "model"
+            C.run(C.cmd_export(NET, WEIGHTS, calib, model, DATASET, DATA_ROOT))
+            for c in C.cmd_cmake("cpp/golden", "build/golden", "golden_run"):
+                C.run(c)
+            for dump in sorted(p for p in (model / "dumps").iterdir() if p.is_dir()):
+                got = HW_DIR / "golden" / dump.name
+                C.run(C.cmd_golden_run(model, dump / "input.npy", got))
+                C.run(C.cmd_compare_dumps(dump, got))
+            # Détections C-sim d'un autre modèle exporté : effacées (sinon reprise).
+            blobs = hashlib.sha256(b"".join((model / f).read_bytes() for f in
+                                            ("weights.bin", "bias.bin", "requant.bin")))
+            stamp = HW_DIR / "model.sha256"
+            if not stamp.exists() or stamp.read_text() != blobs.hexdigest():
+                shutil.rmtree(HW_DIR / "sim", ignore_errors=True)
+                stamp.write_text(blobs.hexdigest())
+            C.run(C.cmd_make_inputs(NET, DATASET, SUBSET, HW_DIR, DATA_ROOT))
+            shutil.copy(map_int, HW_DIR / "eval_float_int.json")
+            for c in C.cmd_cmake("sw", "build/sw-fast", "yolo_bench",
+                                 "-DACC_NO_APINT -march=native", ["-DSW_BACKEND=sim"]):
+                C.run(c)
+            C.run(C.cmd_bench_sim(HW_DIR, model, JOBS), env={"BENCH": C.BENCH_FAST})
+            map_hw = HW_DIR / "map_stades.md"
+            C.run(C.cmd_map_stades(NET, DATASET, HW_DIR, map_hw, SUBSET, DATA_ROOT))
+            display(Markdown(map_hw.read_text()))
+            C.run(C.cmd_perf_model(model / "manifest.json"))
+        else:
+            print("HW = False : volet matériel sauté")
         """), md("## Résumé"), code("""
         print(map_float.read_text())
         if map_int:
             d = json.loads(map_int.read_text())
             for v, r in d["results"].items():
                 print(f"{v:6s} mAP {100 * r['map']:.2f} ({d['images']} images)")
+        if map_hw:
+            print(map_hw.read_text().split("## AP")[0])
         print(f"sorties : {OUT}/ ; révision {TRACE['rev']}")
         print("commandes équivalentes :")
         for c in C.HISTORY:
