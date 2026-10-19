@@ -72,3 +72,16 @@ def test_m10_kernel():
     tiling = [pm.layer_tiling(d, fold=True, tile_pool=14) for d in layers]
     assert [d["layer"] for d, t in zip(layers, tiling) if t[2]] == [0]
     assert [d["layer"] for d, t in zip(layers, tiling) if t[0] == 14] == [0, 2, 4, 6, 8]
+
+
+def test_packed_pe():
+    # T23.3: packing halves the PE DSPs without touching the cycles at equal tiles; the gain
+    # in time needs larger tiles (Tm 64 at the same DSPs, or Tn 32).
+    assert pm.KERNEL["pack"] == 1
+    assert pm.pe_dsp(32, 24) == 768 and pm.pe_dsp(32, 24, 2) == 384
+    assert pm.pe_dsp(31, 24, 2) == 16 * 24  # odd Tm: the last filter keeps its own DSPs
+    _layers("tiny-yolov2-voc")  # skip without the export
+    rows = {r[0]: r for r in pm.pack_table("tiny-yolov2-voc")}
+    base, same, tm64, tn32 = (rows[name] for name, _ in pm.PACK_OPTIONS)
+    assert same[5] == base[5] and same[3] == base[3] // 2
+    assert tm64[3] == base[3] and tm64[5] < tn32[5] < base[5]

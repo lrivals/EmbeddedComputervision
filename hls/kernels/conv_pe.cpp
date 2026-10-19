@@ -97,17 +97,51 @@ load_w:
 // Tm × Tn MAC par cycle : boucle (i, j, trr, tcc) aplatie en PIPELINE II=1, too et tii
 // déroulés, arbre d'additions sur Tn ; voies ≥ n masquées (trim). `first` : première ti,
 // out_buf repart de zéro.
+// ACC_PACK = 2 (T23.2) : les filtres (too, too + 1) partagent un DSP par voie tii ; les
+// produits paquetés sont sommés par groupes de PACK_N voies (tout Tn si `w4`), chaque somme
+// est dépaquetée (retenue de signe du canal bas) avant l'addition int32. Tm impair : le
+// dernier filtre garde un DSP par produit. Même ordonnancement : les cycles ne changent pas.
 static void compute(const act_t in_buf[TN][IR][IC], const w_t w_buf[TM][TN][K_MAX][K_MAX],
                     acc_t out_buf[TM][TRB][TCB], int kh, int kw, int tr, int tc, int n,
-                    bool first) {
+                    bool first, bool w4) {
   int i = 0, j = 0, trr = 0, tcc = 0;
+  (void)w4;
 mac:
   for (int it = 0; it < kh * kw * tr * tc; ++it) {
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT min=TR*TC max=K_MAX*K_MAX*TRB*TCB
 #pragma HLS DEPENDENCE variable=out_buf inter false
     const bool init = first && i == 0 && j == 0;
-    for (int too = 0; too < TM; ++too) {
+#if ACC_PACK == 2
+    for (int tp = 0; tp < TM / 2; ++tp) {
+#pragma HLS UNROLL
+      const int too = 2 * tp;
+      acc_t sa = 0, sb = 0;
+      pack_t psum = 0;
+      for (int tii = 0; tii < TN; ++tii) {
+#pragma HLS UNROLL
+        if (tii < n) {
+          const pack_t prod = mac2(w_buf[too][tii][i][j], w_buf[too + 1][tii][i][j],
+                                   in_buf[tii][trr + i][tcc + j]);
+#pragma HLS BIND_OP variable=prod op=mul impl=dsp
+          psum += prod;
+        }
+        if (tii + 1 == TN || (!w4 && (tii + 1) % golden::PACK_N == 0)) {
+          int32_t hi, lo;
+          golden::unpack2(int64_t(psum), hi, lo);
+          sa += hi;
+          sb += lo;
+          psum = 0;
+        }
+      }
+      out_buf[too][trr][tcc] = (init ? acc_t(0) : out_buf[too][trr][tcc]) + sa;
+      out_buf[too + 1][trr][tcc] = (init ? acc_t(0) : out_buf[too + 1][trr][tcc]) + sb;
+    }
+    constexpr int TOO0 = TM - TM % 2;  // filtre non apparié (Tm impair)
+#else
+    constexpr int TOO0 = 0;
+#endif
+    for (int too = TOO0; too < TM; ++too) {
 #pragma HLS UNROLL
       acc_t sum = 0;
       for (int tii = 0; tii < TN; ++tii) {
@@ -147,13 +181,13 @@ ti_loop:
         load_input(act_in, d, t, (k + 1) * TN, n_next, in_b);
         load_weights(wts, d, t, k + 1, n_next, w_b);
       }
-      compute(in_a, w_a, out_buf, kh, d.k, d.tr, d.tc, n, k == 0);
+      compute(in_a, w_a, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4);
     } else {
       if (more) {
         load_input(act_in, d, t, (k + 1) * TN, n_next, in_a);
         load_weights(wts, d, t, k + 1, n_next, w_a);
       }
-      compute(in_b, w_b, out_buf, kh, d.k, d.tr, d.tc, n, k == 0);
+      compute(in_b, w_b, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4);
     }
   }
 }

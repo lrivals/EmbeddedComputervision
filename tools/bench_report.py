@@ -29,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import numpy as np  # noqa: E402
-from perf_model import FREQ_HZ, TILES, conv_layers, kernel_cycles, kernel_label, macs  # noqa: E402,E501
+from perf_model import (FREQ_HZ, PACK_OPTIONS, TILES, conv_layers, kernel_cycles,  # noqa: E402
+                        kernel_dsp, kernel_label, macs)
 
 COLUMNS = ["travail", "modele", "fpga", "format", "fps", "latence_ms", "gops", "puissance_w",
            "perimetre_puissance", "lut", "dsp", "bram", "frequence_mhz", "map_voc", "source"]
@@ -191,6 +192,35 @@ def main():
                      "map_voc": read_map(net) if net.endswith("voc") else "",
                      "source": f"tools/perf_model.py (accélérateur seul, {kernel_label()}) ; "
                                "ressources après synthèse"})
+    md.append("")
+
+    # Deux MAC par DSP (T23.3) : PE paquetée, C-sim == golden ; DSP du modèle, pas de synthèse.
+    md += ["## Projection, deux MAC par DSP (T23.3)", "",
+           "PE paquetée (`ACC_PACK=2`, results/dsp_packing.md), mêmes hypothèses ; DSP estimés "
+           "(PE + requantification), à confirmer en synthèse.", "",
+           "| Réseau | Option | Tm, Tn | DSP (modèle) | ms | img/s | GOPS |",
+           "|---|---|---|---|---|---|---|"]
+    for net in MODEL_NAME:
+        layers = conv_layers(ROOT / "model" / net / "manifest.json")
+        n_macs = sum(macs(d) for d in layers)
+        for name, o in PACK_OPTIONS:
+            if o["pack"] != 2:
+                continue
+            cyc = sum(kernel_cycles(d, tm=o["tm"], tn=o["tn"])["overlapped"] for d in layers)
+            t = cyc / FREQ_HZ
+            dsp = kernel_dsp(o["tm"], o["tn"], o["pack"])
+            md.append(f"| {net} | {name} | {o['tm']}, {o['tn']} | {dsp} | {1e3 * t:.1f} | "
+                      f"{1 / t:.2f} | {2 * n_macs / t / 1e9:.1f} |")
+            if o["tm"] == TILES["tm"] and o["tn"] == TILES["tn"]:
+                continue  # mêmes tuiles : mêmes temps que la projection ci-dessus, moitié des DSP
+            tiles = f"Tm {o['tm']}" if o["tm"] != TILES["tm"] else f"Tn {o['tn']}"
+            ours.append({"travail": f"{OURS} (projection C-sim, 2 MAC/DSP, {tiles})",
+                         "modele": MODEL_NAME[net], "fpga": FPGA, "format": FORMAT,
+                         "fps": fmt(1 / t), "latence_ms": fmt(1e3 * t, 1),
+                         "gops": fmt(2 * n_macs / t / 1e9, 1), "perimetre_puissance": "à mesurer",
+                         "frequence_mhz": f"{FREQ_HZ / 1e6:.0f}",
+                         "source": f"tools/perf_model.py, PE paquetée T23.2 (Tm {o['tm']}, "
+                                   f"Tn {o['tn']}, {dsp} DSP estimés) ; ressources après synthèse"})
     md.append("")
 
     # Mesures sur la carte, si fournies.

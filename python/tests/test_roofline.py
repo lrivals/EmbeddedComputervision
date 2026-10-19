@@ -50,3 +50,15 @@ def test_boards_have_feasible_points(path):
     best = points[0]
     assert best["dsp"] <= roofline.UTIL * board["dsp"]
     assert best["bram18"] <= roofline.UTIL * board["bram18"]
+
+
+@pytest.mark.parametrize("path", sorted((ROOT / "hw" / "boards").glob("*.yaml")))
+def test_packed_exploration(path):
+    # T23.3: 2 MACs per DSP never makes the best point slower, and the w_buf flip-flops stay
+    # within the limit.
+    pytest.importorskip("yaml")
+    board = roofline.load_board(path)
+    one = roofline.explore(V2, board)[0]
+    two = roofline.explore(V2, board, board["packed_macs_per_dsp"])[0]
+    assert two["time_s"] <= one["time_s"]
+    assert roofline.wbuf_ff(*two["tiles"][:2]) <= roofline.UTIL * board["ff"]

@@ -100,6 +100,24 @@ inline int32_t mul_w(int w, int x) {
 inline int32_t mul_w(int w, int x) { return w * x; }
 #endif
 
+// T23.2 : deux produits par DSP48E2 (ACC_PACK = 2). Opérande A = w_a·2^18 + w_b sur 27 bits,
+// x sur B, produit sur 45 bits, somme paquetée dans le P de 48 bits ; même arithmétique que
+// golden::mac2 (vérifiée sur tous les triplets int8 par tb_pack). Profondeur d'une somme
+// paquetée avant dépaquetage : golden::PACK_N = 8 en int8 (contrat ±127), tout l'arbre Tn
+// en poids 4 bits (|w| ≤ 8 : (2^17 − 1) / (8·127) = 129 produits).
+constexpr int PACK_N4 = ((1 << (golden::PACK_S - 1)) - 1) / (8 * 127);
+static_assert(TN <= PACK_N4, "arbre Tn d'un seul tenant en poids 4 bits");
+#ifndef ACC_NO_APINT
+using pack_t = ap_int<48>;
+inline pack_t mac2(w_t wa, w_t wb, act_t x) {
+  const ap_int<27> a = (ap_int<27>(wa) << golden::PACK_S) + ap_int<27>(wb);
+  return pack_t(ap_int<45>(a * ap_int<18>(x)));
+}
+#else
+using pack_t = int64_t;
+inline pack_t mac2(w_t wa, w_t wb, act_t x) { return golden::mac2(wa, wb, x); }
+#endif
+
 }  // namespace accel
 
 // Top (portée globale pour `set_top`) : `act_in` et `act_out` désignent la même arène DDR

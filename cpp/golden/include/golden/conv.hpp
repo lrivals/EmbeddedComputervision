@@ -111,6 +111,20 @@ inline int32_t mul_split4(int8_t w, int8_t x) {
   return 16 * (int32_t(w) * (int32_t(x) >> 4)) + int32_t(w) * (int32_t(x) & 15);
 }
 
+// T23 [2024-zhang#011.0] : deux produits int8 qui partagent x dans un multiplieur DSP48E2
+// (A 27 bits × B 18 bits, P 48 bits), python/yolo/quant/pack.py. (w_a·2^S + w_b)·x =
+// (w_a·x)·2^S + w_b·x ; une somme de PACK_N produits paquetés reste exacte tant que le canal
+// bas tient sur S bits signés : PACK_N = 8 sous le contrat (|w|, |x| ≤ 127), 7 pour tout int8.
+constexpr int PACK_S = 18, PACK_N = 8;
+inline int64_t pack2(int8_t wa, int8_t wb) { return int64_t(wa) * (int64_t(1) << PACK_S) + wb; }
+inline int64_t mac2(int8_t wa, int8_t wb, int8_t x) { return pack2(wa, wb) * x; }
+// Canal bas étendu en signe ; s'il est négatif, il a emprunté 1 au canal haut.
+inline void unpack2(int64_t p, int32_t& hi, int32_t& lo) {
+  constexpr int64_t half = int64_t(1) << (PACK_S - 1);
+  lo = int32_t(((p & ((int64_t(1) << PACK_S) - 1)) ^ half) - half);
+  hi = int32_t((p >> PACK_S) + (lo < 0));
+}
+
 // Tampons sur puce d'une configuration de tuiles (taille == formules du §10.2).
 template <int TM, int TN, int TR, int TC>
 struct Tiles {

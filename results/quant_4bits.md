@@ -63,6 +63,7 @@ manifest. The C++ golden model and the HLS C-sim (`tb_net`) reproduce it **to th
 
 - A longer QAT: several epochs, or a progressive ramp 8 → 6 → 4 bits.
 - 4-bit packing in the engine: int8 container today, hence no bandwidth gain.
-- Packing of 2 MACs per DSP in the HLS, then synthesis.
+- Packing of 2 MACs per DSP in the HLS: done in C-sim (M23, [dsp_packing.md](dsp_packing.md));
+  synthesis remains.
 
 Figures: `results/figures/resultats/map_formats.png` (T13.14) and `entrainement_qat-w4a4.png` (T13.26), `python -m tools.figures map_formats entrainement`.

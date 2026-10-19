@@ -116,6 +116,10 @@ CrowdHuman & 15,000 & \texttt{b16-sall} & 16 & all & mAP, 11 points & 35.87 & ti
 2025-kim & YOLOv2 full (prototype) & Zybo Z7-20 & INT16 & 0.083 & 12,000 & — & — & published \\
 this work (C-sim projection) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 26.87 & 37.2 & 187.3 & — & projection \\
 this work (C-sim projection) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 27.72 & 36.1 & 154.3 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tm 64) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 40.53 & 24.7 & 282.5 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tn 32) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 33.31 & 30.0 & 232.2 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tm 64) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 41.95 & 23.8 & 233.4 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tn 32) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 33.06 & 30.2 & 184.0 & — & projection \\
 \bottomrule
 \end{tabularx}}
 \expandafter\def\csname arttable:map.formats\endcsname{%
@@ -447,15 +451,15 @@ M19 & 12 & 5 & 42\,\% \\
 M20 & 10 & 9 & 90\,\% \\
 M21 & 12 & 6 & 50\,\% \\
 M22 & 10 & 9 & 90\,\% \\
-M23 & 6 & 0 & 0\,\% \\
+M23 & 6 & 6 & 100\,\% \\
 M24 & 6 & 0 & 0\,\% \\
 M25 & 6 & 0 & 0\,\% \\
 M26 & 6 & 0 & 0\,\% \\
 \midrule
-\textbf{Total} & \textbf{306} & \textbf{190} & \textbf{62\,\%} \\
+\textbf{Total} & \textbf{306} & \textbf{196} & \textbf{64\,\%} \\
 \bottomrule
 \end{tabular}}
-\newcommand\articleetatresume{190 of 306 tasks done across 31 milestones, 6 milestones complete}
+\newcommand\articleetatresume{196 of 306 tasks done across 31 milestones, 7 milestones complete}
 \newcommand\articlestatuslist{%
 {\raggedright
 \begin{itemize}
@@ -464,4 +468,4 @@ M26 & 6 & 0 & 0\,\% \\
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
 \item \textbf{csim} (3): \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{66f9001-dirty}, 2026-10-19}
+\newcommand\articlerev{rev.~\texttt{9955fe9-dirty}, 2026-10-19}

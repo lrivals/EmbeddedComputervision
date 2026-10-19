@@ -59,7 +59,11 @@ says otherwise.
   768). The M6 kernel spent 80 % of its time outside the MAC loop (41.3 Mcycles, 8.2 of
   them compute), waiting for its memory ports and its output stage. The M10 kernel
   (section 3) brings the gap down to 2.6× (37.2 ms): what remains is roughly the gap in
-  multipliers (1.8×) and 39 % of the time outside the MAC loop.
+  multipliers (1.8×) and 39 % of the time outside the MAC loop. Packing two MACs per DSP
+  as 2024-zhang does (M23, [dsp_packing.md](dsp_packing.md), projection) closes the
+  multiplier gap: at Tm 64 on the same 768 PE DSPs, 1,536 products per cycle, 24.7 ms,
+  i.e. a gap of **1.7×**. What is left is time outside the MAC loop: the weight port of
+  L10 to L14, which becomes the limit once Tm is doubled, and L00's output stage.
 - **2026-fata** runs on the **same board**: 60 GOPS and 24 img/s with a DPU on a YOLOv3-tiny
   pruned by 70 %. Our 27.4 projected GOPS on an unpruned Tiny-YOLOv3 are 2.2× below. The
   img/s do not compare: pruning divides the MACs by about 3. Our roofline point on this
@@ -151,6 +155,16 @@ Beyond the single engine (M10, sections C and D):
   streaming.
 - **Pruning** ([elagage.md](elagage.md)): up to 82.5 img/s projected at 70 %, but the mAP
   does not recover in 300 fine-tuning iterations.
+- **Two MACs per DSP** ([dsp_packing.md](dsp_packing.md), M23): packed PE (`ACC_PACK=2`),
+  C-sim == golden to the byte, cycles unchanged at equal tiles. Projections for
+  Tiny-YOLOv2 / Tiny-YOLOv3:
+  - same tiles on half the PE DSPs (384): 37.2 / 36.1 ms;
+  - Tm 64 on the same DSPs: **24.7 / 23.8 ms** (23.2 ms with the mixed precision of
+    T10.10), provided `w_buf` leaves the flip-flops (221 k needed);
+  - Tn 32, the feasible roofline point: 30.0 / 30.2 ms.
+
+  Winograd F(2,3) ([winograd.md](winograd.md)) is not implemented: it loses to packing
+  once the loads are counted.
 
 Note: `results/hls_report.md` gives 210.5 ms instead of 206.5 ms. Its `tb_conv` writes the
 pre-pooling map of all the pooled convs to test that path. The program of the driver only

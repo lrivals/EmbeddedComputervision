@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -24,6 +24,8 @@ help:
 	@echo "csim        C-simulation HLS dans Vitis (BOARD=$(BOARD))"
 	@echo "hls-synth   synthèse Vitis HLS (T6.5)"
 	@echo "hls-synth-pow2  synthèse de la PE à décalages, ACC_WMODE_POW2 (T9.2.4, T13.24)"
+	@echo "hls-synth-pack  synthesis of the packed PE, 2 int8 MACs per DSP, ACC_PACK=2 (T23.2)"
+	@echo "winograd    Winograd F(2x2,3x3) study against packing → results/winograd.md (T23.5)"
 	@echo "hls-cosim   co-simulation RTL sur une image (T6.5, long)"
 	@echo "hls-export  IP pour Vivado → build/hls/ip/ (T6.5)"
 	@echo "hls-report  results/hls_report.md (T6.5)"
@@ -97,6 +99,9 @@ golden-check:
 
 roofline:
 	python tools/roofline.py
+
+winograd:
+	python tools/winograd.py
 
 # M13 : régénère toutes les figures dont la source est présente (palier R ; les autres sont
 # sautées avec un message) et la galerie results/figures.md.
@@ -206,6 +211,9 @@ hls-synth:
 
 hls-synth-pow2:
 	cd hls && vitis_hls -f scripts/synth_pow2.tcl -tclargs $(BOARD)
+
+hls-synth-pack:
+	cd hls && vitis_hls -f scripts/synth_pack.tcl -tclargs $(BOARD)
 
 hls-cosim:
 	cd hls && vitis_hls -f scripts/cosim.tcl -tclargs $(BOARD)

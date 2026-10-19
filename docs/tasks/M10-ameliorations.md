@@ -283,7 +283,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
   - The cycles of the single engine are unchanged (compute-limited).
 - **Remaining**:
   - per-layer QAT (global `qat_from_steps`) to get back under 1 point;
-  - 2 4-bit MACs per DSP in the kernel;
+  - ~~2 4-bit MACs per DSP in the kernel~~: done in C-sim by [T23.4](M23-dsp-packing.md);
   - synthesis of the packed loader.
 
 ### [ ] T10.11 — Channel pruning

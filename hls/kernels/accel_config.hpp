@@ -39,6 +39,12 @@
 #ifndef ACC_TILE_POOL
 #define ACC_TILE_POOL 14
 #endif
+// Produits int8 par multiplieur DSP48E2 (T23.2) : 2 = deux filtres (too, too + 1) × une
+// activation partagée, paquetés sur le port A (golden::mac2). 1 tant que la carte n'a pas
+// mesuré la PE paquetée.
+#ifndef ACC_PACK
+#define ACC_PACK 1
+#endif
 
 namespace accel {
 
@@ -48,6 +54,7 @@ constexpr bool TRIM = ACC_TRIM != 0;
 constexpr int RQ = ACC_RQ;
 constexpr bool FOLD = ACC_FOLD != 0;
 constexpr int TILE_POOL = ACC_TILE_POOL;
+constexpr int PACK = ACC_PACK;
 constexpr int K_MAX = 3;
 // Tampons sur puce : la plus grande des tuiles utilisées.
 constexpr int TRB = TILE_POOL > TR ? TILE_POOL : TR;
@@ -59,6 +66,10 @@ static_assert(WORD == 1 || WORD == 2 || WORD == 4 || WORD == 8, "mot de 1, 2, 4 
 static_assert(TM % (2 * WORD) == 0,
               "blocs de poids alignés sur un mot, y compris paquetés en 4 bits : Tm multiple de 2·WORD");
 static_assert(RQ >= 1 && TM % RQ == 0, "Tm multiple de RQ");
+static_assert(PACK == 1 || PACK == 2, "ACC_PACK : 1 ou 2 produits par DSP");
+#if defined(ACC_WMODE_POW2) && ACC_PACK != 1
+#error "ACC_WMODE_POW2 (décalages, sans DSP) et ACC_PACK = 2 s'excluent"
+#endif
 static_assert(TILE_POOL == 0 || TILE_POOL % 2 == 0, "tuile poolée paire (maxpool stride 2)");
 
 inline int cdiv(int a, int b) { return (a + b - 1) / b; }

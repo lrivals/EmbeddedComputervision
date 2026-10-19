@@ -46,7 +46,7 @@ def kernel_config(path=ROOT / "hls" / "kernels" / "accel_config.hpp"):
     return {"tm": v["ACC_TM"], "tn": v["ACC_TN"], "tr": v["ACC_TR"], "tc": v["ACC_TC"],
             "width": v["ACC_WORD_BYTES"], "trim": bool(v["ACC_TRIM"]),
             "requant": v["ACC_RQ"], "fold": bool(v["ACC_FOLD"]),
-            "tile_pool": v["ACC_TILE_POOL"] or None}
+            "tile_pool": v["ACC_TILE_POOL"] or None, "pack": v["ACC_PACK"]}
 
 
 KERNEL = kernel_config()
@@ -170,8 +170,64 @@ def net_cycles(layers, **kw):
 
 
 def kernel_cycles(d, **kw):
-    """Cycles d'une conv avec le noyau actuel (`KERNEL`)."""
-    return layer_cycles(d, **{**KERNEL, **kw})
+    """Cycles d'une conv avec le noyau actuel (`KERNEL`) ; `pack` ne change pas les cycles."""
+    kw = {k: v for k, v in {**KERNEL, **kw}.items() if k != "pack"}
+    return layer_cycles(d, **kw)
+
+
+# Deux produits int8 par DSP (T23.2, ACC_PACK = 2) : même ordonnancement, donc mêmes cycles à
+# tuiles égales ; seuls changent les DSP de la PE. Deux façons de prendre le gain (T23.3).
+REQUANT_DSP = 4  # produit acc · M0 (32 × 31 bits) par canal requantifié en parallèle
+DDR_BW = 13.44e9  # KV260, débit DDR effectif (hw/boards/kv260.yaml, results/roofline.md)
+# Tn 32 : point de tools/roofline.py en paqueté, limité par les bascules de w_buf (Tm 64 en
+# demande 221 k sur 234 k).
+PACK_OPTIONS = [
+    ("M10 kernel, 1 MAC / DSP", dict(tm=TILES["tm"], tn=TILES["tn"], pack=1)),
+    ("packed, same tiles (half the DSPs)", dict(tm=TILES["tm"], tn=TILES["tn"], pack=2)),
+    ("packed, Tm 64 (same DSPs)", dict(tm=2 * TILES["tm"], tn=TILES["tn"], pack=2)),
+    ("packed, Tn 32 (roofline point)", dict(tm=TILES["tm"], tn=32, pack=2)),
+]
+
+
+def pe_dsp(tm, tn, pack=1):
+    """DSP de la PE : un par produit, ou un par paire de filtres (dernier seul si Tm impair)."""
+    return (tm // pack + tm % pack) * tn
+
+
+def kernel_dsp(tm, tn=TILES["tn"], pack=1, requant=KERNEL["requant"]):
+    return pe_dsp(tm, tn, pack) + REQUANT_DSP * requant
+
+
+def layer_bound(d, freq_hz=FREQ_HZ, bw=DDR_BW, **kw):
+    """What limits a conv: 'compute', 'load' (m_axi ports), 'store' (output stage) or 'DDR'
+    (port bytes / effective DDR bandwidth beyond the kernel cycles)."""
+    c = kernel_cycles(d, **kw)
+    width = kw.get("width", KERNEL["width"])
+    ddr_cycles = (c["load_in"] + c["load_w"]) * width / bw * freq_hz
+    if ddr_cycles > c["overlapped"]:
+        return "DDR"
+    parts = {"compute": c["compute"], "load": max(c["load_in"], c["load_w"]),
+             "store": c["store"]}
+    return max(parts, key=parts.get)
+
+
+def pack_table(net, freq_hz=FREQ_HZ):
+    """Rows (option, Tm, Tn, PE DSP, total DSP, cycles, ms, compute bound ms, GOPS, layers not
+    compute-bound) of PACK_OPTIONS — projection (T23.3)."""
+    layers = conv_layers(ROOT / "model" / net / "manifest.json")
+    total = sum(macs(d) for d in layers)
+    rows = []
+    for name, o in PACK_OPTIONS:
+        kw = dict(tm=o["tm"], tn=o["tn"])
+        cyc = sum(kernel_cycles(d, **kw)["overlapped"] for d in layers)
+        comp = sum(kernel_cycles(d, **kw)["compute"] for d in layers)
+        other = [f"L{d['layer']:02d} {b}" for d in layers
+                 if (b := layer_bound(d, freq_hz, **kw)) != "compute"]
+        t = cyc / freq_hz
+        rows.append((name, o["tm"], o["tn"], pe_dsp(o["tm"], o["tn"], o["pack"]),
+                     kernel_dsp(o["tm"], o["tn"], o["pack"]), cyc, 1e3 * t, 1e3 * comp / freq_hz,
+                     2 * total / t / 1e9, other))
+    return rows
 
 
 P64 = dict(M6, width=8)
@@ -256,6 +312,15 @@ def markdown(nets=NETS):
         out += [f"| {n} | {c / 1e6:.2f} | {ms:.1f} | {fps:.1f} | {g:.1f} | {e * 100:.1f} % |"
                 for n, c, ms, fps, g, e in rows]
         out.append("")
+    out += ["### Two MACs per DSP (T23.3, projection)", "",
+            "| Network | Option | Tm, Tn | PE DSP | PE + requant DSP | Mcycles | ms | compute bound "
+            "(ms) | GOPS | layers not compute-bound |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
+    for net in nets:
+        for name, tm, tn, dpe, dtot, cyc, ms, cb, g, other in pack_table(net):
+            out.append(f"| {net} | {name} | {tm}, {tn} | {dpe} | {dtot} | {cyc / 1e6:.2f} | {ms:.1f} "
+                       f"| {cb:.1f} | {g:.1f} | {', '.join(other) or '—'} |")
+    out.append("")
     return "\n".join(out)
 
 

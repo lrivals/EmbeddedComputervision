@@ -81,6 +81,7 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "quant/int_model": ("réseau entier", "Vitis AI", "test_int_model.py", "T13.44"),
     "quant/lowbit": ("4 bits", "Brevitas", "test_fake_quant.py", "T13.46"),
     "quant/lut": ("tables σ et exp", "—", "test_lut.py", "T13.45"),
+    "quant/pack": ("2 MAC int8 par DSP", "Xilinx WP486", "test_pack.py", "T23.0"),
     "quant/pow2": ("puissances de 2", "Brevitas", "test_pow2.py", "T13.46"),
     "quant/quantize": ("quantification", "torch.quantization", "test_quantize.py", "T13.43"),
     "testing/gradcheck": ("gradcheck", "torch.autograd.gradcheck", "test_gradcheck.py", "T13.33"),

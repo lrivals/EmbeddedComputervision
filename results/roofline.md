@@ -11,6 +11,25 @@ Ordre de grandeur du §10.2 : Tm = Tn = 16, 200 MHz, efficacité 100 % → 3.49 
 | Ultra96-V2 | 360 | 432 | 5.95 | 200 | 8, 32, 13, 13 | 288 | 80 | 60.2 | 81.0 | 80.9 | 86.2 | 71.7 |
 | Zybo Z7-20 | 220 | 280 | 2.98 | 150 | 8, 16, 13, 13 | 160 | 48 | 68.9 | 35.1 | 35.1 | 198.4 | 159.4 |
 
+## Two MACs per DSP (T23.3, projection)
+
+Packed PE of T23.2 (`ACC_PACK=2`, results/dsp_packing.md): same cycles at equal tiles, half the PE DSPs. (a) same tiles as the 1 MAC/DSP point, on fewer DSPs; (b) new exploration with 2 MACs per DSP. Memory-bound layers: index of the conv whose DDR traffic exceeds its compute cycles at the chosen tiles.
+
+| Board | Option | Tm, Tn, Tr, Tc | DSP | BRAM18 | w_buf FF | tiny-yolov2-voc (ms) | tiny-yolov3-voc (ms) | memory-bound convs |
+|---|---|---|---|---|---|---|---|---|
+| Kria KV260 | 1 MAC/DSP | 32, 24, 13, 13 | 896 | 112 | 110592 | 31.9 | 27.0 | — |
+| Kria KV260 | (a) packed, same tiles | 32, 24, 13, 13 | 512 | 112 | 110592 | 31.9 | 27.0 | — |
+| Kria KV260 | (b) packed, explored | 32, 32, 13, 13 | 640 | 128 | 147456 | 25.4 | 21.8 | — |
+| PYNQ-Z2 | 1 MAC/DSP | 8, 16, 13, 13 | 160 | 48 | 18432 | 198.4 | 159.4 | — |
+| PYNQ-Z2 | (a) packed, same tiles | 8, 16, 13, 13 | 96 | 48 | 18432 | 198.4 | 159.4 | — |
+| PYNQ-Z2 | (b) packed, explored | 8, 32, 13, 13 | 160 | 80 | 36864 | 115.2 | 96.6 | 8 |
+| Ultra96-V2 | 1 MAC/DSP | 8, 32, 13, 13 | 288 | 80 | 36864 | 86.2 | 71.7 | 8 |
+| Ultra96-V2 | (a) packed, same tiles | 8, 32, 13, 13 | 160 | 80 | 36864 | 86.2 | 71.7 | 8 |
+| Ultra96-V2 | (b) packed, explored | 24, 16, 13, 13 | 288 | 80 | 55296 | 54.6 | 45.0 | — |
+| Zybo Z7-20 | 1 MAC/DSP | 8, 16, 13, 13 | 160 | 48 | 18432 | 198.4 | 159.4 | — |
+| Zybo Z7-20 | (a) packed, same tiles | 8, 16, 13, 13 | 96 | 48 | 18432 | 198.4 | 159.4 | — |
+| Zybo Z7-20 | (b) packed, explored | 8, 32, 13, 13 | 160 | 80 | 36864 | 115.2 | 96.6 | 8 |
+
 Graphiques : `roofline_kv260.png`, `roofline_pynq-z2.png`, `roofline_ultra96-v2.png`, `roofline_zybo-z7-20.png`
 
 Roofline par couche, avant et après M10 : `results/figures/resultats/roofline_couches_kv260.png` (`python -m tools.figures roofline_couches`, T13.22).

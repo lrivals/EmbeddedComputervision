@@ -143,7 +143,7 @@ progress per milestone here.
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
 | M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |
 | M22 | 10 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.9 closing the loop remains) |
-| M23 | 6 | 0 |
+| M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 6 | 0 |
 | M25 | 6 | 0 |
 | M26 | 6 | 0 |

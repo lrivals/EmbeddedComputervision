@@ -162,3 +162,53 @@ TEST_CASE("T9.3.4 : produit 8 bits par deux multiplieurs 4 bits") {
     for (int x = -128; x < 128; ++x) bad += golden::mul_split4(int8_t(w), int8_t(x)) != w * x;
   REQUIRE(bad == 0);
 }
+
+TEST_CASE("T23.1 : deux produits int8 par DSP, toutes les paires de poids × activation") {
+  int64_t bad = 0;
+  for (int wa = -128; wa < 128; ++wa)
+    for (int wb = -128; wb < 128; ++wb)
+      for (int x = -128; x < 128; ++x) {
+        int32_t hi, lo;
+        golden::unpack2(golden::mac2(int8_t(wa), int8_t(wb), int8_t(x)), hi, lo);
+        bad += hi != wa * x || lo != wb * x;
+      }
+  REQUIRE(bad == 0);
+}
+
+TEST_CASE("T23.1 : somme paquetée de profondeur PACK_N == les deux sommes") {
+  std::mt19937 g(23);
+  std::uniform_int_distribution<int> q(-127, 127);
+  auto check = [](const int8_t* wa, const int8_t* wb, const int8_t* x) {
+    int64_t p = 0;
+    int32_t sa = 0, sb = 0;
+    for (int k = 0; k < golden::PACK_N; ++k) {
+      p += golden::mac2(wa[k], wb[k], x[k]);
+      sa += wa[k] * x[k];
+      sb += wb[k] * x[k];
+    }
+    int32_t hi, lo;
+    golden::unpack2(p, hi, lo);
+    return hi == sa && lo == sb;
+  };
+  int bad = 0;
+  int8_t wa[golden::PACK_N], wb[golden::PACK_N], x[golden::PACK_N];
+  for (int t = 0; t < 100000; ++t) {
+    for (int k = 0; k < golden::PACK_N; ++k) {
+      wa[k] = int8_t(q(g));
+      wb[k] = int8_t(q(g));
+      x[k] = int8_t(q(g));
+    }
+    bad += !check(wa, wb, x);
+  }
+  // Extrêmes du contrat : canal bas à ±PACK_N·127², canal haut de signe opposé.
+  for (int s : {-127, 127})
+    for (int v : {-127, 127}) {
+      for (int k = 0; k < golden::PACK_N; ++k) {
+        wa[k] = int8_t(-s);
+        wb[k] = int8_t(s);
+        x[k] = int8_t(v);
+      }
+      bad += !check(wa, wb, x);
+    }
+  REQUIRE(bad == 0);
+}

@@ -11,4 +11,8 @@ ddr_bw_gbps: 8.5
 ddr_efficiency: 0.7
 freq_mhz: 200
 int8_macs_per_dsp: 1
+# Deux produits int8 par DSP paquetés (T23, results/dsp_packing.md) : DSP48E2 (27 × 18) en
+# UltraScale+, DSP48E1 (25 × 18) en 7-series, avec une profondeur d'accumulation moindre.
+packed_macs_per_dsp: 2
+ff: 141120           # bascules du ZU3EG (w_buf en registres)
 cost: ~300 €

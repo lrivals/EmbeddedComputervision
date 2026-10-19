@@ -1,6 +1,6 @@
 {
  "_rev": {
-  "rev": "66f9001-dirty",
+  "rev": "9955fe9-dirty",
   "date": "2026-10-19"
  },
  "balayage.crowdhuman.meilleur.map": {
@@ -271,14 +271,58 @@
      "154.3",
      "—",
      "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tm 64)",
+     "Tiny-YOLOv2 VOC 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "40.53",
+     "24.7",
+     "282.5",
+     "—",
+     "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tn 32)",
+     "Tiny-YOLOv2 VOC 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "33.31",
+     "30.0",
+     "232.2",
+     "—",
+     "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tm 64)",
+     "Tiny-YOLOv3 COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "41.95",
+     "23.8",
+     "233.4",
+     "—",
+     "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tn 32)",
+     "Tiny-YOLOv3 COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "33.06",
+     "30.2",
+     "184.0",
+     "—",
+     "projection"
     ]
    ]
   },
   "status": "published",
   "source": "results/benchmarks.csv",
   "command": "make bench-report",
-  "rev": "1808467",
-  "date": "2026-10-07"
+  "rev": "9955fe9-dirty",
+  "date": "2026-10-19"
  },
  "map.formats": {
   "value": {

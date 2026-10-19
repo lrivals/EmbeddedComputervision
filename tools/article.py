@@ -541,6 +541,7 @@ EN = [  # phrases of the French result tables → English (M19 glossary)
     ("efficacité", "efficiency"), ("élagué à", "pruned at"), ("élagué", "pruned"),
     ("complet", "full"), ("lot ", "batch "), ("puissances de 2", "powers of 2"),
     ("hétérogène", "heterogeneous"), ("ce travail (projection C-sim)", "this work (C-sim projection)"),
+    ("ce travail (projection C-sim, 2 MAC/DSP", "this work (C-sim projection, 2 MACs/DSP"),
     ("M6 : ports", "M6: ports"), ("par canal", "per channel"),
 ]
 

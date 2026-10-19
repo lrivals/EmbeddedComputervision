@@ -17,7 +17,11 @@ R × C = sortie avant pooling, K, S = 1) :
 - ressources : DSP = Tm Tn / (MAC int8 par DSP) + 4 Tm (requantification 32 × 31 bits) ;
   BRAM18 en ping-pong (×2) : `in_buf` en Tn bancs de 8 bits, `out_buf` en Tm bancs de 32 bits
   (un banc occupe au moins une BRAM18) ; `w_buf` (Tm Tn K² octets, entièrement partitionné)
-  en registres. Points retenus : ≤ 80 % des DSP et des BRAM18.
+  en registres, 2 × 8 Tm Tn K² bascules. Points retenus : ≤ 80 % des DSP, des BRAM18 et des
+  bascules (champ `ff` de la carte).
+- deux MAC par DSP (T23.3, `packed_macs_per_dsp`, results/dsp_packing.md) : mêmes cycles à
+  tuiles égales, DSP de la PE divisés par 2 ; seconde exploration et vérification couche par
+  couche du point retenu (couches limitées par la DDR).
 
 Hypothèses hors base : les formules B_in, B_w, B_out sont celles du §10.2 (relecture de
 `2015-zhang#014.0` non faite, `bin/pdb` absent du dépôt), l'efficacité DDR et l'horloge sont
@@ -74,6 +78,11 @@ def bram18(tm, tn, tr, tc):
 
     depth_in = (S * tr + K_MAX - S) * (S * tc + K_MAX - S)
     return 2 * (banks(tn, 8, depth_in) + banks(tm, 32, tr * tc))
+
+
+def wbuf_ff(tm, tn, k=K_MAX):
+    """Bascules de w_buf en ping-pong (int8, entièrement partitionné)."""
+    return 2 * 8 * tm * tn * k * k
 
 
 def dsp(tm, tn, macs_per_dsp=1):
@@ -139,12 +148,14 @@ def load_board(path):
     return b
 
 
-def explore(layers, board):
+def explore(layers, board, macs_per_dsp=None):
     """Tous les points (Tm, Tn, Tr, Tc) qui tiennent sur la carte, triés par temps."""
     points = []
+    mpd = macs_per_dsp or board["int8_macs_per_dsp"]
     for tm, tn, tr, tc in itertools.product(TM_TN, TM_TN, TR_TC, TR_TC):
-        d, b = dsp(tm, tn, board["int8_macs_per_dsp"]), bram18(tm, tn, tr, tc)
-        if d > UTIL * board["dsp"] or b > UTIL * board["bram18"]:
+        d, b = dsp(tm, tn, mpd), bram18(tm, tn, tr, tc)
+        if (d > UTIL * board["dsp"] or b > UTIL * board["bram18"]
+                or wbuf_ff(tm, tn) > UTIL * board.get("ff", float("inf"))):
             continue
         e = evaluate(layers, tm, tn, tr, tc, board["freq_hz"], board["bw_bytes"])
         points.append({"tiles": (tm, tn, tr, tc), "dsp": d, "bram18": b, **e})
@@ -220,11 +231,54 @@ def report(boards, nets, out_dir):
             + " | ".join(f"{t:.1f}" for t in times) + " |")
         png = out_dir / f"roofline_{board['file']}.png"
         plot(points, board, nets[0], png)
+    lines += pack_report(boards, nets)
     lines += ["", "Graphiques : " + ", ".join(f"`roofline_{b['file']}.png`" for b in boards),
               "", "Roofline par couche, avant et après M10 : "
               "`results/figures/resultats/roofline_couches_kv260.png` "
               "(`python -m tools.figures roofline_couches`, T13.22).", ""]
     return "\n".join(lines)
+
+
+def memory_bound_layers(layers, tiles, board):
+    """Couches dont le trafic DDR dépasse les cycles de calcul aux tuiles `tiles`."""
+    out = []
+    for i, row in enumerate(layers):
+        e = evaluate(row[None, :], *tiles, board["freq_hz"], board["bw_bytes"])
+        if e["bytes"] / board["bw_bytes"] > e["cycles"] / board["freq_hz"]:
+            out.append(i)
+    return out
+
+
+def pack_report(boards, nets):
+    """Section T23.3 : deux MAC int8 par DSP, deux façons de prendre le gain (projection)."""
+    lines = [
+        "", "## Two MACs per DSP (T23.3, projection)", "",
+        "Packed PE of T23.2 (`ACC_PACK=2`, results/dsp_packing.md): same cycles at equal tiles, "
+        "half the PE DSPs. (a) same tiles as the 1 MAC/DSP point, on fewer DSPs; (b) new "
+        "exploration with 2 MACs per DSP. Memory-bound layers: index of the conv whose DDR "
+        "traffic exceeds its compute cycles at the chosen tiles.", "",
+        "| Board | Option | Tm, Tn, Tr, Tc | DSP | BRAM18 | w_buf FF | "
+        + " | ".join(f"{n} (ms)" for n in nets) + " | memory-bound convs |",
+        "|---|---|---|---|---|---|" + "---|" * len(nets) + "---|",
+    ]
+    for board in boards:
+        layers = {n: conv_layers(NETWORKS[n]) for n in nets}
+        one = explore(layers[nets[0]], board)
+        two = explore(layers[nets[0]], board, board.get("packed_macs_per_dsp", 2))
+        if not one or not two:
+            continue
+        opts = [("1 MAC/DSP", one[0]["tiles"], board["int8_macs_per_dsp"]),
+                ("(a) packed, same tiles", one[0]["tiles"], 2),
+                ("(b) packed, explored", two[0]["tiles"], 2)]
+        for name, t, mpd in opts:
+            times = [evaluate(layers[n], *t, board["freq_hz"], board["bw_bytes"])["time_s"]
+                     * 1e3 for n in nets]
+            mem = memory_bound_layers(layers[nets[0]], t, board)
+            lines.append(
+                f"| {board['name']} | {name} | " + "{}, {}, {}, {} | ".format(*t)
+                + f"{dsp(t[0], t[1], mpd)} | {bram18(*t)} | {wbuf_ff(t[0], t[1])} | "
+                + " | ".join(f"{x:.1f}" for x in times) + f" | {', '.join(map(str, mem)) or '—'} |")
+    return lines
 
 
 def main():
