@@ -327,6 +327,16 @@ T10.11 makes it necessary: the pruning does not recover with a short fine-tuning
 [elagage](../../results/elagage.md)), and the long fine-tuning goes through the training
 loop of T2.9.
 
+### [ ] T10.15 — Long pruning fine-tuning
+- **Spec**: §7.1, §10.4 · **Depends on**: T10.11, T15.1 · **Size**: M
+- **Deliverables**: long fine-tuning (tier N, Colab, M15 infrastructure) of the 30, 50 and
+  70 % exports of `tools/prune_study.sh`; update of `results/elagage.md`
+- **Acceptance**: full VOC2007 test mAP against the pruning rate, after a fine-tuning long
+  enough for the loss to plateau (r30: 11.89 after 300 iterations today); projected img/s
+  of each rate; comparison with 2026-fata at equal mAP
+- **Notes**: if r30 stays far below 50 after a long run, try progressive pruning (10 % per
+  step with fine-tuning in between) before concluding on the method.
+
 ## E. Verification and tooling
 
 ### [ ] T10.13 — Continuous integration

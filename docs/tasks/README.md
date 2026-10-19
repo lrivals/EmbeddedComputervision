@@ -32,6 +32,10 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M20](M20-webcam.md) | Live webcam demo (optional) | `make webcam`: pick a model, live camera image, continuous capture + inference, boxes and classes drawn on screen |
 | [M21](M21-asl-alphabet.md) | ASL Alphabet (optional) | hand pseudo-boxes for a classification dataset (`tools/prep_datasets.py asl`), loader and notebooks (stats, fine-tuning, sweep, inference); a sign-letter model for the webcam demo |
 | [M22](M22-autolabel.md) | Photo auto-labelling (optional) | `make autolabel`: drag & drop a photo or a folder, open-vocabulary boxes, manual correction, YOLO txt labels to download |
+| [M23](M23-dsp-packing.md) | Two MACs per DSP (optional) | packed int8 products in the kernel, C-sim == golden; new compute bound; Winograd study |
+| [M24](M24-yolov4-tiny.md) | YOLOv4-tiny (optional) | grouped routes; float / integer / C-sim COCO mAP of a third network |
+| [M25](M25-dependability.md) | Dependability (optional) | fault-injection campaign, exact int32 ABFT checksum (Python, golden, HLS), out-of-distribution monitor |
+| [M26](M26-recent-models.md) | Recent models (optional) | YOLOv7-tiny, YOLOv5n, YOLOv8n on the chain; comparison table |
 
 Datasets outside git (export to Google Drive, local or Colab access):
 [donnees-drive.md](donnees-drive.md). Training on a Colab kernel from VS Code (who
@@ -79,6 +83,12 @@ graph LR
   M20 -.-> M22
   M11 -.-> M22
   M22 -.-> M15
+  M10 --> M23[M23]
+  M93 -.-> M23
+  M11 --> M24[M24]
+  M4 --> M25[M25]
+  M11 -.-> M25
+  M24 --> M26[M26]
 ```
 
 - **T1.9 → M3 shortcut**: with the pre-trained Darknet weights, the reference mAP is
@@ -118,18 +128,22 @@ progress per milestone here.
 | M9 | 1 (T9.5) | 0 |
 | M9.1 | 3 | 2 (T9.1.3 checked in sim; board pending) |
 | M9.2 | 4 | 3 (T9.2.3: ADMM not converged, to revisit) |
-| M9.3 | 5 | 5 (short QAT: 36.4 mAP; synthesis pending) |
+| M9.3 | 6 | 5 (short QAT: 36.4 mAP; synthesis pending; T9.3.6 long QAT open) |
 | M9.4 | 3 | 3 (estimates; synthesis pending) |
-| M10 | 13 (+ pointer T10.12) | 0 |
+| M10 | 14 (+ pointer T10.12) | 0 |
 | M12 | 11 | 0 |
-| M11 | 8 (+ pointer T11.8) | 0 |
+| M11 | 8 (+ pointer T11.8) | 1 (T11.0 generic adapter) |
 | M13 | 54 | 54 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
-| M14 | 12 | 5 (the other 7 implemented; tier N runs, the Colab trial and the trainings remain) |
+| M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain, training, Colab GPU, smoke run) |
 | M15 | 16 | 1 (T15.3; T15.1 and T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
-| M16 | 19 | 17 (T16.13 COCO and T16.14 KITTI: data missing from the PC) |
+| M16 | 20 | 18 (T16.13 COCO and T16.14 KITTI: data missing from the PC) |
 | M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; refs check, v0 procedure, board switch and frozen version remain) |
-| M18 | 11 | 8 (data ready, loaders, 24 notebooks generated; executed stats, Drive, fine-tunings remain) |
+| M18 | 11 | 9 (data ready, loaders, 24 notebooks generated, uploaded to the Drive; executed stats, fine-tunings remain) |
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
 | M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |
 | M22 | 10 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.9 closing the loop remains) |
+| M23 | 6 | 0 |
+| M24 | 6 | 0 |
+| M25 | 6 | 0 |
+| M26 | 6 | 0 |
