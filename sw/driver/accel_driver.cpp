@@ -49,7 +49,9 @@ Accelerator::Accelerator(Device& dev, const golden::Model& m, int n_arenas)
       if (v.nseg != 1 || v.seg[0].up != 0) throw std::runtime_error("tête non contiguë");
       head_off_.push_back(v.seg[0].off);
     }
-    const size_t tab_words = post_table(m, head_off_, 0.25, 0.45).words.size();
+    // Taille de la table de post_table, sans la construire : un réseau que yolo_post ne
+    // prend pas en charge (scale_x_y de YOLOv4-tiny) ne doit échouer qu'à run_post.
+    const size_t tab_words = head_off_.size() * (3 * 256 + accel::POST_HEAD_WORDS);
     tab_at_ = align64(end);
     res_at_ = align64(tab_at_ + int64_t(tab_words * 4));
     end = res_at_ + 4 * (2 + accel::POST_BOX_WORDS * accel::POST_CAP);

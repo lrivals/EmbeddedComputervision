@@ -30,12 +30,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import numpy as np  # noqa: E402
 from perf_model import (FREQ_HZ, PACK_OPTIONS, TILES, conv_layers, kernel_cycles,  # noqa: E402
-                        kernel_dsp, kernel_label, macs)
+                        kernel_dsp, kernel_label, macs, useful_macs)
 
 COLUMNS = ["travail", "modele", "fpga", "format", "fps", "latence_ms", "gops", "puissance_w",
            "perimetre_puissance", "lut", "dsp", "bram", "frequence_mhz", "map_voc", "source"]
 OURS = "ce travail"
-MODEL_NAME = {"tiny-yolov2-voc": "Tiny-YOLOv2 VOC 416", "tiny-yolov3-coco": "Tiny-YOLOv3 COCO 416"}
+MODEL_NAME = {"tiny-yolov2-voc": "Tiny-YOLOv2 VOC 416", "tiny-yolov3-coco": "Tiny-YOLOv3 COCO 416",
+              "tiny-yolov4-coco": "YOLOv4-tiny COCO 416"}
 FPGA = "Kria KV260 (XCK26)"
 FORMAT = "INT8 (W8A8, par canal)"
 MIN_IMAGES = 1000
@@ -179,10 +180,11 @@ def main():
            "| Réseau | GMAC | Mcycles | ms | img/s | GOPS | efficacité |", "|---|---|---|---|---|---|---|"]
     for net in MODEL_NAME:
         layers = conv_layers(ROOT / "model" / net / "manifest.json")
-        n_macs = sum(macs(d) for d in layers)
+        # GOPS sur les MACs du réseau ; efficacité sur ceux calculés (stride 2 décimée, T24.3).
+        n_macs = sum(useful_macs(d) for d in layers)
         cyc = sum(kernel_cycles(d)["overlapped"] for d in layers)
         t = cyc / FREQ_HZ
-        eff = n_macs / (TILES["tm"] * TILES["tn"]) / cyc
+        eff = sum(macs(d) for d in layers) / (TILES["tm"] * TILES["tn"]) / cyc
         md.append(f"| {net} | {n_macs / 1e9:.3f} | {cyc / 1e6:.2f} | {1e3 * t:.1f} | "
                   f"{1 / t:.2f} | {2 * n_macs / t / 1e9:.1f} | {eff * 100:.1f} % |")
         ours.append({"travail": f"{OURS} (projection C-sim)", "modele": MODEL_NAME[net],
@@ -202,7 +204,7 @@ def main():
            "|---|---|---|---|---|---|---|"]
     for net in MODEL_NAME:
         layers = conv_layers(ROOT / "model" / net / "manifest.json")
-        n_macs = sum(macs(d) for d in layers)
+        n_macs = sum(useful_macs(d) for d in layers)
         for name, o in PACK_OPTIONS:
             if o["pack"] != 2:
                 continue
@@ -225,7 +227,7 @@ def main():
 
     # Mesures sur la carte, si fournies.
     layers = conv_layers(ROOT / "model" / args.net / "manifest.json")
-    n_macs = sum(macs(d) for d in layers)
+    n_macs = sum(useful_macs(d) for d in layers)
     pattern = args.times or str(ROOT / "build" / "m8" / args.net / "board" / "times_*.csv")
     t, n = read_times(pattern)
     res = read_utilization(args.vivado / "utilization.rpt") if args.vivado else {}

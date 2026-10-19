@@ -265,7 +265,7 @@ class YoloLabeller(Labeller):
 
 
 REGISTRY = {"grounding-dino-tiny": GroundingDino, "owlv2-base": Owlv2}
-YOLO_MODELS = ("yolo:tiny-yolov2-voc", "yolo:tiny-yolov3-coco")
+YOLO_MODELS = ("yolo:tiny-yolov2-voc", "yolo:tiny-yolov3-coco", "yolo:tiny-yolov4-coco")
 DEFAULT = "grounding-dino-tiny"
 # Export threshold by labeller: precision ≈ 0.85 on 200 VOC 2007 test images (T22.7), a
 # wrong box costing more to fix than a missing one to draw. The score scales differ.
@@ -280,6 +280,7 @@ NOTES = {
     "owlv2-base": "OWLv2 base, one query per class",
     "yolo:tiny-yolov2-voc": "project Tiny-YOLOv2, VOC (20), fixed vocabulary",
     "yolo:tiny-yolov3-coco": "project Tiny-YOLOv3, COCO (80), fixed vocabulary",
+    "yolo:tiny-yolov4-coco": "project YOLOv4-tiny, COCO (80), fixed vocabulary",
 }
 
 

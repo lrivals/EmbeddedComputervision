@@ -8,6 +8,8 @@
 #   coco-float | coco-int          T11.1  tiny-yolov3-coco sur val2017, flottant puis entier
 #   coco-calib                     T11.1  calibration VOC contre 500 images de train2017
 #   coco-fpga                      T11.1  stade FPGA en C-sim, égalité image par image
+#   coco-v4                        T24.5  YOLOv4-tiny : flottant, entier et C-sim sur val2017
+#                                         (calibration COCO de T24.3, build/quant/<net>/)
 #   hors-domaine                   T11.2  poids VOC et COCO sans affinage (ExDark, KITTI, VisDrone)
 #   exdark                         T11.3  calibration ExDark, histogrammes L00-L04
 #   crowdhuman                     T11.6  NMS sans tri et capacité de sélection, scènes denses
@@ -40,6 +42,7 @@ NET=${NET:-tiny-yolov3}
 M11=build/m11
 V2=tiny-yolov2-voc
 V3=tiny-yolov3-coco
+V4=tiny-yolov4-coco
 
 step() {
   echo "\$ $*" | tee -a "$LOG"
@@ -57,7 +60,7 @@ setup() {
 need() {  # jeux requis : vérifiés seulement, jamais téléchargés ici
   local ds
   for ds in "$@"; do
-    tools/get_datasets.sh check | grep -q "^$ds : prêt" || {
+    tools/get_datasets.sh ready "$ds" > /dev/null || {  # pas de `check | grep -q` : pipefail
       echo "$ds absent : tools/get_datasets.sh $ds" >&2
       exit 1
     }
@@ -188,6 +191,21 @@ coco-fpga)  # modèle exporté model/tiny-yolov3-coco (calibration VOC), C-sim d
   BENCH=build/sw-fast/yolo_bench step tools/bench_sim.sh "$d" model/$V3 "$JOBS"
   step python tools/map_stades.py --net $V3 --dataset coco --dir "$d" \
     --out $M11/coco/map_stades.md
+  ;;
+# ------------------------------------------------------------ T24.5 YOLOv4-tiny, COCO
+coco-v4)  # export model/tiny-yolov4-coco (python tools/export_model.py --net tiny-yolov4-coco)
+  setup coco
+  need coco
+  d=$M11/coco/$V4
+  step python tools/make_inputs.py --net $V4 --dataset coco --subset "$SUBSET" --out "$d"
+  step python tools/eval_quant.py --net $V4 --dataset coco --variants float,int \
+    --resize stretch --jobs "$JOBS" --blas-threads 1 --subset "$SUBSET" \
+    --save-dets "$d/int.jsonl" --out "$d/eval_float_int.json"
+  CXXFLAGS="-DACC_NO_APINT -march=native" step cmake -S sw -B build/sw-fast -DSW_BACKEND=sim
+  step cmake --build build/sw-fast -j --target yolo_bench
+  BENCH=build/sw-fast/yolo_bench step tools/bench_sim.sh "$d" model/$V4 "$JOBS"
+  step python tools/map_stades.py --net $V4 --dataset coco --dir "$d" \
+    --out $M11/coco/map_stades_v4.md
   ;;
 # ------------------------------------------------------- T11.2 hors domaine, sans affinage
 hors-domaine)

@@ -66,12 +66,15 @@ MODEL_DIR = ROOT / "model"
 SAVE_DIR = ROOT / "build" / "webcam"
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".bmp")
 # Start-up menu, in this order (docs/tasks/M20-webcam.md §2).
-MENU = ("tiny-yolov2-voc", "tiny-yolov3-coco", "int:tiny-yolov2-voc", "int:tiny-yolov3-coco")
+MENU = ("tiny-yolov2-voc", "tiny-yolov3-coco", "tiny-yolov4-coco", "int:tiny-yolov2-voc",
+        "int:tiny-yolov3-coco", "int:tiny-yolov4-coco")
 DESCRIPTION = {
     "tiny-yolov2-voc": "Tiny-YOLOv2 float, VOC (20)",
     "tiny-yolov3-coco": "Tiny-YOLOv3 float, COCO (80)",
+    "tiny-yolov4-coco": "YOLOv4-tiny float, COCO (80)",
     "int:tiny-yolov2-voc": "Tiny-YOLOv2 integer (M4), VOC (20)",
     "int:tiny-yolov3-coco": "Tiny-YOLOv3 integer (M4), COCO (80)",
+    "int:tiny-yolov4-coco": "YOLOv4-tiny integer (M24), COCO (80)",
 }
 CONF_STEP = 0.05
 

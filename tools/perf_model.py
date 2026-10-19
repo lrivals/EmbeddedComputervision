@@ -71,8 +71,8 @@ def conv_layers(manifest):
             if pool is None and layer["s"] == 2:
                 # T24.3 : stride 2 = stride 1 décimée dans l'étage de sortie (driver::conv_desc).
                 pool = {"k": 1, "s": 2}
-            d = {"layer": layer["id"], "k": layer["k"], "pad": layer["pad"], "cin": layer["cin"],
-                 "cout": layer["cout"], "h": src[0], "w": src[1],
+            d = {"layer": layer["id"], "k": layer["k"], "s": layer["s"], "pad": layer["pad"],
+                 "cin": layer["cin"], "cout": layer["cout"], "h": src[0], "w": src[1],
                  "pool_k": pool["k"] if pool else 0, "pool_s": pool["s"] if pool else 0,
                  "prepool": layer.get("prepool_out") is not None,
                  "wbits": layer.get("wbits", 8)}
@@ -169,6 +169,12 @@ def macs(d):
     return d["k"] ** 2 * d["cin"] * d["cout"] * R * C
 
 
+def useful_macs(d):
+    """MACs du réseau (sortie de stride s : 1/s² de ceux calculés). GOPS : sur ceux-ci ;
+    efficacité MAC du réseau de PE : sur `macs`."""
+    return macs(d) // d.get("s", 1) ** 2
+
+
 def net_cycles(layers, **kw):
     return sum(layer_cycles(d, **kw)["overlapped"] for d in layers)
 
@@ -219,7 +225,7 @@ def pack_table(net, freq_hz=FREQ_HZ):
     """Rows (option, Tm, Tn, PE DSP, total DSP, cycles, ms, compute bound ms, GOPS, layers not
     compute-bound) of PACK_OPTIONS — projection (T23.3)."""
     layers = conv_layers(ROOT / "model" / net / "manifest.json")
-    total = sum(macs(d) for d in layers)
+    total = sum(useful_macs(d) for d in layers)
     rows = []
     for name, o in PACK_OPTIONS:
         kw = dict(tm=o["tm"], tn=o["tn"])
@@ -253,8 +259,8 @@ SCENARIOS = [
 def scenario_table(net, freq_hz=FREQ_HZ, tiles=TILES):
     """Lignes (nom, cycles, ms, FPS accélérateur, GOPS, efficacité MAC)."""
     layers = conv_layers(ROOT / "model" / net / "manifest.json")
-    total_macs = sum(macs(d) for d in layers)
-    ideal = total_macs / (tiles["tm"] * tiles["tn"])
+    total_macs = sum(useful_macs(d) for d in layers)
+    ideal = sum(macs(d) for d in layers) / (tiles["tm"] * tiles["tn"])
     rows = []
 
     def row(name, cyc):
@@ -332,10 +338,11 @@ def manifest_summary(path, freq_hz=FREQ_HZ):
     """Noyau actuel sur un export quelconque (élagué, précision mixte : T10.10, T10.11)."""
     layers = conv_layers(path)
     total = sum(macs(d) for d in layers)
+    useful = sum(useful_macs(d) for d in layers)
     cyc = sum(kernel_cycles(d)["overlapped"] for d in layers)
     t = cyc / freq_hz
     return {"manifest": str(path), "macs": total, "cycles": cyc, "ms": 1e3 * t, "fps": 1 / t,
-            "gops": 2 * total / t / 1e9,
+            "gops": 2 * useful / t / 1e9,
             "mac_efficiency": total / (TILES["tm"] * TILES["tn"]) / cyc}
 
 

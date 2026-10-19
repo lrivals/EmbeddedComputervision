@@ -141,7 +141,8 @@ def test_checkpoint_of_other_cfg_is_refused(tmp_path):
 VOC_IMAGE = ROOT / "data" / "VOCdevkit" / "VOC2007" / "JPEGImages" / "000004.jpg"
 
 
-@pytest.mark.parametrize("spec", ["tiny-yolov3-coco", "int:tiny-yolov2-voc"])
+@pytest.mark.parametrize("spec", ["tiny-yolov3-coco", "int:tiny-yolov2-voc", "tiny-yolov4-coco",
+                                  "int:tiny-yolov4-coco"])
 def test_pretrained_models(spec):
     missing = [p for p in webcam.model_files(spec) + [VOC_IMAGE] if not p.exists()]
     if missing:

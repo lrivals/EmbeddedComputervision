@@ -10,6 +10,7 @@ Généré par `python tools/bench_report.py` (`make bench-report`) ; protocole :
 |---|---|---|---|---|---|---|
 | tiny-yolov2-voc | 3.486 | 7.44 | 37.2 | 26.87 | 187.3 | 61.0 % |
 | tiny-yolov3-coco | 2.782 | 7.21 | 36.1 | 27.72 | 154.3 | 50.2 % |
+| tiny-yolov4-coco | 3.454 | 10.36 | 51.8 | 19.30 | 133.3 | 52.3 % |
 
 ## Projection, deux MAC par DSP (T23.3)
 
@@ -23,6 +24,9 @@ PE paquetée (`ACC_PACK=2`, results/dsp_packing.md), mêmes hypothèses ; DSP es
 | tiny-yolov3-coco | packed, same tiles (half the DSPs) | 32, 24 | 416 | 36.1 | 27.72 | 154.3 |
 | tiny-yolov3-coco | packed, Tm 64 (same DSPs) | 64, 24 | 800 | 23.8 | 41.95 | 233.4 |
 | tiny-yolov3-coco | packed, Tn 32 (roofline point) | 32, 32 | 544 | 30.2 | 33.06 | 184.0 |
+| tiny-yolov4-coco | packed, same tiles (half the DSPs) | 32, 24 | 416 | 51.8 | 19.30 | 133.3 |
+| tiny-yolov4-coco | packed, Tm 64 (same DSPs) | 64, 24 | 800 | 32.5 | 30.79 | 212.7 |
+| tiny-yolov4-coco | packed, Tn 32 (roofline point) | 32, 32 | 544 | 42.5 | 23.51 | 162.4 |
 
 ## Mesures sur la carte
 
