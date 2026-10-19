@@ -3,14 +3,15 @@
 - Inférence, poids pré-entraînés (`PRETRAINED`) : chaque réseau sur son jeu d'origine et
   sur tout jeu qui a une correspondance vers ses classes (`MAPPINGS`, hors domaine, T11.2).
   COCO n'évalue pas les poids VOC : il a son réseau à 80 classes (T11.1).
-- Inférence, poids affinés : `tiny-yolov3-<jeu>` pour chaque jeu de `TRAINABLE`, avec les
-  poids `final.weights` du notebook d'entraînement correspondant.
+- Inférence, poids affinés : `tiny-yolov3-<jeu>` et `tiny-yolov4-<jeu>` (M24) pour chaque jeu
+  de `TRAINABLE`, avec les poids `final.weights` du notebook d'entraînement correspondant.
 - Statistiques (M16) : un notebook `<jeu>_stats` par jeu de `DATASETS`, sans modèle, en tête
   des notebooks du jeu ; la cfg du jeu ne sert qu'aux ancres et aux grilles (collisions).
 - Entraînement : `TRAINABLE`, seule liste écrite à la main (COCO train2017 est trop grand en
   NumPy ; ExDark et CrowdHuman ajoutés pour T15.14) : un notebook `train`
   (affinage unique de tools/m11.sh) et un notebook `sweep` (balayage lot × sous-ensemble,
-  T14.10) par jeu. L'inférence affinée lit l'un ou l'autre de leurs runs (`runs.py`).
+  T14.10) par jeu et par architecture (Tiny-YOLOv3 depuis ses poids COCO, YOLOv4-tiny depuis
+  les siens, T24.6). L'inférence affinée lit l'un ou l'autre de leurs runs (`runs.py`).
 
 Ajouter un jeu à `DATASETS` (avec ses `MAPPINGS`) ajoute ses notebooks d'inférence hors
 domaine sans toucher au générateur.
@@ -96,12 +97,13 @@ def _tasks(dataset, role, out_of_domain=False):
     return TASKS.get(key, ()) + own
 
 
-def finetuned(dataset):
-    """Modèle affiné sur `dataset` : (nom, cfg, entrée de la cfg)."""
-    if dataset == "voc":
+def finetuned(dataset, arch="tiny-yolov3"):
+    """Modèle `arch` affiné sur `dataset` : (nom, cfg, entrée de la cfg). Tiny-YOLOv3 sur VOC
+    a sa cfg dans le dépôt ; les autres sont produites par make_cfg.py (préparation)."""
+    if dataset == "voc" and arch == "tiny-yolov3":
         return "tiny-yolov3-voc", "tiny-yolov3-voc", {}
     inp = TRAIN_INPUT.get(dataset, {})
-    return f"tiny-yolov3-{dataset}", cfg_path("tiny-yolov3", dataset, **inp), inp
+    return f"{arch}-{dataset}", cfg_path(arch, dataset, **inp), inp
 
 
 def stats_net(dataset):
@@ -135,13 +137,14 @@ def build_registry():
             model, cfg, inp = finetuned(ds)
             tasks = _tasks(ds, "train") + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
             out.append(Notebook(ds, model, role, cfg, init, ds, tasks, **inp))
-    # YOLOv4-tiny affiné sur VOC depuis ses poids COCO (T24.6) : affinage et évaluation.
-    v4, model = V4_ARCH, "tiny-yolov4-voc"
-    cfg = cfg_path(v4, "voc")
-    out.append(Notebook("voc", model, "infer", cfg, f"{OUT}/voc/{model}/final.weights", "voc",
-                        V4_TASKS, arch=v4))
-    out.append(Notebook("voc", model, "train", cfg, f"weights/{PRETRAINED[V4_INIT_NET]}",
-                        "voc", V4_TASKS, arch=v4))
+    # YOLOv4-tiny affiné depuis ses poids COCO (T24.6) : évaluation, affinage, balayage.
+    v4, init = V4_ARCH, f"weights/{PRETRAINED[V4_INIT_NET]}"
+    for role in ("infer", "train", "sweep"):
+        for ds in TRAINABLE:
+            model, cfg, inp = finetuned(ds, v4)
+            tasks = V4_TASKS + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
+            weights = f"{OUT}/{ds}/{model}/final.weights" if role == "infer" else init
+            out.append(Notebook(ds, model, role, cfg, weights, ds, tasks, arch=v4, **inp))
     return {f"{nb.dataset}/{nb.name}": nb for nb in out}
 
 

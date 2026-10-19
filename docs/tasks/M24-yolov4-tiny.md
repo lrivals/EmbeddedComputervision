@@ -41,7 +41,8 @@ plots `scale_x_y` ([results/figures.md](../../results/figures.md)).
 (float; `INT8 = True`: calibration and integer AP; `HW = True`: export, golden, C-sim and
 three-stage AP on `SUBSET` images), the same network out of domain on the other datasets,
 and [voc/tiny-yolov4-voc_train](../../notebooks/voc/tiny-yolov4-voc_train.ipynb) /
-[voc/tiny-yolov4-voc_infer](../../notebooks/voc/tiny-yolov4-voc_infer.ipynb) (T24.6).
+[voc/tiny-yolov4-voc_infer](../../notebooks/voc/tiny-yolov4-voc_infer.ipynb), and the same
+`_train` / `_sweep` / `_infer` triple on every trainable dataset (T24.6).
 
 ### [x] T24.0 — Weights, cfg and layer table
 - **Spec**: §3 · **Depends on**: — · **Size**: S
@@ -141,15 +142,18 @@ and [voc/tiny-yolov4-voc_train](../../notebooks/voc/tiny-yolov4-voc_train.ipynb)
   are counted on the network MACs (`perf_model.useful_macs`), the efficiency on the
   computed MACs.
 
-### [ ] T24.6 — Fine-tuning on VOC (notebook)
+### [ ] T24.6 — Fine-tuning (notebooks)
 - **Depends on**: T24.1, T24.2 · **Size**: M
-- **Deliverables**: `notebooks/voc/tiny-yolov4-voc_train.ipynb` (k-means anchors of VOC,
+- **Deliverables**: for each of the 11 trainable datasets (`TRAINABLE`, as Tiny-YOLOv3),
+  `notebooks/<dataset>/tiny-yolov4-<dataset>_train.ipynb` (k-means anchors of the dataset,
   cfg from `yolov4-tiny.cfg` by `tools/make_cfg.py`, fine-tuning from the COCO weights,
-  heads re-initialised) and `notebooks/voc/tiny-yolov4-voc_infer.ipynb` (float, `INT8`,
-  `HW`); registry `tools/notebooks/matrice.py` (`Notebook.arch`)
-- **Acceptance**: VOC2007 test mAP of the fine-tuned network against Tiny-YOLOv3 VOC
-  ([map_float.md](../../results/map_float.md)), integer and C-sim stages from the inference
-  notebook
+  heads re-initialised), `_sweep.ipynb` (batch × subset sweep, T14.10) and `_infer.ipynb`
+  (float, `INT8`, `HW`); registry `tools/notebooks/matrice.py` (`finetuned(dataset, arch)`,
+  `Notebook.arch`). The cross-dataset sweep analysis (`analyse_balayages.ipynb`) stays on
+  the Tiny-YOLOv3 sweeps.
+- **Acceptance**: mAP of each fine-tuned network against the Tiny-YOLOv3 fine-tuning of the
+  same dataset (VOC2007 test: [map_float.md](../../results/map_float.md)), integer and C-sim
+  stages from the inference notebook
 - **Notes**: the second head keeps `mask = 1,2,3` of `yolov4-tiny.cfg`, so anchor 0 is unused
   in training as in Darknet. A 2-iteration run of the chain (anchors, cfg, `train.py`) passes.
 

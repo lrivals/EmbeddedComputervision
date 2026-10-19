@@ -84,7 +84,8 @@ def _executed(path):
 
 def find_sweeps(nb_dir=NB_DIR):
     """{jeu: chemin} des `*_sweep.ipynb`, exécutés ou non, dans l'ordre ORDER."""
-    found = {p.parent.name: p for p in Path(nb_dir).glob("*/*_sweep.ipynb")}
+    # Tiny-YOLOv3 seulement : un balayage par jeu (ceux de YOLOv4-tiny, M24, à part).
+    found = {p.parent.name: p for p in Path(nb_dir).glob("*/tiny-yolov3-*_sweep.ipynb")}
     return {k: found[k] for k in sorted(found, key=lambda k: (ORDER + (k,)).index(k))}
 
 

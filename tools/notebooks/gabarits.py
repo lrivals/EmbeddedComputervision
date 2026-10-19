@@ -704,7 +704,7 @@ def train_body(nb):
     qat = _assign([(k, v, None) for k, v in M12_QAT.items()])
     admm = _assign([(k, v, None) for k, v in M12_ADMM.items()])
     variants = ""
-    if nb.dataset == "voc":
+    if nb.dataset == "voc" and nb.arch != V4_ARCH:  # profils M12 : Tiny-YOLOv2 / v3
         variants = textwrap.dedent("""
 
         ### Variantes QAT et ADMM (T14.7)
