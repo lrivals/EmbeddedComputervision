@@ -132,6 +132,11 @@ Model Model::load(const std::string& dir) {
         require(l.shift >= 1 && l.shift <= 31, "shift hors de [1, 31]");
         if (e.has("qmax")) l.qmax = static_cast<int>(e["qmax"].integer());
         require(l.qmax >= 1 && l.qmax <= 127, "qmax hors de [1, 127]");
+        if (e.has("cs_offset")) {
+          l.cs_offset = e["cs_offset"].integer();
+          l.cs_b = static_cast<int32_t>(e["cs_b"].integer());
+          require(l.cs_offset % BLOB_ALIGN == 0, "cs_offset not aligned on 64 bytes");
+        }
         if (e.has("wbits")) l.wbits = static_cast<int>(e["wbits"].integer());
         require(l.wbits == 4 || l.wbits == 8, "wbits : 4 ou 8");
         break;
@@ -178,6 +183,13 @@ Model Model::load(const std::string& dir) {
   m.bias = read_blob<int32_t>(dir + "/bias.bin", blobs["bias.bin"].integer());
   m.m0 = read_blob<int32_t>(dir + "/requant.bin", blobs["requant.bin"].integer());
   m.luts = read_blob<uint32_t>(dir + "/luts.bin", blobs["luts.bin"].integer());
+  if (blobs.has("checksum.bin"))
+    m.checksum = read_blob<int32_t>(dir + "/checksum.bin", blobs["checksum.bin"].integer());
+  for (const auto& l : m.layers)
+    if (l.type == LayerType::Conv && l.cs_offset >= 0)
+      require(!m.checksum.empty() &&
+                  (l.cs_offset / 4 + int64_t(l.cin) * l.k * l.k) <= int64_t(m.checksum.size()),
+              "checksum filter outside checksum.bin");
 
   // Poids 4 bits (T10.10) : quartet bas = poids d'indice pair, extension de signe ; copie
   // int8 ajoutée en fin de `weights` (alignée sur 64), sur laquelle pointe w_offset.

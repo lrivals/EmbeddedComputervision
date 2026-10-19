@@ -108,6 +108,9 @@ values). Validation: `pytest python/tests/test_manifest.py`.
   σ(q·s) in Q16 and e^{q·s} in Q`exp_frac` (≤ 16, to fit in 32 bits) indexed by `q + 128`,
   then e^{d·s} in Q16 indexed by `d + 255`, d = q_c − q_max ∈ [−255, 0] (v2 softmax), with
   s = `scale` of the head.
+- `checksum.bin` (real export, ABFT, T25.2): for each conv, at `cs_offset`, the checksum
+  filter Σ_f q_w,f as int32 `(C, k, k)`; the conv also carries `cs_b` = Σ_f q_b,f wrapped
+  to int32. Both are optional: an export without them has no check.
 - Real export: `model/<net>/` (`tools/export_model.py`), dumps `dumps/<id>/input.npy`,
   `Lxx.npy` (int8 output of each layer) and `detections.json` for 3 images of VOC2007 test.
 - **Allocation** (`yolo.io.export.layout`, shared by the example and the export): A/B
@@ -131,6 +134,10 @@ Reference: `python/yolo/quant/int_layers.py`; all integers signed, **arithmetic*
   produced.
 - Maxpool, upsample, route: exact (max and copies); stride-1 maxpool by replication.
 - Heads: `M0`/`shift` like the other convs, without leaky.
+- ABFT check (T25.2, `python/yolo/quant/abft.py`, `golden::conv_layer`): on the
+  accumulator, before requantization, Σ_f acc_f = Σ q_x·cs_w + cs_b **modulo 2³²** (a 32-bit
+  lane, unsigned arithmetic in C++). Exact: 0 errors without a fault, and any single bit
+  flip of an accumulator is detected. It never changes the outputs.
 
 ## Test tolerances
 

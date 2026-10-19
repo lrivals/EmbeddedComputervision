@@ -37,6 +37,10 @@ struct Layer {
   // dépaquetés en int8 à la fin de `Model::weights` et w_offset désigne cette copie.
   int wbits = 8;
   double in_scale = 0.0, out_scale = 0.0;
+  // ABFT (T25.2): offset of the checksum filter Σ_f qW_f (int32, cin × k × k) in
+  // checksum.bin (−1: none) and Σ_f q_b,f wrapped to int32.
+  int64_t cs_offset = -1;
+  int32_t cs_b = 0;
 
   // maxpool
   int fused_into = -1;
@@ -70,6 +74,7 @@ struct Model {
   std::vector<int32_t> bias;      // bias.bin
   std::vector<int32_t> m0;        // requant.bin
   std::vector<uint32_t> luts;     // luts.bin
+  std::vector<int32_t> checksum;  // checksum.bin (ABFT, T25.2), empty if not exported
 
   // Lecture complète et contrôles (version, tailles de blobs, alignement 64, formes).
   static Model load(const std::string& dir);
@@ -77,6 +82,10 @@ struct Model {
   const int8_t* conv_weights(const Layer& l) const { return weights.data() + l.w_offset; }
   const int32_t* conv_bias(const Layer& l) const { return bias.data() + l.b_offset / 4; }
   const int32_t* conv_m0(const Layer& l) const { return m0.data() + l.m0_offset / 4; }
+  // ABFT checksum filter of a conv, or nullptr when the export has none (T25.2).
+  const int32_t* conv_checksum(const Layer& l) const {
+    return l.cs_offset < 0 || checksum.empty() ? nullptr : checksum.data() + l.cs_offset / 4;
+  }
   // Tables d'une tête : σ, e^t, e^{d·s} (softmax v2), 256 uint32 chacune.
   const uint32_t* head_lut(const Layer& l, int which) const {
     return luts.data() + l.lut_offset / 4 + 256 * which;

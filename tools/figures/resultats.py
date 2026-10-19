@@ -1779,3 +1779,86 @@ def plot_map_coco(floats, published, stages, out_dir, name="map_coco"):
         "results/map_coco.md")
 def map_coco(out_dir):
     return plot_map_coco(*load_map_coco(need(ROOT / "results" / "map_coco.md")), out_dir)
+
+
+# --- T13.58: fault sensitivity (T25.1) ----------------------------------------------------
+
+FAULT_SITES = ("weight", "bias", "act", "acc")
+
+
+def load_faults(path):
+    """report.json of `tools/fault_campaign.py report`: {baseline, images, ber, layer, bit,
+    ranking, abft} (mAP as fractions)."""
+    rep = _read_json(path)
+    if rep.get("baseline") is None or not (rep["ber"] or rep["layer"] or rep["bit"]):
+        raise MissingSource(f"{path}: no baseline or no grid")
+    return rep
+
+
+def plot_faults(rep, out_dir, name="faults"):
+    plt = st.plt()
+    panels = [g for g in ("ber", "layer", "bit") if rep[g]]
+    fig, axes = plt.subplots(len(panels), 1, figsize=(st.FULL, 2.9 * len(panels)),
+                             squeeze=False)
+    base = rep["baseline"] * 100
+    for ax, g in zip(axes[:, 0], panels):
+        rows = rep[g]
+        sites = [s for s in FAULT_SITES if any(a["site"] == s for a in rows)]
+        if g == "ber":
+            for k, s in enumerate(sites):
+                pts = sorted((a["rate"], a["map"] * 100, a["std"] * 100) for a in rows
+                             if a["site"] == s)
+                r, m, e = map(np.array, zip(*pts))
+                ax.errorbar(r, m, yerr=e, color=st.PALETTE[k], marker="os^D"[k], ms=4,
+                            capsize=2, lw=1.2, label=s)
+            ax.set_xscale("log")
+            ax.axhline(base, color=st.INK2, lw=0.8, ls="--")
+            ax.text(ax.get_xlim()[0], base, f" fault-free {base:.2f}", va="bottom", fontsize=7,
+                    color=st.INK2)
+            ax.set_xlabel("bit error rate (per stored bit)")
+            ax.set_ylabel("mAP (%)")
+            ax.set_title("mAP against the bit error rate, per fault site (mean ± std of the "
+                         "seeds)")
+        elif g == "layer":
+            layers = sorted({a["layer"] for a in rows})
+            rate = max(a["rate"] for a in rows)
+            x = np.arange(len(layers))
+            w = 0.8 / len(sites)
+            for k, s in enumerate(sites):
+                d = {a["layer"]: a["map"] * 100 - base for a in rows
+                     if a["site"] == s and a["rate"] == rate}
+                ax.bar(x + (k - (len(sites) - 1) / 2) * w, [d.get(i, np.nan) for i in layers],
+                       w * 0.92, color=st.PALETTE[k], hatch=("", "//", "..", "xx")[k],
+                       edgecolor="white", linewidth=0.4, label=s)
+            ax.axhline(0, color=st.INK2, lw=0.8)
+            ax.set_xticks(x, [f"L{i:02d}" for i in layers])
+            ax.set_ylabel("mAP change (points)")
+            ax.set_title(f"Faults in one layer at a BER of {rate:.0e}")
+            ax.grid(axis="x", visible=False)
+        else:
+            for k, s in enumerate(sites):
+                pts = sorted((a["bit"], a["map"] * 100 - base) for a in rows if a["site"] == s)
+                b, d = zip(*pts)
+                ax.plot(b, d, color=st.PALETTE[k], marker="os^D"[k], ms=4, lw=1.2, label=s)
+            ax.axhline(0, color=st.INK2, lw=0.8)
+            ax.set_xlabel("bit position (7: sign of an int8, 31: sign of an int32)")
+            ax.set_ylabel("mAP change (points)")
+            ax.set_title("One bit flip at a given position (per image for act / acc, per "
+                         "model for weight / bias)")
+        ax.legend(loc="lower left", ncol=len(sites), fontsize=7)
+    fig.tight_layout(rect=(0, 0.03, 1, 1))
+    fig.text(0.01, 0.005, f"{rep['images']} images of VOC2007 test (ranking only, M12 rule); "
+             "integer model, faults of yolo.quant.faults (T25.0).", fontsize=6.5,
+             color=st.MUTED)
+    return st.save(fig, out_dir, name)
+
+
+@figure("faults", "resultats", "T13.58",
+        "mAP of the integer Tiny-YOLOv2 under bit flips: against the bit error rate per fault "
+        "site, per layer, and per bit position. Subset of VOC2007 test.",
+        "build/m25/faults/report.json (else build/m25/smoke/report.json)", subset=True)
+def faults(out_dir):
+    path = ROOT / "build" / "m25" / "faults" / "report.json"
+    if not path.exists():
+        path = ROOT / "build" / "m25" / "smoke" / "report.json"
+    return plot_faults(load_faults(need(path)), out_dir)

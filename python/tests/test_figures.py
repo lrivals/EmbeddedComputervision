@@ -827,3 +827,23 @@ def test_math_plates_generate(tmp_path):
     """Toutes les planches F se génèrent sur leurs jouets (palier R)."""
     for f in F.select(["maths"]):
         _pngs(f.fn(tmp_path))
+
+
+def test_faults_sources(tmp_path):
+    rows = []
+    for g, extra in (("ber", [{"rate": r} for r in (1e-7, 1e-5)]),
+                     ("layer", [{"layer": i, "rate": 1e-5} for i in (0, 2)]),
+                     ("bit", [{"bit": b} for b in (0, 7)])):
+        for site in ("weight", "acc"):
+            for e in extra:
+                rows.append({"grid": g, "site": site, "layer": None, "bit": None,
+                             "rate": None, **e, "seeds": 2, "map": 0.4, "std": 0.01})
+    rep = {"baseline": 0.5, "images": 100, "ranking": [], "abft": {},
+           **{g: [r for r in rows if r["grid"] == g] for g in ("ber", "layer", "bit")}}
+    p = tmp_path / "report.json"
+    p.write_text(json.dumps(rep))
+    assert resultats.load_faults(p)["baseline"] == 0.5
+    _pngs(resultats.plot_faults(rep, tmp_path))
+    p.write_text(json.dumps({**rep, "ber": [], "layer": [], "bit": []}))
+    with pytest.raises(F.MissingSource):
+        resultats.load_faults(p)

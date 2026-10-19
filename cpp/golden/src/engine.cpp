@@ -182,6 +182,12 @@ void Engine::record(int id) {
   rec_[size_t(id)] = materialize(views_[size_t(id)]);
 }
 
+uint64_t Engine::abft_errors() const {
+  uint64_t n = 0;
+  for (const AccessStats& s : stats_) n += s.abft_errors;
+  return n;
+}
+
 std::vector<postproc::Head> make_heads(const Engine& e) {
   const Model& m = e.model();
   std::vector<postproc::Head> heads;

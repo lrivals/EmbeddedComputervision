@@ -37,7 +37,7 @@
       }
     },
     "blobs": {
-      "description": "Taille en octets de chaque fichier binaire ; luts.bin (tables du décodage, §9.4) est écrit par l'export réel.",
+      "description": "Taille en octets de chaque fichier binaire ; luts.bin (tables du décodage, §9.4) est écrit par l'export réel ; checksum.bin (ABFT, T25.2: int32 checksum filter Σ_f qW_f of each conv, C × k × k) as well.",
       "type": "object",
       "required": ["weights.bin", "bias.bin", "requant.bin"],
       "additionalProperties": false,
@@ -45,7 +45,8 @@
         "weights.bin": {"$ref": "#/$defs/size"},
         "bias.bin": {"$ref": "#/$defs/size"},
         "requant.bin": {"$ref": "#/$defs/size"},
-        "luts.bin": {"$ref": "#/$defs/size"}
+        "luts.bin": {"$ref": "#/$defs/size"},
+        "checksum.bin": {"$ref": "#/$defs/size"}
       }
     },
     "buffers": {
@@ -142,6 +143,8 @@
         "w_offset": {"$ref": "#/$defs/offset64"},
         "b_offset": {"$ref": "#/$defs/offset64"},
         "m0_offset": {"$ref": "#/$defs/offset64"},
+        "cs_offset": {"description": "ABFT (T25.2): offset of the checksum filter Σ_f qW_f (int32, cin × k × k) in checksum.bin.", "$ref": "#/$defs/offset64"},
+        "cs_b": {"description": "ABFT (T25.2): Σ_f q_b,f wrapped to int32 (the check is modulo 2^32).", "type": "integer", "minimum": -2147483648, "maximum": 2147483647},
         "shift": {"type": "integer", "minimum": 1, "maximum": 62},
         "qmax": {
           "description": "Saturation de la sortie dans [−qmax, qmax] (défaut 127 ; 2^{b−1} − 1 pour des activations à b bits, T9.3).",

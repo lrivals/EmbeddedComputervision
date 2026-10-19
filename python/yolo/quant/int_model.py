@@ -15,6 +15,7 @@ import numpy as np
 from yolo.layers.conv import conv_forward
 from yolo.layers.activations import leaky_forward
 from yolo.models.graph import OUTPUT_TYPES
+from yolo.quant import abft
 from yolo.quant import int_layers as il
 from yolo.quant.calibrate import scale_owners
 from yolo.quant.quantize import (fake_quant, quantize_bias, quantize_weights_per_channel,
@@ -36,6 +37,14 @@ class QConv:
     qmax: int = 127   # saturation de la sortie (2^{b−1} − 1 pour b bits, T9.3)
     wqmax: int = 127  # poids dans [−wqmax, wqmax]
     wbits: int = 8    # stockage dans weights.bin : 8, ou 4 (deux poids par octet, T10.10)
+    # ABFT checksum (T25.2): Σ_f qW_f (C, k, k) int32 and Σ_f q_b,f mod 2³² (int). They come
+    # from the fault-free weights, so faulty weights are checked against them.
+    cs_w: np.ndarray = None
+    cs_b: int = None
+
+    def __post_init__(self):
+        if self.cs_w is None:
+            self.cs_w, self.cs_b = abft.checksums(self.qW, self.qb)
 
 
 @dataclass
@@ -105,6 +114,12 @@ class IntNetwork:
         self.qm = qm
         self.engine = engine
         self.max_acc = {}  # |acc| max observé par conv (contrôle du débordement)
+        # Hooks (T25.0, T25.2): objects with `on_acc(i, acc, x) -> acc` (int32 accumulator of
+        # conv i, bias included, before requantization; x = its int input) and
+        # `on_out(i, y) -> y` (int output of conv i). Empty: the fault-free path.
+        self.hooks = []
+        # Faulty model (T25.0): the int32 accumulator wraps instead of raising OverflowError.
+        self.wrap_acc = False
 
     def forward(self, qx, all_outputs=False):
         """`qx` : (N, 3, H, W) int8. Rend {id: tête int8} ou la liste des sorties int8."""
@@ -119,9 +134,13 @@ class IntNetwork:
             src = [x if j < 0 else outs[j] for j in _sources(layers, i)]
             if t == "conv":
                 c = self.qm.convs[i]
-                y, acc = il.conv_int(src[0], c.qW, c.qb, c.M0, c.n, c.act, self.engine,
-                                     c.qmax, c.s)
+                acc = il.conv_acc(src[0], c.qW, c.qb, self.engine, c.s, self.wrap_acc)
                 self.max_acc[i] = max(self.max_acc.get(i, 0), int(np.abs(acc).max()))
+                for h in self.hooks:
+                    acc = h.on_acc(i, acc, src[0])
+                y = il.conv_out(acc, c.M0, c.n, c.act, c.qmax)
+                for h in self.hooks:
+                    y = h.on_out(i, y)
             elif t == "maxpool":
                 y = il.maxpool_int(src[0], k=layer["k"], s=layer["s"])
             elif t == "upsample":

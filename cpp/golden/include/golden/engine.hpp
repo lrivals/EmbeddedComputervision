@@ -52,6 +52,10 @@ class Engine {
   Tensor materialize(const InView& v) const;
   const std::vector<Tensor>& recorded() const { return rec_; }
   const AccessStats& stats(int id) const { return stats_.at(size_t(id)); }
+  // ABFT check of every conv that has an exported checksum (T25.2), on by default; the
+  // counters are in stats(id).abft_*. Outputs are the same with or without it.
+  void set_abft(bool on) { abft_ = on; }
+  uint64_t abft_errors() const;
   std::vector<int8_t>& buffer(const std::string& name) { return arena_.at(name); }
   const std::vector<int8_t>& buffer(const std::string& name) const { return arena_.at(name); }
 
@@ -68,6 +72,7 @@ class Engine {
   std::vector<std::vector<int8_t>> taps_;  // carte avant pooling (débogage) par conv
   std::vector<Tensor> rec_;
   bool recording_ = false;
+  bool abft_ = true;
 };
 
 // Têtes de sortie après `run`, prêtes pour postproc::postprocess (§9.4).
@@ -84,7 +89,11 @@ void Engine::run(const int8_t* input, bool record_all) {
   for (const Layer& l : m_.layers) {
     if (l.type == LayerType::Conv) {
       const InView in = in_view(l);
-      const ConvParams p = conv_params(l, in.h, in.w);
+      ConvParams p = conv_params(l, in.h, in.w);
+      if (abft_) {
+        p.cs_w = m_.conv_checksum(l);
+        p.cs_b = l.cs_b;
+      }
       int8_t* pre = l.prepool_out.valid() ? addr(l.prepool_out) : nullptr;
       int8_t* tap = nullptr;
       if (recording_ && p.pooled()) {

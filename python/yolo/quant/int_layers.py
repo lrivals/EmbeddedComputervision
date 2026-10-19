@@ -52,8 +52,19 @@ def clip8(y):
     return clip_q(y)
 
 
-def conv_acc(qx, qW, qb, engine="int64", s=1):
+def wrap32(v):
+    """Signed int32 value of v mod 2³² (int, or int64 array): a 32-bit register."""
+    if isinstance(v, (int, np.integer)):
+        return (int(v) + (1 << 31)) % (1 << 32) - (1 << 31)
+    v = np.asarray(v, np.int64)
+    return ((v + (1 << 31)) & ((1 << 32) - 1)) - (1 << 31)
+
+
+def conv_acc(qx, qW, qb, engine="int64", s=1, wrap=False):
     """Accumulateur int32 (rangé en int64) : Σ q_w q_x + q_b ; erreur s'il déborde.
+
+    `wrap` (fault injection, T25.0): a faulty bias or weight can push the sum out of int32;
+    it then wraps modulo 2³² as the 32-bit hardware accumulator does, instead of an error.
 
     Stride 2 (YOLOv4-tiny, T24.3) : la sortie de stride 1 prise une ligne et une colonne sur
     deux, ce que fait le matériel (décimation dans l'étage de sortie).
@@ -66,6 +77,8 @@ def conv_acc(qx, qW, qb, engine="int64", s=1):
     else:
         raise ValueError(f"moteur inconnu : {engine!r}")
     acc = acc + np.asarray(qb, np.int64)[None, :, None, None]
+    if wrap:
+        return wrap32(acc)
     if np.abs(acc).max(initial=0) >= ACC_LIMIT:
         raise OverflowError("accumulateur hors de l'int32")
     return acc
@@ -92,13 +105,18 @@ def requantize(acc, M0, n):
     return rshift_round(acc * np.asarray(M0, np.int64)[None, :, None, None], n)
 
 
-def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64", qmax=QMAX, s=1):
-    """Couche conv entière complète (§9.3) ; renvoie (y int64 dans [−qmax, qmax], acc)."""
-    acc = conv_acc(qx, qW, qb, engine, s)
+def conv_out(acc, M0, n, act="leaky", qmax=QMAX):
+    """Output stage of a conv (§9.3): requantization, leaky, saturation of the int32 acc."""
     y = requantize(acc, M0, n)
     if act == "leaky":
         y = leaky_int(y)
-    return clip_q(y, qmax), acc
+    return clip_q(y, qmax)
+
+
+def conv_int(qx, qW, qb, M0, n, act="leaky", engine="int64", qmax=QMAX, s=1):
+    """Couche conv entière complète (§9.3) ; renvoie (y int64 dans [−qmax, qmax], acc)."""
+    acc = conv_acc(qx, qW, qb, engine, s)
+    return conv_out(acc, M0, n, act, qmax), acc
 
 
 def maxpool_int(qx, k=2, s=2):

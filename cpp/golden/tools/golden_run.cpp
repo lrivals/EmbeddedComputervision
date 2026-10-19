@@ -53,6 +53,11 @@ static int inspect(const std::string& dir) {
                   l.k, l.pad, l.cin, l.cout, int(l.leaky), l.pool_k, l.pool_s, l.shift,
                   l.in_scale, l.out_scale, sw, int(m.conv_weights(l)[0]),
                   int(m.conv_weights(l)[nw - 1]), sb, m.conv_bias(l)[0], sm, m.conv_m0(l)[0]);
+      if (const int32_t* cs = m.conv_checksum(l)) {  // ABFT (T25.2)
+        long long sc;
+        stats(cs, int64_t(l.cin) * l.k * l.k, sc);
+        std::printf(" cs_sum %lld cs_b %d", sc, l.cs_b);
+      }
     } else if (l.is_head()) {
       long long s0;
       stats(m.head_lut(l, 0), 3 * 256, s0);
@@ -83,7 +88,13 @@ static int run(const std::string& dir, const std::string& input, const std::stri
   write_detections(out + "/detections.json", dets);
   std::printf("%s : %zu couches, %zu détections → %s\n", m.network.c_str(), e.recorded().size(),
               dets.size(), out.c_str());
-  return 0;
+  if (!m.checksum.empty()) {  // ABFT (T25.2): 0 errors expected without a fault
+    uint64_t checks = 0;
+    for (const Layer& l : m.layers) checks += e.stats(l.id).abft_checks;
+    std::printf("abft checks %llu errors %llu\n", (unsigned long long)checks,
+                (unsigned long long)e.abft_errors());
+  }
+  return e.abft_errors() == 0 ? 0 : 3;
 }
 
 // Têtes (dans l'ordre de `Model::heads`) → boîtes entières du post-traitement matériel.

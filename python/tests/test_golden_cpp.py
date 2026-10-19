@@ -90,6 +90,9 @@ def check_inspect(model_dir):
             assert int(got["b_first"]) == c.qb[0]
             assert int(got["m0_sum"]) == c.M0.astype(np.int64).sum()
             assert int(got["m0_first"]) == c.M0[0]
+            if "cs_offset" in e:  # ABFT checksum (T25.2), read by both readers
+                assert int(got["cs_sum"]) == c.cs_w.astype(np.int64).sum() == w.sum()
+                assert int(got["cs_b"]) == e["cs_b"] == c.cs_b
         elif e["type"] in ("yolo", "region"):
             assert float(got["scale"]) == e["scale"]
             assert int(got["exp_frac"]) == e["exp_frac"]

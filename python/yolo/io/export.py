@@ -14,7 +14,8 @@
     décimée dans l'étage de sortie (maxpool 1×1 de stride 2, T24.3) ;
   - les têtes vont dans `H<grille>`.
 - `build_manifest(net, scales, …)` : manifest au format du schéma ; `export_model(qm, dir)`
-  écrit `manifest.json`, `weights.bin`, `bias.bin`, `requant.bin` et `luts.bin` ;
+  écrit `manifest.json`, `weights.bin`, `bias.bin`, `requant.bin`, `luts.bin` et
+  `checksum.bin` (ABFT checksum filters, T25.2) ;
   `load_model(dir)` relit le tout en `QuantModel` (lecteur indépendant de l'export).
 """
 
@@ -207,7 +208,7 @@ def layout(net):
 
 
 def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_frac=None,
-                   qmax_of=None, wbits_of=None):
+                   qmax_of=None, wbits_of=None, cs_b_of=None):
     """Manifest de `net` (format `specs`).
 
     `scale_of(i)` : échelle de la sortie de la couche i (−1 : entrée) ; `shift_of(i)` : n de
@@ -215,11 +216,13 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
     tête: bits fractionnaires de la table exponentielle} (optionnels). `qmax_of(i)` :
     saturation de la sortie de la conv i, écrite seulement si ≠ 127 (T9.3). `wbits_of(i)` :
     bits de stockage des poids de la conv i, écrit seulement si ≠ 8 (4 : paquetés, T10.10).
+    `cs_b_of(i)`: ABFT checksum bias of conv i (T25.2); when given, each conv gets `cs_offset`
+    and `cs_b`, and the blob `checksum.bin` holds the checksum filters.
     """
     layers = net["layers"]
     shapes = infer_shapes(net)
     places, buffers = layout(net)
-    w_off = b_off = 0
+    w_off = b_off = cs_off = 0
     entries = []
     for i, layer in enumerate(layers):
         t = layer["type"]
@@ -244,6 +247,9 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
             wbits = 8 if wbits_of is None else wbits_of(i)
             if wbits != 8:
                 e["wbits"] = int(wbits)
+            if cs_b_of is not None:
+                e.update(cs_offset=cs_off, cs_b=int(cs_b_of(i)))
+                cs_off = align(cs_off + 4 * k * k * ins[0])
             w_off = align(w_off + weight_bytes(k * k * ins[0] * cout, wbits))
             b_off = align(b_off + 4 * cout)
         elif t == "maxpool":
@@ -273,6 +279,8 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
         entries.append(e)
 
     blobs = {"weights.bin": w_off, "bias.bin": b_off, "requant.bin": b_off}
+    if cs_b_of is not None:
+        blobs["checksum.bin"] = cs_off
     m = {
         "format_version": FORMAT_VERSION,
         "network": net["name"],
@@ -325,9 +333,12 @@ LUT_NAMES = ("sigmoid", "exp", "softmax_exp")
 
 def export_model(qm, out_dir):
     """Écrit le modèle entier `qm` dans `out_dir` ; rend le manifest."""
+    from yolo.quant.abft import checksums
     from yolo.quant.int_model import head_luts
 
     out_dir = Path(out_dir)
+    # ABFT checksums computed here from the exported weights (T25.2).
+    cs = {i: checksums(c.qW, c.qb) for i, c in qm.convs.items()}
     out_dir.mkdir(parents=True, exist_ok=True)
     luts = head_luts(qm)
     lut_offsets, off = {}, 0
@@ -336,12 +347,14 @@ def export_model(qm, out_dir):
         off = align(off + 4 * 256 * len(LUT_NAMES))
     m = build_manifest(qm.net, qm.input_scale, qm.scale_of, lambda i: qm.convs[i].n,
                        lut_offsets, {i: h.exp_frac for i, h in luts.items()},
-                       lambda i: qm.convs[i].qmax, lambda i: qm.convs[i].wbits)
+                       lambda i: qm.convs[i].qmax, lambda i: qm.convs[i].wbits,
+                       lambda i: cs[i][1])
     m["blobs"]["luts.bin"] = off
 
     w = np.zeros(m["blobs"]["weights.bin"], np.int8)
     b = np.zeros(m["blobs"]["bias.bin"] // 4, "<i4")
     m0 = np.zeros(m["blobs"]["requant.bin"] // 4, "<i4")
+    csw = np.zeros(m["blobs"]["checksum.bin"] // 4, "<i4")
     for e in m["layers"]:
         if e["type"] != "conv":
             continue
@@ -350,6 +363,8 @@ def export_model(qm, out_dir):
         w[e["w_offset"]:e["w_offset"] + packed.size] = packed
         b[e["b_offset"] // 4:e["b_offset"] // 4 + len(c.qb)] = c.qb
         m0[e["m0_offset"] // 4:e["m0_offset"] // 4 + len(c.M0)] = c.M0
+        cw = cs[e["id"]][0].ravel()
+        csw[e["cs_offset"] // 4:e["cs_offset"] // 4 + cw.size] = cw
     lut = np.zeros(off // 4, "<u4")
     for hid, o in lut_offsets.items():
         for k, name in enumerate(LUT_NAMES):
@@ -358,6 +373,7 @@ def export_model(qm, out_dir):
     b.tofile(out_dir / "bias.bin")
     m0.tofile(out_dir / "requant.bin")
     lut.tofile(out_dir / "luts.bin")
+    csw.tofile(out_dir / "checksum.bin")
     (out_dir / "manifest.json").write_text(json.dumps(m, indent=1, ensure_ascii=False) + "\n")
     return m
 
@@ -375,6 +391,7 @@ def load_model(model_dir):
     w = np.frombuffer(blobs["weights.bin"], np.int8)
     b = np.frombuffer(blobs["bias.bin"], "<i4")
     m0 = np.frombuffer(blobs["requant.bin"], "<i4")
+    csw = np.frombuffer(blobs["checksum.bin"], "<i4") if "checksum.bin" in blobs else None
     layers, convs = [], {}
     for e in m["layers"]:
         t = e["type"]
@@ -387,9 +404,16 @@ def load_model(model_dir):
             qW = (unpack4(raw, n) if wbits == 4 else raw).reshape(cout, cin, k, k)
             qb = b[e["b_offset"] // 4:e["b_offset"] // 4 + cout]
             M0 = m0[e["m0_offset"] // 4:e["m0_offset"] // 4 + cout]
+            # ABFT checksums of the export if present (T25.2), else recomputed by QConv.
+            cs_w, cs_b = None, None
+            if csw is not None and "cs_offset" in e:
+                o = e["cs_offset"] // 4
+                cs_w = csw[o:o + cin * k * k].reshape(cin, k, k).astype(np.int32)
+                cs_b = e["cs_b"]
             convs[e["id"]] = QConv(qW.copy(), qb.astype(np.int32), M0.astype(np.int32),
                                    e["shift"], e["in_scale"], None, e["out_scale"], e["act"],
-                                   e["s"], e.get("qmax", 127), 7 if wbits == 4 else 127, wbits)
+                                   e["s"], e.get("qmax", 127), 7 if wbits == 4 else 127, wbits,
+                                   cs_w, cs_b)
         elif t == "maxpool":
             layers.append({"type": "maxpool", "k": e["k"], "s": e["s"]})
         elif t == "upsample":

@@ -38,7 +38,8 @@ def build():
             return IN_SCALE
         return LEAKY_SCALE if net["layers"][o]["act"] == "leaky" else LINEAR_SCALE
 
-    return build_manifest(net, IN_SCALE, scale_of, lambda i: SHIFT)
+    # ABFT fields (T25.2) with a fictitious checksum bias of 0.
+    return build_manifest(net, IN_SCALE, scale_of, lambda i: SHIFT, cs_b_of=lambda i: 0)
 
 
 def dumps(manifest):

@@ -76,6 +76,9 @@ struct ConvParams {
   int qmax = 127;        // saturation de la sortie (T9.3)
   bool leaky = true;
   int pool_k = 0, pool_s = 0;  // maxpool fusionné ; 0 : aucun
+  // ABFT (T25.2): checksum filter Σ_f w_f (cin, k, k) and Σ_f b_f; nullptr: no check.
+  const int32_t* cs_w = nullptr;
+  int32_t cs_b = 0;
 
   int out_h() const { return h + 2 * pad - k + 1; }  // stride 1
   int out_w() const { return w + 2 * pad - k + 1; }
@@ -92,6 +95,9 @@ struct AccessStats {
   uint64_t act_rd = 0;    // activations lues
   uint64_t act_wr = 0;    // activations écrites
   uint64_t param_rd = 0;  // poids, biais, M0
+  // ABFT (T25.2): output pixels checked and pixels whose checksum failed.
+  uint64_t abft_checks = 0;
+  uint64_t abft_errors = 0;
 };
 
 // Contrat arithmétique (conventions.md « Arithmétique entière », int_layers.py).
@@ -136,6 +142,10 @@ struct Tiles {
     int8_t in_buf[TN][IR][IC];
     int8_t w_buf[TM][TN][K_MAX][K_MAX];
     int32_t out_buf[TM][TR][TC];
+    // ABFT (T25.2): checksum lane conv(x, Σ_f w_f) and Σ_f (acc_f + b_f) per pixel of the
+    // spatial tile, modulo 2³² (unsigned: wrap without undefined behaviour).
+    uint32_t cs_buf[TR][TC];
+    uint32_t sum_buf[TR][TC];
   };
   static_assert(sizeof(Buffers::in_buf) == buf_in_size(TN, TR, TC, K_MAX, S_CONV), "B_in");
   static_assert(sizeof(Buffers::w_buf) == buf_w_size(TM, TN, K_MAX), "B_w");
@@ -173,6 +183,12 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
       const int col = pcol0 * ps;
       const int tc_n = imin((Pc - 1) * ps + pk, C - col);
       const int np_c = imin(Pc, Cp - pcol0);
+      // ABFT (T25.2): Σ over every channel tile `to` of the int32 accumulators + bias,
+      // against the checksum lane computed once (to == 0) from the same in_buf.
+      const bool abft = p.cs_w != nullptr;
+      if (abft)
+        for (int trr = 0; trr < tr_n; ++trr)
+          for (int tcc = 0; tcc < tc_n; ++tcc) b.cs_buf[trr][tcc] = b.sum_buf[trr][tcc] = 0;
       for (int to = 0; to < p.cout; to += T::Tm) {
         const int tm_n = imin(T::Tm, p.cout - to);
         for (int ti = 0; ti < p.cin; ti += T::Tn) {
@@ -218,6 +234,18 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
                     for (int tcc = 0; tcc < tc_n; ++tcc) o[tcc] += wv * x[S * tcc];
                   }
                 }
+          // Checksum lane (one more output lane in the hardware, T25.3).
+          if (abft && to == 0)
+            for (int tii = 0; tii < T::Tn && ti + tii < p.cin; ++tii)
+              for (int i = 0; i < K; ++i)
+                for (int j = 0; j < K; ++j) {
+                  const uint32_t wv = uint32_t(p.cs_w[((ti + tii) * K + i) * K + j]);
+                  for (int trr = 0; trr < tr_n; ++trr) {
+                    const int8_t* x = &b.in_buf[tii][S * trr + i][j];
+                    for (int tcc = 0; tcc < tc_n; ++tcc)
+                      b.cs_buf[trr][tcc] += wv * uint32_t(int32_t(x[S * tcc]));
+                  }
+                }
         }
         // store(out_buf) : biais + requantification + leaky + saturation (§9.3).
         st.param_rd += 8 * uint64_t(tm_n);
@@ -225,6 +253,7 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
           const int o = to + too;
           for (int trr = 0; trr < tr_n; ++trr)
             for (int tcc = 0; tcc < tc_n; ++tcc) {
+              if (abft) b.sum_buf[trr][tcc] += uint32_t(b.out_buf[too][trr][tcc]) + uint32_t(bias[o]);
               int32_t y = requantize(b.out_buf[too][trr][tcc] + bias[o], m0[o], p.shift);
               if (p.leaky) y = leaky_int(y);
               b.out_buf[too][trr][tcc] = clip_q(y, p.qmax);
@@ -258,12 +287,20 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
             }
         }
       }
+      if (abft) {
+        for (int trr = 0; trr < tr_n; ++trr)
+          for (int tcc = 0; tcc < tc_n; ++tcc)
+            st.abft_errors += b.cs_buf[trr][tcc] + uint32_t(p.cs_b) != b.sum_buf[trr][tcc];
+        st.abft_checks += uint64_t(tr_n) * tc_n;
+      }
     }
   }
   if (stats) {
     stats->act_rd += st.act_rd;
     stats->act_wr += st.act_wr;
     stats->param_rd += st.param_rd;
+    stats->abft_checks += st.abft_checks;
+    stats->abft_errors += st.abft_errors;
   }
 }
 
