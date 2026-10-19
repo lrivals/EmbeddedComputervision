@@ -25,6 +25,11 @@ Winograd F(2,3) is the other way to cut multiplications. It conflicts with packi
 for Vitis and the board, like M6. Results: [dsp_packing.md](../../results/dsp_packing.md),
 [winograd.md](../../results/winograd.md).
 
+**Figures** (M13, section H): `dsp_packing` (bit layout and accumulation depth, T13.54),
+`pack_options` (time per image of each option, per network, T13.55), `winograd` (T13.56); the
+packed PE also shows in `etat_art`, `ressources` and `roofline_couches`
+([results/figures.md](../../results/figures.md)).
+
 ### [x] T23.0 — Packing arithmetic
 - **Spec**: §9.3, §10.2 · **Depends on**: — · **Size**: M
 - **Deliverables**: `python/yolo/quant/pack.py` (`pack2`, `unpack2`) + tests;

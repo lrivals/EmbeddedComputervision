@@ -48,7 +48,7 @@ def plot_profile(profiles, out_dir, name="profil_couches"):
         color = st.NET_COLORS[net]
         for ax, (col, _, div) in zip(axes, specs):
             ax.bar(x, [r[col] / div for r in rows], w * 0.92, color=color,
-                   hatch=("", "//")[k], edgecolor="white", linewidth=0.4,
+                   hatch=st.NET_HATCH[net], edgecolor="white", linewidth=0.4,
                    label=f"{st.NET_LABELS[net]} : total {sum(r[col] for r in rows) / div:.3f}")
         macs = np.cumsum([r[2] for r in rows]) / sum(r[2] for r in rows) * 100
         prm = np.cumsum([r[3] for r in rows]) / max(1, sum(r[3] for r in rows)) * 100
@@ -112,6 +112,8 @@ def graph_dot(net):
         ks = f" {layer['k']}×{layer['k']}/{layer['s']}" if "k" in layer else ""
         if t == "upsample":
             ks = f" ×{layer['s']}"
+        if layer.get("groups", 1) > 1:  # route CSP : un groupe de canaux de la source
+            ks = f" {layer['group_id'] + 1}/{layer['groups']}"
         extra = f"\\n{costs[i] / 1e6:.0f} MMAC" if costs[i] else ""
         act = f" {layer['act']}" if t == "conv" else ""
         pen = 1 + 5 * costs[i] / top
@@ -369,7 +371,8 @@ def ancres_k(out_dir):
 # --- T13.5 : sortie YOLO expliquée ---------------------------------------------------------
 
 WEIGHTS = {"tiny-yolov2-voc": "weights/yolov2-tiny-voc.weights",
-           "tiny-yolov3-coco": "weights/yolov3-tiny.weights"}
+           "tiny-yolov3-coco": "weights/yolov3-tiny.weights",
+           "tiny-yolov4-coco": "weights/yolov4-tiny.weights"}
 DEMO_IMAGE = "000009"  # chevaux et personnes : plusieurs classes et recouvrements
 
 

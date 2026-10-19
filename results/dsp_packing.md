@@ -14,6 +14,10 @@ Code: `python/yolo/quant/pack.py` (reference, budget), `golden::pack2 / mac2 / u
 
 ## Scheme (T23.0)
 
+![Bit layout and accumulation depth](figures/materiel/dsp_packing.png)
+
+Figure: `python -m tools.figures dsp_packing` (T13.54).
+
 The PE multiplies one activation `x` by the Tm weights of the output channels. The weights
 of filters `too` and `too + 1` are packed into the A port (27 bits), and `x` goes to B
 (18 bits):
@@ -80,6 +84,10 @@ The depth N is tight: N + 1 extreme products overflow.
   changes the DSP count, not the schedule.
 
 ## Projected gain (T23.3)
+
+![Packed PE options per network](figures/resultats/pack_options.png)
+
+Figure: `python -m tools.figures pack_options` (T13.55).
 
 `python tools/perf_model.py` (exact cycle model, == C-sim), 200 MHz, accelerator only.
 PE DSP = ⌈Tm/2⌉·Tn when packed; +32 for requantization ×8. All rows are **projections**.

@@ -456,3 +456,89 @@ def chaine_verif(out_dir):
     from tools.figures.projet import load_tracking
 
     return plot_chain(chain_states(load_tracking()), chain_facts(), out_dir)
+
+
+# --- T13.54 : two int8 MACs per DSP (M23) ------------------------------------------------
+
+SHIFTS = range(10, 27)
+
+
+def load_packing():
+    """Bit budget of the packed PE (yolo.quant.pack): kernel shift and depth, depth N(s) for
+    any int8 and under the contract, largest shift that fits A (DSP48E2 and DSP48E1), and the
+    budget table of results/dsp_packing.md."""
+    from yolo.quant import pack
+
+    require_names(KERNEL, ["mac2", "unpack2"])
+    q = pack.QMAX
+    ranges = {"any int8": pack.product_range(-128, 127, -128, 127),
+              "contract ±127": pack.product_range(-q, q, -q, q)}
+    curves = {k: [(s, pack.depth(s, *r)) for s in SHIFTS] for k, r in ranges.items()}
+    limits = {"DSP48E2 (A 27 bits), any int8": pack.max_shift(2, -128, 127, pack.A_BITS),
+              "DSP48E2, contract ±127": pack.max_shift(2, -q, q, pack.A_BITS),
+              "DSP48E1 (A 25 bits), contract ±127": pack.max_shift(2, -q, q, 25)}
+    kernel = pack.lanes(2, -q, q, -q, q, pack.S)
+    return {"s": pack.S, "n": kernel["n"], "groups": pack.groups(24, kernel["n"]),
+            "bits": (pack.A_BITS, pack.B_BITS, pack.P_BITS), "curves": curves,
+            "limits": limits, "table": pack.table()}
+
+
+def plot_packing(d, out_dir, name="dsp_packing"):
+    plt = st.plt()
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(st.FULL, 4.2),
+                                  gridspec_kw={"width_ratios": [1.45, 1]})
+    a_bits, b_bits, p_bits = d["bits"]
+    s = d["s"]
+    u = 11.0 / p_bits  # one bit, in schema units
+    st.schema_axes(ax, (-0.6, 12.0), (0.4, 5.6))
+
+    def word(y, parts, label):
+        """`parts` from the MSB: (bits, text, colour, hatch)."""
+        x = 11.0 - sum(b for b, *_ in parts) * u
+        ax.text(x - 0.12, y + 0.3, label, ha="right", va="center", fontsize=7.5, color=st.INK2)
+        for bits, text, c, hatch in parts:
+            st.block(ax, x, y, bits * u, 0.6, text, c, hatch=hatch, fontsize=6.8)
+            x += bits * u
+
+    word(4.4, [(a_bits - s, f"w_a\n{a_bits - s} b", st.PALETTE[0], ""),
+               (s, f"w_b (sign-extended, {s} b)", st.PALETTE[1], "")], f"A ({a_bits} b)")
+    word(3.3, [(b_bits, f"x ({b_bits} b)", st.PALETTE[2], "")], f"B ({b_bits} b)")
+    word(1.7, [(p_bits - s, f"high lane Σ w_a·x  (P >> {s}) + (lo < 0)", st.PALETTE[0], "//"),
+               (s, f"low lane Σ w_b·x\nsign_extend(P[{s - 1}:0])", st.PALETTE[1], "//")],
+         f"P ({p_bits} b)")
+    ax.text(11.0, 5.3, f"A·x = (w_a·x)·2^{s} + w_b·x  (exact)", ha="right", fontsize=8,
+            color=st.INK)
+    ax.text(11.0, 1.2, f"exact for N ≤ {d['n']} products: Tn = 24 → {len(d['groups'])} groups "
+            f"of {d['groups'][0]}, each unpacked before the int32 sum", ha="right", fontsize=7,
+            color=st.INK2)
+    ax.text(11.0, 0.7, "a negative low lane borrows 1 from the high lane; + (lo < 0) gives it "
+            "back", ha="right", fontsize=7, color=st.MUTED)
+    ax.set_title("Two int8 products in one DSP48E2 (27 × 18 → 48 bits)", fontsize=9)
+
+    for k, (lab, pts) in enumerate(d["curves"].items()):
+        ss, nn = zip(*pts)
+        ax2.step(ss, nn, where="mid", color=st.PALETTE[k + 3], label=f"depth N, {lab}")
+    top = max(n for pts in d["curves"].values() for _, n in pts)
+    for k, (lab, smax) in enumerate(d["limits"].items()):
+        ax2.axvline(smax, color=st.PALETTE[k], lw=1.0, ls=("-", "--", ":")[k])
+        ax2.text(smax - 0.15, top / 2 ** (1.6 * k + 1.2), f"A port limit\n{lab}: s ≤ {smax}",
+                 ha="right", va="center", fontsize=6.3, color=st.PALETTE[k])
+    ax2.plot(s, d["n"], "*", ms=13, color=st.INK, zorder=5)
+    ax2.annotate(f"kernel: s = {s}, N = {d['n']}", (s, d["n"]), textcoords="offset points",
+                 xytext=(-8, 10), ha="right", fontsize=7.5)
+    ax2.set_yscale("log", base=2)
+    ax2.set_ylim(1, top * 1.5)
+    ax2.set_xlabel("shift s of w_a (low-lane width)")
+    ax2.set_ylabel("products summed exactly (N)")
+    ax2.set_title("Accumulation depth against the shift", fontsize=9)
+    ax2.legend(loc="lower right", fontsize=6.5)
+    fig.tight_layout()
+    return st.save(fig, out_dir, name)
+
+
+@figure("dsp_packing", "materiel", "T13.54",
+        "Two int8 MACs per DSP (M23): bit layout of the A port and of the product, and "
+        "accumulation depth N against the shift s with the port limits.",
+        "yolo.quant.pack (depth, max_shift, lanes, groups), hls/kernels/conv_pe.cpp (mac2)")
+def dsp_packing(out_dir):
+    return plot_packing(load_packing(), out_dir)

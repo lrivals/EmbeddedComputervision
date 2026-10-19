@@ -17,6 +17,10 @@ integer stage, `HW = True` for export, golden and C-sim; `SUBSET = 0` for the fu
 
 ## Float
 
+![COCO AP and YOLOv4-tiny stages](figures/resultats/map_coco.png)
+
+Figure: `python -m tools.figures map_coco` (T13.57), read from the tables below.
+
 | Network | Preprocessing | AP | AP50 | AP75 | APs | APm | APl | AR100 |
 |---|---|---|---|---|---|---|---|---|
 | **YOLOv4-tiny** (`tiny-yolov4-coco`) | **stretch** | **21.7** | **41.4** | 20.5 | 9.9 | 26.0 | 30.7 | 35.6 |

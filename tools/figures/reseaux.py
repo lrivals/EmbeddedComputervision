@@ -75,7 +75,9 @@ def layer_table(desc):
             "in_hw": f"{ins[1]}×{ins[2]}", "out_hw": f"{outs[1]}×{outs[2]}",
             "params": int(params), "macs": int(macs), "rf": int(r), "stride": j,
             "act": layer.get("act", ""), "bn": layer.get("bn", ""),
-            "from": " ".join(map(str, layer.get("from", []))),
+            "from": " ".join(map(str, layer.get("from", [])))
+            + (f" [{layer['group_id'] + 1}/{layer['groups']}]" if layer.get("groups", 1) > 1
+               else ""),
         })
     return rows
 
@@ -189,7 +191,8 @@ def plot_receptive(nets, out_dir, name="champ_receptif"):
     ax2.set_xlim(0, 416)
     ax2.set_ylim(416, 0)
     geoms = [(net, g) for net in nets for g in head_geometry(net)]
-    centers = [(208 - 16, 208 - 16), (208 + 8, 208 + 8), (208 + 56, 208 + 72)]
+    centers = [(208 - 16, 208 - 16), (208 + 8, 208 + 8), (208 + 56, 208 + 72),
+               (208 - 120, 208 + 88), (208 + 104, 208 - 112)]
     for k, ((net, (hid, S, j, r, anchors)), (cx, cy)) in enumerate(zip(geoms, centers)):
         c = st.PALETTE[k]
         cell = 416 / S
@@ -201,7 +204,7 @@ def plot_receptive(nets, out_dir, name="champ_receptif"):
         for w_, h_ in anchors:
             ax2.add_patch(Rectangle((x0 + cell / 2 - w_ / 2, y0 + cell / 2 - h_ / 2), w_, h_,
                                     fill=False, ec=c, lw=0.7, alpha=0.8))
-        ax2.plot([], [], color=c, label=f"{'v2' if 'v2' in net else 'v3'} L{hid} : {S}×{S}, "
+        ax2.plot([], [], color=c, label=f"{st.NET_SHORT[net]} L{hid} : {S}×{S}, "
                  f"pas {j:g} px, r = {r:g} px")
     st.image_axes(ax2, "cellule, champ réceptif (tirets) et ancres")
     ax2.legend(loc="lower center", fontsize=6.5, bbox_to_anchor=(0.5, -0.2), frameon=False)
@@ -219,9 +222,11 @@ def champ_receptif(out_dir):
 
 # --- T13.50 : flux des tenseurs -------------------------------------------------------------
 
-def tensor_layout(desc):
+def tensor_layout(desc, wrap=None):
     """[(id, x, rangée, largeur, hauteur, forme, sources)] ; largeur ∝ log2 C, hauteur ∝
-    log2 H ; une route qui ne suit pas sa source ouvre une nouvelle rangée."""
+    log2 H ; une route qui ne lit pas la couche précédente ouvre une nouvelle rangée (une
+    concaténation CSP qui la lit reste sur la rangée) ; avec `wrap`, une rangée plus large
+    passe à la ligne (jamais avant une tête)."""
     from yolo.models.specs import infer_shapes
 
     shapes = infer_shapes(desc)
@@ -230,10 +235,14 @@ def tensor_layout(desc):
     for i, (layer, (_, o)) in enumerate(zip(desc["layers"], shapes)):
         t = layer["type"]
         srcs = layer.get("from", [i - 1]) if t == "route" else [i - 1]
-        if t == "route" and srcs[0] != i - 1:
+        srcs = [s if s >= 0 else i + s for s in srcs]
+        if t == "route" and i - 1 not in srcs:
             row += 1
             px, _, pw = pos[srcs[0]]
             x = px + pw + 0.6
+        elif wrap and x > wrap and t not in ("yolo", "region"):
+            row += 1
+            x = 0.0
         w = 0.25 + 0.12 * math.log2(o[0])
         h = 0.4 + 0.32 * math.log2(o[1])
         out.append((i, x, row, w, h, o, srcs, t))
@@ -242,11 +251,16 @@ def tensor_layout(desc):
     return out
 
 
+FLOW_WIDTH, FLOW_WRAP = 34.0, 26.0  # largeur max d'une rangée (v3 : 33.4), point de retour
+
+
 def plot_flow(net, desc, out_dir, name):
     from matplotlib.patches import Polygon
 
     plt = st.plt()
     lay = tensor_layout(desc)
+    if max(x + w for _, x, _, w, *_ in lay) > FLOW_WIDTH:  # YOLOv4-tiny : CSP sur une rangée
+        lay = tensor_layout(desc, wrap=FLOW_WRAP)
     rows = max(r for _, _, r, *_ in lay) + 1
     xmax = max(x + w for _, x, _, w, *_ in lay)
     fig, ax = plt.subplots(figsize=(st.FULL, 2.6 + 2.8 * rows))
@@ -272,6 +286,10 @@ def plot_flow(net, desc, out_dir, name):
             sx0, sx1, sy = centers[s]
             if s == i - 1 and sy == yc:
                 st.arrow(ax, (sx1 + 0.18, yc), (x, yc), lw=0.8)
+            elif sy == yc:  # raccourci sur la rangée (CSP) : arc au-dessus des blocs
+                ax.annotate("", (x + w / 2, yc + h / 2 + 0.3), ((sx0 + sx1) / 2, sy + h / 2 + 0.3),
+                            arrowprops=dict(arrowstyle="->", color=st.PALETTE[3], lw=1.2,
+                                            connectionstyle="arc3,rad=-0.35"))
             else:
                 ax.annotate("", (x + w / 2, yc + h / 2 + 0.2), ((sx0 + sx1) / 2, sy - 3.4),
                             arrowprops=dict(arrowstyle="->", color=st.PALETTE[3], lw=1.2,

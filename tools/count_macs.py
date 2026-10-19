@@ -19,7 +19,8 @@ def net_from_manifest(path):
     m = json.loads(Path(path).read_text())
     layers = []
     for entry in m["layers"]:
-        layer = {k: v for k, v in entry.items() if k in ("type", "k", "s", "cout", "act", "from")}
+        layer = {k: v for k, v in entry.items() if k in ("type", "k", "s", "cout", "act", "from",
+                                                         "groups", "group_id")}
         if entry["type"] == "conv":
             layer["bn"] = entry["act"] != "linear"
         layers.append(layer)

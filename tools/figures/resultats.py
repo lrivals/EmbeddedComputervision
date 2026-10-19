@@ -7,6 +7,7 @@ source) et le tracé (`plot_*`). Les valeurs ne sont jamais recopiées à la mai
 import csv
 import json
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -736,6 +737,11 @@ def plot_roofline_layers(board, pts, net, out_dir, name):
             f"DDR {board['bw_bytes'] / 1e9:.1f} Go/s", fontsize=7.5, color=st.INK2, rotation=28)
     ax.text(x[-1], peak * 1.08, f"calcul Tm·Tn = {tm}×{tn} : {peak:.0f} GOPS", ha="right",
             fontsize=7.5, color=st.INK2)
+    # PE paquetée à Tm 64 (M23, T23.3) : 2 MAC par DSP, même nombre de DSP, toit doublé.
+    ax.plot(x, np.minimum(board["bw_bytes"] * x / 1e9, 2 * peak), color=st.INK2, lw=1.0,
+            ls=st.PROJECTED["linestyle"], zorder=0)
+    ax.text(x[-1], 2 * peak * 1.08, f"2 MAC/DSP, Tm {2 * tm} : {2 * peak:.0f} GOPS (projeté)",
+            ha="right", fontsize=7.5, color=st.MUTED)
     for layer, c, g0, g1 in pts:
         ax.annotate("", (c, g1), (c, g0), arrowprops=dict(arrowstyle="->", color=st.GREY,
                                                          lw=0.9))
@@ -774,38 +780,64 @@ def _num(v):
         return None
 
 
+PROJ_RE = re.compile(r"\s*\(projection C-sim(?:, ([^)]*))?\)")
+
+
+def bench_net(modele):
+    """Réseau de ce travail d'après la colonne `modele` (« YOLOv4-tiny COCO 416 »), ou None."""
+    return next((n for n, lab in st.NET_LABELS.items() if modele.startswith(lab)), None)
+
+
 def load_benchmarks(path):
-    """Lignes de benchmarks.csv : valeurs numériques ou None, plus `projection` (bool)."""
+    """Lignes de benchmarks.csv : valeurs numériques ou None, plus `projection` (bool),
+    `base` (travail sans la mention de projection, commun à toutes les variantes de ce
+    travail), `variant` (« 2 MAC/DSP, Tm 64 », vide pour le noyau M10) et `net`."""
     rows = []
     for r in csv.DictReader(Path(path).open()):
         d = {k: _num(r[k]) for k in ("fps", "latence_ms", "gops", "puissance_w", "dsp",
                                      "map_voc")}
+        m = PROJ_RE.search(r["travail"])
         d.update(travail=r["travail"], modele=r["modele"], fpga=r["fpga"],
-                 projection="projection" in r["travail"])
+                 projection="projection" in r["travail"],
+                 base=PROJ_RE.sub("", r["travail"]), variant=(m.group(1) or "") if m else "",
+                 net=bench_net(r["modele"]) if m else None)
         if d["fps"] is None and d["latence_ms"]:
             d["fps"] = 1e3 / d["latence_ms"]
         rows.append(d)
     return rows
 
 
+def _bench_tag(r):
+    """Étiquette courte d'une ligne : « 2024-zhang » ou « ce travail* v4 · 2 MAC/DSP, Tm 64 »."""
+    if not r["projection"]:
+        return r["base"]
+    tag = f"{r['base']}* {st.NET_SHORT.get(r['net'], '')}"
+    return f"{tag} · {r['variant']}" if r["variant"] else tag
+
+
 def plot_benchmarks(rows, out_dir, name="etat_art"):
     plt = st.plt()
-    fig, axes = plt.subplots(1, 3, figsize=(st.FULL * 1.3, 4.8),
-                             gridspec_kw={"width_ratios": [1.2, 1, 1.2]})
+    fig, axes = plt.subplots(2, 2, figsize=(st.FULL * 1.3, 9.0))
+    axes = axes.ravel()
     labels = {}
     for r in rows:
-        labels.setdefault(r["travail"].replace(" (projection C-sim)", ""), len(labels))
+        labels.setdefault(r["base"], len(labels))
+
+    def color(r):
+        if r["projection"] and r["net"] in st.NET_COLORS:
+            return st.NET_COLORS[r["net"]]
+        return st.PALETTE[labels[r["base"]] % 8]
 
     seen = {}
 
     def mark(ax, r, x, y):
-        k = labels[r["travail"].replace(" (projection C-sim)", "")]
-        ax.plot(x, y, "o^sDvP*X"[k % 8], ms=8, color=st.PALETTE[k % 8],
-                mfc="white" if r["projection"] else st.PALETTE[k % 8], mew=1.6)
+        k = labels[r["base"]]
+        c = color(r)
+        ax.plot(x, y, "o^sDvP*X"[k % 8], ms=8, color=c, mfc="white" if r["projection"] else c,
+                mew=1.6)
         n = seen[(id(ax), k)] = seen.get((id(ax), k), -1) + 1  # même travail : décalé
-        ax.annotate(r["travail"].replace(" (projection C-sim)", "*"), (x, y),
-                    textcoords="offset points", xytext=(5, 3 - 10 * n), fontsize=6.5,
-                    color=st.INK2)
+        ax.annotate(_bench_tag(r), (x, y), textcoords="offset points", xytext=(5, 3 - 10 * n),
+                    fontsize=6.5, color=st.INK2)
 
     panels = [
         (axes[0], "gops", "puissance_w", "puissance (W)", "GOPS", "GOPS face à la puissance"),
@@ -815,7 +847,7 @@ def plot_benchmarks(rows, out_dir, name="etat_art"):
     for ax, ky, kx, xl, yl, title in panels:
         for r in rows:
             if r[kx] is None or r[ky] is None:
-                missing.setdefault(title, []).append(r["travail"])
+                missing.setdefault(title, []).append(r["base"])
                 continue
             mark(ax, r, r[kx], r[ky])
         ax.set_xlabel(xl)
@@ -833,32 +865,40 @@ def plot_benchmarks(rows, out_dir, name="etat_art"):
     axes[1].set_yscale("log")
     axes[1].set_xlim(40, 70)
 
-    ax = axes[2]
-    r_ok = [r for r in rows if r["gops"] and r["dsp"]]
-    for r in rows:
-        if r not in r_ok:
-            missing.setdefault("GOPS par DSP", []).append(r["travail"])
-    y = np.arange(len(r_ok))[::-1]
-    for yi, r in zip(y, r_ok):
-        k = labels[r["travail"]]
-        ax.barh(yi, r["gops"] / r["dsp"], 0.6, color=st.PALETTE[k % 8])
-        ax.text(r["gops"] / r["dsp"] + 0.01, yi, f"{r['gops'] / r['dsp']:.2f}", va="center",
-                fontsize=7)
-    ax.set_yticks(y, [f"{r['travail']} · {r['modele'][:26]}" for r in r_ok], fontsize=6.5)
-    ax.set_xlabel("GOPS / DSP")
-    ax.set_title("Efficacité par DSP")
-    ax.grid(axis="y", visible=False)
-    foot = ["Marque creuse : projection (ce travail, C-sim, * dans les étiquettes). "
-            "Lignes sans valeur, omises du panneau :"]
+    def bars(ax, key, value, fmt, xlabel, title):
+        ok = [r for r in rows if value(r) is not None]
+        for r in rows:
+            if r not in ok:
+                missing.setdefault(title, []).append(r["base"])
+        y = np.arange(len(ok))[::-1]
+        for yi, r in zip(y, ok):
+            v, c = value(r), color(r)
+            ax.barh(yi, v, 0.6, color="white" if r["projection"] else c, edgecolor=c,
+                    hatch="///" if r["projection"] else "", linewidth=1.2)
+            ax.text(v * 1.02, yi, fmt.format(v), va="center", fontsize=7)
+        ax.set_yticks(y, [f"{r['base']}{'*' if r['projection'] else ''}"
+                          f"{' · ' + r['variant'] if r['variant'] else ''} · {r['modele'][:26]}"
+                          for r in ok], fontsize=6.5)
+        ax.set_xlabel(xlabel)
+        ax.set_title(title)
+        ax.grid(axis="y", visible=False)
+        ax.set_xlim(0, max([value(r) for r in ok], default=1) * 1.18)
+
+    bars(axes[2], "dsp", lambda r: r["gops"] / r["dsp"] if r["gops"] and r["dsp"] else None,
+         "{:.2f}", "GOPS / DSP", "Efficacité par DSP")
+    bars(axes[3], "fps", lambda r: r["fps"], "{:.1f}", "img/s (accélérateur seul pour ce travail)",
+         "Débit")
+    foot = ["Marque creuse, barre hachurée : projection (ce travail, C-sim, * dans les "
+            "étiquettes ; couleur = réseau v2 / v3 / v4). Lignes sans valeur, omises du panneau :"]
     foot += [f"  {k} : {', '.join(sorted(set(v)))}" for k, v in missing.items()]
-    fig.tight_layout(rect=(0, 0.032 * len(foot), 1, 1))
-    fig.text(0.01, 0.01, "\n".join(foot), fontsize=6.5, color=st.MUTED, va="bottom")
+    fig.tight_layout(rect=(0, 0.018 * len(foot), 1, 1))
+    fig.text(0.01, 0.005, "\n".join(foot), fontsize=6.5, color=st.MUTED, va="bottom")
     return st.save(fig, out_dir, name)
 
 
 @figure("etat_art", "resultats", "T13.23",
-        "Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP "
-        "(marque creuse : projection de ce travail).",
+        "Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP, "
+        "débit (marque creuse : projection de ce travail, par réseau et variante M23).",
         "results/benchmarks.csv")
 def etat_art(out_dir):
     return plot_benchmarks(load_benchmarks(need(ROOT / "results" / "benchmarks.csv")), out_dir)
@@ -872,7 +912,7 @@ EST, MES = "estimation", "synthèse"
 # Rapports csynth de chaque variante (make hls-synth, hls-synth-pow2, hls-synth-stream). Le
 # 4 bits n'a pas de noyau HLS propre : il reste une estimation (2 MAC par DSP).
 SYNTH_DIRS = {"moteur unique INT8": "synth", "moteur unique pow2": "synth_pow2",
-              "streaming W8A8": "synth_stream"}
+              "moteur unique 2 MAC/DSP": "synth_pack", "streaming W8A8": "synth_stream"}
 
 
 def load_synth(board_file, step):
@@ -909,6 +949,14 @@ def load_resources(board="kv260"):
         {"name": "moteur unique 4 bits", "dsp": (rl.dsp(t["tm"], t["tn"], 2), EST),
          "mem": (mem, EST), "lut": None},
     ]
+    # PE paquetée (M23, T23.2-T23.3) : mêmes tuiles (make hls-synth-pack), puis les deux façons
+    # de prendre le gain de perf_model.PACK_OPTIONS.
+    for label, tm, tn in (("", t["tm"], t["tn"]), (", Tm 64", 2 * t["tm"], t["tn"]),
+                          (", Tn 32", t["tm"], 32)):
+        rows.append({"name": f"moteur unique 2 MAC/DSP{label}",
+                     "dsp": (pm.kernel_dsp(tm, tn, pack=2), EST),
+                     "mem": (rl.bram18(tm, tn, t["tr"], t["tc"]) * BRAM18_BYTES, EST),
+                     "lut": None})
     budget_mem = None
     for wb in (8, 4):
         p = ROOT / "build" / "m9" / f"stream_plan_w{wb}.json"
@@ -962,15 +1010,17 @@ def plot_resources(board, rows, budget, out_dir, name="ressources"):
     axes[0][0].set_yticks(y, [r["name"] for r in rows], fontsize=8)
     fig.tight_layout(rect=(0, 0.06, 1, 1))
     fig.text(0.01, 0.01, "Hachuré : estimation (modèles roofline, streaming, LUT par MAC de "
-             "req_yolo.md) ; plein : rapport csynth (make hls-synth, hls-synth-pow2, "
-             "hls-synth-stream). « à mesurer » : aucune estimation.", fontsize=6.5,
+             "req_yolo.md, perf_model.kernel_dsp pour la PE paquetée) ; plein : rapport csynth "
+             "(make hls-synth, hls-synth-pow2, hls-synth-pack, hls-synth-stream). « à mesurer » : "
+             "aucune estimation.", fontsize=6.5,
              color=st.MUTED)
     return st.save(fig, out_dir, name)
 
 
 @figure("ressources", "resultats", "T13.24",
-        "DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2 et 4 bits, "
-        "streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse.",
+        "DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2, 4 bits et "
+        "2 MAC/DSP, streaming) face au budget de la KV260 ; hachuré : estimation, plein : "
+        "synthèse.",
         "hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json, "
         "hls/proj_kv260_synth*/sol/syn/report/csynth.xml")
 def ressources(out_dir):
@@ -1484,3 +1534,248 @@ def balayage(out_dir):
     data = load_balayages(ROOT / BALAYAGES_MD)
     return (plot_balayage_map(data, out_dir) + plot_balayage_perte(data, out_dir)
             + plot_balayage_modeles(data, out_dir))
+
+
+# --- T13.55 : two MACs per DSP, the options of T23.3 ---------------------------------------
+
+def _present_nets():
+    nets = [n for n in st.NETS if (ROOT / "model" / n / "manifest.json").exists()]
+    if not nets:
+        raise MissingSource("no model/<net>/manifest.json (make export)")
+    return nets
+
+
+def load_pack_options(nets=None, board="kv260"):
+    """({net: rows of perf_model.pack_table}, w_buf flip-flops per option, board budget)."""
+    pm, rl = _tools("perf_model"), _tools("roofline")
+    nets = nets or _present_nets()
+    try:
+        b = rl.load_board(need(ROOT / "hw" / "boards" / f"{board}.yaml"))
+    except ImportError as e:
+        raise MissingSource(f"pyyaml absent ({e})") from e
+    ff = [rl.wbuf_ff(o["tm"], o["tn"]) for _, o in pm.PACK_OPTIONS]
+    return {net: pm.pack_table(net) for net in nets}, ff, b
+
+
+def plot_pack_options(tables, ff, board, out_dir, name="pack_options"):
+    plt = st.plt()
+    nets = list(tables)
+    fig, axes = plt.subplots(1, len(nets), figsize=(st.FULL * 1.25, 3.6), sharey=True,
+                             squeeze=False)
+    axes = axes[0]
+    budget = {"dsp": rl_util(board["dsp"]), "ff": rl_util(board.get("ff"))}
+    for ax, net in zip(axes, nets):
+        rows = tables[net]
+        y = np.arange(len(rows))[::-1]
+        c = st.NET_COLORS[net]
+        xmax = max(r[6] for r in rows) * 1.75
+        for yi, (opt, tm, tn, dpe, dtot, cyc, ms, cb, gops, other), f in zip(y, rows, ff):
+            packed = yi != y[0]
+            ax.barh(yi, ms, 0.6, color="white" if packed else c, edgecolor=c,
+                    hatch="///" if packed else "", linewidth=1.2)
+            ax.plot([cb, cb], [yi - 0.36, yi + 0.36], color=st.INK, lw=1.6)
+            over = [k for k, v in (("DSP", dtot), ("FF", f)) if budget[k.lower()]
+                    and v > budget[k.lower()]]
+            txt = f"{ms:.1f} ms · {1e3 / ms:.1f} img/s\n{dtot} DSP · w_buf {f / 1e3:.0f} k FF"
+            ax.text(ms + xmax * 0.02, yi, txt + (f"  > 80 % {'+'.join(over)}" if over else ""),
+                    va="center", fontsize=6.5, color=st.PALETTE[7] if over else st.INK2)
+        ax.set_xlim(0, xmax)
+        ax.set_xlabel("accelerator time per image (ms, 200 MHz)")
+        ax.set_title(st.NET_LABELS[net], fontsize=9)
+        ax.grid(axis="y", visible=False)
+    axes[0].set_yticks(np.arange(len(rows))[::-1], [r[0] for r in rows], fontsize=7.5)
+    fig.suptitle("Two int8 MACs per DSP: same tiles (half the DSPs), Tm 64 (same DSPs) or Tn 32",
+                 fontsize=10, weight="bold")
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.text(0.01, 0.01, "Cycle model == C-sim (tools/perf_model.py:pack_table), projection, "
+             "not a board measurement. Black tick: compute bound. Hatched: packed PE "
+             f"(ACC_PACK=2). Budget: 80 % of the {board['name']} DSP and flip-flops "
+             "(w_buf in registers).", fontsize=6.5, color=st.MUTED)
+    return st.save(fig, out_dir, name)
+
+
+def rl_util(v):
+    return None if v is None else _tools("roofline").UTIL * v
+
+
+@figure("pack_options", "resultats", "T13.55",
+        "Time per image of each network with the packed PE (T23.3): M10 kernel, same tiles, "
+        "Tm 64 and Tn 32, with the compute bound, DSP and w_buf flip-flops.",
+        "tools/perf_model.py (PACK_OPTIONS, pack_table), tools/roofline.py (wbuf_ff), "
+        "hw/boards/kv260.yaml")
+def pack_options(out_dir):
+    return plot_pack_options(*load_pack_options(), out_dir)
+
+
+# --- T13.56 : Winograd F(2×2, 3×3) against packing ----------------------------------------
+
+def load_winograd(nets=None):
+    """[tools/winograd.py:net_study(net)] of the exported networks."""
+    w = _tools("winograd")
+    return [w.net_study(net) for net in (nets or _present_nets())]
+
+
+def plot_winograd(rows, out_dir, name="winograd"):
+    plt = st.plt()
+    fig, axes = plt.subplots(1, 3, figsize=(st.FULL * 1.25, 3.8),
+                             gridspec_kw={"width_ratios": [1, 1, 0.8]})
+    x = np.arange(len(rows))
+    panels = [
+        (axes[0], "Compute bound", [("direct", "direct_ms", "", 3),
+                                    ("Winograd", "wino_ms", "//", 4),
+                                    ("packing Tm 64", "pack_ms", "..", 5)]),
+        (axes[1], "With the loads (first order)",
+         [("Winograd, offline weights", "wino_off_ms", "//", 4),
+          ("Winograd, on the fly", "wino_fly_ms", "xx", 4),
+          ("packing Tm 64", "pack_t_ms", "..", 5)]),
+    ]
+    for ax, title, series in panels:
+        w = 0.8 / len(series)
+        for k, (lab, key, hatch, ci) in enumerate(series):
+            xs = x + (k - (len(series) - 1) / 2) * w
+            vals = [r[key] for r in rows]
+            ax.bar(xs, vals, w * 0.92, color="white", edgecolor=st.PALETTE[ci], hatch=hatch,
+                   linewidth=1.2, label=lab)
+            for xi, v in zip(xs, vals):
+                ax.text(xi, v + 0.6, f"{v:.1f}", ha="center", fontsize=6.3)
+        ax.set_xticks(x, [st.NET_SHORT.get(r["net"], r["net"]) for r in rows])
+        ax.set_ylabel("ms per image (200 MHz)")
+        ax.set_title(title, fontsize=9)
+        ax.legend(loc="upper left", fontsize=6.5)
+        ax.grid(axis="x", visible=False)
+        ax.set_ylim(0, max(r[key] for r in rows for _, key, *_ in series) * 1.3)
+    ax = axes[2]
+    w = 0.38
+    direct = [r["w_direct"] / 1e6 for r in rows]
+    wino = [r["w_wino"] * 12 / 8 / 1e6 for r in rows]  # 12-bit transformed weights
+    ax.bar(x - w / 2, direct, w * 0.92, color=st.PALETTE[3], label="direct (int8, 3×3)")
+    ax.bar(x + w / 2, wino, w * 0.92, color="white", edgecolor=st.PALETTE[4], hatch="//",
+           linewidth=1.2, label="Winograd (12 bits, 4×4)")
+    for xi, a, b in zip(x, direct, wino):
+        ax.text(xi + w / 2, b + 0.5, f"×{b / a:.2f}", ha="center", fontsize=6.5)
+    ax.set_xticks(x, [st.NET_SHORT.get(r["net"], r["net"]) for r in rows])
+    ax.set_ylabel("weight bytes of the 3×3 convs (MB)")
+    ax.set_title("Weight footprint", fontsize=9)
+    ax.legend(loc="upper right", fontsize=6.5)
+    ax.grid(axis="x", visible=False)
+    fig.suptitle("Winograd F(2×2, 3×3) against two MACs per DSP (T23.5)", fontsize=10,
+                 weight="bold")
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.text(0.01, 0.01, "Projection from the perf_model counters (tools/winograd.py), M10 tiles "
+             "Tm 32 × Tn 24; v2 Tiny-YOLOv2 VOC, v3 Tiny-YOLOv3 COCO, v4 YOLOv4-tiny COCO.",
+             fontsize=6.5, color=st.MUTED)
+    return st.save(fig, out_dir, name)
+
+
+@figure("winograd", "resultats", "T13.56",
+        "Winograd F(2×2, 3×3) against the packed PE: compute bound, time with the loads and "
+        "weight footprint of the 3×3 convs, per network.",
+        "tools/winograd.py (net_study), model/<net>/manifest.json and weights.bin")
+def winograd(out_dir):
+    return plot_winograd(load_winograd(), out_dir)
+
+
+# --- T13.57 : COCO val2017 AP (M24) --------------------------------------------------------
+
+COCO_METRICS = ("AP", "AP50", "AP75", "APs", "APm", "APl")
+COCO_NETS = {"YOLOv4-tiny": "tiny-yolov4-coco", "Tiny-YOLOv3": "tiny-yolov3-coco"}
+
+
+def _md_cells(line):
+    return [c.strip().strip("*").strip() for c in line.strip().strip("|").split("|")]
+
+
+def _md_num(v):
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
+def load_map_coco(path):
+    """results/map_coco.md: float AP rows [{net, prep, AP…}], published AP50 {net: value} and
+    the YOLOv4-tiny stages [{stage, AP…}] (None where still to run)."""
+    text = Path(path).read_text()
+    floats, stages, table, net = [], [], None, None
+    for line in text.splitlines():
+        if not line.startswith("|"):
+            table = None
+            continue
+        cells = _md_cells(line)
+        if cells[0] in ("Network", "Stage"):
+            table = cells
+            continue
+        if table is None or set(cells[0]) <= {"-"}:
+            continue
+        vals = {m: _md_num(cells[table.index(m)]) for m in COCO_METRICS if m in table}
+        if table[0] == "Network":
+            name = re.sub(r"\s*\(.*\)", "", cells[0]).strip("* ")
+            net = COCO_NETS.get(name, net)
+            floats.append({"net": net, "prep": cells[1], **vals})
+        else:
+            stages.append({"stage": re.sub(r"\s*\(.*\)", "", cells[0]), **vals})
+    published = {COCO_NETS[n]: float(v) for n, v in
+                 re.findall(r"\*\*(YOLOv4-tiny|Tiny-YOLOv3) ([\d.]+)\*\*", text)}
+    if not floats:
+        raise MissingSource(f"{path}: no AP table")
+    return floats, published, stages
+
+
+def plot_map_coco(floats, published, stages, out_dir, name="map_coco"):
+    plt = st.plt()
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(st.FULL * 1.15, 4.0),
+                                  gridspec_kw={"width_ratios": [2.2, 1]})
+    x = np.arange(len(COCO_METRICS))
+    w = 0.8 / len(floats)
+    for k, r in enumerate(floats):
+        xs = x + (k - (len(floats) - 1) / 2) * w
+        c = st.NET_COLORS.get(r["net"], st.MUTED)
+        stretch = r["prep"] == "stretch"
+        ax.bar(xs, [r[m] or 0 for m in COCO_METRICS], w * 0.92, color=c if stretch else "white",
+               edgecolor=c, hatch="" if stretch else "//", linewidth=1.1,
+               label=f"{st.NET_LABELS.get(r['net'], r['net'])}, {r['prep']}")
+        for xi, m in zip(xs, COCO_METRICS):
+            if r[m] is not None:
+                ax.text(xi, r[m] + 0.5, f"{r[m]:.1f}", ha="center", fontsize=5.8, rotation=90)
+    i50 = COCO_METRICS.index("AP50")
+    for net, v in published.items():
+        ax.plot([i50 - 0.45, i50 + 0.45], [v, v], color=st.NET_COLORS[net], ls="--", lw=1.3)
+        ax.text(i50 + 0.47, v, f"published {v:g}\n(test-dev)", fontsize=6, va="center",
+                color=st.NET_COLORS[net])
+    ax.set_xticks(x, COCO_METRICS)
+    ax.set_ylabel("COCO val2017 (%)")
+    ax.set_ylim(0, max(r["AP50"] or 0 for r in floats) * 1.25 + 4)
+    ax.set_title("Float, Darknet weights, 416", fontsize=9)
+    ax.legend(loc="upper right", fontsize=6.5)
+    ax.grid(axis="x", visible=False)
+    c = st.NET_COLORS["tiny-yolov4-coco"]
+    xs = np.arange(len(stages))
+    for xi, r in zip(xs, stages):
+        if r.get("AP") is None and r.get("AP50") is None:
+            ax2.text(xi, 2, "to run", ha="center", va="bottom", fontsize=7.5, color=st.MUTED,
+                     style="italic")
+            continue
+        for k, (m, off) in enumerate((("AP", -0.2), ("AP50", 0.2))):
+            v = r.get(m)
+            if v is None:
+                continue
+            ax2.bar(xi + off, v, 0.38, color=c if k else "white", edgecolor=c, linewidth=1.1)
+            ax2.text(xi + off, v + 0.5, f"{v:.1f}", ha="center", fontsize=6.5)
+    ax2.set_xticks(xs, [r["stage"].replace("FPGA, ", "") for r in stages], fontsize=7)
+    ax2.set_ylim(0, max([r.get("AP50") or 0 for r in stages] + [1]) * 1.2)
+    ax2.set_xlim(-0.6, len(stages) - 0.4)
+    ax2.set_title("YOLOv4-tiny stages: AP (hollow), AP50 (solid)", fontsize=9)
+    ax2.grid(axis="x", visible=False)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.text(0.01, 0.01, "Source: results/map_coco.md (python/yolo/infer/coco_eval.py, equal to "
+             "pycocotools to 1e-4). Solid: stretch resize, hatched: letterbox.", fontsize=6.5,
+             color=st.MUTED)
+    return st.save(fig, out_dir, name)
+
+
+@figure("map_coco", "resultats", "T13.57",
+        "COCO val2017 AP of YOLOv4-tiny and Tiny-YOLOv3 (stretch and letterbox) with the "
+        "published AP50, and the float / integer / C-sim stages of YOLOv4-tiny.",
+        "results/map_coco.md")
+def map_coco(out_dir):
+    return plot_map_coco(*load_map_coco(need(ROOT / "results" / "map_coco.md")), out_dir)

@@ -154,6 +154,10 @@ def report(rows):
         "Packing: [dsp_packing.md](dsp_packing.md). Base: 2023-zhai uses Winograd on FPGA "
         "[2023-zhai#004.0].",
         "",
+        "![Winograd against packing](figures/resultats/winograd.png)",
+        "",
+        "Figure: `python -m tools.figures winograd` (T13.56), which also covers YOLOv4-tiny.",
+        "",
         "## Integer-exact variant",
         "",
         "- G′ = 2G = [[2, 0, 0], [1, 1, 1], [1, −1, 1], [0, 0, 2]]: U = G′ g G′ᵀ = 4·G g Gᵀ "

@@ -493,7 +493,7 @@ def pool_upsample_route(out_dir):
 
 @figure("boites_decodage", "maths", "T13.37",
         "IoU de deux boîtes et IoU de forme des ancres, décodage du centre dans sa cellule, "
-        "taille selon t_w pour les 5 ancres de Tiny-YOLOv2.",
+        "taille selon t_w pour les 5 ancres de Tiny-YOLOv2, scale_x_y de YOLOv4-tiny.",
         "yolo.infer.boxes (iou, iou_wh, cxcywh_to_xyxy), yolo.infer.decode.decode_head")
 def boites_decodage(out_dir):
     from matplotlib.patches import Rectangle
@@ -504,7 +504,7 @@ def boites_decodage(out_dir):
     from yolo.data.targets import anchors_frac
 
     plt = st.plt()
-    fig, axes = plt.subplots(1, 3, figsize=(st.FULL, 3.8))
+    fig, axes = plt.subplots(1, 4, figsize=(st.FULL * 1.3, 3.8))
     ax = axes[0]
     A = np.array([[0.4, 0.45, 0.4, 0.5]])
     B = np.array([[0.58, 0.55, 0.4, 0.35]])
@@ -554,7 +554,30 @@ def boites_decodage(out_dir):
     ax.legend(loc="upper left", fontsize=6.5)
     eq(ax, r"$b_w=p_w\,e^{t_w}$", x=0.6, y=0.15)
     ax.set_title("taille de la boîte selon t_w", fontsize=8.5)
-    fiche(fig, "yolo.infer.boxes:iou, iou_wh, cxcywh_to_xyxy ; yolo.infer.decode:decode_head",
+    # scale_x_y (T24.2) : α des têtes de YOLOv4-tiny lu dans le .cfg ; 2.0 est celui de YOLOv4.
+    ax = axes[3]
+    v4 = sorted({layer.get("scale_x_y", 1.0) for layer in load_cfg("tiny-yolov4-coco")["layers"]
+                 if layer["type"] == "yolo"})
+    tx = np.linspace(-6, 6, 121)
+    for k, alpha in enumerate([1.0] + v4 + [2.0]):
+        out = np.zeros((1, 85, 1, 1))
+        res = []
+        for v in tx:
+            out[0, 0, 0, 0] = v
+            res.append(decode_head(out, [[0.1, 0.1]], 80, "v3", alpha=alpha)[0][0, 0, 0])
+        lab = ("α = 1 (v2, v3)" if alpha == 1 else f"α = {alpha:g} (YOLOv4-tiny)" if alpha in v4
+               else f"α = {alpha:g} (YOLOv4)")
+        ax.plot(tx, res, color=st.PALETTE[k], ls="-" if alpha in [1.0] + v4 else "--",
+                label=lab)
+    ax.axhspan(0, 1, color=st.GRID, alpha=0.6, lw=0)
+    ax.set_ylim(-0.6, 1.6)
+    ax.set_xlabel("t_x")
+    ax.set_ylabel("décalage dans la cellule (b_x·S − j)")
+    ax.legend(loc="upper left", fontsize=6.5)
+    eq(ax, r"$\alpha\,\sigma(t_x)-\frac{\alpha-1}{2}$", x=0.62, y=0.15)
+    ax.set_title("scale_x_y : le centre atteint les bords", fontsize=8.5)
+    fiche(fig, "yolo.infer.boxes:iou, iou_wh, cxcywh_to_xyxy ; yolo.infer.decode:decode_head "
+          "(alpha = scale_x_y)",
           "torchvision.ops.box_iou", "test_boxes.py, test_decode.py")
     return finish(fig, out_dir, "boites_decodage", "Boîtes, IoU et décodage (§5.2, §8.1)")
 

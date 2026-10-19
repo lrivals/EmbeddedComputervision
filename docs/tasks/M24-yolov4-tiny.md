@@ -32,6 +32,11 @@ and C-sim equal to the Python dumps to the byte, C-sim detections == integer on 
 smoke run; projection 51.8 ms, 19.3 img/s, 133.3 GOPS at 200 MHz
 ([map_coco.md](../../results/map_coco.md), [rapport.md](../../results/rapport.md)).
 
+**Figures** (M13, section H): YOLOv4-tiny is the third network of every per-network figure
+(profile, graph, memory, YOLO output, calibration, layer error, datasheet, receptive field,
+tensor flow); `map_coco` (T13.57) plots the COCO AP and the three stages; `boites_decodage`
+plots `scale_x_y` ([results/figures.md](../../results/figures.md)).
+
 **Notebooks**: [coco/tiny-yolov4-coco_infer](../../notebooks/coco/tiny-yolov4-coco_infer.ipynb)
 (float; `INT8 = True`: calibration and integer AP; `HW = True`: export, golden, C-sim and
 three-stage AP on `SUBSET` images), the same network out of domain on the other datasets,

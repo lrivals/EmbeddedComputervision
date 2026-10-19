@@ -258,6 +258,65 @@ def test_resources_synth_replaces_estimate(tmp_path, monkeypatch):
     assert resultats.load_synth("kv260", "synth") is None
 
 
+def test_resources_packed_rows():
+    """T23.3 : PE paquetée, mêmes tuiles (synthèse hls-synth-pack), Tm 64 et Tn 32."""
+    pytest.importorskip("yaml")
+    pm = resultats._tools("perf_model")
+    t = pm.TILES
+    by = {r["name"]: r for r in resultats.load_resources()[1]}
+    assert by["moteur unique 2 MAC/DSP"]["dsp"] == (pm.kernel_dsp(t["tm"], t["tn"], pack=2),
+                                                    resultats.EST)
+    assert by["moteur unique 2 MAC/DSP, Tm 64"]["dsp"][0] == 800  # benchmarks.csv, T23.3
+    assert resultats.SYNTH_DIRS["moteur unique 2 MAC/DSP"] == "synth_pack"
+
+
+def test_benchmarks_projection_rows_grouped():
+    src = ROOT / "results" / "benchmarks.csv"
+    if not src.exists():
+        pytest.skip("results/benchmarks.csv absent")
+    proj = [r for r in resultats.load_benchmarks(src) if r["projection"]]
+    assert proj and {r["base"] for r in proj} == {"ce travail"}
+    assert all(r["net"] in F.style.NETS for r in proj)
+    assert {r["variant"] for r in proj} >= {"", "2 MAC/DSP, Tm 64", "2 MAC/DSP, Tn 32"}
+
+
+def test_pack_options_equal_pack_table(tmp_path):
+    pytest.importorskip("yaml")
+    _manifest("tiny-yolov2-voc")
+    pm = resultats._tools("perf_model")
+    tables, ff, board = resultats.load_pack_options(["tiny-yolov2-voc"])
+    assert tables["tiny-yolov2-voc"] == pm.pack_table("tiny-yolov2-voc")
+    assert ff[2] == 221184  # w_buf de Tm 64 (results/winograd.md)
+    _pngs(resultats.plot_pack_options(tables, ff, board, tmp_path))
+
+
+def test_winograd_plot_and_source(tmp_path):
+    rows = [{"net": n, "direct_ms": 30.0, "wino_ms": 17.0, "pack_ms": 18.0, "wino_off_ms": 42.0,
+             "wino_fly_ms": 22.0, "pack_t_ms": 19.0, "w_direct": 15e6, "w_wino": 28e6}
+            for n in ("tiny-yolov2-voc", "tiny-yolov4-coco")]
+    _pngs(resultats.plot_winograd(rows, tmp_path))
+    _manifest("tiny-yolov2-voc")
+    r = resultats.load_winograd(["tiny-yolov2-voc"])[0]
+    assert r == resultats._tools("winograd").net_study("tiny-yolov2-voc")
+    assert round(r["w_wino"] * 12 / 8 / 1e6, 2) == 41.94  # results/winograd.md
+
+
+def test_map_coco_parsed_as_published(tmp_path):
+    src = ROOT / "results" / "map_coco.md"
+    if not src.exists():
+        pytest.skip("results/map_coco.md absent")
+    floats, published, stages = resultats.load_map_coco(src)
+    v4 = next(r for r in floats if r["net"] == "tiny-yolov4-coco" and r["prep"] == "stretch")
+    assert (v4["AP"], v4["AP50"]) == (21.7, 41.4)
+    assert published == {"tiny-yolov4-coco": 40.2, "tiny-yolov3-coco": 33.1}
+    assert [r["stage"] for r in stages][:2] == ["Float", "Integer Python"]
+    toy = [{"net": "tiny-yolov3-coco", "prep": p, **{m: 10.0 for m in resultats.COCO_METRICS}}
+           for p in ("stretch", "letterbox")]
+    _pngs(resultats.plot_map_coco(toy, {"tiny-yolov3-coco": 33.1},
+                                  [{"stage": "Float", "AP": 20.0, "AP50": 40.0},
+                                   {"stage": "C-sim", "AP": None, "AP50": None}], tmp_path))
+
+
 def test_resources_hwpp_plots(tmp_path):
     board = {"name": "B"}
     rows = [{"name": "a", "dsp": (896, resultats.EST), "mem": (258048, resultats.EST),
@@ -361,9 +420,11 @@ def _manifest(net):
         pytest.skip(f"export absent : model/{net} (make export)")
 
 
-@pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782)])
+@pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782),
+                                       ("tiny-yolov4-coco", 3.454)])
 def test_profile_totals_equal_spec(net, gmac, tmp_path):
-    """§3 : 3,486 GMAC (v2) et 2,782 GMAC (v3), comme tools/count_macs.py."""
+    """§3 : 3,486 GMAC (v2), 2,782 GMAC (v3) et 3.454 GMAC (v4, routes groupées CSP), comme
+    tools/count_macs.py."""
     _manifest(net)
     from tools.count_macs import net_from_manifest, table
 
@@ -392,6 +453,13 @@ def test_graph_dot_one_node_per_layer():
     m = json.loads((ROOT / "model" / "tiny-yolov3-coco" / "manifest.json").read_text())
     assert all(f"  L{i} [label=" in src for i in range(len(m["layers"])))
     assert "L19 -> L20;" in src and "L8 -> L20;" in src  # upsample + route vers la 2e tête
+
+
+def test_graph_dot_grouped_route():
+    """T24.1 : la route CSP de YOLOv4-tiny montre son groupe de canaux."""
+    _manifest("tiny-yolov4-coco")
+    src = modeles.graph_dot("tiny-yolov4-coco")
+    assert 'L3 [label="L03 route 2/2' in src and "L2 -> L3;" in src
 
 
 def test_anchors_md_parsed_as_published(tmp_path):
@@ -656,6 +724,18 @@ def test_chain_states_from_tracking():
                                          "vérifié sur PC", "à faire"]
 
 
+def test_packing_budget_equals_pack(tmp_path):
+    """T23.0 : s = 18, N = 8 sous le contrat, 3 groupes de 8 ; courbes == pack.depth."""
+    from yolo.quant import pack
+
+    d = materiel.load_packing()
+    assert (d["s"], d["n"], d["groups"]) == (18, 8, [8, 8, 8])
+    r = pack.product_range(-128, 127, -128, 127)
+    assert d["curves"]["any int8"] == [(s, pack.depth(s, *r)) for s in materiel.SHIFTS]
+    assert list(d["limits"].values()) == [18, 19, 17]
+    _pngs(materiel.plot_packing(d, tmp_path))
+
+
 def test_materiel_plots(tmp_path):
     if not (ROOT / "model" / materiel.NET / "manifest.json").exists():
         pytest.skip("export absent")
@@ -680,7 +760,8 @@ def test_receptive_fields_strides():
     assert rf3[17] == rf3[13]  # route : reprend sa source
 
 
-@pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782)])
+@pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782),
+                                       ("tiny-yolov4-coco", 3.454)])
 def test_layer_table_totals(net, gmac, tmp_path):
     _manifest(net)
     rows = reseaux.layer_table(reseaux._desc(net))
@@ -697,6 +778,20 @@ def test_tensor_layout_v3_branches():
     rows = {i: r for i, _, r, *_ in lay}
     assert rows[16] == 0 and rows[17] == 1 and rows[23] == 1
     assert lay[20][6] == [19, 8]
+
+
+def test_tensor_layout_v4_csp():
+    """Les concaténations CSP qui lisent la couche précédente restent sur la rangée ; la
+    branche de la seconde tête (route ← 27) en ouvre une ; le retour à la ligne garde la
+    largeur sous FLOW_WIDTH."""
+    from yolo.models.specs import NETWORKS
+
+    desc = NETWORKS["tiny-yolov4-coco"]
+    rows = {i: r for i, _, r, *_ in reseaux.tensor_layout(desc)}
+    assert rows[3] == rows[8] == rows[30] == 0 and rows[31] == 1
+    lay = reseaux.tensor_layout(desc, wrap=reseaux.FLOW_WRAP)
+    assert max(x + w for _, x, _, w, *_ in lay) < reseaux.FLOW_WIDTH
+    assert lay[8][6] == [2, 7]
 
 
 def test_head_vector_decodes_dump():

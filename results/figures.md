@@ -58,6 +58,7 @@ Distribution des activations par couche et seuil de saturation retenu par la cal
 
 ![calibration_tiny-yolov2-voc](figures/resultats/calibration_tiny-yolov2-voc.png)
 ![calibration_tiny-yolov3-coco](figures/resultats/calibration_tiny-yolov3-coco.png)
+![calibration_tiny-yolov4-coco](figures/resultats/calibration_tiny-yolov4-coco.png)
 
 ### T13.18 — `erreur_couches`
 
@@ -68,6 +69,7 @@ SNR par couche entre le flottant et l'entier déquantifié, et écart entier Pyt
 
 ![erreur_couches_tiny-yolov2-voc](figures/resultats/erreur_couches_tiny-yolov2-voc.png)
 ![erreur_couches_tiny-yolov3-coco](figures/resultats/erreur_couches_tiny-yolov3-coco.png)
+![erreur_couches_tiny-yolov4-coco](figures/resultats/erreur_couches_tiny-yolov4-coco.png)
 
 ### T13.20 — `cycles_couches`
 
@@ -98,7 +100,7 @@ Roofline KV260 avec un point par couche de Tiny-YOLOv2, avant et après les opti
 
 ### T13.23 — `etat_art`
 
-Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP (marque creuse : projection de ce travail).
+Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP, débit (marque creuse : projection de ce travail, par réseau et variante M23).
 
 - Commande : `python -m tools.figures etat_art`
 - Source : `results/benchmarks.csv`
@@ -107,7 +109,7 @@ Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOP
 
 ### T13.24 — `ressources`
 
-DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2 et 4 bits, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse.
+DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2, 4 bits et 2 MAC/DSP, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse.
 
 - Commande : `python -m tools.figures ressources`
 - Source : `hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json, hls/proj_kv260_synth*/sol/syn/report/csynth.xml`
@@ -151,6 +153,33 @@ Balayages lot × sous-ensemble, un panneau par jeu : mAP par lot, perte finale f
 - Source : `docs/tasks/resultats-balayages.md (tables des notebooks _sweep et _infer)`
 - Sous-ensemble d'images : sortie dans `docs/tasks/figures/resultats/`, non publiée dans `results/` (règle M12).
 
+### T13.55 — `pack_options`
+
+Time per image of each network with the packed PE (T23.3): M10 kernel, same tiles, Tm 64 and Tn 32, with the compute bound, DSP and w_buf flip-flops.
+
+- Commande : `python -m tools.figures pack_options`
+- Source : `tools/perf_model.py (PACK_OPTIONS, pack_table), tools/roofline.py (wbuf_ff), hw/boards/kv260.yaml`
+
+![pack_options](figures/resultats/pack_options.png)
+
+### T13.56 — `winograd`
+
+Winograd F(2×2, 3×3) against the packed PE: compute bound, time with the loads and weight footprint of the 3×3 convs, per network.
+
+- Commande : `python -m tools.figures winograd`
+- Source : `tools/winograd.py (net_study), model/<net>/manifest.json and weights.bin`
+
+![winograd](figures/resultats/winograd.png)
+
+### T13.57 — `map_coco`
+
+COCO val2017 AP of YOLOv4-tiny and Tiny-YOLOv3 (stretch and letterbox) with the published AP50, and the float / integer / C-sim stages of YOLOv4-tiny.
+
+- Commande : `python -m tools.figures map_coco`
+- Source : `results/map_coco.md`
+
+![map_coco](figures/resultats/map_coco.png)
+
 ### T13.53 — `balayages`
 
 Analyse transversale des balayages lot × sous-ensemble : grilles, classements, effets du lot et du sous-ensemble, époques, perte, courbes, composantes, AP par classe, poids publiés et coût. 50 images, palier R.
@@ -179,6 +208,7 @@ Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord 
 
 ![graphe_tiny-yolov2-voc](figures/modeles/graphe_tiny-yolov2-voc.png)
 ![graphe_tiny-yolov3-coco](figures/modeles/graphe_tiny-yolov3-coco.png)
+![graphe_tiny-yolov4-coco](figures/modeles/graphe_tiny-yolov4-coco.png)
 
 ### T13.3 — `memoire`
 
@@ -189,6 +219,7 @@ Empreinte mémoire par conv (poids, biais, activations) face aux tampons BRAM du
 
 ![memoire_tiny-yolov2-voc](figures/modeles/memoire_tiny-yolov2-voc.png)
 ![memoire_tiny-yolov3-coco](figures/modeles/memoire_tiny-yolov3-coco.png)
+![memoire_tiny-yolov4-coco](figures/modeles/memoire_tiny-yolov4-coco.png)
 
 ### T13.4 — `ancres`
 
@@ -227,6 +258,7 @@ Sortie YOLO pas à pas sur une image : grille, cellules responsables et ancres, 
 
 ![sortie_yolo_tiny-yolov2-voc](figures/modeles/sortie_yolo_tiny-yolov2-voc.png)
 ![sortie_yolo_tiny-yolov3-coco](figures/modeles/sortie_yolo_tiny-yolov3-coco.png)
+![sortie_yolo_tiny-yolov4-coco](figures/modeles/sortie_yolo_tiny-yolov4-coco.png)
 
 ### T13.6 — `augmentations`
 
@@ -331,6 +363,15 @@ Chaîne de vérification bit-exact, du flottant NumPy à la carte : critère et 
 
 ![chaine_verif](figures/materiel/chaine_verif.png)
 
+### T13.54 — `dsp_packing`
+
+Two int8 MACs per DSP (M23): bit layout of the A port and of the product, and accumulation depth N against the shift s with the port limits.
+
+- Commande : `python -m tools.figures dsp_packing`
+- Source : `yolo.quant.pack (depth, max_shift, lanes, groups), hls/kernels/conv_pe.cpp (mac2)`
+
+![dsp_packing](figures/materiel/dsp_packing.png)
+
 ## Réimplémentation de zéro (F)
 
 ### T13.31 — `carte`
@@ -389,7 +430,7 @@ Maxpool 2×2/2 et 2×2/1 (avec la réplication du bord), upsample ×2 et route, 
 
 ### T13.37 — `boites_decodage`
 
-IoU de deux boîtes et IoU de forme des ancres, décodage du centre dans sa cellule, taille selon t_w pour les 5 ancres de Tiny-YOLOv2.
+IoU de deux boîtes et IoU de forme des ancres, décodage du centre dans sa cellule, taille selon t_w pour les 5 ancres de Tiny-YOLOv2, scale_x_y de YOLOv4-tiny.
 
 - Commande : `python -m tools.figures boites_decodage`
 - Source : `yolo.infer.boxes (iou, iou_wh, cxcywh_to_xyxy), yolo.infer.decode.decode_head`
@@ -497,6 +538,7 @@ Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, c
 
 ![fiche_tiny-yolov2-voc](figures/reseaux/fiche_tiny-yolov2-voc.png)
 ![fiche_tiny-yolov3-coco](figures/reseaux/fiche_tiny-yolov3-coco.png)
+![fiche_tiny-yolov4-coco](figures/reseaux/fiche_tiny-yolov4-coco.png)
 
 ### T13.49 — `champ_receptif`
 
@@ -516,6 +558,7 @@ Flux des tenseurs couche par couche, un bloc par tenseur (largeur selon C, haute
 
 ![flux_tiny-yolov2-voc](figures/reseaux/flux_tiny-yolov2-voc.png)
 ![flux_tiny-yolov3-coco](figures/reseaux/flux_tiny-yolov3-coco.png)
+![flux_tiny-yolov4-coco](figures/reseaux/flux_tiny-yolov4-coco.png)
 
 ### T13.51 — `tete`
 
