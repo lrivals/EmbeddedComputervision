@@ -36,6 +36,11 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M24](M24-yolov4-tiny.md) | YOLOv4-tiny (optional) | grouped routes; float / integer / C-sim COCO mAP of a third network |
 | [M25](M25-dependability.md) | Dependability (optional) | fault-injection campaign, exact int32 ABFT checksum (Python, golden, HLS), out-of-distribution monitor |
 | [M26](M26-recent-models.md) | Recent models (optional) | YOLOv7-tiny, YOLOv5n, YOLOv8n on the chain; comparison table |
+| [M27](M27-safety-metrics.md) | Safety metrics for person detection (optional) | recall at fixed FPPI, miss rate per height and occlusion, degraded conditions, dreaded event per hour, at the three stages |
+| [M28](M28-equivalence.md) | Model ↔ circuit equivalence (optional) | equivalence matrix per layer and stage, exhaustive and SMT-proved scalar kernels, traceability table checked in CI |
+| [M29](M29-runtime-monitors.md) | Runtime monitors (optional) | monitors compared on missed persons, conformal threshold, temporal vote, integer monitor in C-sim == golden, fallback logic |
+| [M30](M30-latency-bound.md) | Latency bound and determinism (optional) | static cycle bound of the accelerator, reached in simulation; p99.9, maximum and jitter on the board |
+| [M31](M31-assurance-case.md) | Assurance case (optional) | ODD, requirements, objectives → evidence map, failure-rate budget, assurance argument checked in CI |
 
 Datasets outside git (export to Google Drive, local or Colab access):
 [donnees-drive.md](donnees-drive.md). Training on a Colab kernel from VS Code (who
@@ -89,7 +94,29 @@ graph LR
   M4 --> M25[M25]
   M11 -.-> M25
   M24 --> M26[M26]
+  M11 --> M27[M27]
+  M15 --> M27
+  M22 -.-> M27
+  M5 --> M28[M28]
+  M6 --> M28
+  M24 -.-> M28
+  M7 -.-> M28
+  M25 --> M29[M29]
+  M27 --> M29
+  M6 -.-> M29
+  M6 --> M30[M30]
+  M91 --> M30
+  M12 -.-> M30
+  M8 -.-> M30
+  M25 --> M31[M31]
+  M27 --> M31
+  M28 -.-> M31
+  M29 --> M31
+  M30 -.-> M31
 ```
+
+- **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
+  six gaps between YOLO on FPGA and ML safety. M25 gains T25.6-T25.8 for the same reason.
 
 - **T1.9 → M3 shortcut**: with the pre-trained Darknet weights, the reference mAP is
   available without waiting for a full training in NumPy. M2 can move forward in parallel
@@ -145,5 +172,10 @@ progress per milestone here.
 | M22 | 10 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.9 closing the loop remains) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
-| M25 | 6 | 0 |
+| M25 | 9 | 0 |
 | M26 | 6 | 0 |
+| M27 | 7 | 0 |
+| M28 | 7 | 0 |
+| M29 | 6 | 0 |
+| M30 | 4 | 0 |
+| M31 | 6 | 0 |

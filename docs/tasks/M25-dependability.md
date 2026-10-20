@@ -82,6 +82,41 @@ Vitis.
 - **Notes**: a simpler baseline first (mean and covariance of pooled features, Mahalanobis
   distance) to know what the autoencoder adds.
 
+The three tasks below come from the thesis state of the art (ARCYS, 2026-10): fault studies
+use the error criterion of a classifier (a changed class), always on classifiers, never on a
+YOLO, and the BRAM are excluded (Libano 2019). Rech 2024 defines a critical detection error
+by an IoU threshold on the boxes and reports that temporal coherence between frames detects
+≈ 70 % of the critical errors.
+
+### [ ] T25.6 — Critical error for a person detector
+- **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Size**: S
+- **Deliverables**: `tools/fault_campaign.py --criterion person`; section in
+  `results/faults.md`
+- **Acceptance**: a fault is **critical** when it makes a person present in the fault-free
+  output disappear (no box at IoU ≥ 0.5) and **tolerable** otherwise (extra or moved box
+  counted apart); the T25.1 ranking of layers and bits redone with this criterion on
+  CrowdHuman (tier M), and compared with the mAP ranking
+- **Notes**: the person-level criterion is the input of the budget of
+  [T31.3](M31-assurance-case.md).
+
+### [ ] T25.7 — Faults in the HLS buffers
+- **Spec**: §10.2 · **Depends on**: T25.0, T6.3 · **Size**: M
+- **Deliverables**: fault hook in the C-sim testbench (`hls/tb/`) on the weight, input and
+  output tiles of the on-chip buffers (BRAM) and the line buffer of the fused maxpool;
+  section in `results/faults.md`
+- **Acceptance**: a flip in an HLS buffer gives the same output as the corresponding Python
+  site of T25.0 (the mapping of buffer addresses to tensor indices is tested); the share of
+  faults masked by tiling reuse (a tile reloaded from DDR) is given
+- **Notes**: configuration-memory upsets are out of reach in C-sim; they need the board and
+  a tool such as the Xilinx SEM IP.
+
+### [ ] T25.8 — Fault detection by temporal coherence
+- **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Size**: S
+- **Deliverables**: section in `results/faults.md`
+- **Acceptance**: on a video, the critical faults of T25.6 injected in one frame: share
+  detected by the temporal vote of [T29.3](M29-runtime-monitors.md), by the ABFT of T25.2,
+  and by both; false alarms of the temporal check without faults
+
 ## Dependencies
 
 ```mermaid
@@ -90,4 +125,8 @@ graph LR
   T250 --> T252[T25.2] --> T253[T25.3]
   T252 --> T254
   T112[T11.2] --> T255[T25.5]
+  T251 --> T256[T25.6] --> T258[T25.8]
+  T270[T27.0] --> T256
+  T250 --> T257[T25.7]
+  T293[T29.3] --> T258
 ```
