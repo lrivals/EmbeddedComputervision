@@ -2,11 +2,19 @@
 % Narrative only: every number, table, figure and the milestone status come from the
 % macros of generated.tex (\chiffre, \articletable, \articlefig, \articleetat…), rewritten
 % by `make article`. Never type a result by hand: `python -m tools.article --check`
-% (make ci) rejects a decimal number written in the abstract or in sections 4 to 10.
+% (make ci) rejects a decimal number written in the abstract or in sections 4 to 11.
 % PDF: `make article-pdf` (xelatex + bibtex) → docs/article/article.pdf.
 \documentclass[11pt,a4paper]{article}
 
-\usepackage{fontspec}
+\usepackage{iftex}
+\ifPDFTeX  % pdflatex fallback when xelatex is absent (tools/article.py)
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+  \usepackage{lmodern}
+  \DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\else
+  \usepackage{fontspec}
+\fi
 \usepackage[margin=2.2cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
@@ -47,7 +55,13 @@ KV260 at 200~MHz, the cycle model of the optimized kernel projects
 \chiffre{model.v2.gmacs} GMAC; the board itself has not been measured yet. Extensions
 compare power-of-two weights, 4-bit quantization, integer hardware post-processing
 (\chiffre{map.formats.hwpp} mAP) and a streaming architecture (\chiffre{stream.w8.fps}
-images/s), and first sweeps fine-tune Tiny-YOLOv3 on five other datasets.
+images/s); packing two INT8 multiplications per DSP brings the projection to
+\chiffre{pack.v2.tm64.ms}~ms with the same DSP count. The same chain runs YOLOv4-tiny on COCO
+(\chiffre{map.coco.v4.ap50} AP50 in float, \chiffre{map.coco.v4.drop} point in INT8), and
+YOLOv7-tiny is being brought onto it. A dependability layer injects bit flips into the
+integer model, checks every convolution with an exact int32 checksum (ABFT), and flags
+out-of-distribution inputs from the backbone features (AUROC \chiffre{ood.norm.auroc.flir} on
+thermal images). First sweeps fine-tune Tiny-YOLOv3 on five other datasets.
 
 \smallskip
 \noindent\textit{Status of the numbers.} A superscript marks a number that is not a
@@ -75,7 +89,9 @@ The YOLO family predicts boxes on a grid in a single pass over the image
 \cite[\#002.2]{1612.08242} and Tiny-YOLOv3 adds a second one at $26\times26$
 \cite[\#004.1]{2023-zhai}. These two networks are small enough for a mid-range Zynq
 UltraScale+ and are the reference workload of most FPGA papers of the base
-(Section~\ref{sec:related}).
+(Section~\ref{sec:related}). YOLOv4-tiny and YOLOv7-tiny, more accurate on COCO at a
+similar cost, keep the leaky activation and the Darknet format, and test how far the same
+engine goes (outside the base).
 
 Contributions:
 \begin{enumerate}
@@ -86,12 +102,15 @@ Contributions:
   model, the C++ golden model and the C-simulated kernel behind the ARM driver produce the
   same bytes, verified on the whole VOC2007 test set (Sections~\ref{sec:quant},
   \ref{sec:golden} and~\ref{sec:results}).
-\item \textbf{One engine for v2 and v3}: a single parameterized layer-by-layer accelerator
-  runs both networks from a manifest, with route and upsample handled by addressing
-  (Section~\ref{sec:hls}).
+\item \textbf{One engine for v2, v3 and YOLOv4-tiny}: a single parameterized
+  layer-by-layer accelerator runs the three networks from a manifest, with route,
+  grouped route and upsample handled by addressing (Section~\ref{sec:hls}).
 \item \textbf{Formats compared on the same model}: INT8, power-of-two weights after
   REQ-YOLO, 4-bit weights and activations, and integer post-processing, all evaluated on
   the same test set with the same protocol (Section~\ref{sec:extensions}).
+\item \textbf{Dependability checks on the integer model}: fault injection, an exact ABFT
+  checksum per convolution in Python and in the golden model, and an out-of-distribution
+  monitor that costs a negligible share of the detector (Section~\ref{sec:dependability}).
 \item \textbf{Reproducible tooling}: tiers of test profiles, figures, notebooks and this
   article are regenerated from the repository by \texttt{make} targets
   (Section~\ref{sec:repro}).
@@ -159,6 +178,21 @@ and~\ref{fig:fiche/fiche_tiny-yolov2-voc}).
 \articlefig{graphe/graphe_tiny-yolov2-voc}
 \articlefig{fiche/fiche_tiny-yolov2-voc}
 
+YOLOv4-tiny (\texttt{tiny-yolov4-coco}, outside the base) replaces the plain backbone by
+CSP blocks: a \emph{grouped route} takes the second half of the channels of a map, and the
+heads rescale the box centres by \texttt{scale\_x\_y}. It has \chiffre{model.v4.mparams}~M
+parameters and \chiffre{model.v4.gmacs} GMAC (Figure~\ref{fig:graphe/graphe_tiny-yolov4-coco}).
+The grouped route is one more addressing mode of the engine: it reads a channel range of an
+existing buffer, so it costs no compute and no copy. YOLOv7-tiny
+(\texttt{tiny-yolov7-coco}, \chiffre{model.v7.mparams}~M parameters,
+\chiffre{model.v7.gmacs} GMAC) adds ELAN blocks, whose concatenations have four sources, and a
+spatial pyramid pooling with stride-1 max pools of $5\times5$, $9\times9$ and
+$13\times13$. The export rewrites the two larger pools as chained $5\times5$ pools and
+copies the pooled input by an identity $1\times1$ convolution; this network is work in
+progress (float, calibration and export done, accuracy not yet measured).
+
+\articlefig{graphe/graphe_tiny-yolov4-coco}
+
 Every layer exposes the same interface, \texttt{forward(x) -> (y, cache)} and
 \texttt{backward(dy, cache) -> (dx, grads)}. The convolution exists in a naive version,
 kept as the test reference, and an im2col version used for training; both agree to
@@ -214,6 +248,23 @@ precision-recall curves and the evaluation steps.
 \articlefig{pr/pr_variantes}
 \articlefig{nms_map}
 
+The COCO networks are evaluated on val2017 with the COCO metric (101-point interpolation,
+equal to \texttt{pycocotools} to $10^{-4}$), same threshold and NMS
+(Table~\ref{tab:coco}, Figure~\ref{fig:map_coco}). The configuration of YOLOv4-tiny has no
+letterbox, and the direct resize is again the better preprocessing for it. Its float AP50,
+\chiffre{map.coco.v4.ap50}, is above the \chiffre{map.coco.v4.published} published on
+test-dev, a different image set. Tiny-YOLOv3 reaches \chiffre{map.coco.v3.ap50} AP50, but its
+weights were trained on COCO 2014 images from which val2017 is partly drawn, so this value is
+optimistic and the comparison favours it.
+
+\begin{table}[htbp]
+\caption{Float AP on COCO val2017 (\texttt{results/map\_coco.md}).}
+\label{tab:coco}
+\small\articletable{map.coco.table}
+\end{table}
+
+\articlefig{map_coco}
+
 % ---------------------------------------------------------------------------------------
 \section{INT8 quantization}\label{sec:quant}
 
@@ -252,6 +303,12 @@ no single layer dominates the loss, which spreads over the network
 \end{table}
 
 \articlefig{erreur_couches/erreur_couches_tiny-yolov2-voc}
+
+YOLOv4-tiny, calibrated in the same way on 500 COCO train2017 images, loses more:
+\chiffre{map.coco.v4.drop} point of AP50 (\chiffre{map.coco.v4.int8.ap50} in integer), above
+the one-point target. Fake-quantizing the two heads alone costs nothing, so the loss is again
+spread over the backbone; a coarser head scale would clip less but overflows the exponential
+table of the post-processing. Quantization-aware training is left as follow-up.
 
 % ---------------------------------------------------------------------------------------
 \section{Golden C++ model and verification chain}\label{sec:golden}
@@ -322,6 +379,47 @@ and a roofline point of \chiffre{perf.kv260.roofline.ms}~ms
 \articlefig{roofline_couches/roofline_couches_kv260}
 \articlefig{cycles_couches}
 
+\paragraph{Two INT8 multiplications per DSP.} The compute bound only falls if the
+multiplications per cycle rise. As in 2024-zhang \cite[\#011.0]{2024-zhang}, the weights of
+two output channels that share an input are packed into the 27-bit port of a DSP48E2,
+$A = w_a 2^{18} + w_b$, and one product gives both (Figure~\ref{fig:dsp_packing}). The low
+lane stays exact for a sum of eight products under the contract of the integer model
+(weights and inputs within $\pm127$), so the 24-lane adder tree is cut into three groups of
+eight, each unpacked to int32. Only the multiplication changes: the C-simulated kernel equals
+the golden model byte for byte on every testbench, and its cycles are unchanged. With the same
+tiles, packing frees half of the DSPs; with $T_m=64$ on the same DSPs it projects
+\chiffre{pack.v2.tm64.ms}~ms for Tiny-YOLOv2, but doubles the weight registers beyond the
+flip-flops of the board unless they move to LUTRAM, and $T_n=32$ gives
+\chiffre{pack.v2.tn32.ms}~ms within the budget (Table~\ref{tab:pack},
+Figure~\ref{fig:pack_options}). The YOLOv4-tiny projection with the current kernel is
+\chiffre{perf.kv260.v4.ms}~ms (Table~\ref{tab:perf}).
+
+\begin{table}[htbp]
+\caption{Packed PE options, accelerator only, KV260 at 200~MHz
+(\texttt{results/dsp\_packing.md}).}
+\label{tab:pack}
+\footnotesize\articletable{pack.table}
+\end{table}
+
+\articlefig{dsp_packing}
+\articlefig{pack_options}
+
+\paragraph{Winograd.} An integer-exact Winograd $F(2\times2, 3\times3)$ removes more than half
+of the multiplications of the $3\times3$ convolutions \cite[\#004.0]{2023-zhai} and is
+slightly ahead of packing on the compute bound alone. Once the loads are counted it is not
+(Table~\ref{tab:winograd}, Figure~\ref{fig:winograd}): the transformed weights are wider and
+consumed faster, its weight buffer exceeds the flip-flops of the board, and its products do
+not fit two to a DSP. It is studied, not implemented.
+
+\begin{table}[htbp]
+\caption{Winograd against packing, milliseconds, Tiny-YOLOv2 and Tiny-YOLOv3
+(\texttt{results/winograd.md}).}
+\label{tab:winograd}
+\footnotesize\articletable{winograd.table}
+\end{table}
+
+\articlefig{winograd}
+
 % ---------------------------------------------------------------------------------------
 \section{Results}\label{sec:results}
 
@@ -355,9 +453,10 @@ roofline model with the streaming plan of Section~\ref{sec:extensions}.
 
 \articlefig{ressources}
 
-Against 2024-zhang, the only reference on the same model, the remaining gap is roughly its
-larger number of multipliers (two MACs per DSP) and the share of time our kernel still
-spends outside the MAC loop. On the same board, the projected throughput of the current
+Against 2024-zhang, the only reference on the same model, packing closes the gap in
+multipliers (Section~\ref{sec:hls}); what remains is the share of time our kernel still
+spends outside the MAC loop, in the weight and input loads of the $1\times1$ and
+$13\times13$ layers and in the output stage of the first layer. On the same board, the projected throughput of the current
 kernel exceeds the DPU of 2026-fata in images per second, without pruning
 (Table~\ref{tab:benchmarks}).
 
@@ -419,6 +518,42 @@ simulation, stage by stage; these figures are estimates until synthesis.
 \articlefig{streaming}
 
 % ---------------------------------------------------------------------------------------
+\section{Dependability}\label{sec:dependability}
+
+The bit-exact integer model is a fault-free reference: any difference in its output is caused
+by an injected fault. This section is engineering outside the base.
+
+\paragraph{Fault injection.} An injector flips bits in the INT8 weights, the int32 biases, the
+INT8 activations and the int32 accumulator of a chosen layer, either one given bit or at random
+with a bit error rate, or holds them stuck at a value; every run is seeded, and with no fault the
+output equals the integer model exactly. A campaign tool sweeps the error rate, the layer and the
+bit position against the mAP. Only a smoke run has been made so far; the full grids are to run.
+
+\paragraph{Exact checksum (ABFT).} The sum of the output channels of a convolution equals the
+convolution of its input by the sum of its filters. Before requantization everything is an
+integer, so the check holds exactly modulo $2^{32}$: no tolerance and no false alarm. The
+summed filter and bias are exported with each layer, and the check runs in the integer model
+and in the golden model. On the dumps of the three exports it reports no error, and every
+injected accumulator fault is detected. The hardware lane and its cost are pending synthesis.
+
+\paragraph{Out-of-distribution monitor.} The monitor reads the INT8 output of the last backbone
+layer of Tiny-YOLOv2, which the accelerator already writes, and scores each image on the ARM.
+Dark (ExDark) and thermal (FLIR) images give \emph{weaker} features than VOC: they fall inside
+the shell on which in-domain features lie, so a raw distance score is lower out of domain. The
+monitor therefore uses the typicality of the score, its distance to the median on held-out
+VOC images in either direction. The plain norm of the pooled features is the best score
+(AUROC \chiffre{ood.norm.auroc.exdark} on low light, \chiffre{ood.norm.auroc.flir} on thermal),
+ahead of a Mahalanobis distance and of a NumPy autoencoder that costs ten times more
+(Table~\ref{tab:ood}). It is a domain alarm, not a per-image predictor of accuracy.
+
+\begin{table}[htbp]
+\caption{OOD monitor on the features of the integer Tiny-YOLOv2, typicality scores, VOC test
+against ExDark and FLIR (\texttt{results/ood\_monitor.md}).}
+\label{tab:ood}
+\small\articletable{ood.table}
+\end{table}
+
+% ---------------------------------------------------------------------------------------
 \section{Beyond VOC}\label{sec:beyond}
 
 Milestones M11, M15 and M16 take Tiny-YOLOv3 to other datasets: VisDrone (aerial views),
@@ -462,7 +597,13 @@ Other limits: the power-of-two ADMM did not converge and the 4-bit QAT ran for a
 of an epoch (Section~\ref{sec:extensions}); the training from scratch in NumPy
 (fine-tuning on VOC, M2) is not finished, so the reference mAP uses the published Darknet
 weights; the datasets beyond VOC have only been explored at tier R
-(Section~\ref{sec:beyond}). Table~\ref{tab:etat} gives the progress by milestone.
+(Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on COCO and
+quantization-aware training to come within one point; YOLOv7-tiny has no accuracy yet, and
+YOLOv5n and YOLOv8n (SiLU, anchor-free heads) are planned behind it. The fault campaign has
+only run as a smoke test, and the ABFT lane of the kernel is not synthesized. Safety work
+built on these blocks (safety metrics, equivalence proofs, runtime monitors, a static latency
+bound and an assurance case) is planned. Table~\ref{tab:etat} gives the progress by
+milestone.
 
 \begin{table}[htbp]
 \caption{Progress by milestone (\texttt{docs/tasks/README.md}).}
@@ -492,6 +633,8 @@ export and golden model & \texttt{make export}, \texttt{make golden-check} \\
 HLS kernel in C simulation & \texttt{make csim-gcc}, \texttt{make hls-cycles} \\
 ARM driver on PC & \texttt{make sw-sim} \\
 mAP at the three stages & \texttt{make m8-inputs m8-int bench-sim map-stades} \\
+COCO, YOLOv4-tiny & \texttt{tools/m11.sh coco-v4} \\
+faults, OOD monitor & \texttt{tools/m25.sh}, \texttt{tools/m25.sh ood} \\
 performance projection & \texttt{make perf-model bench-report} \\
 figures, notebooks & \texttt{make figures}, \texttt{make notebooks} \\
 this article & \texttt{make article}, \texttt{make article-pdf} \\
@@ -541,6 +684,8 @@ v0 & 2026-10-07 & Infrastructure (\texttt{tools/article.py}, \texttt{make articl
   measurements pending. \\
 v1 & 2026-10-07 & Source moved from Markdown to LaTeX (\texttt{article.tex},
   \texttt{generated.tex}, \texttt{refs.bib}); PDF compiled by xelatex. \\
+v2 & 2026-10-20 & Two MACs per DSP and the Winograd study (M23), YOLOv4-tiny on COCO
+  (M24), new section on dependability (M25), YOLOv7-tiny in progress (M26). \\
 \bottomrule
 \end{tabularx}
 \end{center}

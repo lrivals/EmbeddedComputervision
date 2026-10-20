@@ -372,7 +372,8 @@ def ancres_k(out_dir):
 
 WEIGHTS = {"tiny-yolov2-voc": "weights/yolov2-tiny-voc.weights",
            "tiny-yolov3-coco": "weights/yolov3-tiny.weights",
-           "tiny-yolov4-coco": "weights/yolov4-tiny.weights"}
+           "tiny-yolov4-coco": "weights/yolov4-tiny.weights",
+           "tiny-yolov7-coco": "weights/yolov7-tiny.weights"}
 DEMO_IMAGE = "000009"  # chevaux et personnes : plusieurs classes et recouvrements
 
 

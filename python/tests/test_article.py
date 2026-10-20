@@ -222,6 +222,11 @@ def test_repository_sources():
     assert data["map.voc.int8"]["value"] == pytest.approx(55.66)
     assert data["map.voc.identical"]["status"] == "csim"
     assert data["perf.kv260.v2.ms"]["status"] == "projection"
+    # M23-M25: COCO, packing, OOD tables of results/
+    assert data["map.coco.v4.drop"]["value"] == pytest.approx(-1.3)
+    assert len(data["map.coco.table"]["value"]["rows"]) == 4
+    assert data["pack.v2.tm64.ms"]["value"] == pytest.approx(24.7)
+    assert data["ood.table"]["value"]["rows"][0][0] == "norm"
 
 
 @pytest.mark.skipif(not shutil.which("xelatex"), reason="xelatex absent")

@@ -19,6 +19,16 @@
 2.24\textsuperscript{tier R}}  % tier-R, docs/tasks/resultats-balayages.md
 \expandafter\def\csname artn:balayage.voc.meilleur.map\endcsname{%
 36.27\textsuperscript{tier R}}  % tier-R, docs/tasks/resultats-balayages.md
+\expandafter\def\csname artn:map.coco.v3.ap50\endcsname{%
+37.2}  % measured, results/map_coco.md
+\expandafter\def\csname artn:map.coco.v4.ap50\endcsname{%
+41.4}  % measured, results/map_coco.md
+\expandafter\def\csname artn:map.coco.v4.drop\endcsname{%
+−1.3}  % measured, results/map_coco.md
+\expandafter\def\csname artn:map.coco.v4.int8.ap50\endcsname{%
+40.1}  % measured, results/map_coco.md
+\expandafter\def\csname artn:map.coco.v4.published\endcsname{%
+40.2\textsuperscript{pub.}}  % published, results/map_coco.md
 \expandafter\def\csname artn:map.formats.admm\endcsname{%
 43.07}  % measured, results/req_yolo.md
 \expandafter\def\csname artn:map.formats.hwpp\endcsname{%
@@ -53,6 +63,22 @@
 2.74}  % measured, python/yolo/models/specs.py
 \expandafter\def\csname artn:model.v3.mparams\endcsname{%
 8.71}  % measured, python/yolo/models/specs.py
+\expandafter\def\csname artn:model.v4.gmacs\endcsname{%
+3.45}  % measured, python/yolo/models/specs.py
+\expandafter\def\csname artn:model.v4.mparams\endcsname{%
+6.06}  % measured, python/yolo/models/specs.py
+\expandafter\def\csname artn:model.v7.gmacs\endcsname{%
+2.89}  % measured, python/yolo/models/specs.py
+\expandafter\def\csname artn:model.v7.mparams\endcsname{%
+6.23}  % measured, python/yolo/models/specs.py
+\expandafter\def\csname artn:ood.norm.auroc.exdark\endcsname{%
+0.74}  % measured, results/ood_monitor.md
+\expandafter\def\csname artn:ood.norm.auroc.flir\endcsname{%
+0.88}  % measured, results/ood_monitor.md
+\expandafter\def\csname artn:pack.v2.tm64.ms\endcsname{%
+24.7\textsuperscript{proj.}}  % projection, results/dsp_packing.md
+\expandafter\def\csname artn:pack.v2.tn32.ms\endcsname{%
+30.0\textsuperscript{proj.}}  % projection, results/dsp_packing.md
 \expandafter\def\csname artn:perf.kv260.bound.ms\endcsname{%
 31.6\textsuperscript{proj.}}  % projection, results/rapport.md
 \expandafter\def\csname artn:perf.kv260.m6.ms\endcsname{%
@@ -69,6 +95,8 @@
 37.2\textsuperscript{proj.}}  % projection, results/mesures.md
 \expandafter\def\csname artn:perf.kv260.v3.ms\endcsname{%
 36.1\textsuperscript{proj.}}  % projection, results/mesures.md
+\expandafter\def\csname artn:perf.kv260.v4.ms\endcsname{%
+51.8\textsuperscript{proj.}}  % projection, results/mesures.md
 \expandafter\def\csname artn:quant.sensitive.gap\endcsname{%
 −0.61\textsuperscript{tier R}}  % tier-R, results/map_int8.md
 \expandafter\def\csname artn:quant.sensitive.layer\endcsname{%
@@ -82,7 +110,7 @@ L10\textsuperscript{tier R}}  % tier-R, results/map_int8.md
 \expandafter\def\csname artn:stream.w8.latency\endcsname{%
 85.2\textsuperscript{est.}}  % estimate, results/streaming.md
 \expandafter\def\csname artn:verif.dumps\endcsname{%
-6}  % measured, Makefile (DUMP_IMAGES × QNETS)
+12}  % measured, Makefile (DUMP_IMAGES × QNETS)
 \expandafter\def\csname artn:verif.hwpp.cases\endcsname{%
 1,014\textsuperscript{C-sim}}  % csim, results/postproc_hw.md
 % ---- tables
@@ -116,10 +144,25 @@ CrowdHuman & 15,000 & \texttt{b16-sall} & 16 & all & mAP, 11 points & 35.87 & ti
 2025-kim & YOLOv2 full (prototype) & Zybo Z7-20 & INT16 & 0.083 & 12,000 & — & — & published \\
 this work (C-sim projection) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 26.87 & 37.2 & 187.3 & — & projection \\
 this work (C-sim projection) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 27.72 & 36.1 & 154.3 & — & projection \\
+this work (C-sim projection) & YOLOv4-tiny COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 19.30 & 51.8 & 133.3 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tm 64) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 40.53 & 24.7 & 282.5 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tn 32) & Tiny-YOLOv2 VOC 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 33.31 & 30.0 & 232.2 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tm 64) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 41.95 & 23.8 & 233.4 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tn 32) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 33.06 & 30.2 & 184.0 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tm 64) & YOLOv4-tiny COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 30.79 & 32.5 & 212.7 & — & projection \\
+this work (C-sim projection, 2 MACs/DSP, Tn 32) & YOLOv4-tiny COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 23.51 & 42.5 & 162.4 & — & projection \\
+\bottomrule
+\end{tabularx}}
+\expandafter\def\csname arttable:map.coco.table\endcsname{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}Xrrrrrr@{}}
+\toprule
+\textbf{Network} & \textbf{Preprocessing} & \textbf{AP} & \textbf{AP50} & \textbf{AP75} & \textbf{APs} & \textbf{APm} & \textbf{APl} \\
+\midrule
+YOLOv4-tiny & stretch & 21.7 & 41.4 & 20.5 & 9.9 & 26.0 & 30.7 \\
+YOLOv4-tiny & letterbox & 21.2 & 39.9 & 20.4 & 8.1 & 24.2 & 33.6 \\
+Tiny-YOLOv3 & stretch & 16.7 & 37.2 & 12.7 & 5.7 & 19.0 & 26.1 \\
+Tiny-YOLOv3 & letterbox & 17.0 & 36.9 & 13.8 & 5.2 & 18.4 & 28.4 \\
 \bottomrule
 \end{tabularx}}
 \expandafter\def\csname arttable:map.formats\endcsname{%
@@ -171,6 +214,34 @@ stretch (\texttt{make eval-float}) & 56.30 & 55.66 & −0.64 \\
 letterbox (the training one) & 54.18 & 53.68 & −0.50 \\
 \bottomrule
 \end{tabularx}}
+\expandafter\def\csname arttable:ood.table\endcsname{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrr>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Score} & \textbf{\begin{tabular}[b]{@{}r@{}}AUROC\\ExDark\end{tabular}} & \textbf{\begin{tabular}[b]{@{}r@{}}AUROC\\FLIR\end{tabular}} & \textbf{\begin{tabular}[b]{@{}r@{}}Spearman\\score / mAP\end{tabular}} & \textbf{MACs (share of the detector)} \\
+\midrule
+norm & 0.744 & 0.884 & −0.66 & 0.35 M (0.01 \%) \\
+Mahalanobis & 0.669 & 0.726 & −0.41 & 4.54 M (0.13 \%) \\
+autoencoder & 0.686 & 0.718 & −0.14 & 45.69 M (1.31 \%) \\
+\bottomrule
+\end{tabularx}}
+\expandafter\def\csname arttable:pack.table\endcsname{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}Xrrr@{}}
+\toprule
+\textbf{Network} & \textbf{Option} & \textbf{Tm, Tn} & \textbf{\begin{tabular}[b]{@{}r@{}}PE\\DSP\end{tabular}} & \textbf{ms} & \textbf{GOPS} \\
+\midrule
+Tiny-YOLOv2 VOC & M10 kernel, 1 MAC / DSP & 32, 24 & 768 & 37.2 & 187.3 \\
+Tiny-YOLOv2 VOC & packed, same tiles (half the DSPs) & 32, 24 & 384 & 37.2 & 187.3 \\
+Tiny-YOLOv2 VOC & packed, Tm 64 (same DSPs) & 64, 24 & 768 & 24.7 & 282.5 \\
+Tiny-YOLOv2 VOC & packed, Tn 32 (roofline point) & 32, 32 & 512 & 30.0 & 232.2 \\
+Tiny-YOLOv3 COCO & M10 kernel, 1 MAC / DSP & 32, 24 & 768 & 36.1 & 154.3 \\
+Tiny-YOLOv3 COCO & packed, same tiles (half the DSPs) & 32, 24 & 384 & 36.1 & 154.3 \\
+Tiny-YOLOv3 COCO & packed, Tm 64 (same DSPs) & 64, 24 & 768 & 23.8 & 233.4 \\
+Tiny-YOLOv3 COCO & packed, Tn 32 (roofline point) & 32, 32 & 512 & 30.2 & 184.0 \\
+\bottomrule
+\end{tabularx}
+\par\smallskip{\footnotesize\emph{Status of every number of this table: projection.}}}
 \expandafter\def\csname arttable:perf.cascade\endcsname{%
 \setlength{\tabcolsep}{4pt}
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrrrr@{}}
@@ -199,14 +270,26 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \midrule
 \texttt{tiny-yolov2-voc} & 3.486 & 7.44 & 37.2 & 26.9 & 187.3 & 61.0 & projection \\
 \texttt{tiny-yolov3-coco} & 2.782 & 7.21 & 36.1 & 27.7 & 154.3 & 50.2 & projection \\
+\texttt{tiny-yolov4-coco} & 3.454 & 10.36 & 51.8 & 19.3 & 133.3 & 52.3 & projection \\
 \bottomrule
 \end{tabularx}}
+\expandafter\def\csname arttable:winograd.table\endcsname{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrrrrr@{}}
+\toprule
+\textbf{Network} & \textbf{\begin{tabular}[b]{@{}r@{}}Bound:\\direct\end{tabular}} & \textbf{Winograd} & \textbf{Packing} & \textbf{\begin{tabular}[b]{@{}r@{}}With loads:\\Winograd offline\end{tabular}} & \textbf{\begin{tabular}[b]{@{}r@{}}on the\\fly\end{tabular}} & \textbf{Packing} \\
+\midrule
+\texttt{tiny-yolov2-voc} & 31.6 & 17.1 & 18.1 & 42.8 & 22.8 & 19.8 \\
+\texttt{tiny-yolov3-coco} & 27.0 & 14.8 & 15.8 & 38.8 & 23.0 & 18.8 \\
+\bottomrule
+\end{tabularx}
+\par\smallskip{\footnotesize\emph{Status of every number of this table: estimate.}}}
 % ---- figures cited by article.tex
 \expandafter\def\csname artfig:etat_art\endcsname{%
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/etat_art.png}
-\caption{Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP (marque creuse : projection de ce travail). (\texttt{etat\_art})}
+\caption{Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP, débit (marque creuse : projection de ce travail, par réseau et variante M23). (\texttt{etat\_art})}
 \label{fig:etat_art}
 % python -m tools.figures etat_art
 \end{figure}}
@@ -225,6 +308,14 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \caption{Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, champ réceptif et pas cumulé (CSV à côté de l'image). (\texttt{fiche})}
 \label{fig:fiche/fiche_tiny-yolov2-voc}
 % python -m tools.figures fiche
+\end{figure}}
+\expandafter\def\csname artfig:graphe/graphe_tiny-yolov4-coco\endcsname{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/modeles/graphe_tiny-yolov4-coco.png}
+\caption{Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord épais = beaucoup de MACs). (\texttt{graphe})}
+\label{fig:graphe/graphe_tiny-yolov4-coco}
+% python -m tools.figures graphe
 \end{figure}}
 \expandafter\def\csname artfig:convolution\endcsname{%
 \begin{figure}[htbp]
@@ -265,6 +356,14 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \caption{NMS pas à pas, appariement détections / vérités et courbe précision-rappel, AP VOC07 sur 11 points face à l'aire sous l'enveloppe, égale à la référence du devkit. (\texttt{nms\_map})}
 \label{fig:nms_map}
 % python -m tools.figures nms_map
+\end{figure}}
+\expandafter\def\csname artfig:map_coco\endcsname{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/map_coco.png}
+\caption{COCO val2017 AP of YOLOv4-tiny and Tiny-YOLOv3 (stretch and letterbox) with the published AP50, and the float / integer / C-sim stages of YOLOv4-tiny. (\texttt{map\_coco})}
+\label{fig:map_coco}
+% python -m tools.figures map_coco
 \end{figure}}
 \expandafter\def\csname artfig:quantification\endcsname{%
 \begin{figure}[htbp]
@@ -354,6 +453,30 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \label{fig:cycles_couches}
 % python -m tools.figures cycles_couches
 \end{figure}}
+\expandafter\def\csname artfig:dsp_packing\endcsname{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/dsp_packing.png}
+\caption{Two int8 MACs per DSP (M23): bit layout of the A port and of the product, and accumulation depth N against the shift s with the port limits. (\texttt{dsp\_packing})}
+\label{fig:dsp_packing}
+% python -m tools.figures dsp_packing
+\end{figure}}
+\expandafter\def\csname artfig:pack_options\endcsname{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/pack_options.png}
+\caption{Time per image of each network with the packed PE (T23.3): M10 kernel, same tiles, Tm 64 and Tn 32, with the compute bound, DSP and w\_buf flip-flops. (\texttt{pack\_options})}
+\label{fig:pack_options}
+% python -m tools.figures pack_options
+\end{figure}}
+\expandafter\def\csname artfig:winograd\endcsname{%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/winograd.png}
+\caption{Winograd F(2×2, 3×3) against the packed PE: compute bound, time with the loads and weight footprint of the 3×3 convs, per network. (\texttt{winograd})}
+\label{fig:winograd}
+% python -m tools.figures winograd
+\end{figure}}
 \expandafter\def\csname artfig:map_stades\endcsname{%
 \begin{figure}[htbp]
 \centering
@@ -366,7 +489,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/ressources.png}
-\caption{DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2 et 4 bits, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse. (\texttt{ressources})}
+\caption{DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2, 4 bits et 2 MAC/DSP, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse. (\texttt{ressources})}
 \label{fig:ressources}
 % python -m tools.figures ressources
 \end{figure}}
@@ -441,7 +564,7 @@ M9.4 & 3 & 3 & 100\,\% \\
 M10 & 14 & 0 & 0\,\% \\
 M12 & 11 & 0 & 0\,\% \\
 M11 & 8 & 1 & 12\,\% \\
-M13 & 54 & 54 & 100\,\% \\
+M13 & 60 & 60 & 100\,\% \\
 M14 & 12 & 8 & 67\,\% \\
 M15 & 16 & 1 & 6\,\% \\
 M16 & 20 & 18 & 90\,\% \\
@@ -450,22 +573,27 @@ M18 & 11 & 9 & 82\,\% \\
 M19 & 12 & 5 & 42\,\% \\
 M20 & 10 & 9 & 90\,\% \\
 M21 & 12 & 6 & 50\,\% \\
-M22 & 10 & 9 & 90\,\% \\
+M22 & 12 & 11 & 92\,\% \\
 M23 & 6 & 6 & 100\,\% \\
-M24 & 6 & 0 & 0\,\% \\
-M25 & 6 & 0 & 0\,\% \\
+M24 & 7 & 5 & 71\,\% \\
+M25 & 9 & 0 & 0\,\% \\
 M26 & 6 & 0 & 0\,\% \\
+M27 & 7 & 0 & 0\,\% \\
+M28 & 7 & 0 & 0\,\% \\
+M29 & 6 & 0 & 0\,\% \\
+M30 & 4 & 0 & 0\,\% \\
+M31 & 6 & 0 & 0\,\% \\
 \midrule
-\textbf{Total} & \textbf{306} & \textbf{196} & \textbf{64\,\%} \\
+\textbf{Total} & \textbf{348} & \textbf{209} & \textbf{60\,\%} \\
 \bottomrule
 \end{tabular}}
-\newcommand\articleetatresume{196 of 306 tasks done across 31 milestones, 7 milestones complete}
+\newcommand\articleetatresume{209 of 348 tasks done across 36 milestones, 7 milestones complete}
 \newcommand\articlestatuslist{%
 {\raggedright
 \begin{itemize}
-\item \textbf{projection} (10): \texttt{perf.cascade}, \texttt{perf.kv260}, \texttt{perf.kv260.bound.ms}, \texttt{perf.kv260.m6.ms}, \texttt{perf.kv260.roofline.ms}, \texttt{perf.kv260.v2.eff}, \texttt{perf.kv260.v2.fps}, \texttt{perf.kv260.v2.gops}, \texttt{perf.kv260.v2.ms}, \texttt{perf.kv260.v3.ms}
-\item \textbf{estimate} (4): \texttt{stream.w4.fps}, \texttt{stream.w8.dsp}, \texttt{stream.w8.fps}, \texttt{stream.w8.latency}
+\item \textbf{projection} (14): \texttt{pack.table}, \texttt{pack.v2.tm64.ms}, \texttt{pack.v2.tn32.ms}, \texttt{perf.cascade}, \texttt{perf.kv260}, \texttt{perf.kv260.bound.ms}, \texttt{perf.kv260.m6.ms}, \texttt{perf.kv260.roofline.ms}, \texttt{perf.kv260.v2.eff}, \texttt{perf.kv260.v2.fps}, \texttt{perf.kv260.v2.gops}, \texttt{perf.kv260.v2.ms}, \texttt{perf.kv260.v3.ms}, \texttt{perf.kv260.v4.ms}
+\item \textbf{estimate} (5): \texttt{stream.w4.fps}, \texttt{stream.w8.dsp}, \texttt{stream.w8.fps}, \texttt{stream.w8.latency}, \texttt{winograd.table}
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
 \item \textbf{csim} (3): \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{9955fe9-dirty}, 2026-10-19}
+\newcommand\articlerev{rev.~\texttt{37cb87d-dirty}, 2026-10-20}

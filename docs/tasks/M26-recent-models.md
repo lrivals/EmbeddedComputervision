@@ -31,6 +31,10 @@ evaluation of T11.1, which this milestone reuses.
     replication (T6.3). A 5×5 / 1 pool equals two chained 3×3 / 1 pools and 9×9 two 5×5
     (SPPF identity): a 3×3 / 1 pool on the ARM or in the post-processing may be enough;
     to measure in cycles.
+  - Figures (T13.59): `tiny-yolov7-coco` is the fourth network of the per-network figures
+    (graph, tensor flow, datasheet, memory, output, calibration, per-layer error). The
+    network is 2.89 GMAC (`make count-macs`); the export counts 2.916 GMAC, as it copies the
+    SPP input by two identity 1×1 convs and chains the 5×5 pools.
 
 ### [ ] T26.1 — Offline PyTorch weight converter
 - **Spec**: §9.1 · **Depends on**: — · **Size**: M

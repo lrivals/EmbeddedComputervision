@@ -50,8 +50,8 @@ STATUSES = {"measured": "", "csim": "C-sim", "projection": "proj.", "estimate": 
 PENDING = ("projection", "estimate", "tier-R", "csim")  # \articlestatuslist (§11)
 
 # Sections whose prose may not quote a decimal number outside a macro (the abstract and
-# sections 4 to 10), and the constants of the network or of the protocol allowed there.
-RESULT_SECTIONS = range(4, 11)
+# sections 4 to 11), and the constants of the network or of the protocol allowed there.
+RESULT_SECTIONS = range(4, 12)
 WHITELIST = {"0.1", "0.45", "0.005", "0.5", "0.25", "0.3", "1.0"}
 
 USES = re.compile(r"\\(chiffre|articletable|articlefig)\{([^}]*)\}|\\(articleetat(?:resume)?)\b")
@@ -323,7 +323,7 @@ _DECIMAL = re.compile(r"(?<![\w#§.\-/])\d+\.\d+(?![\w.])")
 
 def stray_numbers(tex):
     """[(line, number)] of decimal numbers written by hand in the abstract and in
-    sections 4 to 10."""
+    sections 4 to 11."""
     found, section, abstract = [], 0, False
     for i, line in enumerate(uncomment(tex).split("\n"), 1):
         if re.search(r"\\section\{", line):
@@ -753,6 +753,89 @@ def hwpp_cases(root):
     return num(m.group(1), True)
 
 
+def coco(root):
+    """{(network, preprocessing): [AP, AP50, AP75, APs, APm, APl, AR100]} of map_coco.md."""
+    _, rows = table_with(_results("map_coco.md", root), "Preprocessing", "AP50")
+    out, last = {}, None
+    for r in rows:
+        name = en(r[0]).split(" (")[0]
+        last = name = name or last
+        out[(name, en(r[1]))] = [num(c, True) for c in r[2:9]]
+    return out
+
+
+def t_coco(root):
+    return {"header": ["Network", "Preprocessing", "AP", "AP50", "AP75", "APs", "APm", "APl"],
+            "rows": [[n, p] + v[:6] for (n, p), v in coco(root).items()],
+            "nd": [None, None, 1, 1, 1, 1, 1, 1]}
+
+
+def coco_v4_stage(stage_word, col):
+    """AP column `col` (0 = AP, 1 = AP50) of the YOLOv4-tiny stage table of map_coco.md."""
+    def read(root):
+        _, rows = table_with(_results("map_coco.md", root), "Stage", "AP50")
+        return num(row_with(rows, stage_word)[1 + col], True)
+    return read
+
+
+def coco_published(root):
+    m = re.search(r"\*\*YOLOv4-tiny (\d+\.\d+)\*\*",
+                  need(_results("map_coco.md", root)).read_text())
+    if not m:
+        raise MissingSource("map_coco.md: published YOLOv4-tiny AP50 not found")
+    return num(m.group(1), True)
+
+
+def pack_rows(root):
+    _, rows = table_with(_results("dsp_packing.md", root), "Option", "PE DSP")
+    return rows
+
+
+def t_pack(root):
+    rows = [[en(r[0]), en(r[1]), en(r[2]), num(r[3], True), num(r[4], True), num(r[6], True)]
+            for r in pack_rows(root)]
+    return {"header": ["Network", "Option", "Tm, Tn", "PE DSP", "ms", "GOPS"],
+            "rows": rows, "nd": [None, None, None, 0, 1, 1], "status": "projection"}
+
+
+def pack_ms(net, option):
+    def read(root):
+        for r in pack_rows(root):
+            if net in r[0] and option in r[1]:
+                return num(r[4], True)
+        raise MissingSource(f"dsp_packing.md: no row {net} / {option}")
+    return read
+
+
+def t_winograd(root):
+    _, rows = table_with(_results("winograd.md", root), "compute bound")
+    out = []
+    for r in rows:
+        bound = [num(c, True) for c in r[2].split("/")]
+        load = [num(c, True) for c in r[3].split("/")]
+        out.append([f"`{r[0]}`", *bound, *load])
+    return {"header": ["Network", "Bound: direct", "Winograd", "Packing",
+                       "With loads: Winograd offline", "on the fly", "Packing"],
+            "rows": out, "nd": [None, 1, 1, 1, 1, 1, 1], "status": "estimate"}
+
+
+def ood_rows(root):
+    _, rows = table_with(_results("ood_monitor.md", root), "AUROC ExDark (typicality)")
+    return rows
+
+
+def t_ood(root):
+    rows = [[en(r[0]), num(r[3], True), num(r[4], True), num(r[5], True), en(r[6])]
+            for r in ood_rows(root)]
+    return {"header": ["Score", "AUROC ExDark", "AUROC FLIR", "Spearman score / mAP",
+                       "MACs (share of the detector)"],
+            "rows": rows, "nd": [None, 3, 3, 2, None]}
+
+
+def ood_auroc(score, col):
+    return lambda root: num(row_with(ood_rows(root), score)[col], True)
+
+
 # ------------------------------------------------------------------------- registry
 
 @dataclass
@@ -777,6 +860,27 @@ CLES: dict[str, Key] = {
                           "make count-macs", "measured", 2),
     "model.v3.mparams": Key(macs("tiny-yolov3-voc", "params"), "python/yolo/models/specs.py",
                             "make count-macs", "measured", 2),
+    "model.v4.gmacs": Key(macs("tiny-yolov4-coco", "macs"), "python/yolo/models/specs.py",
+                          "make count-macs", "measured", 2),
+    "model.v4.mparams": Key(macs("tiny-yolov4-coco", "params"), "python/yolo/models/specs.py",
+                            "make count-macs", "measured", 2),
+    "model.v7.gmacs": Key(macs("tiny-yolov7-coco", "macs"), "python/yolo/models/specs.py",
+                          "make count-macs", "measured", 2),
+    "model.v7.mparams": Key(macs("tiny-yolov7-coco", "params"), "python/yolo/models/specs.py",
+                            "make count-macs", "measured", 2),
+    # §4-§5 COCO val2017 (M24)
+    "map.coco.table": Key(t_coco, R + "map_coco.md", "tools/m11.sh coco-v4", "measured"),
+    "map.coco.v4.ap50": Key(coco_v4_stage("Float", 1), R + "map_coco.md",
+                            "tools/m11.sh coco-v4", "measured", 1),
+    "map.coco.v4.int8.ap50": Key(coco_v4_stage("Integer", 1), R + "map_coco.md",
+                                 "tools/m11.sh coco-v4", "measured", 1),
+    "map.coco.v4.drop": Key(lambda r: round(coco_v4_stage("Integer", 1)(r)
+                                            - coco_v4_stage("Float", 1)(r), 1),
+                            R + "map_coco.md", "tools/m11.sh coco-v4", "measured", 1, True),
+    "map.coco.v4.published": Key(coco_published, R + "map_coco.md", "—", "published", 1),
+    "map.coco.v3.ap50": Key(lambda r: coco(r)[("Tiny-YOLOv3", "stretch")][1],
+                            R + "map_coco.md", "python tools/eval_voc.py --dataset coco",
+                            "measured", 1),
     # §4-§5-§8 mAP on VOC2007 test
     "map.voc.images": Key(images, R + "map_stades.md", CMD_STAGES, "measured", 0),
     "map.voc.float": Key(lambda r: stage("flottant", r), R + "map_stades.md", CMD_STAGES,
@@ -815,6 +919,16 @@ CLES: dict[str, Key] = {
                              "make perf-model bench-report", "projection", 1),
     "perf.kv260.v3.ms": Key(lambda r: perf(r)["tiny-yolov3-coco"]["ms"], R + "mesures.md",
                             "make perf-model bench-report", "projection", 1),
+    "perf.kv260.v4.ms": Key(lambda r: perf(r)["tiny-yolov4-coco"]["ms"], R + "mesures.md",
+                            "make perf-model bench-report", "projection", 1),
+    "pack.table": Key(t_pack, R + "dsp_packing.md", "python tools/perf_model.py",
+                      "projection"),
+    "pack.v2.tm64.ms": Key(pack_ms("Tiny-YOLOv2", "Tm 64"), R + "dsp_packing.md",
+                           "python tools/perf_model.py", "projection", 1),
+    "pack.v2.tn32.ms": Key(pack_ms("Tiny-YOLOv2", "Tn 32"), R + "dsp_packing.md",
+                           "python tools/perf_model.py", "projection", 1),
+    "winograd.table": Key(t_winograd, R + "winograd.md", "python tools/winograd.py",
+                          "estimate"),
     "perf.cascade": Key(t_cascade, R + "rapport.md", "make perf-model", "projection"),
     "perf.kv260.m6.ms": Key(cascade_row("M6: ports", 2), R + "rapport.md", "make perf-model",
                             "projection", 1),
@@ -847,6 +961,12 @@ CLES: dict[str, Key] = {
                          "python tools/stream_model.py", "estimate", 0),
     "stream.w4.fps": Key(lambda r: streaming(r)[1]["fps"], R + "streaming.md",
                          "python tools/stream_model.py", "estimate", 1),
+    # dependability (M25)
+    "ood.table": Key(t_ood, R + "ood_monitor.md", "tools/m25.sh ood", "measured"),
+    "ood.norm.auroc.exdark": Key(ood_auroc("norm", 3), R + "ood_monitor.md",
+                                 "tools/m25.sh ood", "measured", 2),
+    "ood.norm.auroc.flir": Key(ood_auroc("norm", 4), R + "ood_monitor.md",
+                               "tools/m25.sh ood", "measured", 2),
     # §2 related work
     "benchmarks": Key(t_bench, R + "benchmarks.csv", "make bench-report", "published"),
     # §10 beyond VOC
@@ -904,22 +1024,24 @@ VERSIONED_PDF = ARTICLE.with_suffix(".pdf")
 
 
 def export(article=ARTICLE, out=BUILD, versioned=VERSIONED_PDF):
-    """xelatex (with bibtex) → out/article.pdf, copied to `versioned`
+    """xelatex, else pdflatex (with bibtex) → out/article.pdf, copied to `versioned`
     (docs/article/article.pdf, the export kept in git; build/ is not versioned)."""
-    if not shutil.which("xelatex"):
+    engine = next((e for e in ("xelatex", "pdflatex") if shutil.which(e)), None)
+    if engine is None:
         print("xelatex not installed: no PDF (apt install texlive-xetex "
               "texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended)")
         return 0
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     src = Path(article).resolve()
-    tex = ["xelatex", "-interaction=nonstopmode", "-halt-on-error", f"-output-directory={out}",
+    tex = [engine, "-interaction=nonstopmode", "-halt-on-error", f"-output-directory={out}",
            src.name]
     env = dict(os.environ, BIBINPUTS=f"{src.parent}{os.pathsep}",
                TEXINPUTS=f"{src.parent}{os.pathsep}")
     try:
         if shutil.which("latexmk"):
-            subprocess.run(["latexmk", "-xelatex", "-interaction=nonstopmode", "-halt-on-error",
+            subprocess.run(["latexmk", "-xelatex" if engine == "xelatex" else "-pdf",
+                            "-interaction=nonstopmode", "-halt-on-error",
                             f"-outdir={out}", src.name], cwd=src.parent, env=env, check=True,
                            capture_output=True, text=True)
         else:

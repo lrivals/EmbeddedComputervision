@@ -1,7 +1,7 @@
 {
  "_rev": {
-  "rev": "9955fe9-dirty",
-  "date": "2026-10-19"
+  "rev": "37cb87d-dirty",
+  "date": "2026-10-20"
  },
  "balayage.crowdhuman.meilleur.map": {
   "value": 35.87,
@@ -273,6 +273,17 @@
      "projection"
     ],
     [
+     "this work (C-sim projection)",
+     "YOLOv4-tiny COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "19.30",
+     "51.8",
+     "133.3",
+     "—",
+     "projection"
+    ],
+    [
      "this work (C-sim projection, 2 MACs/DSP, Tm 64)",
      "Tiny-YOLOv2 VOC 416",
      "Kria KV260 (XCK26)",
@@ -315,14 +326,153 @@
      "184.0",
      "—",
      "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tm 64)",
+     "YOLOv4-tiny COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "30.79",
+     "32.5",
+     "212.7",
+     "—",
+     "projection"
+    ],
+    [
+     "this work (C-sim projection, 2 MACs/DSP, Tn 32)",
+     "YOLOv4-tiny COCO 416",
+     "Kria KV260 (XCK26)",
+     "INT8 (W8A8, per channel)",
+     "23.51",
+     "42.5",
+     "162.4",
+     "—",
+     "projection"
     ]
    ]
   },
   "status": "published",
   "source": "results/benchmarks.csv",
   "command": "make bench-report",
-  "rev": "9955fe9-dirty",
-  "date": "2026-10-19"
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.table": {
+  "value": {
+   "header": [
+    "Network",
+    "Preprocessing",
+    "AP",
+    "AP50",
+    "AP75",
+    "APs",
+    "APm",
+    "APl"
+   ],
+   "rows": [
+    [
+     "YOLOv4-tiny",
+     "stretch",
+     21.7,
+     41.4,
+     20.5,
+     9.9,
+     26.0,
+     30.7
+    ],
+    [
+     "YOLOv4-tiny",
+     "letterbox",
+     21.2,
+     39.9,
+     20.4,
+     8.1,
+     24.2,
+     33.6
+    ],
+    [
+     "Tiny-YOLOv3",
+     "stretch",
+     16.7,
+     37.2,
+     12.7,
+     5.7,
+     19.0,
+     26.1
+    ],
+    [
+     "Tiny-YOLOv3",
+     "letterbox",
+     17.0,
+     36.9,
+     13.8,
+     5.2,
+     18.4,
+     28.4
+    ]
+   ],
+   "nd": [
+    null,
+    null,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ]
+  },
+  "status": "measured",
+  "source": "results/map_coco.md",
+  "command": "tools/m11.sh coco-v4",
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.v3.ap50": {
+  "value": 37.2,
+  "status": "measured",
+  "source": "results/map_coco.md",
+  "command": "python tools/eval_voc.py --dataset coco",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.v4.ap50": {
+  "value": 41.4,
+  "status": "measured",
+  "source": "results/map_coco.md",
+  "command": "tools/m11.sh coco-v4",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.v4.drop": {
+  "value": -1.3,
+  "status": "measured",
+  "source": "results/map_coco.md",
+  "command": "tools/m11.sh coco-v4",
+  "nd": 1,
+  "sign": true,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.v4.int8.ap50": {
+  "value": 40.1,
+  "status": "measured",
+  "source": "results/map_coco.md",
+  "command": "tools/m11.sh coco-v4",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "map.coco.v4.published": {
+  "value": 40.2,
+  "status": "published",
+  "source": "results/map_coco.md",
+  "command": "—",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
  },
  "map.formats": {
   "value": {
@@ -678,6 +828,216 @@
   "rev": "1808467",
   "date": "2026-10-07"
  },
+ "model.v4.gmacs": {
+  "value": 3.45,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "model.v4.mparams": {
+  "value": 6.06,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "model.v7.gmacs": {
+  "value": 2.89,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "model.v7.mparams": {
+  "value": 6.23,
+  "status": "measured",
+  "source": "python/yolo/models/specs.py",
+  "command": "make count-macs",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "ood.norm.auroc.exdark": {
+  "value": 0.744,
+  "status": "measured",
+  "source": "results/ood_monitor.md",
+  "command": "tools/m25.sh ood",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "ood.norm.auroc.flir": {
+  "value": 0.884,
+  "status": "measured",
+  "source": "results/ood_monitor.md",
+  "command": "tools/m25.sh ood",
+  "nd": 2,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "ood.table": {
+  "value": {
+   "header": [
+    "Score",
+    "AUROC ExDark",
+    "AUROC FLIR",
+    "Spearman score / mAP",
+    "MACs (share of the detector)"
+   ],
+   "rows": [
+    [
+     "norm",
+     0.744,
+     0.884,
+     -0.66,
+     "0.35 M (0.01 %)"
+    ],
+    [
+     "Mahalanobis",
+     0.669,
+     0.726,
+     -0.41,
+     "4.54 M (0.13 %)"
+    ],
+    [
+     "autoencoder",
+     0.686,
+     0.718,
+     -0.14,
+     "45.69 M (1.31 %)"
+    ]
+   ],
+   "nd": [
+    null,
+    3,
+    3,
+    2,
+    null
+   ]
+  },
+  "status": "measured",
+  "source": "results/ood_monitor.md",
+  "command": "tools/m25.sh ood",
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "pack.table": {
+  "value": {
+   "header": [
+    "Network",
+    "Option",
+    "Tm, Tn",
+    "PE DSP",
+    "ms",
+    "GOPS"
+   ],
+   "rows": [
+    [
+     "Tiny-YOLOv2 VOC",
+     "M10 kernel, 1 MAC / DSP",
+     "32, 24",
+     768,
+     37.2,
+     187.3
+    ],
+    [
+     "Tiny-YOLOv2 VOC",
+     "packed, same tiles (half the DSPs)",
+     "32, 24",
+     384,
+     37.2,
+     187.3
+    ],
+    [
+     "Tiny-YOLOv2 VOC",
+     "packed, Tm 64 (same DSPs)",
+     "64, 24",
+     768,
+     24.7,
+     282.5
+    ],
+    [
+     "Tiny-YOLOv2 VOC",
+     "packed, Tn 32 (roofline point)",
+     "32, 32",
+     512,
+     30.0,
+     232.2
+    ],
+    [
+     "Tiny-YOLOv3 COCO",
+     "M10 kernel, 1 MAC / DSP",
+     "32, 24",
+     768,
+     36.1,
+     154.3
+    ],
+    [
+     "Tiny-YOLOv3 COCO",
+     "packed, same tiles (half the DSPs)",
+     "32, 24",
+     384,
+     36.1,
+     154.3
+    ],
+    [
+     "Tiny-YOLOv3 COCO",
+     "packed, Tm 64 (same DSPs)",
+     "64, 24",
+     768,
+     23.8,
+     233.4
+    ],
+    [
+     "Tiny-YOLOv3 COCO",
+     "packed, Tn 32 (roofline point)",
+     "32, 32",
+     512,
+     30.2,
+     184.0
+    ]
+   ],
+   "nd": [
+    null,
+    null,
+    null,
+    0,
+    1,
+    1
+   ],
+   "status": "projection"
+  },
+  "status": "projection",
+  "source": "results/dsp_packing.md",
+  "command": "python tools/perf_model.py",
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "pack.v2.tm64.ms": {
+  "value": 24.7,
+  "status": "projection",
+  "source": "results/dsp_packing.md",
+  "command": "python tools/perf_model.py",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
+ "pack.v2.tn32.ms": {
+  "value": 30.0,
+  "status": "projection",
+  "source": "results/dsp_packing.md",
+  "command": "python tools/perf_model.py",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
  "perf.cascade": {
   "value": {
    "header": [
@@ -826,6 +1186,16 @@
      154.3,
      50.2,
      "projection"
+    ],
+    [
+     "`tiny-yolov4-coco`",
+     3.454,
+     10.36,
+     51.8,
+     19.3,
+     133.3,
+     52.3,
+     "projection"
     ]
    ],
    "nd": [
@@ -842,8 +1212,8 @@
   "status": "projection",
   "source": "results/mesures.md",
   "command": "make bench-report",
-  "rev": "1808467",
-  "date": "2026-10-07"
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
  },
  "perf.kv260.bound.ms": {
   "value": 31.6,
@@ -917,6 +1287,15 @@
   "rev": "1808467",
   "date": "2026-10-07"
  },
+ "perf.kv260.v4.ms": {
+  "value": 51.8,
+  "status": "projection",
+  "source": "results/mesures.md",
+  "command": "make perf-model bench-report",
+  "nd": 1,
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
+ },
  "quant.sensitive.gap": {
   "value": -0.61,
   "status": "tier-R",
@@ -972,13 +1351,13 @@
   "date": "2026-10-07"
  },
  "verif.dumps": {
-  "value": 6,
+  "value": 12,
   "status": "measured",
   "source": "Makefile (DUMP_IMAGES × QNETS)",
   "command": "make golden-check",
   "nd": 0,
-  "rev": "1808467",
-  "date": "2026-10-07"
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
  },
  "verif.hwpp.cases": {
   "value": 1014,
@@ -988,5 +1367,53 @@
   "nd": 0,
   "rev": "1808467",
   "date": "2026-10-07"
+ },
+ "winograd.table": {
+  "value": {
+   "header": [
+    "Network",
+    "Bound: direct",
+    "Winograd",
+    "Packing",
+    "With loads: Winograd offline",
+    "on the fly",
+    "Packing"
+   ],
+   "rows": [
+    [
+     "`tiny-yolov2-voc`",
+     31.6,
+     17.1,
+     18.1,
+     42.8,
+     22.8,
+     19.8
+    ],
+    [
+     "`tiny-yolov3-coco`",
+     27.0,
+     14.8,
+     15.8,
+     38.8,
+     23.0,
+     18.8
+    ]
+   ],
+   "nd": [
+    null,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "status": "estimate"
+  },
+  "status": "estimate",
+  "source": "results/winograd.md",
+  "command": "python tools/winograd.py",
+  "rev": "7db966a-dirty",
+  "date": "2026-10-20"
  }
 }

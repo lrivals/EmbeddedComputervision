@@ -189,11 +189,11 @@ progress per milestone here.
 | M10 | 14 (+ pointer T10.12) | 0 |
 | M12 | 11 | 0 |
 | M11 | 8 (+ pointer T11.8) | 1 (T11.0 generic adapter) |
-| M13 | 59 | 59 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
+| M13 | 60 | 60 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
 | M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain, training, Colab GPU, smoke run) |
 | M15 | 16 | 1 (T15.3; T15.1 and T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
 | M16 | 20 | 18 (T16.13 COCO: data on the PC since M24, notebook to run; T16.14 KITTI: data missing) |
-| M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; refs check, v0 procedure, board switch and frozen version remain) |
+| M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; v2 follows M23-M26; refs check, v0 procedure, board switch and frozen version remain) |
 | M18 | 11 | 9 (data ready, loaders, 24 notebooks generated, uploaded to the Drive; executed stats, fine-tunings remain) |
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |

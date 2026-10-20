@@ -31,6 +31,14 @@ from the command line.
 
 **State**: 17 tasks done out of 21 (T17.0 to T17.16); T17.17 to T17.20 remain.
 
+**Update v2 (2026-10-20).** The article and the slides follow M23 to M26: two MACs per DSP
+and the Winograd study (§7, `pack.*`, `winograd.table`), YOLOv4-tiny on COCO (§3, §4, §5,
+`model.v4.*`, `map.coco.*`), a new §10 Dependability (faults, ABFT, OOD monitor,
+`ood.*`) and YOLOv7-tiny as work in progress (`model.v7.*`). The new section moves the
+sections checked for hand-typed numbers to 4 to 11 (`RESULT_SECTIONS`). The slides gain a
+YOLOv4/v7 frame, a COCO frame, three packing frames, a Winograd frame and a Dependability
+section.
+
 **LaTeX (2026-10-07).** The source is now `docs/article/article.tex`, compiled by xelatex
 and bibtex (`make article-pdf`) into `docs/article/article.pdf`. LaTeX comments run to the
 end of the line, so the inline blocks below are replaced by macros: the hand-written
@@ -61,7 +69,9 @@ thousands separator, minus sign −). Differences from the plan below:
   the sweep figures (`balayage`, `balayages`) are not in `results/figures/` yet and are not
   cited;
 - `make article-pdf` compiles `build/article/article.pdf` (latexmk -xelatex) and copies it
-  to `docs/article/article.pdf`, the one exported file kept in git.
+  to `docs/article/article.pdf`, the one exported file kept in git. Without xelatex it falls
+  back to pdflatex: the preamble loads `fontspec` under xelatex and `inputenc` / `fontenc` /
+  `lmodern` under pdflatex (`iftex`), so the same source compiles with both.
 
 ## Shared conventions
 

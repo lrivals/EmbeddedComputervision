@@ -75,6 +75,7 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "models/tiny_yolo": ("construction", "torch.nn.Module", "test_tiny_yolo.py", ""),
     "prune": ("élagage", "torch.nn.utils.prune", "test_prune.py", ""),
     "quant/abft": ("ABFT checksum", "—", "test_abft.py", "T25.2"),
+    "quant/bounds": ("accumulator bounds", "—", "test_exhaustive_ops.py", "T28.1"),
     "quant/calibrate": ("calibration", "Vitis AI, TensorRT", "test_quantize.py", "T13.43"),
     "quant/fake_quant": ("fake-quant, QAT", "torch.ao.quantization", "test_fake_quant.py",
                          "T13.46"),

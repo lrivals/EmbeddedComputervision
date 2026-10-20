@@ -114,7 +114,7 @@ notebooks:
 	python -m tools.notebooks all
 
 # M17: article numbers and macros (collect, then render generated.tex); make ci runs --check.
-# article-pdf needs TeX Live: texlive-xetex texlive-latex-recommended texlive-latex-extra.
+# article-pdf needs TeX Live: xelatex (texlive-xetex), else pdflatex; texlive-latex-recommended texlive-latex-extra.
 article:
 	python -m tools.article all
 

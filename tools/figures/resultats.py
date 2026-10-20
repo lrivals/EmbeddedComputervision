@@ -442,6 +442,8 @@ def calibration(out_dir):
     paths = []
     for net in st.NETS:
         p = ROOT / "build" / "quant" / net / "calib.json"
+        if not p.exists():  # calibration sur un autre jeu (calib-<jeu>.json, T11.1)
+            p = next(iter(sorted(p.parent.glob("calib-*.json"))), p)
         if not p.exists():
             continue
         name, layers = load_calib(p)

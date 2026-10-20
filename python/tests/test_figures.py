@@ -421,7 +421,8 @@ def _manifest(net):
 
 
 @pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782),
-                                       ("tiny-yolov4-coco", 3.454)])
+                                       ("tiny-yolov4-coco", 3.454),
+                                       ("tiny-yolov7-coco", 2.916)])
 def test_profile_totals_equal_spec(net, gmac, tmp_path):
     """§3 : 3,486 GMAC (v2), 2,782 GMAC (v3) et 3.454 GMAC (v4, routes groupées CSP), comme
     tools/count_macs.py."""
@@ -460,6 +461,14 @@ def test_graph_dot_grouped_route():
     _manifest("tiny-yolov4-coco")
     src = modeles.graph_dot("tiny-yolov4-coco")
     assert 'L3 [label="L03 route 2/2' in src and "L2 -> L3;" in src
+
+
+def test_graph_dot_spp_concat():
+    """T26.0 : le SPP de YOLOv7-tiny (pools 5×5 / 1 chaînés) et sa concaténation à 4 sources."""
+    _manifest("tiny-yolov7-coco")
+    src = modeles.graph_dot("tiny-yolov7-coco")
+    assert 'L36 [label="L36 maxpool 5×5/1' in src
+    assert all(f"L{s} -> L41;" in src for s in (35, 36, 38, 40))
 
 
 def test_anchors_md_parsed_as_published(tmp_path):
@@ -761,7 +770,8 @@ def test_receptive_fields_strides():
 
 
 @pytest.mark.parametrize("net, gmac", [("tiny-yolov2-voc", 3.486), ("tiny-yolov3-coco", 2.782),
-                                       ("tiny-yolov4-coco", 3.454)])
+                                       ("tiny-yolov4-coco", 3.454),
+                                       ("tiny-yolov7-coco", 2.916)])
 def test_layer_table_totals(net, gmac, tmp_path):
     _manifest(net)
     rows = reseaux.layer_table(reseaux._desc(net))

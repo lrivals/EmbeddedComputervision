@@ -70,6 +70,7 @@ SNR par couche entre le flottant et l'entier déquantifié, et écart entier Pyt
 ![erreur_couches_tiny-yolov2-voc](figures/resultats/erreur_couches_tiny-yolov2-voc.png)
 ![erreur_couches_tiny-yolov3-coco](figures/resultats/erreur_couches_tiny-yolov3-coco.png)
 ![erreur_couches_tiny-yolov4-coco](figures/resultats/erreur_couches_tiny-yolov4-coco.png)
+![erreur_couches_tiny-yolov7-coco](figures/resultats/erreur_couches_tiny-yolov7-coco.png)
 
 ### T13.20 — `cycles_couches`
 
@@ -180,6 +181,14 @@ COCO val2017 AP of YOLOv4-tiny and Tiny-YOLOv3 (stretch and letterbox) with the 
 
 ![map_coco](figures/resultats/map_coco.png)
 
+### T13.58 — `faults`
+
+mAP of the integer Tiny-YOLOv2 under bit flips: against the bit error rate per fault site, per layer, and per bit position. Subset of VOC2007 test.
+
+- Commande : `python -m tools.figures faults`
+- Source : `build/m25/faults/report.json (else build/m25/smoke/report.json)`
+- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
+
 ### T13.53 — `balayages`
 
 Analyse transversale des balayages lot × sous-ensemble : grilles, classements, effets du lot et du sous-ensemble, époques, perte, courbes, composantes, AP par classe, poids publiés et coût. 50 images, palier R.
@@ -209,6 +218,7 @@ Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord 
 ![graphe_tiny-yolov2-voc](figures/modeles/graphe_tiny-yolov2-voc.png)
 ![graphe_tiny-yolov3-coco](figures/modeles/graphe_tiny-yolov3-coco.png)
 ![graphe_tiny-yolov4-coco](figures/modeles/graphe_tiny-yolov4-coco.png)
+![graphe_tiny-yolov7-coco](figures/modeles/graphe_tiny-yolov7-coco.png)
 
 ### T13.3 — `memoire`
 
@@ -220,6 +230,7 @@ Empreinte mémoire par conv (poids, biais, activations) face aux tampons BRAM du
 ![memoire_tiny-yolov2-voc](figures/modeles/memoire_tiny-yolov2-voc.png)
 ![memoire_tiny-yolov3-coco](figures/modeles/memoire_tiny-yolov3-coco.png)
 ![memoire_tiny-yolov4-coco](figures/modeles/memoire_tiny-yolov4-coco.png)
+![memoire_tiny-yolov7-coco](figures/modeles/memoire_tiny-yolov7-coco.png)
 
 ### T13.4 — `ancres`
 
@@ -259,6 +270,7 @@ Sortie YOLO pas à pas sur une image : grille, cellules responsables et ancres, 
 ![sortie_yolo_tiny-yolov2-voc](figures/modeles/sortie_yolo_tiny-yolov2-voc.png)
 ![sortie_yolo_tiny-yolov3-coco](figures/modeles/sortie_yolo_tiny-yolov3-coco.png)
 ![sortie_yolo_tiny-yolov4-coco](figures/modeles/sortie_yolo_tiny-yolov4-coco.png)
+![sortie_yolo_tiny-yolov7-coco](figures/modeles/sortie_yolo_tiny-yolov7-coco.png)
 
 ### T13.6 — `augmentations`
 
@@ -539,6 +551,7 @@ Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, c
 ![fiche_tiny-yolov2-voc](figures/reseaux/fiche_tiny-yolov2-voc.png)
 ![fiche_tiny-yolov3-coco](figures/reseaux/fiche_tiny-yolov3-coco.png)
 ![fiche_tiny-yolov4-coco](figures/reseaux/fiche_tiny-yolov4-coco.png)
+![fiche_tiny-yolov7-coco](figures/reseaux/fiche_tiny-yolov7-coco.png)
 
 ### T13.49 — `champ_receptif`
 
@@ -559,6 +572,7 @@ Flux des tenseurs couche par couche, un bloc par tenseur (largeur selon C, haute
 ![flux_tiny-yolov2-voc](figures/reseaux/flux_tiny-yolov2-voc.png)
 ![flux_tiny-yolov3-coco](figures/reseaux/flux_tiny-yolov3-coco.png)
 ![flux_tiny-yolov4-coco](figures/reseaux/flux_tiny-yolov4-coco.png)
+![flux_tiny-yolov7-coco](figures/reseaux/flux_tiny-yolov7-coco.png)
 
 ### T13.51 — `tete`
 
