@@ -187,7 +187,8 @@ class SimDevice : public Device {
     yolo_conv(word(regmap::ACT_IN), word(regmap::ACT_OUT), word(regmap::WTS),
               reinterpret_cast<const int32_t*>(virt(reg64(regmap::PRM))), d,
               n_calls ? reinterpret_cast<const int32_t*>(virt(reg64(regmap::DESCS))) : nullptr,
-              n_calls);
+              n_calls, reinterpret_cast<int32_t*>(&regs_[regmap::ABFT_ERR / 4]));
+    regs_[regmap::ABFT_ERR_CTRL / 4] = 1;  // ap_vld
     regs_[regmap::CTRL / 4] |= regmap::AP_DONE | regmap::AP_IDLE | regmap::AP_READY;
     if ((regs_[regmap::IER / 4] & 1)) regs_[regmap::ISR / 4] |= 1;
   }

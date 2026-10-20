@@ -96,3 +96,37 @@ def test_typicality_catches_low_energy_inputs():
     assert ood.auroc(ood.typicality(m.score(inside), ref),
                      ood.typicality(m.score(low), ref)) > 0.9
     assert ood.norm(np.array([[3.0, 4.0]]))[0] == 5.0
+
+
+# --------------------------------------------------------------------------- T29.0
+def test_new_monitors_separate_shifted_gaussians():
+    from yolo.infer import ood
+
+    rng = np.random.default_rng(0)
+    fit = rng.normal(0, 1, (600, 32)).round().astype(np.int64) * 10
+    inside = rng.normal(0, 1, (200, 32)).round().astype(np.int64) * 10
+    outside = rng.normal(2.5, 1, (200, 32)).round().astype(np.int64) * 10
+    for mon in (ood.AbstractionBoxes(k=3), ood.ActivationPatterns(bits=16)):
+        mon.fit(fit)
+        a = ood.auroc(mon.score(inside), mon.score(outside))
+        assert a > 0.9, (type(mon).__name__, a)
+        assert mon.memory_bytes > 0 and mon.ops(fit.shape[1]) > 0
+    assert ood.AbstractionBoxes(k=2).fit(fit).score(fit).max() == 0  # every fit point inside
+
+
+def test_fpr_at_tpr_and_max_score():
+    from yolo.infer import ood
+
+    inside = np.linspace(0, 1, 101)
+    outside = np.linspace(2, 3, 101)
+    assert ood.fpr_at_tpr(inside, outside) == 0.0
+    assert ood.fpr_at_tpr(outside, inside) == 1.0
+    assert ood.MaxScore().score([0.9, 0.2]).tolist() == pytest.approx([0.1, 0.8])
+
+
+def test_pool_int():
+    from yolo.infer import ood
+
+    m = np.arange(2 * 3 * 2 * 2, dtype=np.int8).reshape(2, 3, 2, 2)
+    p = ood.pool_int(m)
+    assert p.shape == (2, 6) and p[0, 0] == 0 + 1 + 2 + 3 and p[0, 3] == 3

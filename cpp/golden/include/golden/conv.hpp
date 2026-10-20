@@ -77,6 +77,7 @@ struct ConvParams {
   int shift = 31;        // n de la requantification
   int qmax = 127;        // saturation de la sortie (T9.3)
   bool leaky = true;
+  const int8_t* act_lut = nullptr;  // SiLU (T26.2) : table de 256 entrées ; nullptr : aucune
   int pool_k = 0, pool_s = 0;  // maxpool fusionné ; 0 : aucun
   // ABFT (T25.2): checksum filter Σ_f w_f (cin, k, k) and Σ_f b_f; nullptr: no check.
   const int32_t* cs_w = nullptr;
@@ -105,15 +106,26 @@ struct AccessStats {
 };
 
 // Contrat arithmétique (conventions.md « Arithmétique entière », int_layers.py).
+// Précondition (vérifiée au chargement, Model::load ; prouvée par tools/prove_kernels.py) :
+// 0 ≤ M0 < 2ⁿ, soit un multiplicateur M = M0·2⁻ⁿ < 1 ; le résultat tient alors sur int32.
 inline int32_t requantize(int32_t acc, int32_t m0, int n) {
   // §9.3 : (acc · M0 + 2ⁿ⁻¹) >> n sur 64 bits, décalage arithmétique.
   return int32_t((int64_t(acc) * m0 + (int64_t(1) << (n - 1))) >> n);
 }
-inline int32_t leaky_int(int32_t y) { return y > 0 ? y : (13 * y + 64) >> 7; }
+// 13·y sur 64 bits : sur 32 bits, débordement (comportement indéfini) dès y < −165 191 049,
+// trouvé par T28.1 ; inatteignable sur les exports (|y| < 2¹⁵), mais le contrat vaut ∀ y int32.
+inline int32_t leaky_int(int32_t y) {
+  return y > 0 ? y : int32_t((int64_t(13) * y + 64) >> 7);
+}
 inline int8_t clip_q(int32_t y, int qmax) {
   return int8_t(y < -qmax ? -qmax : (y > qmax ? qmax : y));
 }
 inline int8_t clip8(int32_t y) { return clip_q(y, 127); }
+// SiLU entière (T26.2) : y requantifié à l'échelle de la table, borné à [−128, 127], puis
+// la table int8 de 256 entrées (python/yolo/quant/lut.py `silu_lut`), déjà saturée à ±qmax.
+inline int8_t silu_lookup(int32_t y, const int8_t* lut) {
+  return lut[(y < -128 ? -128 : y > 127 ? 127 : y) + 128];
+}
 
 // T9.3.4 [2024-yan#007.3] : produit d'une entrée 8 bits par deux multiplieurs à entrée 4 bits,
 // x = 16·(x ≫ 4) + (x & 15) ; égal à w·x pour tout (w, x) int8.
@@ -262,6 +274,10 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
             for (int tcc = 0; tcc < tc_n; ++tcc) {
               if (abft) b.sum_buf[trr][tcc] += uint32_t(b.out_buf[too][trr][tcc]) + uint32_t(bias[o]);
               int32_t y = requantize(b.out_buf[too][trr][tcc] + bias[o], m0[o], p.shift);
+              if (p.act_lut) {
+                b.out_buf[too][trr][tcc] = silu_lookup(y, p.act_lut);
+                continue;
+              }
               if (p.leaky) y = leaky_int(y);
               b.out_buf[too][trr][tcc] = clip_q(y, p.qmax);
             }

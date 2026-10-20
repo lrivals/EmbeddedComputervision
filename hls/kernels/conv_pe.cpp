@@ -17,6 +17,7 @@ namespace accel {
 
 #ifndef __SYNTHESIS__
 SimCycles sim_cycles;
+HlsFault hls_fault;
 #endif
 
 // load(in_buf) : n voies × (tr + K_MAX − 1) lignes × row_words(tc + K_MAX − 1) mots. Zéros hors
@@ -94,6 +95,24 @@ load_w:
   }
 }
 
+// ABFT (T25.3) : poids de la voie de contrôle Σ_f w_f (int32, cin × k × k dans `prm` à
+// `cs_index`) des n voies de la tuile ti, même correspondance voie → (canal, ligne du noyau)
+// que load_input et reorder_weights (conv pliée : la voie (c, i) porte la ligne i du noyau).
+// Port gmem_p, n·kh·k mots par ti, en parallèle des chargements de in_buf et w_buf.
+static void load_cs(const int32_t* prm, const LayerDesc& d, int cs_index, int ti, int n,
+                    int32_t cs_w[TN][K_MAX][K_MAX]) {
+  const int K = d.k, kh = kern_h(d);
+load_cs:
+  for (int it = 0; it < n * kh * K; ++it) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT max=TN*K_MAX*K_MAX
+    const int tii = it / (kh * K), i = (it / K) % kh, j = it % K;
+    const int lane = ti + tii;
+    const int c = d.fold ? lane / K : lane, r = d.fold ? lane % K : i;
+    cs_w[tii][i][j] = prm[cs_index + (c * K + r) * K + j];
+  }
+}
+
 // Tm × Tn MAC par cycle : boucle (i, j, trr, tcc) aplatie en PIPELINE II=1, too et tii
 // déroulés, arbre d'additions sur Tn ; voies ≥ n masquées (trim). `first` : première ti,
 // out_buf repart de zéro.
@@ -101,9 +120,13 @@ load_w:
 // produits paquetés sont sommés par groupes de PACK_N voies (tout Tn si `w4`), chaque somme
 // est dépaquetée (retenue de signe du canal bas) avant l'addition int32. Tm impair : le
 // dernier filtre garde un DSP par produit. Même ordonnancement : les cycles ne changent pas.
+// ABFT (T25.3) : avec `cs_on` (premier `to` d'une tuile (row, col)), une voie de plus,
+// Σ_tii cs_w·x en arithmétique modulo 2³² dans cs_buf : Tn produits int8 × ≤ 18 bits, un DSP
+// chacun.
 static void compute(const act_t in_buf[TN][IR][IC], const w_t w_buf[TM][TN][K_MAX][K_MAX],
                     acc_t out_buf[TM][TRB][TCB], int kh, int kw, int tr, int tc, int n,
-                    bool first, bool w4) {
+                    bool first, bool w4, const int32_t cs_w[TN][K_MAX][K_MAX],
+                    uint32_t cs_buf[TRB][TCB], bool cs_on) {
   int i = 0, j = 0, trr = 0, tcc = 0;
   (void)w4;
 mac:
@@ -150,6 +173,14 @@ mac:
       }
       out_buf[too][trr][tcc] = (init ? acc_t(0) : out_buf[too][trr][tcc]) + sum;
     }
+    if (ABFT && cs_on) {
+      uint32_t cs = 0;
+      for (int tii = 0; tii < TN; ++tii) {
+#pragma HLS UNROLL
+        if (tii < n) cs += uint32_t(cs_w[tii][i][j]) * uint32_t(int32_t(in_buf[tii][trr + i][tcc + j]));
+      }
+      cs_buf[trr][tcc] = (init ? 0u : cs_buf[trr][tcc]) + cs;
+    }
     if (++tcc == tc) {
       tcc = 0;
       if (++trr == tr) {
@@ -164,13 +195,32 @@ mac:
 }
 
 // Une tuile de sortie complète : accumulation sur ti avec double tampon in_buf / w_buf.
-static void conv_tile(const word_t* act_in, const word_t* wts, const LayerDesc& d,
-                      const TileInfo& t, act_t in_a[TN][IR][IC], act_t in_b[TN][IR][IC],
-                      w_t w_a[TM][TN][K_MAX][K_MAX], w_t w_b[TM][TN][K_MAX][K_MAX],
-                      acc_t out_buf[TM][TRB][TCB]) {
+#ifndef __SYNTHESIS__
+// T25.7 : bit inversé dans in_buf ou w_buf juste avant le calcul de la tuile ti `k`.
+static void fault_in_w(const TileInfo& t, int k, act_t in_buf[TN][IR][IC],
+                       w_t w_buf[TM][TN][K_MAX][K_MAX]) {
+  HlsFault& f = hls_fault;
+  if (f.armed(FB_IN, t.id, k)) {
+    flip8(in_buf[f.a][f.b][f.c], f.bit);
+    f.fired = 1;
+  }
+  if (f.armed(FB_W, t.id, k)) {
+    flip8(w_buf[f.a][f.b][f.c][f.d], f.bit);
+    f.fired = 1;
+  }
+}
+#endif
+
+static void conv_tile(const word_t* act_in, const word_t* wts, const int32_t* prm,
+                      const LayerDesc& d, const TileInfo& t, act_t in_a[TN][IR][IC],
+                      act_t in_b[TN][IR][IC], w_t w_a[TM][TN][K_MAX][K_MAX],
+                      w_t w_b[TM][TN][K_MAX][K_MAX], acc_t out_buf[TM][TRB][TCB],
+                      int cs_index, int32_t cs_wa[TN][K_MAX][K_MAX],
+                      int32_t cs_wb[TN][K_MAX][K_MAX], uint32_t cs_buf[TRB][TCB], bool cs_on) {
   const int nti = n_ti(d), kh = kern_h(d);
   load_input(act_in, d, t, 0, ti_lanes(d, 0), in_a);
   load_weights(wts, d, t, 0, ti_lanes(d, 0), w_a);
+  if (ABFT && cs_on) load_cs(prm, d, cs_index, 0, ti_lanes(d, 0), cs_wa);
 ti_loop:
   for (int k = 0; k < nti; ++k) {
 #pragma HLS LOOP_TRIPCOUNT min=1 max=43
@@ -180,14 +230,24 @@ ti_loop:
       if (more) {
         load_input(act_in, d, t, (k + 1) * TN, n_next, in_b);
         load_weights(wts, d, t, k + 1, n_next, w_b);
+        if (ABFT && cs_on) load_cs(prm, d, cs_index, (k + 1) * TN, n_next, cs_wb);
       }
-      compute(in_a, w_a, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4);
+#ifndef __SYNTHESIS__
+      fault_in_w(t, k, in_a, w_a);
+#endif
+      compute(in_a, w_a, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4, cs_wa, cs_buf,
+              cs_on);
     } else {
       if (more) {
         load_input(act_in, d, t, (k + 1) * TN, n_next, in_a);
         load_weights(wts, d, t, k + 1, n_next, w_a);
+        if (ABFT && cs_on) load_cs(prm, d, cs_index, (k + 1) * TN, n_next, cs_wa);
       }
-      compute(in_b, w_b, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4);
+#ifndef __SYNTHESIS__
+      fault_in_w(t, k, in_b, w_b);
+#endif
+      compute(in_b, w_b, out_buf, kh, d.k, d.tr, d.tc, n, k == 0, d.wbits == 4, cs_wb, cs_buf,
+              cs_on);
     }
   }
 }
@@ -227,12 +287,22 @@ static void count_cycles(const LayerDesc& d, const TileInfo& t, bool first_tile,
 }
 #endif
 
-// Une couche conv (+ maxpool fusionné), décrite par `d`.
-static void conv_layer(const word_t* act_in, word_t* act_out, const word_t* wts,
-                       const int32_t* prm, const LayerDesc& d, act_t in_a[TN][IR][IC],
-                       act_t in_b[TN][IR][IC], w_t w_a[TM][TN][K_MAX][K_MAX],
-                       w_t w_b[TM][TN][K_MAX][K_MAX], acc_t out_a[TM][TRB][TCB],
-                       acc_t out_b[TM][TRB][TCB]) {
+// Tampons de la vérification ABFT (T25.3) : poids de contrôle en ping-pong sur ti, voie de
+// contrôle en ping-pong sur les tuiles (row, col) (la voie de (row, col) est comparée au
+// stockage de son dernier `to`, pendant le calcul de la tuile suivante), somme des voies.
+struct AbftBufs {
+  int32_t cs_wa[TN][K_MAX][K_MAX], cs_wb[TN][K_MAX][K_MAX];
+  uint32_t cs[2][TRB][TCB];
+  uint32_t sum[TRB][TCB];
+};
+
+// Une couche conv (+ maxpool fusionné), décrite par `d` ; rend les pixels dont la somme de
+// contrôle a échoué (0 sans faute, ou sans somme de contrôle).
+static int32_t conv_layer(const word_t* act_in, word_t* act_out, const word_t* wts,
+                          const int32_t* prm, const LayerDesc& d, act_t in_a[TN][IR][IC],
+                          act_t in_b[TN][IR][IC], w_t w_a[TM][TN][K_MAX][K_MAX],
+                          w_t w_b[TM][TN][K_MAX][K_MAX], acc_t out_a[TM][TRB][TCB],
+                          acc_t out_b[TM][TRB][TCB], AbftBufs& ab) {
   const int R = d.out_h(), C = d.out_w();
   const int pk = d.pk(), ps = d.ps(), lo = d.pool_lo();
   const int Rp = d.pool_h(), Cp = d.pool_w();
@@ -243,10 +313,17 @@ static void conv_layer(const word_t* act_in, word_t* act_out, const word_t* wts,
 #ifndef __SYNTHESIS__
   uint64_t prev_store = 0;
 #endif
+  // ABFT : deux mots avant les M0 de la couche (driver::build) ; indice < 0 : pas de voie.
+  const int32_t cs_index = ABFT ? prm[d.m0_off - 1] : -1;
+  AbftTile at;
+  at.on = ABFT && cs_index >= 0;
+  at.cs_b = at.on ? prm[d.m0_off - 2] : 0;
+  int32_t errors = 0;
 
   // Parcours row → col → to (golden) ; le stockage de la tuile k − 1 se fait pendant le
   // calcul de la tuile k, dans l'autre out_buf.
   TileInfo prev{};
+  int prev_im = 0, prev_rc = 0;
   int ir = 0, ic = 0, im = 0;
 tiles:
   for (int k = 0; k <= n_tiles; ++k) {
@@ -263,20 +340,42 @@ tiles:
     cur.np_r = imin(Pr, Rp - cur.prow0);
     cur.np_c = imin(Pc, Cp - cur.pcol0);
     cur.tm_n = imin(TM, d.cout - cur.to);
+    cur.id = k;
+    const int rc = (ir * n_c + ic) % 2;  // tampon de la voie de contrôle de (row, col)
+    const bool cs_on = at.on && im == 0;
 
     const bool do_conv = k < n_tiles, do_store = k > 0;
+    AbftTile st = at;
+    st.first = prev_im == 0;
+    st.last = prev_im == n_m - 1;
     if (k % 2 == 0) {
-      if (do_conv) conv_tile(act_in, wts, d, cur, in_a, in_b, w_a, w_b, out_a);
-      if (do_store) store_tile(act_out, prm, d, prev, out_b);
+      if (do_conv)
+        conv_tile(act_in, wts, prm, d, cur, in_a, in_b, w_a, w_b, out_a, cs_index, ab.cs_wa,
+                  ab.cs_wb, ab.cs[rc], cs_on);
+      if (do_store) store_tile(act_out, prm, d, prev, out_b, st, ab.cs[prev_rc], ab.sum, errors);
     } else {
-      if (do_conv) conv_tile(act_in, wts, d, cur, in_a, in_b, w_a, w_b, out_b);
-      if (do_store) store_tile(act_out, prm, d, prev, out_a);
+      if (do_conv)
+        conv_tile(act_in, wts, prm, d, cur, in_a, in_b, w_a, w_b, out_b, cs_index, ab.cs_wa,
+                  ab.cs_wb, ab.cs[rc], cs_on);
+      if (do_store) store_tile(act_out, prm, d, prev, out_a, st, ab.cs[prev_rc], ab.sum, errors);
     }
 #ifndef __SYNTHESIS__
     if (do_conv) count_cycles(d, cur, k == 0, prev_store);
     else sim_cycles.overlapped += prev_store;
+    // T25.7 : bit inversé dans les accumulateurs de la tuile, ou dans sa voie de contrôle.
+    HlsFault& f = hls_fault;
+    if (do_conv && f.armed(FB_OUT, k)) {
+      flip32((k % 2 == 0 ? out_a : out_b)[f.a][f.b][f.c], f.bit);
+      f.fired = 1;
+    }
+    if (do_conv && cs_on && f.armed(FB_CS, k)) {
+      flip32(ab.cs[rc][f.b][f.c], f.bit);
+      f.fired = 1;
+    }
 #endif
     prev = cur;
+    prev_im = im;
+    prev_rc = rc;
     if (++im == n_m) {
       im = 0;
       if (++ic == n_c) {
@@ -285,6 +384,7 @@ tiles:
       }
     }
   }
+  return errors;
 }
 
 }  // namespace accel
@@ -292,11 +392,11 @@ tiles:
 using namespace accel;
 
 void yolo_conv(const word_t* act_in, word_t* act_out, const word_t* wts, const int32_t* prm,
-               LayerDesc d, const int32_t* descs, int32_t n_calls) {
+               LayerDesc d, const int32_t* descs, int32_t n_calls, int32_t* abft_err) {
 #pragma HLS INTERFACE m_axi port=act_in offset=slave bundle=gmem_in depth=131072
 #pragma HLS INTERFACE m_axi port=act_out offset=slave bundle=gmem_out depth=131072
 #pragma HLS INTERFACE m_axi port=wts offset=slave bundle=gmem_w depth=1105688
-#pragma HLS INTERFACE m_axi port=prm offset=slave bundle=gmem_p depth=7392
+#pragma HLS INTERFACE m_axi port=prm offset=slave bundle=gmem_p depth=65536
 #pragma HLS INTERFACE m_axi port=descs offset=slave bundle=gmem_p depth=720
 #pragma HLS INTERFACE s_axilite port=act_in bundle=control
 #pragma HLS INTERFACE s_axilite port=act_out bundle=control
@@ -305,6 +405,7 @@ void yolo_conv(const word_t* act_in, word_t* act_out, const word_t* wts, const i
 #pragma HLS INTERFACE s_axilite port=d bundle=control
 #pragma HLS INTERFACE s_axilite port=descs bundle=control
 #pragma HLS INTERFACE s_axilite port=n_calls bundle=control
+#pragma HLS INTERFACE s_axilite port=abft_err bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 #pragma HLS AGGREGATE variable=d
 
@@ -323,14 +424,18 @@ void yolo_conv(const word_t* act_in, word_t* act_out, const word_t* wts, const i
 #pragma HLS ARRAY_PARTITION variable=w_b complete dim=2
 #pragma HLS ARRAY_PARTITION variable=out_a complete dim=1
 #pragma HLS ARRAY_PARTITION variable=out_b complete dim=1
+  static AbftBufs ab;
+#pragma HLS ARRAY_PARTITION variable=ab.cs_wa complete dim=1
+#pragma HLS ARRAY_PARTITION variable=ab.cs_wb complete dim=1
 
 #ifndef __SYNTHESIS__
   sim_cycles = SimCycles{};
 #endif
   if (n_calls == 0) {
-    conv_layer(act_in, act_out, wts, prm, d, in_a, in_b, w_a, w_b, out_a, out_b);
+    *abft_err = conv_layer(act_in, act_out, wts, prm, d, in_a, in_b, w_a, w_b, out_a, out_b, ab);
     return;
   }
+  int32_t err = 0;
   // Séquenceur (T10.7) : descripteurs lus en DDR, couches enchaînées sans l'ARM.
 seq:
   for (int c = 0; c < n_calls; ++c) {
@@ -340,7 +445,8 @@ seq:
 #pragma HLS PIPELINE II=1
       w[i] = descs[c * D_WORDS + i];
     }
-    conv_layer(act_in, act_out, wts, prm, desc_from_words(w), in_a, in_b, w_a, w_b, out_a,
-               out_b);
+    err += conv_layer(act_in, act_out, wts, prm, desc_from_words(w), in_a, in_b, w_a, w_b,
+                      out_a, out_b, ab);
   }
+  *abft_err = err;
 }

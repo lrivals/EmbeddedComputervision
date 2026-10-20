@@ -42,7 +42,6 @@ int main(int argc, char** argv) {
     }
     const Model m = Model::load(tb::net_dir(a, net));
     const driver::Program prog = driver::build(m);
-    const int64_t m0_base = int64_t(m.bias.size());
     std::vector<driver::Word> wts((prog.weights.size() + accel::WORD - 1) / accel::WORD, 0);
     std::memcpy(wts.data(), prog.weights.data(), prog.weights.size());
     uint64_t net_ovl = 0, net_comp = 0;
@@ -67,8 +66,10 @@ int main(int argc, char** argv) {
         const driver::View in = driver::single_view(0, c, h, w);
         const accel::LayerDesc d =
             driver::conv_desc(l, in, n_in, p.pooled() ? n_in + n_out : -1, l.b_offset / 4,
-                              m0_base + l.m0_offset / 4, prog.w_off.at(l.id));
-        yolo_conv(arena.data(), arena.data(), wts.data(), prog.params.data(), d, nullptr, 0);
+                              prog.m0_index.at(l.id), prog.w_off.at(l.id));
+        int32_t abft_err = -1;
+        yolo_conv(arena.data(), arena.data(), wts.data(), prog.params.data(), d, nullptr, 0,
+                  &abft_err);
         const int8_t* k_out = bytes + n_in;
         const int8_t* k_pre = bytes + n_in + n_out;
 
@@ -100,6 +101,10 @@ int main(int argc, char** argv) {
             const NpyInt8 want_pre = tb::dump(a, net, image, l.id);
             nd += tb::compare("dump prépool", k_pre, want_pre.data.data(), size_t(n_pre));
           }
+        }
+        if (abft_err != 0) {  // T25.3 : sans faute, la somme de contrôle passe partout
+          std::printf("ABFT %d pixels en échec ", abft_err);
+          nd += size_t(abft_err < 0 ? 1 : abft_err);
         }
         total_diff += nd;
         ++checked;

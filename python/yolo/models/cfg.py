@@ -53,7 +53,8 @@ def _conv(opts, i):
     if pad != k // 2:
         raise ValueError(f"couche {i} : padding {pad} non supporté (attendu k//2)")
     act = opts.get("activation", "logistic")
-    if act not in ("leaky", "linear", "logistic"):
+    act = "silu" if act == "swish" else act  # Darknet's name of the SiLU (T26.2)
+    if act not in ("leaky", "linear", "logistic", "silu"):
         raise ValueError(f"couche {i} : activation {act!r} non supportée")
     return {"type": "conv", "k": k, "s": int(opts.get("stride", 1)), "cout": int(opts["filters"]),
             "act": act, "bn": bool(int(opts.get("batch_normalize", 0)))}

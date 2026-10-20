@@ -208,11 +208,11 @@ progress per milestone here.
 | M22 | 12 | 11 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC and per-domain measurement: usable at ground level and in low light, not on aerial images; datasets to label ranked; T22.9 closing the loop remains) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
-| M25 | 9 | 0 |
-| M26 | 6 | 0 |
+| M25 | 9 | 5 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign to run) |
+| M26 | 6 | 2 (T26.1 offline converter: YOLOv5n / v8n NumPy == torch to 2·10⁻⁷; T26.2 integer SiLU table, Python == golden == HLS; T26.0 YOLOv7-tiny in progress) |
 | M27 | 7 | 0 |
-| M28 | 7 | 0 |
-| M29 | 6 | 0 |
-| M30 | 4 | 0 |
+| M28 | 7 | 3 (T28.1 Python == golden == HLS on 105.6 M swept accumulators, int32 leaky overflow found and fixed; T28.2 95 SMT obligations proved with z3; T28.3 traceability in `make ci`) |
+| M29 | 6 | 1 (T29.0 six monitors on integer features: max score best on ExDark, activation patterns on FLIR; T29.1-T29.3 wait for M27) |
+| M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 0 |

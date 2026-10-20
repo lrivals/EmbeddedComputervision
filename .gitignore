@@ -28,3 +28,4 @@ __pycache__/
 # Dumps de test
 *.npy
 *.npz
+tstex_modules/

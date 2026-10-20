@@ -19,9 +19,12 @@ features, OOD sets ExDark and FLIR, `results/ood_monitor.md`). This milestone co
 monitors on the question that matters for safety — "is a person being missed?" — and puts
 the best one in the integer chain and the HLS kernel.
 
-**State**: not started (2026-10-20). T29.0 to T29.3 and T29.5 run on the PC.
+**State** (2026-10-20): T29.0 done ([results/ood_monitor.md](../../results/ood_monitor.md)).
+No monitor wins on both shifts: the detector's max score is the best on ExDark (AUROC 0.81),
+the activation patterns on FLIR (AUROC 0.93). T29.1 to T29.3 and T29.5 run on the PC; T29.1
+to T29.3 wait for the person metrics of M27.
 
-### [ ] T29.0 — Monitor comparison
+### [x] T29.0 — Monitor comparison
 - **Spec**: §4, §8 · **Depends on**: T25.5 · **Runs on**: PC · **Size**: M
 - **Deliverables**: in `python/yolo/infer/ood.py`: maximum objectness (the detector's MSP
   analogue), abstraction boxes per cluster on L13 (Henzinger 2020), binary activation
@@ -30,6 +33,16 @@ the best one in the integer chain and the HLS kernel.
 - **Acceptance**: same protocol as T25.5 (fit, reference, VOC test, ExDark, FLIR): AUROC,
   false-alarm rate at 95 % detection, memory and MACs per monitor, computed on the integer
   features
+- **Done**:
+  - **Monitors**: `ood.MaxScore`, `AbstractionBoxes` (4 k-means clusters, compare-only),
+    `ActivationPatterns` (64 bits, Hamming distance); `pool_int` (integer pooled features),
+    `fpr_at_tpr`.
+  - **Command**: `tools/ood_monitor.py compare` runs the six monitors against VOC test,
+    ExDark and FLIR, raw and typicality, and writes `build/m25/ood/compare.json`.
+  - **Results**:
+    - max_score: AUROC 0.81 / 0.80, one compare.
+    - patterns: AUROC 0.78 / 0.93, FPR@95 29 % on FLIR, 12.5 KB.
+    - Mahalanobis and the autoencoder are dominated at 10³ to 10⁴ times the cost.
 
 ### [ ] T29.1 — Monitors against missed persons
 - **Spec**: §8.3 · **Depends on**: T29.0, T27.2 · **Runs on**: PC · **Size**: M

@@ -16,7 +16,9 @@ weights is in scope; training these networks is not.
 Related backlog: [M24](M24-yolov4-tiny.md) brings grouped routes, `scale_x_y` and the COCO
 evaluation of T11.1, which this milestone reuses.
 
-**State**: not started (2026-10-19).
+**State** (2026-10-20): T26.0 in progress (SPP 5×5 stride-1 pool, `new_coords` heads,
+calibration). T26.1 (converter) and T26.2 (SiLU) done; the export, driver and engine wiring
+of SiLU layers comes with T26.3.
 
 ### [ ] T26.0 — YOLOv7-tiny
 - **Spec**: §3, §4.4, §10.3 · **Depends on**: T24.5 · **Size**: L
@@ -36,7 +38,7 @@ evaluation of T11.1, which this milestone reuses.
     network is 2.89 GMAC (`make count-macs`); the export counts 2.916 GMAC, as it copies the
     SPP input by two identity 1×1 convs and chains the 5×5 pools.
 
-### [ ] T26.1 — Offline PyTorch weight converter
+### [x] T26.1 — Offline PyTorch weight converter
 - **Spec**: §9.1 · **Depends on**: — · **Size**: M
 - **Deliverables**: `tools/convert_ultralytics.py` (torch imported only there, optional
   extra in `python/pyproject.toml`); `.npz` + generated cfg-like description per network
@@ -44,8 +46,20 @@ evaluation of T11.1, which this milestone reuses.
   on 3 images (test skipped without torch); BN folded or kept as in the NumPy layers
 - **Notes**: check the licence of the weights (Ultralytics models are AGPL-3.0) before
   storing them on Drive or in the article.
+- **Done**:
+  - **Converter**: `tools/convert_ultralytics.py` rebuilds YOLOv5n (C3, SPPF, anchor
+    `Detect`) and YOLOv8n (C2f, SPPF, DFL `Detect`) in torch with the reference parameter
+    names (`strict=True` loading of a state dict or of an official checkpoint, the latter
+    with `ultralytics` / the yolov5 repo to unpickle).
+  - **Output**: BN folded, `.npz` + `.json` flat layer list, run in NumPy by
+    `python/yolo/models/ul_graph.py`.
+  - **Check**: NumPy == torch to within 2·10⁻⁷ (random weights, non-trivial BN, 3 images).
+    The parameter counts are those published for the two "n" models (1.87 M, 3.15 M).
+  - **Test**: `test_convert_ultralytics.py`, skipped without torch.
+  - **Remaining**: a run on the official weights, which needs a download and the licence
+    check.
 
-### [ ] T26.2 — SiLU
+### [x] T26.2 — SiLU
 - **Spec**: §4.3, §9.4 · **Depends on**: — · **Size**: M
 - **Deliverables**: float SiLU (forward, backward) in `python/yolo/layers/activations.py`;
   integer SiLU as a 256-entry table indexed by the int8 input (Python, golden, HLS);
@@ -55,6 +69,18 @@ evaluation of T11.1, which this milestone reuses.
 - **Notes**: the SiLU is applied before the requantization to the output scale, unlike the
   leaky: define where the table sits (after requant to an intermediate scale, then table to
   the output scale), and its cost in the PE.
+- **Done**:
+  - **Float**: `silu_forward` / `silu_backward` (gradcheck), `activation=silu|swish` in the
+    cfg and the graph.
+  - **Integer**: `lut.silu_lut(s_mid, s_out, qmax)`, `int_layers.silu_int`,
+    `conv_out(act="silu")`, `golden::silu_lookup`, `ConvParams::act_lut`.
+  - **HLS**: `store_tile` with `LayerDesc::leaky = 2`; the table is 64 words of `prm` after
+    the M0s.
+  - **Equality**: Python == golden == HLS on every accumulator around the 256 table inputs,
+    5 random scale sets (`test_silu_python_golden_hls`).
+  - **Contract**: in [conventions.md](../conventions.md).
+  - **Remaining for T26.3**: the manifest field (table scale, table blob), the driver and
+    the calibration of s_mid.
 
 ### [ ] T26.3 — YOLOv5n
 - **Spec**: §3, §8 · **Depends on**: T26.1, T26.2, T24.2 · **Size**: L

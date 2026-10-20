@@ -3,6 +3,7 @@
     python tools/ood_monitor.py extract --jobs 16   # features + integer detections
     python tools/ood_monitor.py fit                 # Mahalanobis baseline + autoencoder
     python tools/ood_monitor.py eval                # AUROC, score / mAP per group, cost
+    python tools/ood_monitor.py compare             # T29.0: six monitors, integer features
 
 Features: output of L13 (last backbone conv, 1024 × 13 × 13) of the integer model
 (`IntNetwork`, int8 map dequantized by its scale), `stretch` preprocessing as
@@ -316,6 +317,85 @@ def markdown(res):
     return "\n".join(lines)
 
 
+# ------------------------------------------------------------------------- T29.0
+NEW_MONITORS = ("max_score", "boxes", "patterns")
+ALL_MONITORS = METHODS + NEW_MONITORS
+
+
+def top_scores(out, name):
+    """Highest detection score of each image (0 without detection)."""
+    dets = json.loads((out / f"dets_{name}.json").read_text())
+    return np.array([max(d["scores"], default=0.0) for d in dets])
+
+
+def cmd_compare(args):
+    """Fit the monitors of T29.0 on the fit split (integer pooled L13 features), score the
+    held-out reference and the three test sets with all monitors; AUROC (raw and typicality),
+    false alarms at 95 % detection, memory and operations."""
+    wanted = ALL_MONITORS if args.monitors == "all" else tuple(args.monitors.split(","))
+    maps, scale, _ = load_feats(args.out, "fit")
+    tr, ho = split_fit(len(maps), args.seed)
+    pooled_fit = ood.pool_int(maps)
+    t0 = time.time()
+    fitted = {"max_score": ood.MaxScore().fit(None),
+              "boxes": ood.AbstractionBoxes(k=args.clusters, seed=args.seed).fit(pooled_fit[tr]),
+              "patterns": ood.ActivationPatterns(bits=args.bits).fit(pooled_fit[tr])}
+    print(f"fit: {len(tr)} images, {time.time() - t0:.0f} s; boxes {len(fitted['boxes'].lo)}, "
+          f"patterns {len(fitted['patterns'].patterns)}")
+    old = load_monitor(args.out)[0] if any(m in METHODS for m in wanted) else None
+
+    def scores(name, sel=None):
+        m, _, _ = load_feats(args.out, name)
+        top = top_scores(args.out, name)
+        if sel is not None:
+            m, top = m[sel], top[sel]
+        out = {}
+        if old is not None:
+            out.update({k: v for k, v in raw_scores(old, m, scale).items() if k in wanted})
+        pi = ood.pool_int(m)
+        for k in NEW_MONITORS:
+            if k in wanted:
+                out[k] = fitted[k].score(top if k == "max_score" else pi)
+        return out
+
+    ref_raw = scores("fit", ho)
+    ref = {k: float(np.median(v)) for k, v in ref_raw.items()}
+    sets = {n: scores(n) for n in TEST_SETS}
+    d = pooled_fit.shape[1]
+    maha_d = len(old[0].mean) if old is not None else d
+    cost = {"norm": (0, d), "mahalanobis": (maha_d * (maha_d + 1) * 4, maha_d * maha_d + maha_d),
+            "max_score": (0, 1)}
+    if old is not None:
+        cost["autoencoder"] = (sum(v.size for p in old[2].params for v in p.values()) * 4,
+                               ood.macs(old[2].net))
+    for k in ("boxes", "patterns"):
+        cost[k] = (fitted[k].memory_bytes, fitted[k].ops(d))
+    res = {"ref": ref, "rows": []}
+    for k in wanted:
+        row = {"monitor": k, "memory": cost[k][0], "ops": cost[k][1]}
+        for kind, f in (("raw", lambda v: v), ("typ", lambda v: ood.typicality(v, ref[k]))):
+            for o in ("exdark", "flir"):
+                row[f"auroc_{kind}_{o}"] = ood.auroc(f(sets["voc"][k]), f(sets[o][k]))
+                row[f"fpr95_{kind}_{o}"] = ood.fpr_at_tpr(f(sets["voc"][k]), f(sets[o][k]))
+        res["rows"].append(row)
+    (args.out / "compare.json").write_text(json.dumps(res, indent=1) + "\n")
+    print(compare_markdown(res))
+
+
+def compare_markdown(res):
+    lines = ["| Monitor | AUROC ExDark raw / typ. | AUROC FLIR raw / typ. | FPR@95 ExDark (best) "
+             "| FPR@95 FLIR (best) | Memory | Ops per image |",
+             "|---|---|---|---|---|---|---|"]
+    for r in res["rows"]:
+        def best(o):
+            k = "raw" if r[f"auroc_raw_{o}"] >= r[f"auroc_typ_{o}"] else "typ"
+            return f"{r[f'fpr95_{k}_{o}'] * 100:.1f} % ({k})"
+        lines.append(f"| {r['monitor']} | {r['auroc_raw_exdark']:.3f} / {r['auroc_typ_exdark']:.3f}"
+                     f" | {r['auroc_raw_flir']:.3f} / {r['auroc_typ_flir']:.3f} | {best('exdark')} "
+                     f"| {best('flir')} | {r['memory']:,} B | {r['ops']:,} |")
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=OUT)
@@ -332,8 +412,14 @@ def main():
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--seed", type=int, default=0)
     sub.add_parser("eval")
+    p = sub.add_parser("compare")
+    p.add_argument("--monitors", default="all", help="all, or a list among " + ",".join(ALL_MONITORS))
+    p.add_argument("--clusters", type=int, default=4)
+    p.add_argument("--bits", type=int, default=64)
+    p.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
-    {"extract": cmd_extract, "fit": cmd_fit, "eval": cmd_eval}[args.cmd](args)
+    {"extract": cmd_extract, "fit": cmd_fit, "eval": cmd_eval,
+     "compare": cmd_compare}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -151,3 +151,118 @@ def spearman(x, y):
     rx = np.asarray(x).argsort().argsort().astype(np.float64)
     ry = np.asarray(y).argsort().argsort().astype(np.float64)
     return float(np.corrcoef(rx, ry)[0, 1])
+
+
+# ------------------------------------------------------------- T29.0: more monitors
+# Three monitors of the literature, computed on the **integer** features (int8 L13 map,
+# pooled as integers: per-channel sum of the 169 cells, int32, and max, int8), next to the
+# norm, Mahalanobis and autoencoder of T25.5. Each one has `fit` / `score` (high = alarm) and
+# its cost: `memory_bytes` (stored state) and `ops` (operations per image after the pooling,
+# compares counted as one).
+
+
+def pool_int(maps):
+    """(N, C, H, W) int8 → (N, 2C) int64: per-channel sum (int32 in hardware) and max."""
+    m = np.asarray(maps, np.int64)
+    return np.concatenate([m.sum(axis=(2, 3)), m.max(axis=(2, 3))], axis=1)
+
+
+def fpr_at_tpr(inside, outside, tpr=0.95):
+    """False-alarm rate on `inside` at the threshold that flags `tpr` of `outside`."""
+    thr = np.quantile(np.asarray(outside, np.float64), 1 - tpr)
+    return float((np.asarray(inside, np.float64) >= thr).mean())
+
+
+class MaxScore:
+    """Maximum class score of the detector on the image (MSP of Hendrycks 2017 for a
+    detector: max over cells and classes of σ(t_o)·p_c, the top detection after NMS). Score
+    = 1 − max: a low top confidence raises the alarm. No state, one compare per detection."""
+
+    memory_bytes = 0
+
+    def fit(self, _):
+        return self
+
+    def score(self, top):
+        return 1.0 - np.asarray(top, np.float64)
+
+    @staticmethod
+    def ops(d):
+        return 0
+
+
+def kmeans(x, k, iters=50, seed=0):
+    """Lloyd's k-means on the rows of x: (centres (k, d), labels)."""
+    x = np.asarray(x, np.float64)
+    rng = np.random.default_rng(seed)
+    c = x[rng.choice(len(x), k, replace=False)]
+    for _ in range(iters):
+        d = ((x[:, None, :] - c[None]) ** 2).sum(-1)
+        lab = d.argmin(1)
+        new = np.array([x[lab == j].mean(0) if (lab == j).any() else c[j] for j in range(k)])
+        if np.allclose(new, c):
+            break
+        c = new
+    return c, lab
+
+
+class AbstractionBoxes:
+    """Per-cluster boxes [min, max] of each neuron on the fit features (Henzinger 2020).
+    Score = smallest number of neurons outside the box over the clusters (0: inside one
+    box). Compare-only: 2·d·k compares, 2·d·k stored integers (int32 sums, int8 maxes)."""
+
+    def __init__(self, k=4, seed=0):
+        self.k, self.seed = k, seed
+
+    def fit(self, x):
+        x = np.asarray(x, np.int64)
+        _, lab = kmeans(x.astype(np.float64) / (np.abs(x).max(0) + 1), self.k, seed=self.seed)
+        self.lo = np.stack([x[lab == j].min(0) for j in range(self.k) if (lab == j).any()])
+        self.hi = np.stack([x[lab == j].max(0) for j in range(self.k) if (lab == j).any()])
+        return self
+
+    def score(self, x):
+        x = np.asarray(x, np.int64)[:, None, :]
+        out = ((x < self.lo[None]) | (x > self.hi[None])).sum(-1)
+        return out.min(1).astype(np.float64)
+
+    @property
+    def memory_bytes(self):
+        return self.lo.size * 4 * 2
+
+    def ops(self, d):
+        return 2 * d * len(self.lo)
+
+
+class ActivationPatterns:
+    """Binary activation patterns (Cheng 2018) of the `bits` pooled neurons of largest
+    variance on the fit set: neuron on when above its fit median. Score = Hamming distance to
+    the nearest pattern seen in the fit (0: a known pattern). XOR + popcount over the stored
+    patterns."""
+
+    def __init__(self, bits=64):
+        self.bits = bits
+
+    def fit(self, x):
+        x = np.asarray(x, np.float64)
+        self.idx = np.argsort(x.var(0))[::-1][:self.bits]
+        self.thr = np.median(x[:, self.idx], 0)
+        self.patterns = np.unique(self._binarize(x), axis=0)
+        return self
+
+    def _binarize(self, x):
+        return (np.asarray(x, np.float64)[:, self.idx] > self.thr).astype(np.uint8)
+
+    def score(self, x):
+        b = self._binarize(x)
+        d = np.empty(len(b))
+        for s in range(0, len(b), 256):
+            d[s:s + 256] = (b[s:s + 256, None, :] != self.patterns[None]).sum(-1).min(1)
+        return d
+
+    @property
+    def memory_bytes(self):
+        return len(self.patterns) * self.bits // 8 + self.bits * 4 * 2
+
+    def ops(self, d):
+        return self.bits + len(self.patterns) * (self.bits // 64 + 1) * 2

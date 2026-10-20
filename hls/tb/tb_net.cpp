@@ -50,7 +50,8 @@ int main(int argc, char** argv) {
       uint64_t cycles = 0;
       size_t nd_img = 0;
       size_t next = 1;
-      driver::run(prog, m, arena, x.data.data(), yolo_conv, [&](const driver::ConvCall& c) {
+      const int64_t abft = driver::run(prog, m, arena, x.data.data(), yolo_conv,
+                                       [&](const driver::ConvCall& c) {
         const accel::SimCycles& s = accel::sim_cycles;
         cycles += s.overlapped;
         if (csv.is_open())
@@ -79,6 +80,9 @@ int main(int argc, char** argv) {
           ++checked;
         }
       });
+      // T25.3 : sans faute, aucune somme de contrôle ABFT ne doit échouer.
+      if (abft) std::printf("  ABFT : %lld pixels en échec sans faute\n", (long long)abft);
+      nd_img += size_t(abft);
       total_diff += nd_img;
       std::printf("%s %s : %s, ≈ %llu cycles (estimation C-sim)\n", net.c_str(), image.c_str(),
                   nd_img ? "ÉCHEC" : "OK", (unsigned long long)cycles);

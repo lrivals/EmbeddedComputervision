@@ -186,6 +186,13 @@ Model Model::load(const std::string& dir) {
   m.luts = read_blob<uint32_t>(dir + "/luts.bin", blobs["luts.bin"].integer());
   if (blobs.has("checksum.bin"))
     m.checksum = read_blob<int32_t>(dir + "/checksum.bin", blobs["checksum.bin"].integer());
+  // Précondition de `requantize` (T28.2) : 0 < M0 < 2^shift, multiplicateur < 1.
+  for (const auto& l : m.layers)
+    if (l.type == LayerType::Conv)
+      for (int f = 0; f < l.cout; ++f) {
+        const int64_t v = m.m0[size_t(l.m0_offset / 4 + f)];
+        require(v > 0 && v < (int64_t(1) << l.shift), "M0 hors de ]0, 2^shift[ (multiplicateur ≥ 1)");
+      }
   for (const auto& l : m.layers)
     if (l.type == LayerType::Conv && l.cs_offset >= 0)
       require(!m.checksum.empty() &&

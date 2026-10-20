@@ -58,7 +58,10 @@ struct Program {
   std::map<std::string, int64_t> base;  // tampon nommé → indice dans l'arène
   int64_t arena_size = 0;
   int64_t input_off = 0;
-  std::vector<int32_t> params;          // bias.bin puis requant.bin
+  // bias.bin, puis par conv [Σ_f b_f, indice de Σ_f w_f ou −1] et ses M0 (ABFT, T25.3 :
+  // prm[m0_off − 2], prm[m0_off − 1]), puis checksum.bin.
+  std::vector<int32_t> params;
+  std::map<int, int64_t> m0_index;      // conv → indice de ses M0 dans `params`
   std::vector<int8_t> weights;          // weights.bin dans l'ordre des tuiles (weight_layout)
   std::map<int, int64_t> w_off;         // conv → octet de ses poids dans `weights`
   std::vector<View> views;              // par couche ; nseg = 0 : pas en DDR
@@ -78,12 +81,14 @@ using Word = std::conditional_t<accel::WORD == 1, uint8_t,
              std::conditional_t<accel::WORD == 2, uint16_t,
              std::conditional_t<accel::WORD == 4, uint32_t, uint64_t>>>;
 using Kernel = void (*)(const Word* act_in, Word* act_out, const Word* wts, const int32_t* prm,
-                        accel::LayerDesc d, const int32_t* descs, int32_t n_calls);
+                        accel::LayerDesc d, const int32_t* descs, int32_t n_calls,
+                        int32_t* abft_err);
 
 // Passe avant : copie `input` (C, H, W) dans l'arène puis appelle le noyau pour chaque conv.
 // `after` (optionnel) est appelé après chaque conv. L'arène est allouée alignée sur un mot.
-void run(const Program& p, const golden::Model& m, std::vector<Word>& arena,
-         const int8_t* input, Kernel kernel,
-         const std::function<void(const ConvCall&)>& after = nullptr);
+// Rend le total des pixels dont la somme de contrôle ABFT a échoué (T25.3).
+int64_t run(const Program& p, const golden::Model& m, std::vector<Word>& arena,
+            const int8_t* input, Kernel kernel,
+            const std::function<void(const ConvCall&)>& after = nullptr);
 
 }  // namespace driver

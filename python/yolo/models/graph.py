@@ -12,7 +12,8 @@
 import numpy as np
 
 from yolo.backend import get_xp, to_device, to_numpy
-from yolo.layers.activations import leaky_backward, leaky_forward
+from yolo.layers.activations import (leaky_backward, leaky_forward, silu_backward,
+                                      silu_forward)
 from yolo.layers.batchnorm import bn_backward, bn_forward, bn_init_state
 from yolo.layers.conv import conv_backward, conv_forward
 from yolo.layers.pool import maxpool_backward, maxpool_forward
@@ -95,6 +96,9 @@ class Network:
         if layer["act"] == "leaky":
             y, c_act = leaky_forward(y)
             caches.append(c_act)
+        elif layer["act"] == "silu":  # T26.2
+            y, c_act = silu_forward(y)
+            caches.append(c_act)
         return y, caches
 
     def forward(self, x, train=True, all_outputs=False):
@@ -131,6 +135,8 @@ class Network:
         caches = list(caches)
         if layer["act"] == "leaky":
             dy, _ = leaky_backward(dy, caches.pop())
+        elif layer["act"] == "silu":
+            dy, _ = silu_backward(dy, caches.pop())
         if layer["bn"]:
             dy, g = bn_backward(dy, caches.pop())
             grads.update(g)

@@ -45,6 +45,11 @@
 #ifndef ACC_PACK
 #define ACC_PACK 1
 #endif
+// ABFT (T25.3) : voie de somme de contrôle Σ_f w_f à côté des Tm filtres, comparée en int32
+// (modulo 2³²) à la somme des Tm voies + biais dans l'étage de sortie ; 0 : retirée.
+#ifndef ACC_ABFT
+#define ACC_ABFT 1
+#endif
 
 namespace accel {
 
@@ -55,6 +60,7 @@ constexpr int RQ = ACC_RQ;
 constexpr bool FOLD = ACC_FOLD != 0;
 constexpr int TILE_POOL = ACC_TILE_POOL;
 constexpr int PACK = ACC_PACK;
+constexpr bool ABFT = ACC_ABFT != 0;
 constexpr int K_MAX = 3;
 constexpr int PK_MAX = 5;  // maxpool fusionné le plus large (5×5 stride 1 du SPP, T26.0)
 // Tampons sur puce : la plus grande des tuiles utilisées.

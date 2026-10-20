@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel traceability prove-kernels
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -20,7 +20,9 @@ help:
 	@echo "eval-int    mAP VOC2007 test du modèle entier et du flottant (T4.5)"
 	@echo "export      modèle entier + dumps → model/<net>/ (T4.7)"
 	@echo "csim-gcc    C-sim du noyau HLS avec g++ (sans Vitis) : tb_conv + tb_net (T6.1-T6.4)"
-	@echo "hls-cycles  estimation de cycles par couche en C-sim → build/hls/cycles_conv.csv"
+	@echo "hls-cycles  estimation de cycles par couche en C-sim → build/hls/cycles_conv.csv, cycles_post.csv (T30.1)"
+	@echo "traceability  docs/traceability.md : opération cfg → Python, golden, HLS (T28.3)"
+	@echo "prove-kernels preuve SMT de l'étage de sortie (z3, T28.2)"
 	@echo "csim        C-simulation HLS dans Vitis (BOARD=$(BOARD))"
 	@echo "hls-synth   synthèse Vitis HLS (T6.5)"
 	@echo "hls-synth-pow2  synthèse de la PE à décalages, ACC_WMODE_POW2 (T9.2.4, T13.24)"
@@ -66,6 +68,7 @@ ci:
 	$(MAKE) lint
 	python -m tools.notebooks --check
 	python -m tools.article --check
+	python tools/traceability.py --check
 	$(MAKE) test-cpp
 	$(MAKE) golden-check
 	$(MAKE) csim-gcc
@@ -198,10 +201,17 @@ csim-gcc:
 	cmake --build build/hls -j
 	cd build/hls && ctest --output-on-failure
 
+traceability:
+	python tools/traceability.py
+
+prove-kernels:
+	python tools/prove_kernels.py --markdown
+
 hls-cycles:
 	cmake -S hls -B build/hls
-	cmake --build build/hls -j --target tb_conv
+	cmake --build build/hls -j --target tb_conv tb_post
 	build/hls/tb_conv --image 000001 --csv build/hls/cycles_conv.csv
+	build/hls/tb_post --image 000001 --random 0 --csv build/hls/cycles_post.csv
 
 csim:
 	cd hls && vitis_hls -f scripts/csim.tcl -tclargs $(BOARD)

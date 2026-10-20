@@ -110,6 +110,54 @@ Reading:
 - A per-image score is therefore a domain alarm, not a predictor of the accuracy on one
   image.
 
+## T29.0: six monitors compared (2026-10-20)
+
+`python tools/ood_monitor.py compare` uses the same features, sets, fit split (1,500
+trainval images) and held-out reference (500) as T25.5. It adds three monitors of the
+literature, computed on the **integer** features: per-channel sum (int32) and max (int8) of
+the int8 L13 map, 2,048 values (`ood.pool_int`).
+
+| Monitor | Computes | Fit |
+|---|---|---|
+| max_score | 1 − top detection score of the image (MSP of Hendrycks 2017 for a detector) | none |
+| boxes | fewest neurons outside a [min, max] box, over 4 k-means clusters (Henzinger 2020) | 4 boxes × 2,048 neurons |
+| patterns | Hamming distance to the nearest binary pattern of the fit; the 64 pooled neurons of largest variance, on when above their median (Cheng 2018) | 1,500 patterns (all distinct) |
+
+AUROC of VOC test against each shifted set: raw score, then typicality |s − median of the
+reference|. FPR@95: share of VOC test images flagged when the threshold flags 95 % of the
+shifted set, for the better of the two forms. Memory: stored state. Ops: operations per image
+after the pooling; compares, XOR and popcount count one each.
+
+| Monitor | AUROC ExDark raw / typ. | AUROC FLIR raw / typ. | FPR@95 ExDark | FPR@95 FLIR | Memory | Ops per image |
+|---|---|---|---|---|---|---|
+| norm (T25.5) | 0.195 / 0.744 | 0.086 / 0.884 | 85.2 % (typ) | 38.4 % (typ) | 0 B | 2,048 |
+| Mahalanobis (T25.5) | 0.321 / 0.669 | 0.213 / 0.726 | 85.8 % (typ) | 81.0 % (typ) | 16.8 MB | 4.2 M |
+| autoencoder (T25.5) | 0.279 / 0.686 | 0.183 / 0.718 | 86.8 % (typ) | 84.0 % (typ) | 1.1 MB | 45.7 M |
+| **max_score** | **0.809** / 0.794 | 0.801 / 0.775 | **70.0 %** (raw) | 68.0 % (raw) | 0 B | 1 |
+| boxes | 0.642 / 0.541 | 0.624 / 0.449 | 91.0 % (raw) | 79.6 % (raw) | 64 KB | 16,384 |
+| **patterns** | 0.777 / 0.639 | **0.933** / 0.863 | 75.4 % (raw) | **29.4 %** (raw) | 12.5 KB | 6,064 |
+
+The rows of T25.5 reproduce `eval.json` to the third decimal.
+
+Reading:
+
+- **No monitor wins on both shifts.**
+  - On low light (ExDark), the detector's own confidence is the best: AUROC 0.81 at the
+    cost of one compare.
+  - On thermal images (FLIR), the activation patterns are the best: AUROC 0.93, 29 % false
+    alarms at 95 % detection, against 38 % for the norm.
+  - A pair (max_score, patterns) costs ≈ 6,000 operations and 12.5 KB.
+- **Mahalanobis and the autoencoder** are dominated by cheaper monitors on both shifts. They
+  cost 4.2 M and 45.7 M operations.
+- **Abstraction boxes** are compare-only (the most hardware-friendly logic), but weak: with
+  2,048 neurons, a VOC test image also falls outside every box on some neurons.
+- **The new monitors need no typicality**: their raw form is the better one (a low score =
+  in domain). The norm, Mahalanobis and the autoencoder only work as typicality (§ above).
+- **False alarms stay high**: none of them is an alarm with an acceptable false-alarm rate
+  on its own. FPR@95 ≥ 29 %.
+- **Next (T29.1)**: the question that matters for safety is whether the monitor flags the
+  images where a person is missed. That needs the person ground truth of M27.
+
 ## Remaining
 
 - Monitor on L12 instead of L13 (`extract --layer 12`), and on the HIT-UAV and drone sets of

@@ -63,6 +63,16 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     add_test(NAME ${tb} COMMAND ${tb})
   endforeach()
 
+  # T28.1 : étage de sortie sur des accumulateurs balayés (python/tests/test_exhaustive_ops.py).
+  add_executable(tb_ops tb/tb_ops.cpp)
+  target_link_libraries(tb_ops PRIVATE accel)
+  add_test(NAME tb_ops COMMAND tb_ops)
+  # T25.3, T25.7 : fautes dans les tampons sur puce, détection par la voie ABFT.
+  add_executable(tb_fault tb/tb_fault.cpp)
+  target_link_libraries(tb_fault PRIVATE accel driver)
+  target_compile_definitions(tb_fault PRIVATE ACC_MODEL_DIR="${ACC_MODEL_DIR}")
+  add_test(NAME tb_fault COMMAND tb_fault)
+
   # T9.4.2 : architecture streaming (Tiny-YOLOv2).
   add_executable(tb_stream tb/tb_stream.cpp)
   target_link_libraries(tb_stream PRIVATE accel_stream)

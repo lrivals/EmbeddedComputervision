@@ -92,6 +92,7 @@ void Accelerator::set_ptrs(int slot) {
 void Accelerator::start_and_wait(int slot) {
   dev_.write32(regmap::CTRL, regmap::AP_START);
   dev_.wait_done();
+  abft_errors_ += int32_t(dev_.read32(regmap::ABFT_ERR));
   dev_.sync_for_cpu(mem_, size_t(slot * arena_stride_), size_t(prog_.arena_size));
 }
 

@@ -226,3 +226,102 @@ def apply(inet, faults, seed=0, sizes=None):
     inj = FaultInjector(faults, seed, sizes)
     out.hooks = [inj, *inet.hooks]
     return out, inj
+
+
+# ------------------------------------------------------- T25.7: faults in the HLS buffers
+# A flip in an on-chip buffer of `yolo_conv` (hls/kernels/fault_hook.hpp) is not a fault of a
+# T25.0 site: the buffer holds one tile, reloaded from DDR for the next tile, so the fault only
+# reaches the outputs that this tile owns. `hls_buffer_reference` maps the buffer address to
+# tensor indices and recomputes those outputs; hls/tb/tb_fault.cpp --dump gives the C-sim
+# outputs it is compared with (python/tests/test_faults.py).
+#
+# Buffers (indices a, b, c, d of the CSV of tb_fault):
+#   in   in_buf[lane][row][col] of input-channel tile `ti`: lane = ti·Tn + a is the channel
+#        (or (channel, kernel row) of a folded conv), row/col relative to the tile window;
+#   w    w_buf[o][lane][i][j]: weight (to + a, channel of lane, i, j);
+#   out  out_buf[o][r][c]: int32 accumulator **without the bias** (added by the output stage);
+#   q    requantized int8 tile read by the fused max-pool;
+#   cs   ABFT checksum lane: no output effect.
+HLS_BUFFERS = ("in", "w", "out", "q", "cs")
+
+
+def _flip8(v, bit):
+    u = (int(v) & 0xFF) ^ (1 << bit)
+    return u - 256 if u >= 128 else u
+
+
+def _flip32(v, bit):
+    from yolo.quant.int_layers import wrap32
+
+    return wrap32((int(v) & 0xFFFFFFFF) ^ (1 << bit))
+
+
+def hls_lane(lane, k, fold):
+    """(channel, kernel row) of an in_buf / w_buf lane (`load_input`, `reorder_weights`)."""
+    return (lane // k, lane % k) if fold else (lane, None)
+
+
+def hls_buffer_reference(x, qc, g, pool, tn, fold):
+    """Owned outputs of the faulty tile: (to, prow0, pcol0, int8 array (tm_n, np_r, np_c)).
+
+    `x`: int8 input (C, H, W) of the conv; `qc`: its `QConv`; `g`: one tb_fault CSV row
+    (dict of ints: buf name, ti, a, b, c, d, bit, row, col, prow0, pcol0, to, tr_n, tc_n, np_r,
+    np_c, tm_n); `pool`: (pk, ps) of the fused max-pool, (1, 1) without, (1, 2) for a stride-2
+    conv; `tn`: Tn of the kernel; `fold`: the conv is folded (cin·k ≤ Tn, first conv)."""
+    from yolo.quant import int_layers as il
+
+    k = qc.qW.shape[-1]
+    pad = (k - 1) // 2
+    x = np.asarray(x, np.int64)
+    W = np.asarray(qc.qW, np.int64)
+    xp = np.pad(x, ((0, 0), (pad, pad), (pad, pad)))
+    to, tm, row, col, trn, tcn = (g[n] for n in ("to", "tm_n", "row", "col", "tr_n", "tc_n"))
+    Wt = W[to:to + tm]
+
+    def window(ch, dr, dc):  # x_pad[ch, row + dr + trr, col + dc + tcc] over the tile
+        return xp[ch, row + dr:row + dr + trn, col + dc:col + dc + tcn]
+
+    # Accumulators of the tile without the bias (out_buf).
+    acc = np.zeros((tm, trn, tcn), np.int64)
+    for i in range(k):
+        for j in range(k):
+            acc += np.einsum("oc,crs->ors", Wt[:, :, i, j], xp[:, row + i:row + i + trn,
+                                                               col + j:col + j + tcn])
+    buf, a, b, c, d, bit = g["buf"], g["a"], g["b"], g["c"], g["d"], g["bit"]
+    if buf == "out":
+        acc[a, b, c] = _flip32(acc[a, b, c], bit)
+    elif buf == "w":
+        ch, r = hls_lane(g["ti"] * tn + b, k, fold)
+        i = r if fold else c
+        o = to + a
+        dw = _flip8(W[o, ch, i, d], bit) - W[o, ch, i, d]
+        acc[a] += dw * window(ch, i, d)
+    elif buf == "in":
+        ch, ki = hls_lane(g["ti"] * tn + a, k, fold)
+        ir, ic = row - pad + b + (ki or 0), col - pad + c
+        inside = 0 <= ir < x.shape[1] and 0 <= ic < x.shape[2] and ch < x.shape[0]
+        v = int(x[ch, ir, ic]) if inside else 0
+        dv = _flip8(v, bit) - v
+        # out[trr, tcc] reads in_buf[trr + i][tcc + j] (folded: kernel row fixed by the lane)
+        for i in ([0] if fold else range(k)):
+            for j in range(k):
+                trr, tcc = b - i, c - j
+                if 0 <= trr < trn and 0 <= tcc < tcn:
+                    acc[:, trr, tcc] += Wt[:, ch, ki if fold else i, j] * dv
+    acc = il.wrap32(acc + np.asarray(qc.qb, np.int64)[to:to + tm, None, None])
+    q = il.conv_out(acc[None], np.asarray(qc.M0)[to:to + tm], qc.n, qc.act, qc.qmax)[0]
+    if buf == "q":
+        q[a, b, c] = _flip8(q[a, b, c], bit)
+    # Fused max-pool of the owned outputs, window clamped to the map (edge replication).
+    pk, ps = pool
+    lo = (pk - 1) // 2 if ps == 1 else 0
+    R, C = x.shape[1] + 2 * pad - k + 1, x.shape[2] + 2 * pad - k + 1
+    out = np.full((tm, g["np_r"], g["np_c"]), -128, np.int64)
+    for pr in range(g["np_r"]):
+        for pc in range(g["np_c"]):
+            for u in range(pk):
+                for v in range(pk):
+                    r = min(max((g["prow0"] + pr) * ps - lo + u, 0), R - 1) - row
+                    s = min(max((g["pcol0"] + pc) * ps - lo + v, 0), C - 1) - col
+                    out[:, pr, pc] = np.maximum(out[:, pr, pc], q[:, r, s])
+    return to, g["prow0"], g["pcol0"], out.astype(np.int8)

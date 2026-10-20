@@ -66,6 +66,16 @@ def softmax_exp_lut(scale):
     return _fixed(np.exp(d * scale))
 
 
+def silu_lut(s_mid, s_out, qmax=127):
+    """T26.2: int8 table of the integer SiLU. The accumulator is requantized to an
+    intermediate int8 scale `s_mid` (clipped to [−128, 127], the table index), then the table
+    gives round(SiLU(q·s_mid) / s_out), saturated to [−qmax, qmax]: exact by construction
+    (every int8 input has its entry), the same 256 bytes in Python, golden and HLS."""
+    t = lut_inputs(s_mid)
+    y = np.floor(t / (1.0 + np.exp(-t)) / s_out + 0.5)
+    return np.clip(y, -qmax, qmax).astype(np.int8)
+
+
 def lookup(lut, q, offset=OFFSET):
     """Entrées de `lut` pour les entiers `q` (int8 ou int64)."""
     return lut[np.asarray(q, dtype=np.int64) + offset]

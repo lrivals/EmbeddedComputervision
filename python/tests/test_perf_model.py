@@ -85,3 +85,52 @@ def test_packed_pe():
     base, same, tm64, tn32 = (rows[name] for name, _ in pm.PACK_OPTIONS)
     assert same[5] == base[5] and same[3] == base[3] // 2
     assert tm64[3] == base[3] and tm64[5] < tn32[5] < base[5]
+
+
+# --------------------------------------------------------------------------- T30.0, T30.1
+POST_CSV = ROOT / "build" / "hls" / "cycles_post.csv"
+
+
+@pytest.mark.parametrize("net", ["tiny-yolov2-voc", "tiny-yolov3-coco"])
+def test_wcet_bounds_the_schedule(net):
+    _layers(net)
+    w = pm.wcet(net)
+    for x in w["layers"]:
+        assert x["bound"] >= x["sequential"] >= x["overlapped"] > 0
+    assert w["accel"] > w["overlapped"]
+    assert w["total"] == w["accel"] + w["post"]["total"]
+    assert w["watchdog_ms"] >= w["ms"] * pm.WATCHDOG_MARGIN
+
+
+def test_softmax_classes_per_cell():
+    h = dict(classes=20, softmax=True)
+    # Q16 scores of one cell sum to ≤ 2^16 + C/2: at most 4 classes above 0.25 (>, not ≥).
+    assert pm.classes_per_cell(h, 0.25) == 4
+    assert pm.classes_per_cell(h, 0.005) == 20
+    assert pm.classes_per_cell(dict(classes=80, softmax=False), 0.9) == 80
+
+
+@pytest.mark.skipif(not POST_CSV.exists(), reason="make hls-cycles")
+def test_postproc_bound_vs_adversarial_csim():
+    """T30.1: the adversarial inputs of tb_post never exceed the static bound, and the
+    terms set by the cells (tables, scan, decode of every cell) are reached exactly."""
+    import csv as _csv
+
+    for r in _csv.DictReader(POST_CSV.open()):
+        b = pm.postproc_wcet(ROOT / "model" / r["net"] / "manifest.json", float(r["conf"]))
+        assert int(r["total"]) <= b["total"]
+        assert int(r["candidates"]) <= b["candidates"]
+        assert int(r["nms"]) <= b["nms"] and int(r["store"]) <= b["store"]
+        assert (int(r["luts"]), int(r["scan"]), int(r["decode"])) == \
+            (b["luts"], b["scan"], b["decode"])
+        if r["case"] == "all_classes" and r["net"] == "tiny-yolov3-coco":
+            assert int(r["candidates"]) == b["candidates"]  # every cell × class
+
+
+@pytest.mark.parametrize("net", ["tiny-yolov2-voc", "tiny-yolov3-coco"])
+def test_abft_lane_cost(net):
+    """T25.3: + Tn DSP, checksum weights within a DSP48E2 port, their loads hidden."""
+    _layers(net)
+    a = pm.abft_cost(net)
+    assert a["dsp"] == pm.TILES["tn"] and a["exposed_cycles"] == 0
+    assert a["cs_bits"] is not None and a["cs_bits"] <= 27

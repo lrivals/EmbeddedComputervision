@@ -141,9 +141,20 @@ Reference: `python/yolo/quant/int_layers.py`; all integers signed, **arithmetic*
 - Accumulator: `acc = Σ q_w·q_x + q_b` on 32 signed bits (int8 × int8, int32 bias).
 - Requantization: `y = (acc·M0 + 2ⁿ⁻¹) >> n`, product on **64 bits**, `M0 < 2³¹` per
   channel, `n ≤ 31` per layer (`shift`). Round to nearest, halves towards +∞
-  (−2.5 → −2, −0.5 → 0).
+  (−2.5 → −2, −0.5 → 0). Precondition **0 < M0 < 2ⁿ** (multiplier M0·2⁻ⁿ < 1, checked by
+  `golden::Model::load`): y then fits int32, and the C++ equals the Python for every int32
+  accumulator (proved by `tools/prove_kernels.py`, T28.2).
 - Leaky: `y > 0 ? y : (13·y + 64) >> 7` (slope 13/128, **rounded** the same way; the
-  floor `(13·y) >> 7` of §9.3 biases the negatives by −½ step per layer).
+  floor `(13·y) >> 7` of §9.3 biases the negatives by −½ step per layer). The product 13·y
+  is on **64 bits** in C++ (on 32 bits it overflows below y = −165,191,049, found by T28.1).
+- SiLU (T26.2, YOLOv5n / v8n): the accumulator is requantized (`M0`, `shift`) to an
+  intermediate int8 scale s_mid, clipped to [−128, 127], then a **256-entry int8 table**
+  gives `clip(round(SiLU(q·s_mid)/s_out), −qmax, qmax)` (`lut.silu_lut`,
+  `int_layers.silu_int`, `golden::silu_lookup`). Exact by construction: the same 256 bytes
+  everywhere. Unlike the leaky, the non-linearity sits **between** two scales. In HLS, the
+  `leaky` field of `LayerDesc` is the activation code (0 linear, 1 leaky, 2 SiLU) and the
+  table is 64 words of `prm` right after the M0s of the layer. Cost: one 256 × 8 ROM per
+  requantized lane (RQ). The export and driver wiring comes with T26.3.
 - Saturation: `clip(y, −qmax, qmax)` after the leaky, `qmax = 127` unless the conv has a
   `qmax` field in the manifest (b-bit activations: 2^{b−1} − 1, T9.3); −128 is never
   produced.
@@ -152,7 +163,11 @@ Reference: `python/yolo/quant/int_layers.py`; all integers signed, **arithmetic*
 - ABFT check (T25.2, `python/yolo/quant/abft.py`, `golden::conv_layer`): on the
   accumulator, before requantization, Σ_f acc_f = Σ q_x·cs_w + cs_b **modulo 2³²** (a 32-bit
   lane, unsigned arithmetic in C++). Exact: 0 errors without a fault, and any single bit
-  flip of an accumulator is detected. It never changes the outputs.
+  flip of an accumulator is detected. It never changes the outputs. HLS (T25.3): one more
+  output lane in `compute`, compared in the requantization pass of `store_tile`. The
+  driver writes `[cs_b, index of cs_w]` in the two `prm` words before the M0s of each conv
+  (index −1: no check), then `checksum.bin` after all of them; `LayerDesc` is unchanged.
+  The failing pixels of a call are counted in the output register `ABFT_ERR`.
 
 ## Test tolerances
 

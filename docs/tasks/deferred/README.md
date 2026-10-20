@@ -82,7 +82,7 @@ The first useful step on a machine with Vitis is `make csim` (Vitis C-sim must e
 | [M20](M20-webcam.md) | T20.9 | Board | webcam on the KV260 | [ ] |
 | [M23](M23-dsp-packing.md) | T23.2 | Vitis | packed PE synthesis, Tm 64 or Tn 32 | [ ] |
 | | T23.3 | Vivado, Board | packed PE measured | [ ] |
-| [M25](M25-dependability.md) | T25.3 | Vitis | ABFT lane cost | [ ] |
+| [M25](M25-dependability.md) | T25.3 | Vitis | ABFT lane cost, `ABFT_ERR` offsets (`check-regmap`) | [ ] |
 | | T25.4 | Vitis | protection costs | [ ] |
 | | T25.7 | Vivado, Board | configuration-memory upsets | [ ] |
 | [M28](M28-equivalence.md) | T28.0 | Vitis, Board | co-sim and board rows | [ ] |

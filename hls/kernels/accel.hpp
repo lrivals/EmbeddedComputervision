@@ -19,6 +19,7 @@
 #endif
 
 #include "accel_config.hpp"
+#include "fault_hook.hpp"
 #include "golden/conv.hpp"
 #include "layer_desc.hpp"
 #include "weight_layout.hpp"
@@ -62,6 +63,7 @@ struct TileInfo {
   int tr_n, tc_n;      // lignes / colonnes conv calculées
   int np_r, np_c;      // lignes / colonnes poolées produites
   int tm_n;            // canaux de sortie valides
+  int id;              // rang de la tuile dans la couche (crochet de fautes de la C-sim, T25.7)
 };
 
 #ifndef __SYNTHESIS__
@@ -127,5 +129,10 @@ inline pack_t mac2(w_t wa, w_t wb, act_t x) { return golden::mac2(wa, wb, x); }
 // (driver::ARENA_SLACK). `wts` : poids dans l'ordre des tuiles (weight_layout.hpp).
 // n_calls = 0 : une couche, décrite par `d` ; n_calls > 0 : `descs` contient n_calls
 // descripteurs de D_WORDS mots, exécutés dans l'ordre (`d` ignoré).
+// `abft_err` (T25.3, registre de sortie) : pixels dont la somme de contrôle a échoué pendant
+// l'appel (toutes couches) ; 0 sans faute. La voie ABFT d'une conv est décrite par deux mots
+// juste avant ses M0 : prm[m0_off − 2] = Σ_f b_f, prm[m0_off − 1] = indice de Σ_f w_f dans
+// `prm` (−1 : pas de vérification) — `LayerDesc` inchangé (driver::build).
 void yolo_conv(const accel::word_t* act_in, accel::word_t* act_out, const accel::word_t* wts,
-               const int32_t* prm, accel::LayerDesc d, const int32_t* descs, int32_t n_calls);
+               const int32_t* prm, accel::LayerDesc d, const int32_t* descs, int32_t n_calls,
+               int32_t* abft_err);

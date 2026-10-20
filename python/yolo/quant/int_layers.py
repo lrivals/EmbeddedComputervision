@@ -105,9 +105,18 @@ def requantize(acc, M0, n):
     return rshift_round(acc * np.asarray(M0, np.int64)[None, :, None, None], n)
 
 
-def conv_out(acc, M0, n, act="leaky", qmax=QMAX):
-    """Output stage of a conv (§9.3): requantization, leaky, saturation of the int32 acc."""
+def silu_int(y, lut):
+    """T26.2: y requantized to the intermediate scale, clipped to [−128, 127], then the int8
+    table of `lut.silu_lut` (index y + 128)."""
+    return np.asarray(lut, np.int64)[np.clip(np.asarray(y, np.int64), -128, 127) + 128]
+
+
+def conv_out(acc, M0, n, act="leaky", qmax=QMAX, lut=None):
+    """Output stage of a conv (§9.3): requantization, leaky, saturation of the int32 acc;
+    SiLU (T26.2): requantization to the table scale, then the table (`lut`)."""
     y = requantize(acc, M0, n)
+    if act == "silu":
+        return silu_int(y, lut)
     if act == "leaky":
         y = leaky_int(y)
     return clip_q(y, qmax)

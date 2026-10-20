@@ -73,6 +73,8 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "models/graph": ("graphe et rétropropagation", "torch.autograd", "test_graph.py", "T13.33"),
     "models/specs": ("formes et coûts", "torchinfo", "test_tiny_yolo.py", ""),
     "models/tiny_yolo": ("construction", "torch.nn.Module", "test_tiny_yolo.py", ""),
+    "models/ul_graph": ("converted YOLOv5n / v8n", "ultralytics", "test_convert_ultralytics.py",
+                        "T26.1"),
     "prune": ("élagage", "torch.nn.utils.prune", "test_prune.py", ""),
     "quant/abft": ("ABFT checksum", "—", "test_abft.py", "T25.2"),
     "quant/bounds": ("accumulator bounds", "—", "test_exhaustive_ops.py", "T28.1"),

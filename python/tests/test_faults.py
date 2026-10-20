@@ -200,3 +200,58 @@ def test_bias_overflow_wraps_and_is_detected(model):
     finet, _ = F.apply(inet, faults)
     outs = finet.forward(qx, all_outputs=True)
     assert outs[i0].dtype == np.int8 and mon.errors[i0] > 0
+
+
+# --------------------------------------------------------------------------- T25.7
+HLS_DUMP = ROOT / "build" / "m25" / "hls"
+
+
+def _tn():
+    import re
+
+    text = (ROOT / "hls" / "kernels" / "accel_config.hpp").read_text()
+    return int(re.search(r"#define ACC_TN (\d+)", text).group(1))
+
+
+@pytest.mark.skipif(not (HLS_DUMP / "dump.csv").exists(),
+                    reason="tb_fault --csv build/m25/hls/dump.csv --dump build/m25/hls/dump")
+def test_hls_buffer_faults_match_python_reference():
+    """Each flip of an on-chip buffer (C-sim) == `hls_buffer_reference`: the buffer address
+    maps to the right tensor element, and the fault reaches exactly the outputs the tile owns
+    (outside them, the output is the fault-free dump)."""
+    import csv
+    import json
+
+    from yolo.quant.int_layers import QMAX  # noqa: F401  (import check of the module)
+
+    tn = _tn()
+    rows = list(csv.DictReader((HLS_DUMP / "dump.csv").open()))
+    assert rows
+    cache = {}
+    checked = 0
+    for r in rows:
+        net, layer = r["net"], int(r["layer"])
+        if net not in cache:
+            d = ROOT / "model" / net
+            cache[net] = (load_model(d)[0], json.loads((d / "manifest.json").read_text()))
+        qm, man = cache[net]
+        e = next(x for x in man["layers"] if x["id"] == layer)
+        pool = e.get("fused_pool")
+        pk_ps = (pool["k"], pool["s"]) if pool else ((1, 2) if e["s"] == 2 else (1, 1))
+        dumps = ROOT / "model" / net / "dumps" / r["image"]
+        x = np.load(dumps / ("input.npy" if layer == 0 else f"L{layer - 1:02d}.npy"))[0]
+        clean = np.load(dumps / f"L{pool['layer'] if pool else layer:02d}.npy")[0]
+        got = np.load(HLS_DUMP / "dump" / net / f"f{int(r['flip']):05d}.npy")
+        qc = qm.convs[layer]
+        k = qc.qW.shape[-1]
+        fold = k > 1 and qc.qW.shape[1] * k <= tn
+        g = {key: (v if key in ("net", "image", "buf") else int(v)) for key, v in r.items()}
+        to, p0, c0, want = F.hls_buffer_reference(x, qc, g, pk_ps, tn, fold)
+        tm, nr, nc = want.shape
+        region = got[to:to + tm, p0:p0 + nr, c0:c0 + nc]
+        assert np.array_equal(region, want), f"{net} L{layer} flip {r['flip']} ({r['buf']})"
+        outside = got.copy()
+        outside[to:to + tm, p0:p0 + nr, c0:c0 + nc] = clean[to:to + tm, p0:p0 + nr, c0:c0 + nc]
+        assert np.array_equal(outside, clean), f"{net} L{layer} flip {r['flip']}: leak"
+        checked += 1
+    assert checked == len(rows)

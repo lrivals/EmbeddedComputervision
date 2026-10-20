@@ -28,6 +28,11 @@ constexpr uint32_t PRM = 0x34;
 constexpr uint32_t D = 0x40;
 constexpr uint32_t DESCS = 0xc0;    // table des descripteurs (T10.7)
 constexpr uint32_t N_CALLS = 0xcc;  // 0 : une couche décrite par D
+// T25.3 : sortie scalaire `abft_err` (pixels en échec de la somme de contrôle pendant l'appel),
+// données puis contrôle (bit 0 ap_vld) — offsets supposés (mot réservé après N_CALLS), à
+// confirmer par `make check-regmap` (deferred, Vitis).
+constexpr uint32_t ABFT_ERR = 0xd4;
+constexpr uint32_t ABFT_ERR_CTRL = 0xd8;
 
 constexpr uint32_t AP_START = 1u << 0;
 constexpr uint32_t AP_DONE = 1u << 1;
@@ -40,7 +45,8 @@ constexpr uint32_t SPAN = 0x1000;          // fenêtre AXI-Lite (assign_bd_addre
 
 static_assert(DESCS == END + 4 && N_CALLS == DESCS + 12, "séquenceur après d");
 static_assert(std::is_trivially_copyable<accel::LayerDesc>::value, "LayerDesc copiable");
-static_assert(N_CALLS + 4 <= SPAN, "registres hors de la fenêtre");
+static_assert(ABFT_ERR == N_CALLS + 8 && ABFT_ERR_CTRL == ABFT_ERR + 4, "sortie ABFT après n_calls");
+static_assert(ABFT_ERR_CTRL + 4 <= SPAN, "registres hors de la fenêtre");
 
 inline void desc_to_words(const accel::LayerDesc& d, uint32_t w[D_WORDS]) {
   std::memcpy(w, &d, sizeof d);

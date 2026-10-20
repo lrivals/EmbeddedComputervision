@@ -37,3 +37,15 @@ def test_sigmoid_stable():
     assert np.all(np.isfinite(y))
     np.testing.assert_allclose(y, [0.0, 1 / (1 + np.exp(50)), 0.5, 1 / (1 + np.exp(-50)), 1.0],
                                rtol=1e-15, atol=0)
+
+
+def test_silu_gradcheck_and_values():
+    """T26.2: SiLU φ(x) = x·σ(x) (YOLOv5, YOLOv8)."""
+    from yolo.layers.activations import silu_backward, silu_forward
+
+    rng = np.random.default_rng(11)
+    x = rng.standard_normal((2, 3, 4, 4)) * 3
+    errors = check_layer(lambda x, p: silu_forward(x), silu_backward, x, {})
+    assert errors["x"] <= 1e-7
+    y, _ = silu_forward(np.array([-1.0, 0.0, 2.0]))
+    np.testing.assert_allclose(y, [-1 / (1 + np.e), 0.0, 2 / (1 + np.exp(-2))])

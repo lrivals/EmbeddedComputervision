@@ -15,6 +15,8 @@ target_include_directories(golden PUBLIC include)
 
 add_executable(golden_run tools/golden_run.cpp)
 target_link_libraries(golden_run PRIVATE golden)
+add_executable(golden_ops tools/golden_ops.cpp)
+target_link_libraries(golden_ops PRIVATE golden)
 
 option(GOLDEN_TESTS "Construire les tests (Catch2 via FetchContent)" OFF)
 if(GOLDEN_TESTS)

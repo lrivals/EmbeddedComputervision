@@ -58,9 +58,23 @@ write_words:
   }
 }
 
+// ABFT (T25.3) : vérification de la tuile (row, col) à laquelle appartient la tuile stockée.
+// Σ des tm_n voies + biais, accumulée sur les tuiles `to` de (row, col) dans `sum_buf`
+// (modulo 2³², comme golden::conv_layer), comparée à la voie de contrôle `cs_buf` + Σ_f b_f
+// au dernier `to`, pour les tr_n × tc_n pixels calculés. Dans la passe de requantification :
+// pas de cycle de plus (additionneur de RQ voies et comparateur en plus).
+struct AbftTile {
+  bool on = false;     // couche vérifiée (somme de contrôle exportée)
+  bool first = false;  // premier `to` de (row, col) : sum_buf repart de zéro
+  bool last = false;   // dernier `to` : comparaison
+  int32_t cs_b = 0;    // Σ_f b_f
+};
+
 // Stocke la tuile `t` de `out_buf` (accumulateurs int32 sans biais) en DDR.
 inline void store_tile(word_t* act_out, const int32_t* prm, const LayerDesc& d,
-                       const TileInfo& t, const acc_t out_buf[TM][TRB][TCB]) {
+                       const TileInfo& t, const acc_t out_buf[TM][TRB][TCB],
+                       const AbftTile& ab, const uint32_t cs_buf[TRB][TCB],
+                       uint32_t sum_buf[TRB][TCB], int32_t& errors) {
 #pragma HLS INLINE off
   const int R = d.out_h(), C = d.out_w();
   const int pk = d.pk(), ps = d.ps(), lo = d.pool_lo();
@@ -77,6 +91,13 @@ inline void store_tile(word_t* act_out, const int32_t* prm, const LayerDesc& d,
 #pragma HLS ARRAY_PARTITION variable=q cyclic factor=2 dim=3
   int8_t row[IC];
 #pragma HLS ARRAY_PARTITION variable=row complete
+  // SiLU (T26.2) : table int8 de 256 entrées, 64 mots juste après les M0 de la couche (lue ici
+  // à chaque tuile en C-sim ; une fois par couche en matériel, T26.3).
+  int8_t silu_t[256];
+#pragma HLS ARRAY_PARTITION variable=silu_t complete
+  if (d.leaky == 2)
+    for (int k = 0; k < 256; ++k)
+      silu_t[k] = int8_t(uint32_t(prm[d.m0_off + d.cout + k / 4]) >> (8 * (k % 4)));
 
 store_group:
   for (int g = 0; g < TM; g += RQ) {
@@ -93,14 +114,34 @@ store_group:
 #pragma HLS PIPELINE II=1
 #pragma HLS LOOP_TRIPCOUNT max=TRB*TCB
       const int trr = n / tc, tcc = n % tc;
+      uint32_t sum = 0;
       for (int r = 0; r < RQ; ++r) {
 #pragma HLS UNROLL
         int32_t y = golden::requantize(int32_t(out_buf[g + r][trr][tcc]) + bias[r], m0[r],
                                        d.shift);
-        if (d.leaky) y = golden::leaky_int(y);
-        q[r][trr][tcc] = golden::clip_q(y, d.qmax);
+        if (d.leaky == 2) {
+          q[r][trr][tcc] = golden::silu_lookup(y, silu_t);
+        } else {
+          if (d.leaky) y = golden::leaky_int(y);
+          q[r][trr][tcc] = golden::clip_q(y, d.qmax);
+        }
+        if (g + r < t.tm_n) sum += uint32_t(int32_t(out_buf[g + r][trr][tcc])) + uint32_t(bias[r]);
+      }
+      if (ABFT && ab.on) {
+        const uint32_t tot = (ab.first && g == 0 ? 0u : sum_buf[trr][tcc]) + sum;
+        sum_buf[trr][tcc] = tot;
+        if (ab.last && g + RQ >= t.tm_n && trr < t.tr_n && tcc < t.tc_n &&
+            tot != cs_buf[trr][tcc] + uint32_t(ab.cs_b))
+          ++errors;
       }
     }
+#ifndef __SYNTHESIS__
+    // T25.7 : bit inversé dans la tuile requantifiée que lit le maxpool fusionné.
+    if (hls_fault.armed(FB_Q, t.id) && hls_fault.a >= g && hls_fault.a < g + RQ) {
+      flip8(q[hls_fault.a - g][hls_fault.b][hls_fault.c], hls_fault.bit);
+      hls_fault.fired = 1;
+    }
+#endif
 
   store_ch:
     for (int r = 0; r < RQ; ++r) {
@@ -139,6 +180,14 @@ store_group:
       }
     }
   }
+}
+
+// Sans vérification ABFT (testbench de l'étage de sortie, T28.1).
+inline void store_tile(word_t* act_out, const int32_t* prm, const LayerDesc& d,
+                       const TileInfo& t, const acc_t out_buf[TM][TRB][TCB]) {
+  static uint32_t none[TRB][TCB];
+  int32_t errors = 0;
+  store_tile(act_out, prm, d, t, out_buf, AbftTile{}, none, none, errors);
 }
 
 }  // namespace accel

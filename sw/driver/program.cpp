@@ -138,8 +138,22 @@ Program build(const golden::Model& m) {
   p.arena_size += ARENA_SLACK;
   p.input_off = addr(m.input);
   p.params = m.bias;
-  p.params.insert(p.params.end(), m.m0.begin(), m.m0.end());
-  const int64_t m0_base = int64_t(m.bias.size());
+  // Par conv : [Σ_f b_f, indice de Σ_f w_f] puis ses M0 ; les sommes de contrôle à la fin.
+  std::map<int, int64_t> cs_word;
+  for (const Layer& l : m.layers) {
+    if (l.type != LayerType::Conv) continue;
+    p.params.push_back(l.cs_b);
+    cs_word[l.id] = int64_t(p.params.size());
+    p.params.push_back(-1);
+    p.m0_index[l.id] = int64_t(p.params.size());
+    const int32_t* m0 = m.conv_m0(l);
+    p.params.insert(p.params.end(), m0, m0 + l.cout);
+  }
+  const int64_t cs_base = int64_t(p.params.size());
+  p.params.insert(p.params.end(), m.checksum.begin(), m.checksum.end());
+  for (const Layer& l : m.layers)
+    if (l.type == LayerType::Conv && m.conv_checksum(l))
+      p.params[size_t(cs_word.at(l.id))] = i32(cs_base + l.cs_offset / 4, "cs_index");
 
   // Vues : même logique que golden::Engine::place_views (cpp/golden/src/engine.cpp).
   p.views.assign(m.layers.size(), View{});
@@ -198,7 +212,7 @@ Program build(const golden::Model& m) {
     const int64_t pre = l.prepool_out.valid() ? addr(l.prepool_out) : -1;
     const int64_t w_off = int64_t(p.weights.size());
     accel::LayerDesc d =
-        conv_desc(l, in, addr(l.out), pre, l.b_offset / 4, m0_base + l.m0_offset / 4, w_off);
+        conv_desc(l, in, addr(l.out), pre, l.b_offset / 4, p.m0_index.at(l.id), w_off);
     accel::reorder_weights(d, m.conv_weights(l), p.weights);
     p.w_off[l.id] = w_off;
     p.calls.push_back({l.id, d});
@@ -213,18 +227,23 @@ std::vector<int32_t> desc_table(const Program& p) {
   return t;
 }
 
-void run(const Program& p, const golden::Model& m, std::vector<Word>& arena,
-         const int8_t* input, Kernel kernel, const std::function<void(const ConvCall&)>& after) {
+int64_t run(const Program& p, const golden::Model& m, std::vector<Word>& arena,
+            const int8_t* input, Kernel kernel,
+            const std::function<void(const ConvCall&)>& after) {
   arena.assign(size_t(p.arena_size + accel::WORD - 1) / accel::WORD, 0);
   std::memcpy(reinterpret_cast<int8_t*>(arena.data()) + p.input_off, input,
               size_t(m.in_c) * m.in_h * m.in_w);
   // Poids réordonnés, copiés dans des mots (alignement du port m_axi).
   std::vector<Word> wts((p.weights.size() + accel::WORD - 1) / accel::WORD, 0);
   std::memcpy(wts.data(), p.weights.data(), p.weights.size());
+  int64_t errors = 0;
   for (const ConvCall& c : p.calls) {
-    kernel(arena.data(), arena.data(), wts.data(), p.params.data(), c.desc, nullptr, 0);
+    int32_t err = 0;
+    kernel(arena.data(), arena.data(), wts.data(), p.params.data(), c.desc, nullptr, 0, &err);
+    errors += err;
     if (after) after(c);
   }
+  return errors;
 }
 
 }  // namespace driver

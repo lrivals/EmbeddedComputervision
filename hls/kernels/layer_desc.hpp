@@ -21,7 +21,7 @@ struct LayerDesc {
   int32_t cin, cout;       // canaux
   int32_t h, w;            // forme logique de l'entrée
   int32_t shift;           // n de la requantification
-  int32_t leaky;           // 0 / 1
+  int32_t leaky;           // activation : 0 linéaire, 1 leaky, 2 SiLU (table après les M0, T26.2)
   int32_t pool_k, pool_s;  // maxpool fusionné (2×2, ou 5×5 en stride 1, T26.0) ; 0 : aucun
   int32_t nseg;            // 1 ou 2
   int32_t seg0_off, seg0_c, seg0_h, seg0_w, seg0_up;

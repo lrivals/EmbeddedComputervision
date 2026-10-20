@@ -26,6 +26,8 @@ FIELDS = {
     "D": "D_DATA",
     "DESCS": "DESCS_DATA",
     "N_CALLS": "N_CALLS_DATA",
+    "ABFT_ERR": "ABFT_ERR_DATA",  # T25.3
+    "ABFT_ERR_CTRL": "ABFT_ERR_CTRL",
 }
 D_BITS = 31 * 32
 

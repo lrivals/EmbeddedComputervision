@@ -5,9 +5,18 @@ checks run on the PC (C-sim gcc, `perf_model` estimates); only the exact costs a
 configuration-memory faults need the tools or the board. Index: [README.md](README.md).
 
 ### [ ] T25.3 — Exact cost of the ABFT lane
-- **Condition**: Vitis · **Needs first**: T25.3 (PC part), T6.0
-- **To do**: DSP and cycles of the checksum lane (Tm + 1) after synthesis, in place of the
-  `perf_model` cost; check the combination with the packing of M23 (odd lane count).
+- **Condition**: Vitis · **Needs first**: T25.3 (PC part, done 2026-10-20), T6.0
+- **To do**:
+  - **Cost**: DSP and cycles of the checksum lane after synthesis, in place of the
+    `perf_model --abft` projection (+Tn = 24 DSP, no cycle: lane in the same II = 1 loop,
+    weights loaded on gmem_p in parallel).
+  - **II**: check that the requantization pass keeps II = 1 with the RQ-lane sum and the
+    compare.
+  - **Registers**: `make check-regmap` for the new output `abft_err`. The offsets
+    `ABFT_ERR = 0xd4`, `ABFT_ERR_CTRL = 0xd8` of `sw/driver/regmap.hpp` are assumed (a
+    reserved word after `n_calls`).
+  - **Packing (M23)**: the lane is computed apart from the Tm filters, so it does not make
+    the Tm count odd; check the synthesis with `ACC_PACK = 2`.
 
 ### [ ] T25.4 — Exact cost of the protections
 - **Condition**: Vitis · **Needs first**: T25.4 (PC part), T6.0

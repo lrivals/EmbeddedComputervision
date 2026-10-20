@@ -52,6 +52,9 @@ class Accelerator {
   // (coins Q4, scores Q16). `seconds` : registres + calcul + lecture du résultat.
   std::vector<hwpp::Box> run_post(double conf, double iou, int* overflow = nullptr,
                                   double* seconds = nullptr, int slot = 0);
+  // Pixels dont la somme de contrôle ABFT a échoué depuis la création (registre ABFT_ERR lu
+  // après chaque appel de yolo_conv, T25.3) ; 0 sans faute.
+  int64_t abft_errors() const { return abft_errors_; }
 
  private:
   uint64_t arena_phys(int slot) const { return mem_.phys + uint64_t(slot * arena_stride_); }
@@ -69,6 +72,7 @@ class Accelerator {
   double post_conf_ = -1.0, post_iou_ = -1.0;
   std::vector<int64_t> head_off_;
   accel::PostDesc post_desc_{};
+  int64_t abft_errors_ = 0;
 };
 
 }  // namespace driver

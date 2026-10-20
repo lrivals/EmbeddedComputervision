@@ -1,8 +1,12 @@
 // Testbench du post-traitement matériel (T9.1.2) : boîtes de `yolo_post` == `hwpp::run`
 // (golden) sur les têtes des dumps et sur des têtes aléatoires ; cycles estimés en C-sim.
 //
-//   tb_post [--model DIR] [--net NAME]… [--image ID]… [--random N]
+//   tb_post [--model DIR] [--net NAME]… [--image ID]… [--random N] [--csv FILE]
+//
+// --csv : cycles of the adversarial inputs (every cell, every class passes; T30.1), compared
+// with the static bound `perf_model.postproc_wcet` by python/tests/test_perf_model.py.
 #include <cstdio>
+#include <fstream>
 #include <random>
 
 #include "golden/hw_heads.hpp"
@@ -62,6 +66,18 @@ int main(int argc, char** argv) {
   const tb::Args a = tb::parse(argc, argv);
   int checked = 0, failed = 0;
   std::mt19937 rng(7);
+  std::ofstream csv;
+  if (!a.csv.empty()) {
+    csv.open(a.csv);
+    csv << "net,case,conf,candidates,survivors,luts,scan,decode,nms,store,total\n";
+  }
+  auto log = [&](const std::string& net, const char* what, double conf) {
+    if (!csv.is_open()) return;
+    const accel::PostCycles& c = accel::post_cycles;
+    csv << net << "," << what << "," << conf << "," << c.candidates << "," << c.survivors << ","
+        << c.luts << "," << c.scan << "," << c.decode << "," << c.nms << "," << c.store << ","
+        << c.total << "\n";
+  };
   for (const std::string& net : a.nets) {
     if (!tb::have_model(a, net)) {
       std::printf("%s : export absent (make export), sauté\n", net.c_str());
@@ -97,6 +113,28 @@ int main(int argc, char** argv) {
         heads.push_back(h);
       }
       failed += !check(m, heads, 0.25, "toutes cellules", true);
+      log(net, "all_cells", 0.25);
+      ++checked;
+    }
+    // T30.1: every cell and every class passes (t_o = t_c = 127), boxes spread over the image
+    // so that the NMS keeps them apart and the slots fill up: the post-processing worst case.
+    for (double conf : {0.25, 0.005}) {
+      std::vector<std::vector<int8_t>> heads;
+      std::uniform_int_distribution<int> u(-128, 127), small(-40, -20);
+      for (int id : m.heads()) {
+        const Layer& l = m.layers[size_t(id)];
+        std::vector<int8_t> h(size_t(l.out_c) * l.out_h * l.out_w);
+        const int A = l.out_c / (5 + m.classes), plane = l.out_h * l.out_w;
+        for (int an = 0; an < A; ++an)
+          for (int ch = 0; ch < 5 + m.classes; ++ch)
+            for (int c = 0; c < plane; ++c) {
+              int v = ch < 2 ? u(rng) : ch < 4 ? small(rng) : 127;  // small boxes, all pass
+              h[size_t((an * (5 + m.classes) + ch) * plane + c)] = int8_t(v);
+            }
+        heads.push_back(h);
+      }
+      failed += !check(m, heads, conf, "toutes classes", true);
+      log(net, "all_classes", conf);
       ++checked;
     }
     // Têtes aléatoires ; --random N pour une campagne longue (T12.7, ex. 100000).

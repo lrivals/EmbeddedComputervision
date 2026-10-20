@@ -2,6 +2,7 @@
 
     python tools/perf_model.py                       # scénarios, Tiny-YOLOv2 et v3
     python tools/perf_model.py --check build/hls/cycles_conv.csv   # == compteurs C-sim
+    python tools/perf_model.py --wcet                # static latency bound (T30.0)
 
 Réplique en Python de `count_cycles` (hls/kernels/conv_pe.cpp) : même parcours des tuiles
 (row → col → to, tuiles partielles, maxpool fusionné), mêmes hypothèses (II = 1, profondeurs
@@ -341,6 +342,193 @@ def markdown(nets=NETS):
     return "\n".join(out)
 
 
+# --------------------------------------------------------------- T30.0: static latency bound
+# Why the accelerator cycles cannot depend on the image: every loop of `conv_layer`,
+# `conv_tile`, `compute` and `store_tile` (hls/kernels/conv_pe.cpp, output_stage.hpp) has its
+# trip count computed from `LayerDesc` fields (k, pad, cin, cout, h, w, pool_k, pool_s, tr, tc,
+# fold) and the tile constants; activations and weights are only read as data, never as a
+# branch or loop condition (requant, leaky and clip are straight-line, max-pool a compare).
+# `wcet_layer` therefore takes only the manifest. The only data-dependent part of a frame is
+# the post-processing (`yolo_post`): the number of cells above t_o, of candidates and of
+# occupied NMS slots; `postproc_wcet` bounds it by its worst case (every cell passes, every
+# class passes, every slot full).
+AXI_LATENCY = 64  # cycles of DDR latency per m_axi phase (assumption, Zynq US+ HP; T30.2)
+WATCHDOG_MARGIN = 1.25
+
+
+def layer_phases(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc"],
+                 fold=False, tile_pool=None):
+    """m_axi phases of a conv: per tile, one input and one weight load per input-channel tile
+    (`conv_tile`), and one store (`store_tile`). Within a phase the bursts are issued back to
+    back (Vitis default: 16 outstanding requests), so the DDR latency is paid once per phase."""
+    g = tile_grid(d, tm, tn, tr, tc, fold, tile_pool)
+    return g["n_r"] * g["n_c"] * g["n_m"] * (2 * g["nti"] + 1)
+
+
+def wcet_layer(d, freq_hz=FREQ_HZ, bw=DDR_BW, axi_latency=AXI_LATENCY):
+    """Upper bound of one conv with the current kernel, from the manifest only.
+
+    Kernel cycles without any overlap (`sequential`: loads, compute and store one after the
+    other), plus the DDR transfer time of every byte at the effective bandwidth, plus a fixed
+    latency per m_axi phase: each term is an upper bound of what the overlapped schedule hides."""
+    kw = {k: v for k, v in KERNEL.items() if k != "pack"}
+    c = layer_cycles(d, **kw)
+    width = KERNEL["width"]
+    port_bytes = (c["load_in"] + c["load_w"]) * width + c["store"] * width
+    ddr = _cdiv(int(port_bytes * freq_hz), int(bw))
+    phases = layer_phases(d, **{k: KERNEL[k] for k in ("tm", "tn", "tr", "tc", "fold",
+                                                       "tile_pool")})
+    lat = phases * axi_latency
+    return dict(layer=d["layer"], overlapped=c["overlapped"], sequential=c["sequential"],
+                ddr=ddr, phases=phases, latency=lat, bound=c["sequential"] + ddr + lat)
+
+
+def heads(manifest):
+    """Detection heads of a manifest: grid, anchors, classes, softmax (region = v2)."""
+    m = json.loads(Path(manifest).read_text())
+    out = []
+    for layer in m["layers"]:
+        if layer["type"] not in ("yolo", "region"):
+            continue
+        ch, gh, gw = layer["out_shape"]
+        a = layer["num"] if layer["type"] == "region" else len(layer["mask"])
+        out.append(dict(layer=layer["id"], grid_h=gh, grid_w=gw, anchors=a,
+                        classes=ch // a - 5, softmax=layer["type"] == "region"))
+    return out
+
+
+def classes_per_cell(h, conf):
+    """Most classes of one cell whose Q16 score can pass `conf`.
+
+    Sigmoid heads: every class. Softmax heads: the class scores of a cell sum to at most
+    obj + C/2 ≤ 2^16 + C/2 in Q16 (one rounding per class, `cell_scores`), and a passing class
+    has score ≥ conf_q + 1, so at most ⌊(2^16 + C/2) / (conf_q + 1)⌋ of them pass."""
+    if not h["softmax"]:
+        return h["classes"]
+    conf_q = int(conf * (1 << 16))
+    return min(h["classes"], (65536 + h["classes"] // 2) // (conf_q + 1))
+
+
+def postproc_wcet(manifest, conf=0.25, cap=256, max_heads=2):
+    """Worst-case cycles of `yolo_post` (hls/kernels/postproc.cpp, C-sim cycle convention):
+    every cell above t_o, every passing class a candidate, `cap` NMS slots full.
+
+    Per head: 256 table loads, one cycle per cell (t_o scan), 4 + C (+ 2C softmax) + C decode
+    cycles per surviving cell; per candidate, the two `Selector::push` loops over at most `cap`
+    slots; then the 6-word store of `cap` boxes. Returns None when the network has more heads
+    than the kernel (`POST_MAX_HEADS`): its post-processing stays on the ARM."""
+    hs = heads(manifest)
+    if len(hs) > max_heads:
+        return None
+    luts = scan = decode = cand = 0
+    for h in hs:
+        cells = h["anchors"] * h["grid_h"] * h["grid_w"]
+        nc = h["classes"]
+        luts += 256
+        scan += cells
+        decode += cells * (4 + nc + (2 * nc if h["softmax"] else 0) + nc)
+        cand += cells * classes_per_cell(h, conf)
+    nms = cand * 2 * cap
+    store = 6 * cap + 2
+    return dict(luts=luts, scan=scan, decode=decode, candidates=cand, nms=nms, store=store,
+                total=luts + scan + decode + nms + store)
+
+
+def wcet(net, conf=0.25, freq_hz=FREQ_HZ, margin=WATCHDOG_MARGIN):
+    """Static latency bound of a network: per-conv bounds, post-processing bound, total ms and
+    watchdog (bound × margin, rounded up to the next ms)."""
+    manifest = ROOT / "model" / net / "manifest.json"
+    layers = [wcet_layer(d, freq_hz) for d in conv_layers(manifest)]
+    acc = sum(x["bound"] for x in layers)
+    post = postproc_wcet(manifest, conf)
+    total = acc + (post["total"] if post else 0)
+    ms = 1e3 * total / freq_hz
+    return dict(net=net, layers=layers, accel=acc, overlapped=sum(x["overlapped"] for x in layers),
+                post=post, total=total, ms=ms, watchdog_ms=int(-(-ms * margin // 1)))
+
+
+def wcet_markdown(nets=NETS, confs=(0.25, 0.005)):
+    out = [f"Kernel: {kernel_label()}, Tm·Tn = {TILES['tm']}×{TILES['tn']}, {FREQ_HZ / 1e6:.0f} MHz, "
+           f"DDR {DDR_BW / 1e9:.2f} GB/s, {AXI_LATENCY} cycles of latency per m_axi phase (assumed).", ""]
+    for net in nets:
+        w = wcet(net)
+        out += [f"### {net}", "",
+                "| Layer | overlapped (model) | sequential | DDR | phases × latency | bound |",
+                "|---|---|---|---|---|---|"]
+        out += [f"| L{x['layer']:02d} | {x['overlapped']:,} | {x['sequential']:,} | {x['ddr']:,} "
+                f"| {x['latency']:,} | {x['bound']:,} |" for x in w["layers"]]
+        out += [f"| **total** | {w['overlapped']:,} | | | | **{w['accel']:,}** "
+                f"({1e3 * w['accel'] / FREQ_HZ:.1f} ms) |", ""]
+        for conf in confs:
+            p = postproc_wcet(ROOT / "model" / net / "manifest.json", conf)
+            if p is None:
+                out.append("Post-processing: more heads than `POST_MAX_HEADS`, on the ARM "
+                           "(not bounded here).")
+                break
+            out.append(f"Post-processing at conf {conf}: {p['candidates']:,} candidates, "
+                       f"{p['total']:,} cycles ({1e3 * p['total'] / FREQ_HZ:.1f} ms; NMS "
+                       f"{p['nms']:,}).")
+        out += ["", f"**Frame bound (conf 0.25)**: {w['total']:,} cycles = {w['ms']:.1f} ms; "
+                f"watchdog {w['watchdog_ms']} ms (× {WATCHDOG_MARGIN}).", ""]
+    return "\n".join(out)
+
+
+# ------------------------------------------------------------ T25.3: cost of the ABFT lane
+def checksum_bits(manifest):
+    """Widest checksum weight Σ_f w_f of a network (signed bits), from checksum.bin."""
+    import numpy as np
+
+    d = Path(manifest).parent
+    if not (d / "checksum.bin").exists():
+        return None
+    cs = np.fromfile(d / "checksum.bin", "<i4").astype(np.int64)
+    return int(np.abs(cs).max()).bit_length() + 1
+
+
+def abft_cost(net):
+    """Projected cost of the checksum lane of `yolo_conv` (ACC_ABFT = 1), per network.
+
+    - DSP: one more output lane, Tn products int8 × checksum (≤ 27 bits: port A of a DSP48E2,
+      x on port B), so + Tn DSP;
+    - cycles: the lane is computed in the same II = 1 loop as the Tm filters (no cycle); its
+      weights (n·kh·k int32 words per input-channel tile) are loaded on the gmem_p port while
+      in_buf and w_buf load on their own ports: hidden when shorter than the longer of the
+      two, checked per layer here; the sum of the Tm lanes and the compare happen in the
+      requantization pass (no cycle);
+    - memory: two (row, col) lanes and one running sum of Trb × Tcb int32, two weight tiles of
+      Tn × K_MAX² int32 (registers)."""
+    manifest = ROOT / "model" / net / "manifest.json"
+    exposed = 0
+    for d in conv_layers(manifest):
+        g = tile_grid(d, **{k: KERNEL[k] for k in ("tm", "tn", "tr", "tc", "fold",
+                                                   "tile_pool")})
+        kh = 1 if g["folded"] else d["k"]
+        c = kernel_cycles(d)
+        n_ti = g["nti"]
+        tiles_rc = g["n_r"] * g["n_c"]  # the lane is loaded at the first `to` only
+        cs_words = sum(min(KERNEL["tn"], g["lanes"] - t * KERNEL["tn"]) * kh * d["k"]
+                       for t in range(n_ti))
+        per_tile_load = max(c["load_in"], c["load_w"]) / (tiles_rc * g["n_m"])
+        exposed += max(0, cs_words - per_tile_load) * tiles_rc
+    trb = max(KERNEL["tile_pool"] or 0, KERNEL["tr"])
+    tcb = max(KERNEL["tile_pool"] or 0, KERNEL["tc"])
+    return dict(net=net, dsp=KERNEL["tn"], dsp_kernel=kernel_dsp(KERNEL["tm"]),
+                cs_bits=checksum_bits(manifest), exposed_cycles=int(exposed),
+                bram_bytes=3 * trb * tcb * 4, reg_bits=2 * KERNEL["tn"] * K_MAX ** 2 * 32)
+
+
+def abft_markdown(nets=NETS):
+    out = ["| Network | widest checksum weight (bits) | extra DSP | kernel DSP | cycles not "
+           "hidden | buffers (bytes) | weight registers (bits) |",
+           "|---|---|---|---|---|---|---|"]
+    for net in nets:
+        a = abft_cost(net)
+        out.append(f"| {net} | {a['cs_bits']} | +{a['dsp']} | {a['dsp_kernel']} "
+                   f"(+{100 * a['dsp'] / a['dsp_kernel']:.1f} %) | {a['exposed_cycles']} | "
+                   f"{a['bram_bytes']:,} | {a['reg_bits']:,} |")
+    return "\n".join(out)
+
+
 def manifest_summary(path, freq_hz=FREQ_HZ):
     """Noyau actuel sur un export quelconque (élagué, précision mixte : T10.10, T10.11)."""
     layers = conv_layers(path)
@@ -358,11 +546,21 @@ def main():
     ap.add_argument("--check", type=Path, default=None, help="cycles_conv.csv de make hls-cycles")
     ap.add_argument("--manifest", type=Path, action="append", default=[],
                     help="cycles du noyau actuel pour cet export (répétable, JSON en sortie)")
+    ap.add_argument("--wcet", action="store_true",
+                    help="static latency bound per network, Markdown (T30.0)")
+    ap.add_argument("--abft", action="store_true",
+                    help="projected cost of the ABFT checksum lane (T25.3)")
     ap.add_argument("--no-figures", action="store_true",
                     help="pas de figure dans build/perf/figures/ (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
     if args.check:
         sys.exit(1 if check(args.check) else 0)
+    if args.abft:
+        print(abft_markdown([n for n in NETS if (ROOT / "model" / n / "manifest.json").exists()]))
+        return
+    if args.wcet:
+        print(wcet_markdown([n for n in NETS if (ROOT / "model" / n / "manifest.json").exists()]))
+        return
     if args.manifest:
         print(json.dumps([manifest_summary(m) for m in args.manifest], indent=1))
         return

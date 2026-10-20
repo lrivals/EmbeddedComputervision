@@ -31,3 +31,15 @@ def sigmoid_backward(dy, cache):
     # §4.5 : σ'(t) = σ(t)(1 − σ(t))
     y = cache
     return dy * y * (1.0 - y), {}
+
+
+def silu_forward(x):
+    """SiLU (swish, YOLOv5 / v8, T26.2) : φ(x) = x·σ(x)."""
+    s = sigmoid(x)
+    return x * s, (x, s)
+
+
+def silu_backward(dy, cache):
+    # φ'(x) = σ(x)·(1 + x·(1 − σ(x)))
+    x, s = cache
+    return dy * s * (1.0 + x * (1.0 - s)), {}
