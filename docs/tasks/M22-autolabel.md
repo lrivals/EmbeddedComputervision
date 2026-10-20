@@ -20,14 +20,14 @@ to any class that can be named.
 v1 runs on the PC (CPU, CUDA if present). The open-vocabulary model is a large PyTorch
 network: it is a labelling tool, never something that goes on the FPGA.
 
-**State**: 9 of 12 tasks done (2026-10-12): T22.0-T22.8. What remains (2026-10-20):
+**State**: 11 of 12 tasks done (2026-10-20): T22.0-T22.8 (2026-10-12), T22.10 (quality by
+domain: usable at ground level, in low light and for persons / cars in thermal, not on
+aerial images) and T22.11 (datasets worth labelling: own photos first, then TrashNet).
+What remains:
 
-- T22.10: the only quality measurement (T22.7) is on VOC, i.e. everyday photos. The
-  project's domains are aerial (VisDrone, AU-AIR), thermal (HIT-UAV, FLIR) and low light
-  (ExDark); the labellers must be measured there before they label a new set.
-- T22.11: choose the datasets worth labelling, using the T22.10 numbers.
 - T22.9: closing the loop (auto-labelled set → M15 fine-tuning → webcam / board), on the
-  T22.11 choice.
+  first T22.11 choice.
+- Tiling for aerial images (T22.10), before any aerial set is labelled.
 - The editor's mouse interactions (draw, move, resize, delete a box) were only exercised
   through `gradio_client`; they are still to be tried by hand in a browser.
 
@@ -315,7 +315,7 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **First trial**: the first dataset of the T22.11 list; labeller and threshold from the
   T22.10 row of its domain; a val split of about 100 images checked by hand in the editor.
 
-### [ ] T22.10 — Labelling quality by domain
+### [x] T22.10 — Labelling quality by domain
 - **Spec**: §8.3 · **Depends on**: T22.7, M11, M18 · **Size**: M
 - **Deliverables**: `tools/autolabel_eval.py --dataset <name>` on any `DATASETS` entry
   (classes of the dataset as prompts, alias map; random subset with a fixed seed, as
@@ -330,8 +330,56 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   result. The VOC row of T22.7 is the reference. Dataset class names that are bad prompts
   (`people`, `motor`, `Human`, `OtherVehicle`, …) go through the alias map. VOC keeps its
   historical file names (`results/autolabel_voc.md`, cached predictions).
+- **Done** (2026-10-20): `tools/autolabel_eval.py --dataset` (`--seed`, small-object mAP,
+  ignored regions in P / R), aliases for the drone / thermal / low-light names
+  (`Human`, `bike`, `motor`, `light`, `sign`, `hydrant`, `awning-tricycle`; `People` of
+  ExDark → `person` but `people` of VisDrone → `sitting person`, exact case first),
+  `test_eval_on_a_yolo_dir_dataset`. The 10 runs (5 datasets × 2 labellers) ran as 3
+  parallel processes of 6 threads each (`OMP_NUM_THREADS=6`, `xargs -P 3`; one process
+  with 16 threads left the E-cores of the Core Ultra 7 155H waiting) in 1 h 20 min. Full
+  tables: `results/autolabel_<dataset>-<split>.md`.
 
-### [ ] T22.11 — Datasets worth labelling
+100 images per dataset (random subset, seed 0), the dataset's class names as prompts.
+P / R at the default thresholds of T22.7 (0.55 for Grounding DINO, 0.4 for OWLv2). "small"
+= objects < 32² px.
+
+| dataset | domain | objects (small) | GD mAP | GD mAP small | GD P / R @ 0.55 | OWL mAP | OWL mAP small | OWL P / R @ 0.4 |
+|---|---|---|---|---|---|---|---|---|
+| VOC 2007 test (T22.7, 200 images) | everyday photos | 473 (21) | 0.832 | 0.390 | 0.84 / 0.73 | 0.862 | 0.373 | 0.81 / 0.38 |
+| ExDark test | low light | 287 (13) | 0.730 | 0.308 | 0.90 / 0.45 | 0.752 | 0.398 | 0.83 / 0.32 |
+| FLIR val | road, thermal | 1426 (1057) | 0.335 | 0.213 | 0.94 / 0.11 | 0.346 | 0.218 | 0.87 / 0.15 |
+| VisDrone val | aerial RGB | 7181 (5050) | 0.267 | 0.185 | 0.87 / 0.01 | 0.264 | 0.216 | 0.70 / 0.09 |
+| HIT-UAV test | aerial thermal | 827 (639) | 0.159 | 0.172 | 0.88 / 0.03 | 0.231 | 0.184 | 0.89 / 0.05 |
+| AU-AIR val | aerial RGB, low altitude | 334 (36) | 0.094 | 0.005 | 0.31 / 0.07 | 0.115 | 0.337 | 0.28 / 0.32 |
+
+- **Result, by domain** (GD = `grounding-dino-tiny`, OWL = `owlv2-base`):
+  - **Ground-level RGB, including low light: usable.** ExDark loses only 0.1 mAP to VOC.
+    Grounding DINO at 0.55 keeps a precision of 0.90 but a recall of 0.45 (0.73 on VOC);
+    in low light **0.5** is the better threshold (P / R 0.83 / 0.51). Weak classes: cup
+    0.46, boat 0.53.
+  - **Road thermal (FLIR): usable for persons and cars only.** person 0.57, car 0.65
+    (GD), but traffic light 0.08 and traffic sign 0.22 (small, without colour) drag the
+    mAP down. Grounding DINO at **0.4** gives P / R 0.87 / 0.25: a quarter of the objects at
+    a good precision, the rest to draw by hand.
+  - **Aerial, RGB or thermal (VisDrone, HIT-UAV, AU-AIR): not usable as is.** mAP 0.09 to
+    0.27, and at a precision ≥ 0.8 the recall is under 0.1: almost every box would be
+    drawn by hand. Causes: small objects (70 % of VisDrone, 77 % of HIT-UAV), the
+    top-down view that the models rarely saw, and classes told apart by pose or detail
+    (VisDrone `pedestrian` / `people` 0.29 / 0.24, `tricycle` 0.15, HIT-UAV bicycle 0.00).
+    The AU-AIR ground truth is itself loose (person boxes 2 to 4 times wider than the
+    person, unlabelled objects): at IoU 0.3 its mAP is 0.13 (GD) / 0.20 (OWL), still far
+    from usable. The fix to try before labelling aerial images is **tiling** (run the
+    labeller on overlapping crops of about 640 px, merge with the agnostic NMS), as in
+    SAHI; not done.
+  - **Labeller**: Grounding DINO stays the default (better precision / recall trade-off
+    on every usable domain); OWLv2 is ahead on mAP in thermal and aerial, but with too
+    low a recall at a useful precision.
+- **Speed**: 12 to 15 s per image and per process with 3 processes in parallel, i.e.
+  4 to 5 s per image of throughput (images of 640 × 512 to 1920 × 1080, 4 to 15
+  prompts), against 5 to 7 s for one process alone on VOC (T22.7): about 1.5 times
+  faster. A folder of 500 photos takes about 40 min with `xargs -P 3` over sub-folders.
+
+### [x] T22.11 — Datasets worth labelling
 - **Spec**: — · **Depends on**: T22.10 · **Size**: S
 - **Deliverables**: a ranked list in this document: source, licence, size, classes, why it
   serves the project (new class for the webcam / board demo, a class missing from a
@@ -341,6 +389,20 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   completing the classes missing from a project dataset (UAVDT and DroneVehicle have
   vehicles only, CrowdHuman persons only); classification-only image sets turned into
   detection sets, as ASL in M21; unlabelled aerial frames (search and rescue).
+- **Done** (2026-10-20): ranked with the T22.10 numbers. Labelling is worth it only in
+  the ground-level domains (VOC, ExDark: precision ≥ 0.83 at a recall ≥ 0.45); aerial
+  sets are left out until tiling is tried.
+
+| rank | dataset | licence | size | classes | why for the project | labeller / conf | effort |
+|---|---|---|---|---|---|---|---|
+| 1 (**T22.9**) | own photos / webcam captures (M20) of 2 or 3 desk objects (e.g. `cup, bottle, phone`) | own photos | 300 to 500 photos | named freely | a new class on the webcam / board demo, end to end; ground level, the domain where the labellers are good; a hand-checked val split is easy to make | GD / 0.55 (0.5 in dim light) | capture 1 h, labelling ≈ 30 min (3 processes), review 1 to 2 h |
+| 2 | [TrashNet](https://github.com/garythung/trashnet) | MIT | 2527 images, 512 × 384 | glass, paper, cardboard, plastic, metal, trash | classification set turned into a detection set, as ASL in M21: one object per image on a plain background, the class is given by the folder, so the prompt is only `object`, `bottle`, … and the labeller only has to place the box; a waste-sorting demo | GD, one prompt per image, best box | ≈ 3 h of CPU, light review |
+| 3 | [Oxford-IIIT Pet](https://www.robots.ox.ac.uk/~vgg/data/pets/) | CC BY-SA 4.0 | 7349 images | 37 breeds (cat / dog) | only head boxes in the original; whole-body boxes from the prompt `cat` / `dog`, the breed from the image label; a fine-grained class set for M15 | GD / 0.55 | ≈ 9 h of CPU, review of the multi-animal images |
+| 4 | UAVDT, DroneVehicle: add `person`, `bicycle` | dataset licences | 40 k / 28 k images | vehicles only | would merge the drone sets with VisDrone / AU-AIR classes | **not now**: aerial recall < 0.1 at P ≥ 0.8 (T22.10) | after tiling |
+| — | [SARD](https://ieee-dataport.org/documents/search-and-rescue-image-dataset-person-detection-sard) (search and rescue), Det-Fly (drones) | to check | 1981 frames / ≈ 13 k | person / drone | already boxed by hand: a test of the tiled labeller, not a set to label | — | — |
+
+  First choice for T22.9: rank 1, as its domain is the one measured as usable and it
+  ends on the webcam; TrashNet is the second trial (no capture work).
 
 ## Design notes
 
