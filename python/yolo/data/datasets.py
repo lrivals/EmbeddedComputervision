@@ -62,6 +62,22 @@ UAVDT_CLASSES = ("car", "truck", "bus")
 # ASL Alphabet (M21, docs/tasks/M21-asl-alphabet.md): one hand pseudo-box per image;
 # `nothing` images are negatives (no box), so it is not a class.
 ASL_CLASSES = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ("del", "space")
+# TrashNet (M32, docs/tasks/M32-trashnet-pets.md): one box per image from the M22 labeller;
+# the class is the folder of the raw image.
+TRASHNET_CLASSES = ("cardboard", "glass", "metal", "paper", "plastic", "trash")
+# Oxford-IIIT Pet (M32): 37 breeds in the CLASS-ID order of `annotations/list.txt`
+# (alphabetical, case ignored); a capitalised name is a cat breed. Whole-body boxes from
+# the trimaps.
+PETS_CLASSES = (
+    "Abyssinian", "american_bulldog", "american_pit_bull_terrier", "basset_hound", "beagle",
+    "Bengal", "Birman", "Bombay", "boxer", "British_Shorthair", "chihuahua", "Egyptian_Mau",
+    "english_cocker_spaniel", "english_setter", "german_shorthaired", "great_pyrenees",
+    "havanese", "japanese_chin", "keeshond", "leonberger", "Maine_Coon", "miniature_pinscher",
+    "newfoundland", "Persian", "pomeranian", "pug", "Ragdoll", "Russian_Blue", "saint_bernard",
+    "samoyed", "scottish_terrier", "shiba_inu", "Siamese", "Sphynx",
+    "staffordshire_bull_terrier", "wheaten_terrier", "yorkshire_terrier",
+)
+PETS_CATS = tuple(c for c in PETS_CLASSES if c[0].isupper())
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
 PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd")
@@ -404,16 +420,34 @@ def load_uavdt(root, split):
 ASL_VAL_FROM = 2551  # frames n° 2551-3000 of each class: val split (M21, no random split)
 
 
+def _load_json_split(root, split, classes):
+    """`root/annotations_<split>.json` written by tools/prep_datasets.py (continuous corners,
+    class names, image paths relative to `root`) → samples."""
+    out = []
+    for a in json.loads((root / f"annotations_{split}.json").read_text()):
+        labels = [classes.index(c) for c in a["labels"]]
+        out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
+                               a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
+    return out
+
+
 def load_asl(root, split):
     """Output of `tools/prep_datasets.py asl`: `root/annotations_<split>.json` (hand
     pseudo-boxes; letter images where no hand was found are left out), image paths relative
     to `root`."""
-    out = []
-    for a in json.loads((root / f"annotations_{split}.json").read_text()):
-        labels = [ASL_CLASSES.index(c) for c in a["labels"]]
-        out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
-                               a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
-    return out
+    return _load_json_split(root, split, ASL_CLASSES)
+
+
+def load_trashnet(root, split):
+    """Output of `tools/prep_datasets.py trashnet`: one auto-labelled box per image (images
+    the labeller missed are left out), stratified random split."""
+    return _load_json_split(root, split, TRASHNET_CLASSES)
+
+
+def load_pets(root, split):
+    """Output of `tools/prep_datasets.py pets`: whole-body boxes from the trimaps (one per
+    mask component), `test` = official test.txt, `train` / `val` from trainval.txt."""
+    return _load_json_split(root, split, PETS_CLASSES)
 
 
 @dataclass(frozen=True)
@@ -450,6 +484,11 @@ DATASETS = {
     "uavdt": Dataset(UAVDT_CLASSES, _splits(load_uavdt), "uavdt", "test", "train", "train"),
     # No VOC or COCO mapping (no hand class): fine-tuned models only.
     "asl": Dataset(ASL_CLASSES, _splits(load_asl), "asl", "val", "train", "train"),
+    # M32: TrashNet has no mapping (no waste class worth it in VOC or COCO); Pet breeds map to
+    # cat / dog.
+    "trashnet": Dataset(TRASHNET_CLASSES, _splits(load_trashnet), "trashnet", "test", "train",
+                        "train"),
+    "pets": Dataset(PETS_CLASSES, _splits(load_pets), "pets", "test", "train", "train"),
 }
 
 
@@ -502,6 +541,9 @@ MAPPINGS = {
     ("hituav", "coco"): {"Person": "person", "Car": "car", "Bicycle": "bicycle"},
     ("uavdt", "voc"): {"car": "car", "bus": "bus"},
     ("uavdt", "coco"): {"car": "car", "truck": "truck", "bus": "bus"},
+    # M32: each breed to its species.
+    ("pets", "voc"): {c: "cat" if c in PETS_CATS else "dog" for c in PETS_CLASSES},
+    ("pets", "coco"): {c: "cat" if c in PETS_CATS else "dog" for c in PETS_CLASSES},
 }
 
 FAMILIES = {"voc": VOC_CLASSES, "coco": COCO_CLASSES}

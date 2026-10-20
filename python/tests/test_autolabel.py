@@ -272,6 +272,7 @@ def test_eval_on_a_yolo_dir_dataset(tmp_path):
     assert r["map"] == pytest.approx(1.0) and r["pr"][0.3] == pytest.approx((1.0, 1.0))
     assert r["n_small"] == 0 and np.isnan(r["map_small"])  # 128 × 144 px boxes: none small
     assert (tmp_path / "eval" / "fake" / "autolabel.json").exists()
+    assert r["map75"] == pytest.approx(1.0) and np.allclose(r["ious"], 1.0) and len(r["ious"]) == 8
     assert "| cat | 4 |" in ae.table([r], samples, ["cat", "dog"], "test")
 
 

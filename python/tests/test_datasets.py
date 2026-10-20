@@ -250,6 +250,34 @@ def test_asl(tmp_path):
     assert "nothing" not in D.ASL_CLASSES and len(D.ASL_CLASSES) == 28
 
 
+def test_trashnet(tmp_path):
+    rec = [{"image": "images/test/glass12.jpg", "width": 512, "height": 384, "class": "glass",
+            "boxes": [[100, 50, 300, 350]], "labels": ["glass"], "score": 0.7}]
+    (tmp_path / "annotations_test.json").write_text(json.dumps(rec))
+    (s,) = D.load("trashnet", tmp_path)  # default split: test
+    _check(s)
+    assert s["labels"].tolist() == [D.TRASHNET_CLASSES.index("glass")]
+    with pytest.raises(ValueError):  # no mapping
+        D.eval_view("trashnet", 80)
+
+
+def test_pets(tmp_path):
+    rec = [{"image": "images/test/Bengal_3.jpg", "width": 500, "height": 375,
+            "class": "Bengal", "species": "cat", "boxes": [[10, 20, 400, 370]],
+            "labels": ["Bengal"], "head": None, "components": 1}]
+    (tmp_path / "annotations_test.json").write_text(json.dumps(rec))
+    (s,) = D.load("pets", tmp_path)
+    _check(s)
+    assert s["labels"].tolist() == [D.PETS_CLASSES.index("Bengal")]
+    assert len(D.PETS_CLASSES) == 37 and len(D.PETS_CATS) == 12
+    for n, fam in ((20, D.VOC_CLASSES), (80, D.COCO_CLASSES)):
+        view = D.eval_view("pets", n)
+        assert view.names == tuple(c for c in fam if c in ("cat", "dog"))
+        cat = view.names.index("cat")
+        assert view.gt_lut[D.PETS_CLASSES.index("Bengal")] == cat
+        assert view.gt_lut[D.PETS_CLASSES.index("pug")] == 1 - cat
+
+
 @pytest.mark.parametrize("ds", ["auair", "dronevehicle", "hituav", "uavdt"])
 def test_m18_mappings(ds):
     for n in (20, 80):
@@ -308,7 +336,7 @@ def test_mappings_valid(name, n):
     """Toute correspondance vise des classes existantes et ses sources sont des classes du jeu."""
     fam = "voc" if n == 20 else "coco"
     if name != fam and n != len(D.DATASETS[name].classes) and (name, fam) not in D.MAPPINGS:
-        with pytest.raises(ValueError):  # ASL: no hand class in VOC or COCO
+        with pytest.raises(ValueError):  # ASL, TrashNet: no class in VOC or COCO
             D.eval_view(name, n)
         return
     v = D.eval_view(name, n)

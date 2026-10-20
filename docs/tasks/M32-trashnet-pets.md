@@ -26,13 +26,18 @@ This milestone comes out of T22.11 (ranks 2 and 3 of the datasets worth labellin
 | domain shift | plain backgrounds and centred objects (TrashNet), pet photos from the web (Pet): the webcam is out of domain for both |
 | out-of-domain baseline (Pet) | breeds map to VOC / COCO `cat` and `dog`: the pre-trained networks get a score before any fine-tuning |
 
-**State**: 0 of 14 tasks done (2026-10-20). Document prepared from T22.11; no data
-downloaded yet.
+**State**: 3 of 14 tasks done (2026-10-20): T32.4, T32.5 and T32.8. In progress:
+- **Code written and tested** for the whole data chain of both datasets (loaders, prep,
+  `get_datasets.sh`, registry, notebooks, `autolabel_eval.py --map`).
+- **Pet**: boxed and loaded. Anchors and cfg written (`tools/m11.sh pets-prep`);
+  `pets_stats` run.
+- **TrashNet**: downloaded; labelling stopped at 100 of 2 527 images (cache
+  `data/trashnet/autolabel.json`, resumed by the next run).
 
 ## Summary
 
-Numbers from the dataset pages (2026-10-20); the counts after preprocessing are to be
-filled by T32.1 and T32.5.
+Numbers from the dataset pages (2026-10-20). The counts after preprocessing come from T32.5
+for Pet; the TrashNet counts are to be filled in by T32.1.
 
 ### TrashNet
 
@@ -40,7 +45,7 @@ filled by T32.1 and T32.5.
 |---|---|
 | Source | [github.com/garythung/trashnet](https://github.com/garythung/trashnet) (`dataset-resized.zip`), mirror on Hugging Face `garythung/trashnet` |
 | Licence | MIT (repository) |
-| Images | 2527 JPEG, 512 × 384 (resized by the authors) |
+| Images | 2527 JPEG, 512 × 384 (resized by the authors); 2527 found in `dataset-resized/` (2026-10-20) |
 | Classes | 6: glass 501, paper 594, cardboard 403, plastic 482, metal 410, trash 137 |
 | Objects per image | 1, roughly centred, on a white or light plain background |
 | Official split | none |
@@ -55,7 +60,9 @@ filled by T32.1 and T32.5.
 | Licence | CC BY-SA 4.0 for the annotations; the image copyright stays with the owners (photos from the web) |
 | Images | 7349 JPEG, sizes vary (most about 500 × 375) |
 | Classes | 37 breeds: 12 cats, 25 dogs, about 200 images each; the file name gives the breed (`Abyssinian_12.jpg`; capitalised = cat) |
-| Annotations | head ROI (`annotations/xmls/`, Pascal VOC XML, trainval images only), trimap of every image (`annotations/trimaps/*.png`: 1 = pet, 2 = background, 3 = boundary; to verify at download), `list.txt`, `trainval.txt` (3680), `test.txt` (3669) |
+| Annotations | head ROI (`annotations/xmls/`, Pascal VOC XML, 3686 files, trainval images only), trimap of every image (`annotations/trimaps/*.png`: 1 = pet, 2 = background, 3 = boundary, checked on 3 images), `list.txt`, `trainval.txt` (3680), `test.txt` (3669) |
+| Files | `images/` holds 7390 JPEGs (41 not in the lists, unused); 4 of the listed ones are PNGs named `.jpg` (`Abyssinian_5`, `Egyptian_Mau_14`, `_156`, `_186`), read as is by PIL |
+| After preprocessing | train 3302, val 368, test 3662 images, one box each; 17 left out (`small` 14, `head outside` 3), 99.8 % kept |
 | Objects per image | 1 most of the time; a few images show two animals or more (one mask for all) |
 | Pre-trained mapping | breed → VOC / COCO `cat` or `dog` |
 
@@ -102,12 +109,14 @@ tools/get_datasets.sh check                   # "trashnet : prêt", "pets : prê
 - **Box from the trimap**: pixels 1 (pet) and 3 (boundary) form the mask; the box is
   the min / max of the mask. Made by hand, so it is the reference of this dataset; no
   labeller is needed for the main path.
-- **Several animals**: the trimap holds all of them in one mask. Connected components of
-  the mask (ignoring specks under 1 % of the image) → one box per component when they
-  are apart. Touching animals stay one component: these images are listed
-  (`multi`) and split with the M22 labeller (`cat` / `dog` boxes inside the mask), or
-  left out if that fails. The class of every box is the breed of the file name (one
-  breed per image).
+- **Several parts**: the trimap holds every animal in one mask, and an occluder (coat,
+  hand, collar, leash) often cuts one animal into several parts. On the 131 images with
+  more than one part over 1 % of the image, 48 checked by eye: almost all are one animal
+  cut apart, about three show two animals. So the box is the min / max of the whole mask
+  (specks under 0.2 % of the image ignored), and the parts are counted (`components`) for
+  the stats. The rare photos with two animals get one box over both (known limit). This
+  replaces the first plan (one box per part, touching animals split by the M22 labeller).
+  The class is the breed of the file name (one breed per image).
 - **Sanity checks**: the head box (when the XML exists) must lie inside the body box
   (≥ 90 % of its area), else reason `head outside`; a mask under 2 % of the image →
   reason `small`.
@@ -127,6 +136,8 @@ tools/get_datasets.sh check                   # "trashnet : prêt", "pets : prê
 - **Pet**: the mask is a segmentation, not a box annotation: the box includes the
   whole silhouette, tail and legs, which is the "whole body" asked for. Leashes and
   people are background.
+- **Pet**: a few photos show two animals and get one box over both (about 3 among the
+  48 multi-part images checked, see "Several parts").
 - **Pet**: 37 fine-grained classes at 416 px on Tiny-YOLO: expect a low breed mAP and a
   high cat / dog accuracy; report both (T32.12).
 
@@ -162,6 +173,10 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 ## A. TrashNet data
 
 ### [ ] T32.0 — Download and `tools/get_datasets.sh`
+- **In progress** (2026-10-20): `MARKER`, `HOWTO`, the `trashnet` command (download,
+  unzip, prep) and `check` written. `dataset-resized.zip` (43 MB) downloaded from GitHub
+  into `data/TrashNet/`; the 6 folders hold 2527 images. `trashnet : prêt` waits for the
+  prep (T32.1).
 - **Depends on**: T11.0 · **Size**: S
 - **Deliverables**: `MARKER[trashnet]=trashnet/annotations_val.json`, `HOWTO`, a
   `trashnet` command (download of `dataset-resized.zip` into `data/TrashNet/`, then the
@@ -170,6 +185,16 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   the 6 folders hold 2527 images.
 
 ### [ ] T32.1 — Boxes from the M22 labeller
+- **In progress** (2026-10-20): `prep_trashnet` written:
+  - prompts `TRASHNET_PROMPTS` plus `object`, best box, `whole image` check, rejects;
+  - 70 / 15 / 15 split stratified by class;
+  - cache in the `autolabel_io` format, written every 100 images so a stopped run resumes;
+  - hard links, `--preview`, and `--handcheck` / `--handcheck-iou` for T32.3.
+
+  Tested with a fake labeller (`test_prep_trashnet`). The run (3 processes × 6 threads,
+  about 8 s per image per process) was stopped at 100 of 2527 images; to resume, run
+  `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png
+  --handcheck build/trashnet_handcheck`.
 - **Depends on**: T32.0, T22.10 · **Size**: M
 - **Deliverables**: `tools/prep_datasets.py trashnet` (prompts, best box, sanity check,
   rejects, stratified split, `autolabel.json` cache, hard links, report);
@@ -180,6 +205,8 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   the counts of the Summary.
 
 ### [ ] T32.2 — Loader
+- **In progress** (2026-10-20): `TRASHNET_CLASSES`, `load_trashnet`, `DATASETS["trashnet"]`
+  and `test_trashnet` done; the acceptance waits for T32.1.
 - **Depends on**: T32.1 · **Size**: S
 - **Deliverables**: `TRASHNET_CLASSES`, `load_trashnet`, `DATASETS["trashnet"]`
   (evaluation on `test`, calibration and fine-tuning on `train`); `test_trashnet`.
@@ -196,14 +223,26 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 
 ## B. Oxford-IIIT Pet data
 
-### [ ] T32.4 — Download and `tools/get_datasets.sh`
+### [x] T32.4 — Download and `tools/get_datasets.sh`
+- **Done** (2026-10-20): `tools/get_datasets.sh pets` (downloads the two archives into
+  `data/Oxford-IIIT Pet/`, extracts them, then runs the prep). Found: 7390 images (7349
+  listed), 7390 trimaps, `trainval.txt` and `test.txt`; trimap values 1 / 2 / 3 confirmed
+  (Summary). `check` gives `pets : prêt`.
 - **Depends on**: T11.0 · **Size**: S
 - **Deliverables**: `MARKER[pets]=pets/annotations_val.json`, `HOWTO`, a `pets` command
   (the two archives into `data/Oxford-IIIT Pet/`, then the prep); `pets` in `check`.
 - **Acceptance**: 7349 images, 7349 trimaps, `trainval.txt` and `test.txt` found; the
   trimap values (1 / 2 / 3) confirmed on a few images and written in the Summary.
 
-### [ ] T32.5 — Whole-body boxes from the trimaps
+### [x] T32.5 — Whole-body boxes from the trimaps
+- **Done** (2026-10-20): `python tools/prep_datasets.py pets` takes 3 s on 22 cores.
+  - Kept: 7332 of 7349 images (99.8 %); left out: `small` 14, `head outside` 3.
+  - 131 images have a mask in several parts. The rule changed after the preview: one box
+    over the whole mask (see "Several parts" under Preprocessing).
+  - The preview (`build/pets_preview.png`, one image per breed and several multi-part
+    images): every body box covers its animal and contains its head box.
+  - Tests: `test_trimap_box` (one animal, two apart, two touching, specks),
+    `test_pets_check`, `test_prep_pets`.
 - **Depends on**: T32.4 · **Size**: M
 - **Deliverables**: `tools/prep_datasets.py pets` (mask → box, components, head check,
   split, report with the `multi`, `head outside` and `small` counts); `--preview` with the
@@ -215,6 +254,10 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   more than about 1 %; otherwise leave them out.
 
 ### [ ] T32.6 — Loader and mappings
+- **In progress** (2026-10-20): `PETS_CLASSES` (`list.txt` order), `PETS_CATS`, `load_pets`,
+  `DATASETS["pets"]`, `MAPPINGS[("pets", "voc")]` and `("pets", "coco")`, `test_pets`;
+  `test_mappings_valid` passes. The out-of-domain run of `tools/eval_voc.py --dataset pets`
+  (VOC and COCO weights) is underway, writing to `build/m32/pets_ood.md`.
 - **Depends on**: T32.5 · **Size**: S
 - **Deliverables**: `PETS_CLASSES`, `load_pets`, `DATASETS["pets"]` (evaluation on
   `test`), `MAPPINGS[("pets", "voc")]` and `("pets", "coco")` (each breed → `cat` or
@@ -223,6 +266,14 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   (out-of-domain cat / dog mAP).
 
 ### [ ] T32.7 — M22 labeller against the mask boxes
+- **In progress** (2026-10-20): `tools/autolabel_eval.py` gains:
+  - `--map voc|coco` (the ground truth goes through `eval_view` / `remap`; the prompts
+    are the family classes reached, `cat` and `dog` for Pet);
+  - mAP@0.75;
+  - the IoU of the matched boxes (median, q10-q90, boxes scored ≥ 0.3).
+
+  Not run yet: `python tools/autolabel_eval.py --dataset pets --n 200 --models
+  grounding-dino-tiny --map voc`.
 - **Depends on**: T32.5, T22.10 · **Size**: S
 - **Deliverables**: `python tools/autolabel_eval.py --dataset pets --n 200` with the
   prompts `cat, dog` (breeds mapped to their species); mAP@0.5, mAP@0.75 and the IoU
@@ -235,13 +286,27 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 
 ## C. Registry and notebooks
 
-### [ ] T32.8 — Datasheets
+### [x] T32.8 — Datasheets
 - **Depends on**: T32.2, T32.6 · **Size**: S
 - **Deliverables**: `FICHES["trashnet"]`, `FICHES["pets"]` in `tools/data_stats.py`;
   `LABELS` and `GROUND` in `tools/notebooks/jeux.py`; the two stats questions in
   `QUESTIONS` of `tools/notebooks/gabarits.py`.
+- **Done** (2026-10-20): all three, for both datasets (`GROUND`: close-up views).
 
 ### [ ] T32.9 — Matrix, profiles, notebook generation
+- **In progress** (2026-10-20):
+  - `matrice.py` entries done (`SPLIT_IMAGES` of TrashNet waits for T32.1), plus the
+    `trashnet-*` / `pets-*` profiles of `tools/m11.sh`.
+  - `python -m tools.notebooks trashnet pets` wrote `notebooks/trashnet/` (7) and
+    `notebooks/pets/` (11, out-of-domain notebooks included), and their rows in
+    `notebooks/README.md`.
+  - `tools/data_stats.py --dataset pets --sample 8` passes.
+  - `--check` still fails, for reasons that predate M32:
+    - `README.md` lacks the `tiny-yolov7-coco` rows of the other datasets (M26 in
+      progress);
+    - `analyse_jeux.ipynb` must be regenerated and run again.
+  - Do not run `python -m tools.notebooks all` before M26 is settled: it rewrites the
+    executed notebooks whose template changed (`voc_stats`, `analyse_*`), outputs lost.
 - **Depends on**: T32.8 · **Size**: S
 - **Deliverables**: `matrice.py` entries; profiles `trashnet-prep`, `trashnet-train`,
   `pets-prep`, `pets-train` in `tools/m11.sh`; `notebooks/trashnet/`, `notebooks/pets/`,
@@ -252,12 +317,20 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 ## D. Runs
 
 ### [ ] T32.10 — `stats` notebook runs
+- **In progress** (2026-10-20):
+  - `notebooks/pets/pets_stats.ipynb` run with its outputs; "Oxford-IIIT Pet" section in
+    [stats-jeux.md](stats-jeux.md), with the answer to the question.
+  - The body box is a median 3.7 times the head box in area (q10 1.8, q90 9.3), and
+    1.8 % of the images have a mask in several parts.
+  - TrashNet waits for T32.1.
 - **Depends on**: T32.9 · **Size**: S
 - **Deliverables**: `notebooks/trashnet/trashnet_stats.ipynb` and
   `notebooks/pets/pets_stats.ipynb` run with their outputs; sections in
   [stats-jeux.md](stats-jeux.md).
 
 ### [ ] T32.11 — Drive upload
+- **In progress** (2026-10-20): `tools/get_datasets.sh push pets` started
+  (`data_archives/pets.tar`, 798 MB); TrashNet waits for T32.1.
 - **Depends on**: T32.1, T32.5 · **Size**: S
 - **Deliverables**: `tools/get_datasets.sh push trashnet`, `push pets`; rows in
   [donnees-drive.md](donnees-drive.md).
@@ -265,6 +338,9 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   trimaps.
 
 ### [ ] T32.12 — Fine-tuning and sweep
+- **In progress** (2026-10-20): `tools/m11.sh pets-prep` done: anchors
+  `results/anchors_pets.md` (k = 6, mean IoU 0.824: large boxes, 151 to 383 px at 416),
+  cfg `build/m11/cfg/tiny-yolov3-pets.cfg`.
 - **Depends on**: T32.10, T32.11 · **Size**: L
 - **Deliverables**: `tools/m11.sh trashnet-prep` / `pets-prep` (anchors, cfg), then the
   `_sweep` and `_train` notebooks, tracked in [M15](M15-campagne-entrainement.md); mAP on

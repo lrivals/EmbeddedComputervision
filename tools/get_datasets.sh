@@ -3,6 +3,7 @@
 #
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
 #                                    | auair | dronevehicle | hituav | uavdt (M18) | asl (M21)
+#                                    | trashnet | pets (M32: download + tools/prep_datasets.py)
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
 #                                    et les dossiers bruts de M18, puis lance leurs prétraitements
@@ -25,6 +26,9 @@
 # (docs/tasks/M18-jeux-drone.md) : dossiers bruts déposés dans data/, reliés et prétraités
 # par `kaggle`. ASL Alphabet (M21, docs/tasks/M21-asl-alphabet.md): hand pseudo-boxes made
 # by `kaggle` (tools/prep_datasets.py asl, needs `pip install -e "python[asl]"`).
+# TrashNet and Oxford-IIIT Pet (M32, docs/tasks/M32-trashnet-pets.md): downloaded here, then
+# boxed by tools/prep_datasets.py (TrashNet: M22 labeller, `pip install -e
+# "python[autolabel]"`, ≈ 1 h on CPU; Pet: trimaps, seconds).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -68,6 +72,8 @@ declare -A MARKER=(
   [hituav]=hituav/labels/test
   [uavdt]=uavdt/annotations_test.json
   [asl]=asl/annotations_val.json
+  [trashnet]=trashnet/annotations_val.json
+  [pets]=pets/annotations_val.json
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
@@ -101,6 +107,13 @@ declare -A HOWTO=(
     in data/ASL Alphabet/asl_alphabet_{train,test}/, then: $0 kaggle
     (hand pseudo-boxes: pip install -e \"python[asl]\"; tools/prep_datasets.py asl)
     data/asl/annotations_{train,val,test}.json, data/asl/images/{train,val,test}/"
+  [trashnet]="https://github.com/garythung/trashnet (data/dataset-resized.zip): $0 trashnet
+    in data/TrashNet/dataset-resized/<class>/, boxes: pip install -e \"python[autolabel]\";
+    tools/prep_datasets.py trashnet
+    data/trashnet/annotations_{train,val,test}.json, data/trashnet/images/{train,val,test}/"
+  [pets]="https://www.robots.ox.ac.uk/~vgg/data/pets/ (images.tar.gz, annotations.tar.gz): $0 pets
+    in data/Oxford-IIIT Pet/{images,annotations}/, boxes: tools/prep_datasets.py pets
+    data/pets/annotations_{train,val,test}.json, data/pets/images/{train,val,test}/"
 )
 
 # Dossier de chaque jeu dans data/ (Dataset.root de python/yolo/data/datasets.py) : contenu
@@ -254,6 +267,29 @@ m21() {
   return 0
 }
 
+# TrashNet and Oxford-IIIT Pet (M32): download, extract, then the prep (marker written last).
+trashnet() {
+  mkdir -p "$DATA_DIR/TrashNet"
+  if [[ ! -d "$DATA_DIR/TrashNet/dataset-resized" ]]; then
+    download https://github.com/garythung/trashnet/raw/master/data/dataset-resized.zip \
+      "$DATA_DIR/TrashNet/dataset-resized.zip"
+    unzip -q -o "$DATA_DIR/TrashNet/dataset-resized.zip" -d "$DATA_DIR/TrashNet"
+  fi
+  [[ -e "$DATA_DIR/${MARKER[trashnet]}" ]] || python "$ROOT/tools/prep_datasets.py" trashnet
+}
+
+pets() {
+  local d="$DATA_DIR/Oxford-IIIT Pet" f
+  mkdir -p "$d"
+  for f in images annotations; do
+    if [[ ! -d "$d/$f" ]]; then
+      download "https://www.robots.ox.ac.uk/~vgg/data/pets/data/$f.tar.gz" "$d/$f.tar.gz"
+      tar -xzf "$d/$f.tar.gz" -C "$d"
+    fi
+  done
+  [[ -e "$DATA_DIR/${MARKER[pets]}" ]] || python "$ROOT/tools/prep_datasets.py" pets
+}
+
 check() {
   local ds=$1
   if [[ -e "$DATA_DIR/${MARKER[$ds]}" ]]; then
@@ -264,7 +300,7 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,26p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,31p' "$0"; exit 1; }
 case "$1" in
 ready)
   shift
@@ -310,7 +346,8 @@ for ds in "$@"; do
     kaggle
     ;&
   check)
-    for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl; do
+    for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl \
+      trashnet pets; do
       check "$d" || true
     done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \
@@ -326,6 +363,10 @@ for ds in "$@"; do
     base=https://s3.eu-central-1.amazonaws.com/avg-kitti
     fetch kitti $base/data_object_label_2.zip training/label_2
     fetch kitti $base/data_object_image_2.zip training/image_2
+    ;;
+  trashnet|pets)
+    "$ds"
+    check "$ds" || status=1
     ;;
   visdrone|crowdhuman|exdark|flir|auair|dronevehicle|hituav|uavdt|asl)
     if ! check "$ds"; then

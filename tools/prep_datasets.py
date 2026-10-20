@@ -3,6 +3,8 @@
     python tools/prep_datasets.py dronevehicle [--keep-border]   # → data/dronevehicle/
     python tools/prep_datasets.py uavdt                          # → data/uavdt/
     python tools/prep_datasets.py asl [--preview build/asl.png]  # → data/asl/ (M21)
+    python tools/prep_datasets.py pets [--preview build/pets_preview.png]          # M32
+    python tools/prep_datasets.py trashnet [--preview build/trashnet_preview.png]  # M32
 
 - **dronevehicle** (version Roboflow YOLO-OBB, `data/DroneVehicle Dataset/`) : le cadre
   blanc de 100 px autour de l'image 640×512 est recadré ; chaque boîte orientée (4 coins)
@@ -27,6 +29,22 @@
   `data/asl/detections.json` (the annotations are rebuilt from it at each run). See
   docs/tasks/M21-asl-alphabet.md.
 
+- **pets** (Oxford-IIIT Pet, `data/Oxford-IIIT Pet/{images,annotations}/`, M32): the
+  whole-body box comes from the hand-made trimap (pixels 1 pet and 3 boundary): the min /
+  max of the mask without its specks (an occluder often splits one animal; the rare images
+  with two animals get one box over both). Images with a
+  mask under 2 % of the image or a head box (`annotations/xmls/`) outside the body box are
+  left out (`data/pets/rejected.json`). Split: `test.txt` → test, `trainval.txt` → train /
+  val (90 / 10, stratified by breed). Output `data/pets/annotations_{train,val,test}.json`
+  and `data/pets/images/<split>/` (hard links).
+- **trashnet** (TrashNet, `data/TrashNet/dataset-resized/<class>/`, M32): one object per
+  image, boxed by the M22 labeller (Grounding DINO tiny, `pip install -e
+  "python[autolabel]"`) with the prompt of its class folder plus `object`; the best box is
+  kept if its score is ≥ `TRASHNET_CONF` and it does not cover the whole photo. The raw
+  predictions are cached in `data/trashnet/autolabel.json` (format of
+  tools/autolabel_io.py); the annotations are rebuilt from it at each run. Split 70 / 15 /
+  15 stratified by class. See docs/tasks/M32-trashnet-pets.md.
+
 Idempotent : un fichier de sortie présent n'est pas refait. AU-AIR et HIT-UAV n'ont pas de
 prétraitement sur disque (liens de `tools/get_datasets.sh local`).
 """
@@ -42,8 +60,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 
+sys.path.insert(0, str(ROOT / "tools"))
+
 from yolo.data.datasets import (  # noqa: E402
-    ASL_CLASSES, ASL_VAL_FROM, DRONEVEHICLE_CLASSES, UAVDT_CLASSES)
+    ASL_CLASSES, ASL_VAL_FROM, DRONEVEHICLE_CLASSES, PETS_CATS, PETS_CLASSES, TRASHNET_CLASSES,
+    UAVDT_CLASSES)
 
 DATA = ROOT / "data"
 BORDER = 100  # px de cadre blanc de DroneVehicle de chaque côté (840×712 → 640×512)
@@ -415,20 +436,521 @@ def asl_preview(out, dest, per_class=2, split="val", seed=0):
     grid.save(dest)
     print(f"asl preview : {len(picks)} images → {dest}")
 
+# ------------------------------------------------------------------------ Oxford-IIIT Pet
+
+PETS_RAW = "Oxford-IIIT Pet"
+# The trimap holds every animal in one mask, and an occluder (coat, hand, collar, leash)
+# often splits one animal in several components: on the 128 images with several components
+# over 1 % of the image, almost all are one animal cut apart, a handful two animals. So the
+# body box is the union of the mask (specks under PETS_SPECK ignored); `components` counts
+# the parts over PETS_PART, for the stats.
+PETS_SPECK = 0.002    # mask components under this share of the image are ignored
+PETS_PART = 0.01      # components over this share of the image are counted
+PETS_SMALL = 0.02     # mask under this share of the image: reason `small`
+PETS_HEAD_IN = 0.9    # share of the head box that must lie inside a body box
+PETS_VAL = 0.1        # share of trainval.txt held out as `val`, stratified by breed
+SEED = 0
+
+
+def pets_breed(stem):
+    """`Abyssinian_12` → `Abyssinian`, `great_pyrenees_3` → `great_pyrenees`."""
+    return stem.rsplit("_", 1)[0]
+
+
+def trimap_box(trimap, speck=PETS_SPECK, part=PETS_PART):
+    """Trimap (h, w) (1 pet, 2 background, 3 boundary) → (continuous corners of the union of
+    the mask {1, 3} without its specks, or None; number of components over `part` × image;
+    mask share of the image)."""
+    import numpy as np
+    from scipy import ndimage
+
+    mask = (trimap == 1) | (trimap == 3)
+    lab, n = ndimage.label(mask)
+    if not n:
+        return None, 0, 0.0
+    sizes = np.bincount(lab.ravel(), minlength=n + 1)
+    keep = np.nonzero(sizes[1:] >= speck * mask.size)[0] + 1
+    if not len(keep):
+        return None, 0, float(mask.mean())
+    ys, xs = np.nonzero(np.isin(lab, keep))
+    box = [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)]
+    return box, int((sizes[1:] >= part * mask.size).sum()), float(mask.mean())
+
+
+def pets_head(xml):
+    """Head box of `annotations/xmls/<stem>.xml` (VOC 1-indexed pixels) → continuous corners,
+    or None if the file is missing (test images)."""
+    import xml.etree.ElementTree as ET
+
+    if not xml.exists():
+        return None
+    b = ET.parse(xml).find("object/bndbox")
+    v = [float(b.find(k).text) for k in ("xmin", "ymin", "xmax", "ymax")]
+    return [v[0] - 1, v[1] - 1, v[2], v[3]]
+
+
+def _inside(inner, outer):
+    """Share of the area of `inner` inside `outer` (corners)."""
+    w = min(inner[2], outer[2]) - max(inner[0], outer[0])
+    h = min(inner[3], outer[3]) - max(inner[1], outer[1])
+    area = (inner[2] - inner[0]) * (inner[3] - inner[1])
+    return max(w, 0) * max(h, 0) / area if area > 0 else 0.0
+
+
+def pets_check(box, mask_share, head):
+    """Reason to drop an image (`small`, `head outside`) or None."""
+    if box is None or mask_share < PETS_SMALL:
+        return "small"
+    if head is not None and _inside(head, box) < PETS_HEAD_IN:
+        return "head outside"
+    return None
+
+
+def stratified_split(items, key, shares, names, seed=SEED):
+    """{item: split}: within each `key(item)` group (sorted, then shuffled with `seed`), the
+    first round(share × n) items go to each split of `names[1:]`, the rest to `names[0]`."""
+    import random
+
+    groups = {}
+    for it in sorted(items):
+        groups.setdefault(key(it), []).append(it)
+    out = {}
+    for g in sorted(groups):
+        its = groups[g]
+        random.Random(f"{seed}-{g}").shuffle(its)
+        start = 0
+        for name, share in zip(names[1:], shares[1:]):
+            n = round(share * len(its))
+            out.update((it, name) for it in its[start:start + n])
+            start += n
+        out.update((it, names[0]) for it in its[start:])
+    return out
+
+
+def pets_jobs(src):
+    """(stem, split): test.txt → test; trainval.txt → train / val by breed."""
+    ann = src / "annotations"
+
+    def read(f):
+        return [ln.split()[0] for ln in (ann / f).read_text().splitlines() if ln.strip()]
+
+    trainval = read("trainval.txt")
+    split = stratified_split(trainval, pets_breed, (1 - PETS_VAL, PETS_VAL), ("train", "val"))
+    jobs = [(s, split[s]) for s in trainval] + [(s, "test") for s in read("test.txt")]
+    for stem, _ in jobs:
+        if pets_breed(stem) not in PETS_CLASSES:
+            raise ValueError(f"unknown Pet breed {stem}")
+    return jobs
+
+
+def _pets_one(job):
+    """(src, stem, split) → (entry, reason or None)."""
+    import numpy as np
+    from PIL import Image
+
+    src, stem, split = job
+    breed = pets_breed(stem)
+    entry = {"image": f"images/{split}/{stem}.jpg", "width": 0, "height": 0, "class": breed,
+             "species": "cat" if breed in PETS_CATS else "dog", "boxes": [], "labels": [],
+             "head": None, "components": 0, "mask": 0.0}
+    try:
+        with Image.open(src / "images" / f"{stem}.jpg") as img:
+            entry["width"], entry["height"] = img.size
+    except OSError:
+        return entry, "unreadable"
+    tri = src / "annotations" / "trimaps" / f"{stem}.png"
+    if not tri.exists():
+        return entry, "no trimap"
+    with Image.open(tri) as t:
+        trimap = np.asarray(t)
+    if trimap.shape != (entry["height"], entry["width"]):
+        return entry, "size mismatch"
+    box, parts, share = trimap_box(trimap)
+    head = pets_head(src / "annotations" / "xmls" / f"{stem}.xml")
+    entry.update(head=head, components=parts, mask=round(share, 4))
+    reason = pets_check(box, share, head)
+    if reason is None:
+        entry["boxes"] = [box]
+        entry["labels"] = [breed]
+    return entry, reason
+
+
+def prep_pets(src, out, jobs=None):
+    """Whole-body boxes of every image of trainval.txt and test.txt from its trimap."""
+    splits = ("train", "val", "test")
+    work = pets_jobs(src)
+    for split in splits:
+        (out / "images" / split).mkdir(parents=True, exist_ok=True)
+    for stem, split in work:
+        _link(src / "images" / f"{stem}.jpg", out / "images" / split / f"{stem}.jpg")
+    with Pool(jobs) as pool:
+        done = pool.map(_pets_one, [(src, s, sp) for s, sp in work], chunksize=32)
+    records = {s: [] for s in splits}
+    rejected = []
+    for (stem, split), (entry, reason) in zip(work, done):
+        if reason is None:
+            records[split].append(entry)
+        else:
+            rejected.append({"image": entry["image"], "class": entry["class"], "split": split,
+                             "reason": reason})
+    write_split_files(out, records, rejected, PETS_CLASSES)
+    pets_report(records, rejected)
+
+
+def write_split_files(out, records, rejected, classes):
+    (out / "rejected.json").write_text(json.dumps(rejected, indent=0))
+    (out / "classes.txt").write_text("".join(c + "\n" for c in classes))
+    for split in ("train", "test", "val"):  # val last: it is the marker of get_datasets.sh
+        (out / f"annotations_{split}.json").write_text(
+            json.dumps(records[split], separators=(",", ":")))
+
+
+def pets_report(records, rejected):
+    from collections import Counter
+
+    for split, r in records.items():
+        print(f"pets {split} : {len(r)} images, {sum(len(e['boxes']) for e in r)} boxes")
+    kept = sum(len(r) for r in records.values())
+    multi = sum(e["components"] > 1 for r in records.values() for e in r)
+    why = Counter(r["reason"] for r in rejected)
+    print(f"pets : {kept} of {kept + len(rejected)} images kept "
+          f"({100 * kept / max(kept + len(rejected), 1):.1f} %), multi {multi}; left out: "
+          + (", ".join(f"{k} {n}" for k, n in why.most_common()) or "none"))
+
+
+def grid_preview(out, dest, picks, label, extra=None, cell=256, cols=8):
+    """Grid of `picks` (annotation entries) with their boxes in red, `extra(entry)` boxes in
+    green, `label(entry)` written on each."""
+    from PIL import Image, ImageDraw
+
+    grid = Image.new("RGB", (cols * cell, -(-len(picks) // cols) * cell), "white")
+    for i, e in enumerate(picks):
+        with Image.open(out / e["image"]) as img:
+            img = img.convert("RGB")
+        sx, sy = cell / img.width, cell / img.height
+        img = img.resize((cell, cell))
+        d = ImageDraw.Draw(img)
+        for boxes, color in ((e["boxes"], (255, 0, 0)), (extra(e) if extra else [], (0, 255, 0))):
+            for b in boxes:
+                d.rectangle([b[0] * sx, b[1] * sy, b[2] * sx, b[3] * sy], outline=color, width=2)
+        d.text((4, 4), label(e), fill=(255, 255, 0))
+        grid.paste(img, (i % cols * cell, i // cols * cell))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    grid.save(dest)
+
+
+def pick_per_class(out, split, per_class, seed=SEED, first=None):
+    import random
+
+    entries = json.loads((out / f"annotations_{split}.json").read_text())
+    by_class = {}
+    for e in entries:
+        by_class.setdefault(e["class"], []).append(e)
+    rng = random.Random(seed)
+    picks = [e for c in sorted(by_class) for e in rng.sample(by_class[c],
+                                                             min(per_class, len(by_class[c])))]
+    if first:  # images to show first (e.g. several components)
+        picks = [e for e in entries if first(e)][:8] + picks
+    return picks
+
+
+def pets_preview(out, dest, per_class=1, split="val"):
+    """Body boxes (red) and head boxes (green) of `per_class` images per breed (T32.5); the
+    first row shows images with several components."""
+    picks = pick_per_class(out, split, per_class, first=lambda e: e["components"] > 1)
+    grid_preview(out, dest, picks, lambda e: e["class"][:18],
+                 extra=lambda e: [e["head"]] if e["head"] else [])
+    print(f"pets preview : {len(picks)} images → {dest}")
+
+
+# ------------------------------------------------------------------------------ TrashNet
+
+TRASHNET_RAW = "TrashNet"
+# One image = one object of a known class: the labeller only places the box. Prompt of
+# each class folder, plus a generic one sent with every image (`TRASHNET_GENERIC`).
+TRASHNET_PROMPTS = {"cardboard": "cardboard", "glass": "glass bottle or jar",
+                    "metal": "metal can", "paper": "paper",
+                    "plastic": "plastic bottle or container", "trash": "waste"}
+TRASHNET_GENERIC = "object"
+TRASHNET_LABELLER = "grounding-dino-tiny"
+TRASHNET_CONF = 0.3     # best box kept if its score is ≥ this
+TRASHNET_WHOLE = 0.98   # a box over this share of the image boxed the whole photo
+TRASHNET_SPLIT = (0.7, 0.15, 0.15)  # train, val, test, stratified by class
+TRASHNET_THREADS = 6    # torch threads per labeller process
+
+
+def trashnet_files(src):
+    """(image, class) of every raw image: `dataset-resized/<class>/*.jpg`."""
+    base = src / "dataset-resized"
+    files = [(p, d.name) for d in sorted(base.iterdir()) if d.is_dir()
+             for p in sorted(d.glob("*.jpg"))]
+    for _, cls in files:
+        if cls not in TRASHNET_CLASSES:
+            raise ValueError(f"unknown TrashNet class {cls}")
+    return files
+
+
+def trashnet_prompts():
+    """Global prompt list of the cache: the class prompts in class order, then the generic."""
+    return [TRASHNET_PROMPTS[c] for c in TRASHNET_CLASSES] + [TRASHNET_GENERIC]
+
+
+def trashnet_labeller():
+    import autolabel_models as lm
+
+    try:
+        import torch
+        torch.set_num_threads(TRASHNET_THREADS)
+    except ImportError:
+        pass
+    return lm.get_labeller(TRASHNET_LABELLER, device="cpu")
+
+
+_LABELLER = None
+
+
+def _trashnet_init(factory):
+    global _LABELLER
+    _LABELLER = factory()
+
+
+def _trashnet_label(job):
+    """(path, class) → raw predictions with global prompt indices, image size."""
+    import autolabel_io as lio
+    import numpy as np
+
+    path, cls = job
+    img = lio.load_image(path)
+    k = TRASHNET_CLASSES.index(cls)
+    names = [cls, TRASHNET_GENERIC]
+    boxes, scores, labels = _LABELLER.predict(
+        img, (names, [TRASHNET_PROMPTS[cls], TRASHNET_GENERIC]))
+    glob = np.array([k, len(TRASHNET_CLASSES)], dtype=np.int64)
+    labels = glob[np.asarray(labels, dtype=np.int64)] if len(labels) else labels
+    return lio.raw_record(boxes, scores, labels), img.size
+
+
+def trashnet_autolabel(files, cache, factory, jobs=None, every=100):
+    """Provenance of `tools/autolabel_io.py` ({sha1: record}), read from `cache` and
+    completed for the images it lacks (`factory()` builds a labeller per worker); written
+    back every `every` images, so a stopped run resumes. Returns (provenance, sha1 by path)."""
+    import autolabel_io as lio
+
+    prov = lio.read_provenance(cache.parent) if cache.exists() else None
+    if prov is None:
+        prov = lio.new_provenance(TRASHNET_LABELLER, None, list(TRASHNET_CLASSES)
+                                  + [TRASHNET_GENERIC], trashnet_prompts(), TRASHNET_CONF)
+    digests = {p: lio.sha1(p) for p, _ in files}
+    if len(set(digests.values())) < len(digests):  # one prediction per distinct image
+        print(f"trashnet : {len(digests) - len(set(digests.values()))} duplicate images")
+    todo = [(p, c) for p, c in files if digests[p] not in prov["images"]]
+    if todo:
+        print(f"trashnet : labelling {len(todo)} images ({len(files) - len(todo)} cached)",
+              flush=True)
+
+        def store(job, res):
+            raw, size = res
+            prov["images"][digests[job[0]]] = lio.image_record(digests[job[0]], size, raw)
+
+        if jobs == 1:
+            _trashnet_init(factory)
+            for i, job in enumerate(todo, 1):
+                store(job, _trashnet_label(job))
+                if i % every == 0:
+                    lio.write_provenance(cache.parent, prov)
+        else:
+            with Pool(jobs or 3, initializer=_trashnet_init, initargs=(factory,)) as pool:
+                for i, (job, res) in enumerate(zip(todo, pool.imap(_trashnet_label, todo)), 1):
+                    store(job, res)
+                    if i % every == 0:
+                        lio.write_provenance(cache.parent, prov)
+                        print(f"trashnet : {i} / {len(todo)}", flush=True)
+        if prov["model_version"] is None and getattr(_LABELLER, "version", None):
+            prov["model_version"] = _LABELLER.version
+        lio.write_provenance(cache.parent, prov)
+    return prov, digests
+
+
+def trashnet_box(record, conf=TRASHNET_CONF):
+    """Best raw box of an image over all its prompts → (continuous corners, score) and the
+    reason it is dropped (`no box`, `whole image`) or None."""
+    raw, w, h = record["raw"], record["width"], record["height"]
+    if not raw["scores"]:
+        return None, None, "no box"
+    i = max(range(len(raw["scores"])), key=lambda j: raw["scores"][j])
+    score = raw["scores"][i]
+    cx, cy, bw, bh = raw["boxes"][i]
+    box = [max((cx - bw / 2) * w, 0.0), max((cy - bh / 2) * h, 0.0),
+           min((cx + bw / 2) * w, float(w)), min((cy + bh / 2) * h, float(h))]
+    box = [round(v, 2) for v in box]
+    if score < conf:
+        return box, score, "no box"
+    if (box[2] - box[0]) * (box[3] - box[1]) > TRASHNET_WHOLE * w * h:
+        return box, score, "whole image"
+    return box, score, None
+
+
+def prep_trashnet(src, out, factory=trashnet_labeller, jobs=None, conf=TRASHNET_CONF):
+    """One auto-labelled box per image. The raw predictions are cached in
+    `autolabel.json` (delete it to label again); the annotation files are rebuilt from it at
+    each run."""
+    splits = ("train", "val", "test")
+    files = trashnet_files(src)
+    split = stratified_split([p for p, _ in files], lambda p: p.parent.name,
+                             TRASHNET_SPLIT, splits)
+    for s in splits:
+        (out / "images" / s).mkdir(parents=True, exist_ok=True)
+    for p, _ in files:
+        _link(p, out / "images" / split[p] / p.name)
+    prov, digests = trashnet_autolabel(files, out / "autolabel.json", factory, jobs)
+    records = {s: [] for s in splits}
+    rejected = []
+    for p, cls in files:
+        rec = prov["images"][digests[p]]
+        box, score, reason = trashnet_box(rec, conf)
+        entry = {"image": f"images/{split[p]}/{p.name}", "width": rec["width"],
+                 "height": rec["height"], "class": cls, "boxes": [], "labels": [],
+                 "score": score}
+        if reason is None:
+            entry.update(boxes=[box], labels=[cls])
+            records[split[p]].append(entry)
+        else:
+            rejected.append({"image": entry["image"], "class": cls, "split": split[p],
+                             "reason": reason, "score": score})
+    write_split_files(out, records, rejected, TRASHNET_CLASSES)
+    trashnet_report(records, rejected)
+
+
+def trashnet_report(records, rejected):
+    from collections import Counter
+
+    for split, r in records.items():
+        print(f"trashnet {split} : {len(r)} images")
+    kept = Counter(e["class"] for r in records.values() for e in r)
+    lost = Counter(r["class"] for r in rejected)
+    why = Counter(r["reason"] for r in rejected)
+    total = sum(kept.values()) + sum(lost.values())
+    print(f"trashnet : {sum(kept.values())} of {total} images kept "
+          f"({100 * sum(kept.values()) / max(total, 1):.1f} %); left out: "
+          + (", ".join(f"{k} {n}" for k, n in why.most_common()) or "none"))
+    print("trashnet kept by class : " + ", ".join(
+        f"{c} {100 * kept[c] / max(kept[c] + lost[c], 1):.1f} %" for c in TRASHNET_CLASSES))
+
+
+def trashnet_preview(out, dest, per_class=2, split="val"):
+    """Auto-label boxes of `per_class` images per class (T32.3)."""
+    picks = pick_per_class(out, split, per_class)
+    grid_preview(out, dest, picks, lambda e: f"{e['class']} {e['score']:.2f}", cols=6)
+    print(f"trashnet preview : {len(picks)} images → {dest}")
+
+
+TRASHNET_HANDCHECK = 100
+
+
+def trashnet_handcheck(out, dest, n=TRASHNET_HANDCHECK):
+    """`n` val images, stratified by class, copied to `dest/` for the "Folder" tab of the M22
+    editor (`make autolabel`): label them there with the classes of `dest/classes.txt`,
+    correct every box by hand, then "Download all (zip)" (T32.3)."""
+    entries = json.loads((out / "annotations_val.json").read_text())
+    cls = {e["image"]: e["class"] for e in entries}
+    pick = stratified_split(list(cls), cls.get, (1 - n / len(cls), n / len(cls)),
+                            ("rest", "check"))
+    dest.mkdir(parents=True, exist_ok=True)
+    chosen = sorted(i for i in cls if pick[i] == "check")
+    for i in chosen:
+        _link(out / i, dest / Path(i).name)
+    (dest.parent / f"{dest.name}_classes.txt").write_text(
+        ", ".join(f"{c}={TRASHNET_PROMPTS[c]}" for c in TRASHNET_CLASSES) + "\n")
+    print(f"trashnet hand check : {len(chosen)} val images → {dest} (classes to type: "
+          f"{dest.parent / (dest.name + '_classes.txt')})")
+
+
+def _read_result_labels(result):
+    """{image stem: (n, 4) normalised cxcywh} of an editor result: a folder holding
+    `labels/` or the zip of "Download all"."""
+    import zipfile
+
+    import numpy as np
+
+    out = {}
+    if Path(result).suffix == ".zip":
+        with zipfile.ZipFile(result) as z:
+            for m in z.namelist():
+                if m.endswith(".txt") and "/labels/" in f"/{m}":
+                    rows = [ln.split() for ln in z.read(m).decode().splitlines() if ln.strip()]
+                    out[Path(m).stem] = np.array([[float(v) for v in r[1:5]] for r in rows])
+    else:
+        for f in Path(result).rglob("labels/**/*.txt"):
+            rows = [ln.split() for ln in f.read_text().splitlines() if ln.strip()]
+            out[f.stem] = np.array([[float(v) for v in r[1:5]] for r in rows])
+    return out
+
+
+def box_iou(a, b):
+    w = min(a[2], b[2]) - max(a[0], b[0])
+    h = min(a[3], b[3]) - max(a[1], b[1])
+    inter = max(w, 0) * max(h, 0)
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def trashnet_handcheck_iou(out, result):
+    """IoU of the auto-labels against the boxes corrected by hand in the editor (`result`:
+    zip or folder); the corrected boxes (class: the folder's) are saved as the hand-checked
+    val subset `out/handcheck_val.json`. Returns the IoUs (0: no box kept or drawn)."""
+    import numpy as np
+
+    hand = _read_result_labels(result)
+    entries = {Path(e["image"]).stem: e
+               for s in ("train", "val", "test")
+               for e in json.loads((out / f"annotations_{s}.json").read_text())}
+    rejected = {Path(r["image"]).stem: r for r in json.loads((out / "rejected.json").read_text())}
+    ious, ref = [], []
+    for stem, b in sorted(hand.items()):
+        e = entries.get(stem)
+        if e is None and stem not in rejected:
+            continue
+        w, h = (e["width"], e["height"]) if e else (512, 384)
+        corners = [[(x - bw / 2) * w, (y - bh / 2) * h, (x + bw / 2) * w, (y + bh / 2) * h]
+                   for x, y, bw, bh in b]
+        cls = e["class"] if e else rejected[stem]["class"]
+        ref.append({"image": e["image"] if e else rejected[stem]["image"], "width": w,
+                    "height": h, "class": cls, "boxes": [[round(v, 2) for v in c]
+                                                         for c in corners],
+                    "labels": [cls] * len(corners)})
+        auto = e["boxes"][0] if e and e["boxes"] else None
+        ious.append(max((box_iou(auto, c) for c in corners), default=0.0) if auto else 0.0)
+    (out / "handcheck_val.json").write_text(json.dumps(ref, separators=(",", ":")))
+    ious = np.array(ious)
+    if len(ious):
+        print(f"trashnet hand check : {len(ious)} images, IoU median {np.median(ious):.3f}, "
+              f"q10 {np.quantile(ious, 0.1):.3f}, < 0.5 : {int((ious < 0.5).sum())}")
+    return ious
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("datasets", nargs="+", choices=("dronevehicle", "uavdt", "asl"))
+    ap.add_argument("datasets", nargs="+",
+                    choices=("dronevehicle", "uavdt", "asl", "trashnet", "pets"))
     ap.add_argument("--src", type=Path, default=None,
                     help="dossier brut (défaut : data/DroneVehicle Dataset/"
-                         "DroneVehiclesDatasetYOLO, data/UAVDT Dataset, data/ASL Alphabet)")
+                         "DroneVehiclesDatasetYOLO, data/UAVDT Dataset, data/ASL Alphabet, "
+                         "data/TrashNet, data/Oxford-IIIT Pet)")
     ap.add_argument("--out", type=Path, default=None,
-                    help="sortie (défaut : data/dronevehicle, data/uavdt, data/asl)")
+                    help="sortie (défaut : data/<dataset>)")
     ap.add_argument("--keep-border", action="store_true",
                     help="DroneVehicle : garder le cadre blanc (boîtes seules converties)")
-    ap.add_argument("--jobs", type=int, default=None)
+    ap.add_argument("--jobs", type=int, default=None,
+                    help="processes (TrashNet: labeller processes of "
+                         f"{TRASHNET_THREADS} threads, default 3)")
     ap.add_argument("--preview", type=Path, default=None,
-                    help="ASL: also write a grid of pseudo-boxes (2 val images per class)")
+                    help="ASL, TrashNet, Pet: also write a grid of boxes (val images)")
+    ap.add_argument("--handcheck", type=Path, default=None,
+                    help="TrashNet: copy 100 val images there for a hand check in the M22 "
+                         "editor (T32.3)")
+    ap.add_argument("--handcheck-iou", type=Path, default=None,
+                    help="TrashNet: zip or folder of the corrected labels → IoU of the "
+                         "auto-labels, data/trashnet/handcheck_val.json")
     args = ap.parse_args()
     for ds in args.datasets:
         if ds == "dronevehicle":
@@ -437,12 +959,26 @@ def main():
                               args.jobs)
         elif ds == "uavdt":
             prep_uavdt(args.src or DATA / "UAVDT Dataset", args.out or DATA / "uavdt")
-        else:
+        elif ds == "asl":
             out = args.out or DATA / "asl"
             ensure_hand_model()
             prep_asl(args.src or DATA / ASL_RAW, out, jobs=args.jobs)
             if args.preview:
                 asl_preview(out, args.preview)
+        elif ds == "pets":
+            out = args.out or DATA / "pets"
+            prep_pets(args.src or DATA / PETS_RAW, out, jobs=args.jobs)
+            if args.preview:
+                pets_preview(out, args.preview)
+        else:
+            out = args.out or DATA / "trashnet"
+            prep_trashnet(args.src or DATA / TRASHNET_RAW, out, jobs=args.jobs)
+            if args.preview:
+                trashnet_preview(out, args.preview)
+            if args.handcheck:
+                trashnet_handcheck(out, args.handcheck)
+            if args.handcheck_iou:
+                trashnet_handcheck_iou(out, args.handcheck_iou)
 
 
 if __name__ == "__main__":

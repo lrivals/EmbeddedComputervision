@@ -23,6 +23,7 @@ anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0
 | crowdhuman | 1 | 19 370 | 566 493 | 20 | 47,5 % | 10,0 % | 19,82 % | 32 | 113 | 0,679 |
 | exdark | 12 | 5 563 | 17 498 | 2 | 18,1 % | 1,0 % | 0,74 % | 0 | 33 | 0,615 |
 | flir | 15 | 11 886 | 191 728 | 15 | 85,6 % | 50,7 % | 17,70 % | 0 | 133 | 0,564 |
+| pets | 37 | 6 964 | 6 964 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 114 | 0,824 |
 <!-- /data_stats:comparatif -->
 
 ## VOC
@@ -168,3 +169,29 @@ always enough for the ground truth. The bottleneck is the grid: **19.8 %** of th
 are lost by collision. **22.5 %** of the boxes are `difficult` (`mask` and `ignore`).
 77,738 `fbox` boxes overflow the image: they are clipped by the loader, 15 become empty
 and are removed.
+
+## Oxford-IIIT Pet
+
+<!-- data_stats:pets -->
+Révision `145dc7c`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-pets.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset pets --split train,test --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 3 302 | 3 302 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| test | 3 662 | 3 662 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| ensemble | 6 964 | 6 964 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 3 302 | 3 302 | — / — | ok |
+| test | 3 662 | 3 662 | — / — | ok |
+<!-- /data_stats:pets -->
+
+**Question (T32.8): how much larger is the body box than the head box, and how many images
+hold more than one animal?** On the 3 662 trainval images that have a head box, the body box
+(min / max of the trimap mask) is a median **3.7 times** the head box in area (q10 1.8,
+q90 9.3): close-ups of the face are frequent, so the body box often fills most of the photo.
+The mask splits into several parts over 1 % of the image on **131 of 7 332** images
+(1.8 %). On the 48 that were checked by eye, almost all show one animal cut apart by a coat,
+a hand, a collar or a leash. Only about three show two animals, which then get one box over
+both. So the body box is the union of the mask, not one box per part (T32.5).

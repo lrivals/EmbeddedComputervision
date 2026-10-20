@@ -260,6 +260,47 @@ FICHES = {
                   "duplicates); test: the 28 official images (no `del`), indicative only",
                   "a 2 px blue frame surrounds every image (left in place)"],
     },
+    # M32 (docs/tasks/M32-trashnet-pets.md): classification datasets, boxes made on disk.
+    "trashnet": {
+        "name": "TrashNet (auto-labelled boxes)",
+        "source": "https://github.com/garythung/trashnet",
+        "version": "dataset-resized.zip (2017); boxes from the M22 labeller, Grounding DINO "
+                   "tiny (tools/prep_datasets.py trashnet)",
+        "license": "MIT (repository)",
+        "sensor": "phone photos, one piece of waste on a white or light plain background",
+        "resolution": "512×384",
+        "classes": D.TRASHNET_CLASSES,
+        # Raw counts: 2 527 images; the loaded counts are lower (images without a box kept
+        # are left out).
+        "official": {"train": (None, None), "val": (None, None), "test": (None, None)},
+        "objects": "one auto-labelled box per image (the best one over the class prompt and "
+                   "`object`); the class is the folder",
+        "notes": ["the boxes are auto-labels: val and test measure agreement with the "
+                  "labeller, not with a human (hand-checked val subset: T32.3)",
+                  "images with no box ≥ TRASHNET_CONF or a box over the whole photo left "
+                  "out (`data/trashnet/rejected.json`)",
+                  "no official split: 70 / 15 / 15 stratified by class, fixed seed; photos "
+                  "of one object from several angles may sit on both sides"],
+    },
+    "pets": {
+        "name": "Oxford-IIIT Pet (whole-body boxes)",
+        "source": "https://www.robots.ox.ac.uk/~vgg/data/pets/",
+        "version": "2012; whole-body boxes from the hand-made trimaps "
+                   "(tools/prep_datasets.py pets)",
+        "license": "CC BY-SA 4.0 (annotations); image copyright with the owners",
+        "sensor": "pet photos from the web (Flickr and others), varied scenes",
+        "resolution": "varies, most about 500×375",
+        "classes": D.PETS_CLASSES,
+        "official": {"train": (None, None), "val": (None, None), "test": (None, None)},
+        "objects": "one box per image: min / max of the trimap mask (pet and boundary pixels); "
+                   "head box of the trainval images kept apart",
+        "notes": ["test = official test.txt; train / val = trainval.txt split 90 / 10 by breed",
+                  "an occluder (coat, hand, collar) often splits the mask: the box spans all "
+                  "the parts; the rare photos with two animals get one box over both",
+                  "masks under 2 % of the image or a head box outside the body box left out "
+                  "(`data/pets/rejected.json`)",
+                  "breeds map to VOC / COCO `cat` and `dog` (out-of-domain baseline)"],
+    },
 }
 
 

@@ -14,7 +14,12 @@ in `build/autolabel/eval/[<dataset>-<split>/]<model>/autolabel.json` and are reu
 second run. They are scored as detections with `evaluate` (mAP@0.5, VOC07 11 points,
 difficult objects and VisDrone ignored regions ignored); precision / recall over all classes
 are given at several export thresholds, and the mAP of small objects (< 32² px) apart.
-Open-vocabulary labellers are zero-shot here: their mAP is a labelling quality.
+Open-vocabulary labellers are zero-shot here: their mAP is a labelling quality. mAP@0.75 and
+the IoU of the matched boxes (best IoU of each object with a box of its class scored ≥
+`MATCH_CONF`, kept if ≥ 0.5) measure how tight the boxes are.
+
+`--map voc|coco` scores through `MAPPINGS` instead of the dataset classes: the prompts are
+the family classes reached (Oxford-IIIT Pet: 37 breeds → `cat`, `dog`, M32 T32.7).
 """
 
 import argparse
@@ -42,6 +47,7 @@ MODELS = ("grounding-dino-tiny", "owlv2-base", "yolo:tiny-yolov2-voc")
 CONFS = (0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.55, 0.6)
 OUT = ROOT / "build" / "autolabel" / "eval"
 SMALL = 32 * 32     # area (px²) under which an object is small (COCO convention)
+MATCH_CONF = 0.3    # score of the boxes whose IoU is measured (threshold of M32 TrashNet)
 
 
 def subset(samples, n, seed):
@@ -107,10 +113,39 @@ def present(samples, n_classes):
             if any((~a["difficult"][a["labels"] == c]).any() for a in samples)]
 
 
+def _iou(a, b):
+    """IoU of VOC pixel corners `a` (4,) against `b` (n, 4)."""
+    w = np.minimum(a[2], b[:, 2]) - np.maximum(a[0], b[:, 0]) + 1
+    h = np.minimum(a[3], b[:, 3]) - np.maximum(a[1], b[:, 1]) + 1
+    inter = np.clip(w, 0, None) * np.clip(h, 0, None)
+    return inter / (_area(a)[0] + _area(b) - inter)
+
+
+def matched_ious(dets, samples, n_classes, thr=0.5):
+    """Best IoU of each non-difficult object with a detection of its class and image, for the
+    objects matched at `thr`."""
+    out = []
+    for c in range(n_classes):
+        ids, _, boxes = dets[c]
+        ids = np.asarray(ids)
+        for a in samples:
+            mine = boxes[ids == a["id"]] if len(ids) else np.zeros((0, 4))
+            for g in a["xyxy"][(a["labels"] == c) & ~a["difficult"]]:
+                best = _iou(g, mine).max() if len(mine) else 0.0
+                if best >= thr:
+                    out.append(float(best))
+    return np.array(out)
+
+
 def score(prov, samples, root, n_classes):
-    """mAP, AP per class, small-object mAP and P / R by threshold of a provenance."""
+    """mAP@0.5 and @0.75, AP per class, small-object mAP, IoU of the matched boxes and P / R
+    by threshold of a provenance."""
     cls = present(samples, n_classes)
-    aps, _ = evaluate(detections(prov, samples, root, n_classes), samples, n_classes)
+    dets = detections(prov, samples, root, n_classes)
+    aps, _ = evaluate(dets, samples, n_classes)
+    aps75, _ = evaluate(dets, samples, n_classes, iou_thr=0.75)
+    ious = matched_ious(detections(prov, samples, root, n_classes, MATCH_CONF), samples,
+                        n_classes)
     small = small_only(samples)
     cls_s = present(small, n_classes)
     aps_s, _ = evaluate(detections(prov, samples, root, n_classes, small=True), small,
@@ -118,6 +153,7 @@ def score(prov, samples, root, n_classes):
     pr = {t: precision_recall(detections(prov, samples, root, n_classes, t), samples, n_classes)
           for t in CONFS}
     return {"map": float(aps[cls].mean()) if cls else float("nan"), "aps": aps,
+            "map75": float(aps75[cls].mean()) if cls else float("nan"), "ious": ious,
             "map_small": float(aps_s[cls_s].mean()) if cls_s else float("nan"),
             "n_small": int(sum((~a["difficult"]).sum() for a in small)), "pr": pr}
 
@@ -151,12 +187,15 @@ def table(results, samples, names, where):
              + ", ".join(f"`{c}` → `{lm.prompt_of(c)}`" for c in names
                          if lm.prompt_of(c) != c.lower())
              + f"), raw predictions ≥ {lm.FLOOR}, device {lm.pick_device()}.", "",
-             "| labeller | mAP@0.5 | mAP small | s / image | "
-             + " | ".join(f"P / R @ {t}" for t in CONFS) + " |",
-             "|---|---|---|---|" + "---|" * len(CONFS)]
+             "| labeller | mAP@0.5 | mAP@0.75 | IoU matched, median (q10-q90) | mAP small "
+             "| s / image | " + " | ".join(f"P / R @ {t}" for t in CONFS) + " |",
+             "|---|---|---|---|---|---|" + "---|" * len(CONFS)]
     for r in results:
-        lines.append(f"| `{r['model']}` | {r['map']:.3f} | {r['map_small']:.3f} | "
-                     f"{r['s_per_image']:.2f} | "
+        q = (np.quantile(r["ious"], [0.5, 0.1, 0.9]) if len(r["ious"])
+             else [float("nan")] * 3)
+        lines.append(f"| `{r['model']}` | {r['map']:.3f} | {r['map75']:.3f} | "
+                     f"{q[0]:.3f} ({q[1]:.2f}-{q[2]:.2f}, n {len(r['ious'])}) | "
+                     f"{r['map_small']:.3f} | {r['s_per_image']:.2f} | "
                      + " | ".join(f"{p:.2f} / {q:.2f}" for p, q in r["pr"].values()) + " |")
     cls = present(samples, len(names))
     lines += ["", "AP per class (classes present in the subset):", "",
@@ -176,6 +215,9 @@ def main():
     ap.add_argument("--seed", type=int, default=None,
                     help="random subset; < 0: the first --n (default: VOC first, others 0)")
     ap.add_argument("--models", default=",".join(MODELS))
+    ap.add_argument("--map", choices=sorted(datasets.FAMILIES), default=None,
+                    help="score through MAPPINGS[(dataset, family)]: prompts = the family "
+                         "classes reached (pets: cat, dog)")
     ap.add_argument("-o", "--out", type=Path, default=None,
                     help="default results/autolabel_voc.md or results/autolabel_<tag>.md")
     args = ap.parse_args()
@@ -185,6 +227,10 @@ def main():
     samples = subset(datasets.load_args(args), args.n, seed)
     names = list(datasets.DATASETS[args.dataset].classes)
     tag = datasets.tag(args.dataset, split)
+    if args.map:
+        view = datasets.eval_view(args.dataset, len(datasets.FAMILIES[args.map]))
+        samples, names = datasets.remap(samples, view.gt_lut), list(view.names)
+        tag += f"-{args.map}"
     out_dir = OUT / tag if tag else OUT
     where = "VOC 2007 test" if args.dataset == "voc" else f"{args.dataset} {split}"
     if seed >= 0:

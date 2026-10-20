@@ -1072,6 +1072,50 @@ QUESTIONS = {
                   + ", ".join(f"{c} {n}" for c, n in lost.most_common(8)))
         display(Markdown(DS.md_par_classe(STATS)))
         """),
+    # TrashNet and Oxford-IIIT Pet (M32, docs/tasks/M32-trashnet-pets.md#stats-questions).
+    "trashnet": ("How much of the image does one piece of waste cover, and which classes lose "
+                 "the most images to the labeller?", "T32.8", """
+        import json
+        from collections import Counter
+        from pathlib import Path
+        import numpy as np
+        from yolo.data.datasets import DATA_DIR
+        root = Path(DATA_ROOT or DATA_DIR / "trashnet")
+        kept = [e for s in ("train", "val", "test")
+                for e in json.loads((root / f"annotations_{s}.json").read_text())]
+        cover = np.array([(b[2] - b[0]) * (b[3] - b[1]) / (e["width"] * e["height"])
+                          for e in kept for b in e["boxes"]])
+        print(f"box share of the image: median {np.median(cover):.2f}, "
+              f"q10 {np.quantile(cover, 0.1):.2f}, q90 {np.quantile(cover, 0.9):.2f}")
+        rej = json.loads((root / "rejected.json").read_text())
+        n = Counter(e["class"] for e in kept)
+        lost = Counter(r["class"] for r in rej)
+        print("left out by the labeller: " + ", ".join(
+            f"{c} {lost[c]} / {n[c] + lost[c]} ({100 * lost[c] / (n[c] + lost[c]):.1f} %)"
+            for c in sorted(n, key=lambda c: -lost[c] / (n[c] + lost[c]))))
+        print("reasons: " + ", ".join(f"{k} {v}" for k, v in
+                                      Counter(r["reason"] for r in rej).most_common()))
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
+    "pets": ("How much larger is the body box than the head box, and how many images hold "
+             "more than one animal?", "T32.8", """
+        import json
+        from pathlib import Path
+        import numpy as np
+        from yolo.data.datasets import DATA_DIR
+        root = Path(DATA_ROOT or DATA_DIR / "pets")
+        es = [e for s in ("train", "val", "test")
+              for e in json.loads((root / f"annotations_{s}.json").read_text())]
+        area = lambda b: (b[2] - b[0]) * (b[3] - b[1])
+        r = np.array([area(e["boxes"][0]) / area(e["head"]) for e in es if e["head"]])
+        print(f"body / head box area, {len(r)} trainval images: median {np.median(r):.1f}, "
+              f"q10 {np.quantile(r, 0.1):.1f}, q90 {np.quantile(r, 0.9):.1f}")
+        multi = sum(e["components"] > 1 for e in es)
+        print(f"mask in several parts over 1 % of the image: {multi} of {len(es)} images "
+              f"({100 * multi / len(es):.1f} %); mostly one animal cut by a coat, a hand or a "
+              "leash, a few with two animals (one box over both)")
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
 }
 
 
