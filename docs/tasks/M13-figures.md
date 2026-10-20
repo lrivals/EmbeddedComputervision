@@ -20,8 +20,8 @@ or one produced by an existing tool. No figure is copied by hand.
 **State**: 59 tasks done out of 59. `make figures` produces 61 figures in about two minutes,
 gathered in the gallery [results/figures.md](../../results/figures.md). The code is
 complete; some data remains to be produced:
-- the Vitis syntheses (`make hls-synth`, `hls-synth-pow2`, `hls-synth-pack`,
-  `hls-synth-stream`), which make the bars of T13.24 solid;
+- the Vitis syntheses, which make the bars of T13.24 solid, and the board stage of the
+  result figures: [deferred/M13](deferred/M13-figures.md);
 - `make test-durations` (tier N), for the durations panel of T13.30.
 
 ## Shared conventions
@@ -441,7 +441,7 @@ complete; some data remains to be produced:
     `synth` (INT8), `synth_pow2` (new target `make hls-synth-pow2`,
     `hls/scripts/synth_pow2.tcl`, `-DACC_WMODE_POW2`) and `synth_stream` (W8A8);
   - 4 bits has no HLS kernel of its own: it stays an estimate (2 MACs per DSP).
-- **Pending**: the Vitis syntheses (machine with Vitis HLS).
+- **Deferred** (Vitis): [deferred/M13](deferred/M13-figures.md) — T13.24, the Vitis syntheses.
 
 ### [x] T13.25 — Hardware post-processing
 - **Spec**: §10.3 · **Depends on**: M9.1 · **Size**: S

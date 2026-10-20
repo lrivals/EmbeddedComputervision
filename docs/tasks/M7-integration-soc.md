@@ -15,9 +15,7 @@ same integers as the golden model.
   power reports; fails if WNS, TNS or WHS < 0. `pl.dtsi` (overlay: `generic-uio` + IRQ,
   32 MB u-dma-buf, clock), `shell.json`, `firmware.sh` (`make fpga-firmware`), board
   procedure in `hw/boards/kv260/README.md`. `make vivado-build`.
-- **Remaining**: everything that needs Vivado: bitstream generation, timing met at
-  200 MHz. The script has never been run (Vivado missing); `pl.dtsi` not compiled (dtc
-  missing).
+- **Deferred** (Vivado): [deferred/M7](deferred/M7-integration-soc.md) — T7.1, bitstream and timing.
 
 ### [ ] T7.2 — ARM driver
 - **Spec**: §10.1, §10.3 · **Depends on**: T7.1, T5.1 · **Size**: L
@@ -37,7 +35,7 @@ same integers as the golden model.
   `run_compare --layer N` (arena prefilled with the dumps of the layers < N) == dump for
   L00 (v2, v3), L13 (v2) and L21 (v3, route in 2 segments, one of them an upsample).
   `make sw-sim`, `make sw-board` (native build, uio backend).
-- **Remaining**: run on the KV260.
+- **Deferred** (board): [deferred/M7](deferred/M7-integration-soc.md) — T7.2, run on the KV260.
 
 ### [ ] T7.3 — Post-processing on the ARM
 - **Spec**: §10.3 (decoding + NMS on the ARM, as 2025-kim and 2024-yan do) ·
@@ -52,7 +50,7 @@ same integers as the golden model.
   like `resize_darknet`, quantization `quantize_input`), `--draw` (boxes on the image),
   preprocessing / accelerator / post-processing times. On the PC: detections ==
   `detections.json` for the 3 images of both networks; post-processing < 0.02 ms on x86.
-- **Remaining**: post-processing time measured on the A53.
+- **Deferred** (board): [deferred/M7](deferred/M7-integration-soc.md) — T7.3, time on the A53.
 
 ### [ ] T7.4 — End to end on the board
 - **Spec**: §10.5 step 4, §11 · **Depends on**: T7.3 · **Size**: M
@@ -65,5 +63,4 @@ same integers as the golden model.
   per layer (M8). Sim backend: **87 layer outputs, 0 differences**, identical detections,
   Tiny-YOLOv2 VOC and Tiny-YOLOv3 COCO, 3 images. Demo `yolo_app --image 000004.jpg`:
   7 cars detected.
-- **Remaining**: 0 differences on the KV260 (`hw/boards/kv260/README.md`, step 3); demo on
-  the board.
+- **Deferred** (board): [deferred/M7](deferred/M7-integration-soc.md) — T7.4, 0 differences and demo on the KV260.

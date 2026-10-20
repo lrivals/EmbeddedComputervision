@@ -23,8 +23,7 @@ scope.
   estimated / SOM measured), conditions, board commands. Without a board: a "C-sim
   projection" row (Tiny-YOLOv2: 206.5 ms accelerator, 4.8 img/s, 33.8 GOPS, efficiency
   11.0 %).
-- **Remaining**: measurements on the KV260 (≥ 1,000 images, SOM power); LUT/DSP/BRAM and
-  chip power from `make vivado-build`.
+- **Deferred** (board, Vivado): [deferred/M8](deferred/M8-mesures.md) — T8.1, measurements.
 
 ### [ ] T8.2 — mAP at the three stages
 - **Spec**: §11 · **Depends on**: T8.1, T4.5 · **Size**: S
@@ -37,7 +36,7 @@ scope.
   equality + mAP). Float 56.30, integer 55.66 (= T3.4, T4.5). FPGA stage in C-sim
   (`make bench-sim`, ARM driver + C-sim kernel, 22 processes, ≈ 40 min): **mAP 55.66,
   4,952 / 4,952 images identical** to the integer model.
-- **Remaining**: the same `yolo_bench --inputs` on the KV260 (`board/dets_*.jsonl`).
+- **Deferred** (board): [deferred/M8](deferred/M8-mesures.md) — T8.2, FPGA stage on the KV260.
 - **PC profiles**: simulated chain by tiers [T12.9](M12-profils-pc.md#--t129--simulated-board-chain), rehearsal of the protocol [T12.10](M12-profils-pc.md#--t1210--dress-rehearsal-of-the-board-protocol)
 
 ### [ ] T8.3 — Comparative report
@@ -49,4 +48,4 @@ scope.
 - **Done**: `results/rapport.md`: comparison with the projection (until the board is
   available), "not comparable" column, directions costed by `tools/perf_model.py` (64/128-bit
   ports, valid channels, parallel requantization) and set against the roofline.
-- **Remaining**: replace the projection with the board measurements.
+- **Deferred** (board): [deferred/M8](deferred/M8-mesures.md) — T8.3, report on measurements.

@@ -43,11 +43,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     (16.3 img/s). The ideal model `cdiv(bytes, 8)` announced 59.4 ms.
   - C-sim == golden and dumps (v2, v3, 3 images; KV260 and Zybo tiles, `tb_net_pow2`);
     `perf_model --check`: 0 differences.
-- **Remaining**:
-  - synthesis and co-sim (Vitis);
-  - byte mask (WSTRB) of the partial writes; possible fallback: 8-bit output port widened
-    by `m_axi_max_widen_bitwidth`;
-  - II of the loader in upsample (2·WORD columns per word, L21 of v3).
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.1, synthesis, WSTRB, II of the upsample loader.
 
 ### [ ] T10.2 — Parallel requantization
 - **Spec**: §9.3, §10.3 · **Depends on**: T10.1 · **Size**: M
@@ -63,7 +59,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     `golden::requantize`;
   - the model reads `requant` from `accel_config.hpp`;
   - 64-bit ports + trim + requant ×8: 9.29 Mcycles, 46.4 ms (21.5 img/s, 48.9 %).
-- **Remaining**: DSPs actually added and frequency met (synthesis).
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.2.
 
 ### [ ] T10.3 — Valid channels only (trim)
 - **Spec**: §10.2 · **Depends on**: T6.2 · **Size**: S
@@ -77,6 +73,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     masked in `compute` (one mux per lane);
   - with the 64-bit ports, the gain is almost zero (12.27 → 12.27 Mcycles on v2);
   - trim stays on because it reduces the size of the reordered weights.
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.3, synthesis check.
 
 ### [ ] T10.4 — Tiling losses
 - **Spec**: §10.2 · **Depends on**: T10.2 · **Size**: L
@@ -104,8 +101,8 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     Tiny-YOLOv3: 36.1 ms, 27.7 img/s.
 - **Remaining**:
   - L00 stays limited by the store (requant of 2 groups + writes ≈ compute);
-  - the 1×1 convs load IR rows per lane instead of Tr;
-  - 14 × 14 buffers: BRAM to be confirmed in synthesis.
+  - the 1×1 convs load IR rows per lane instead of Tr.
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.4, BRAM of the 14 × 14 buffers.
 
 ## B. ARM software
 
@@ -129,8 +126,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     the stages);
   - ctests `yolo_bench_pipeline` (detections identical to the sequential mode, 3 images)
     and `yolo_app_pipeline`.
-- **Remaining**: the throughput gain, measurable only on the KV260. In C-sim, the
-  accelerator takes 8 s per image and hides everything.
+- **Deferred** (board): [deferred/M10](deferred/M10-ameliorations.md) — T10.5, throughput gain.
 
 ### [ ] T10.6 — Cached DMA buffer
 - **Spec**: §10.4 · **Depends on**: T8.1 · **Size**: S
@@ -148,8 +144,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     kernel), the `yolo_post` table and its result, instead of the whole buffer at every
     layer;
   - the uio backend builds (`make sw-board` on the PC).
-- **Remaining**: output == golden on the board, copy and post-processing times compared
-  with the uncached mode.
+- **Deferred** (board): [deferred/M10](deferred/M10-ameliorations.md) — T10.6.
 
 ### [ ] T10.7 — Chaining conv → post without the ARM
 - **Spec**: §10.3 · **Depends on**: T9.1.3 · **Size**: S
@@ -169,10 +164,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     thread during acc + post);
   - ctest `run_compare_chain`: heads == dumps and `yolo_post` boxes == golden
     `hw_postproc` (v2, v3).
-- **Remaining**:
-  - real register offsets (Vitis header);
-  - ARM time per image measured on the board: in C-sim, the kernel runs in the calling
-    thread.
+- **Deferred** (Vitis, board): [deferred/M10](deferred/M10-ameliorations.md) — T10.7, register offsets and ARM time.
 
 ## C. Streaming (follow-up of M9.4)
 
@@ -212,10 +204,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
     - `tb_stream` (pointers) and `tb_stream_rom` (ROM): each stage == dumps to the byte on
       3 images, cycles unchanged == model;
     - `test_stream_model.py`: FIFOs, pragmas and tables == model.
-- **Remaining**:
-  - synthesis (DSP, LUT, BRAM/URAM, frequency) and co-sim of the DATAFLOW (Vitis missing);
-  - check that Vitis accepts the 1.2 MB ROM of L10 in `ARRAY_RESHAPE` (otherwise, split by
-    og group).
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.8, synthesis and co-sim.
 
 ### [ ] T10.9 — Integration of the streaming design
 - **Spec**: §10.5 step 5 · **Depends on**: T10.8, T7.1 · **Size**: L
@@ -244,10 +233,7 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
   - Block design: `build.tcl -tclargs <jobs> stream` (`make vivado-build ENGINE=stream`),
     `yolo_stream` + 8-bit AXI DMA; overlay `pl_stream.dtsi` (`ENGINE=stream make
     fpga-firmware`). Written, Tcl syntactically complete, **not run** (Vivado missing).
-- **Remaining**:
-  - export of the IP, block design and bitstream;
-  - real register offsets and names of the AXIS ports (`in_r`, `out_r`);
-  - output == golden, throughput and latency on the board.
+- **Deferred** (Vitis, Vivado, board): [deferred/M10](deferred/M10-ameliorations.md) — T10.9.
 
 ## D. Model and quantization
 
@@ -283,8 +269,8 @@ Before taking up a direction, rank it by gain / effort with the PC profiles of
   - The cycles of the single engine are unchanged (compute-limited).
 - **Remaining**:
   - per-layer QAT (global `qat_from_steps`) to get back under 1 point;
-  - ~~2 4-bit MACs per DSP in the kernel~~: done in C-sim by [T23.4](M23-dsp-packing.md);
-  - synthesis of the packed loader.
+  - ~~2 4-bit MACs per DSP in the kernel~~: done in C-sim by [T23.4](M23-dsp-packing.md).
+- **Deferred** (Vitis): [deferred/M10](deferred/M10-ameliorations.md) — T10.10, synthesis of the packed loader.
 
 ### [ ] T10.11 — Channel pruning
 - **Spec**: §10.4 · **Depends on**: T9.3.3 · **Size**: L

@@ -71,6 +71,21 @@ English is the project's only language (M19,
   The dumps and the manifest use these numbers.
 - Tasks: `T<milestone>.<n>`; suggested git branch: `t1.2-conv`.
 
+## Deferred work (board, Vitis)
+
+The development machine has neither Vitis/Vivado nor the KV260. Work that needs them is
+gathered in [tasks/deferred/](tasks/deferred/README.md), so development goes on on the PC.
+
+- A task whose acceptance needs Vitis, Vivado or the board, in whole or in part, gets
+  `Runs on: PC + Vitis | board`. Its PC part (Python, golden, `make csim-gcc`, `sw-sim`,
+  `perf_model` estimate) stays in the milestone file and is done first.
+- The hardware part goes to `tasks/deferred/MXX-<same name>.md` (created if needed), with a
+  `- **Deferred** (<conditions>): [deferred/MXX](…) — <task>.` line in the milestone task
+  and a row in the index of `tasks/deferred/README.md`. A **Remaining** field never holds a
+  hardware step.
+- Done on the hardware: tick the item and its index row, fold the result into the **Done**
+  of the task, remove the **Deferred** line, update the Progress table.
+
 ## Exchange format (`model/<name>/`)
 
 Schema: [manifest.schema.json](manifest.schema.json); full example:

@@ -12,8 +12,7 @@ co-simulation against the golden model, with usable synthesis reports.
 - **Done**: ADR 0003 accepted: **KV260**, tiles 32, 24, 13, 13 at 200 MHz (roofline point
   of T5.6, 6× faster than the Zynq-7020 boards at the same price); `hls/configs/kv260.tcl`,
   plus `zybo-z7-20.tcl` (8, 16, 13, 13) to test smaller tiles.
-- **Remaining**: Vitis/Vivado missing from the development machine — installation to do and
-  to check (`which vitis_hls`).
+- **Deferred** (Vitis, Vivado): [deferred/M6](deferred/M6-accelerateur-hls.md) — T6.0, installation.
 
 ### [ ] T6.1 — Convolution PE
 - **Spec**: §10.2 · **Depends on**: T6.0, T5.2 · **Size**: L
@@ -31,8 +30,7 @@ co-simulation against the golden model, with usable synthesis reports.
   dump (pooled map and pre-pooling map), KV260 and Zybo tiles. C-sim with g++ and the
   open-source `ap_int` headers (`hls/CMakeLists.txt`, `make csim-gcc`);
   `hls/scripts/csim.tcl` (`make csim`) ready for Vitis.
-- **Remaining**: II = 1 reached in the synthesis report (`make hls-synth`, Vitis
-  required).
+- **Deferred** (Vitis): [deferred/M6](deferred/M6-accelerateur-hls.md) — T6.1, II = 1 in synthesis.
 
 ### [ ] T6.2 — Memory interfaces and control
 - **Spec**: §10.2 (double buffering) · **Depends on**: T6.1 · **Size**: L
@@ -48,7 +46,7 @@ co-simulation against the golden model, with usable synthesis reports.
   (`accel::sim_cycles`, `make hls-cycles`): ≈ 210 ms/image for Tiny-YOLOv2 at 200 MHz
   against 41 ms of pure compute — the kernel is limited by the byte-by-byte loads
   (`results/hls_report.md`).
-- **Remaining**: co-sim, traces and real cycles (`make hls-cosim`, Vitis required).
+- **Deferred** (Vitis): [deferred/M6](deferred/M6-accelerateur-hls.md) — T6.2, co-sim and real cycles.
 
 ### [ ] T6.3 — Fused output stage
 - **Spec**: §9.3, §10.3 · **Depends on**: T6.1 · **Size**: M
@@ -60,8 +58,7 @@ co-simulation against the golden model, with usable synthesis reports.
   reused as they are, 2×2 s2 and s1 maxpool (border replication), pre-pooling map in DDR
   (L08 → R). Layers 0 to 11 (and all the others) == golden in C-sim, v2 and v3. A single
   acc·M0 multiplier (64 bits) shared by the Tm channels: 4 DSP48 expected.
-- **Remaining**: DSP cost measured in the synthesis report (`store_tile`,
-  `make hls-report`).
+- **Deferred** (Vitis): [deferred/M6](deferred/M6-accelerateur-hls.md) — T6.3, DSP cost of `store_tile`.
 
 ### [x] T6.4 — Upsample and route by addressing
 - **Spec**: §10.3 · **Depends on**: T6.2 · **Size**: M
@@ -87,5 +84,4 @@ co-simulation against the golden model, with usable synthesis reports.
   `results/hls_report.md`: cycles-per-layer section (C-sim estimate) filled; synthesis
   (LUT, FF, DSP, BRAM, period, II of the loops, DSP of `store_tile`) and co-sim sections
   read from the Vitis reports as soon as they exist.
-- **Remaining**: everything that needs Vitis: synthesis, co-sim of one image (long:
-  ~4·10⁷ estimated cycles), timing at 200 MHz, IP export.
+- **Deferred** (Vitis): [deferred/M6](deferred/M6-accelerateur-hls.md) — T6.5, synthesis, co-sim, timing, IP export.

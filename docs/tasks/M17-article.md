@@ -369,9 +369,7 @@ Shared acceptance of the writing tasks:
 
 ### [ ] T17.19 — Switch "projection → measurement" (board)
 - **Depends on**: T7.4, T8.1-T8.3 on the board · **Size**: M
-- **Deliverables**: statuses of the performance and FPGA mAP keys moved to `mesure`;
-  narrative of §0, §8 and §11 rewritten; projection / measurement comparison added in §8.
-- **Acceptance**: no `projection` key cited in the abstract any more.
+- **Deferred** (board): [deferred/M17](deferred/M17-article.md) — T17.19, deliverables and acceptance.
 
 ### [ ] T17.20 — Frozen version for submission
 - **Depends on**: T17.18 · **Size**: S

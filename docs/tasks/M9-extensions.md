@@ -18,3 +18,4 @@ parameterised bit width that the ADMM uses.
 - **Spec**: §4 (EF-Train), §12 (gaps) · **Depends on**: T8.3
 - Open research direction: fine-tune the YOLO head on the board (BN in full precision,
   §9.1). To be crossed with the continual learning axis.
+- **Deferred** (board): [deferred/M9](deferred/M9-extensions.md) — T9.5.

@@ -27,7 +27,9 @@ Details: [docs/architecture.md](docs/architecture.md) · conventions:
 
 The work is split into milestones M0 to M22 in [docs/tasks/](docs/tasks/README.md). Each
 task gives the section of the spec, its dependencies, its deliverables and a measurable
-acceptance criterion.
+acceptance criterion. What needs Vitis/Vivado or the KV260, not available yet, is put aside
+in [docs/tasks/deferred/](docs/tasks/deferred/README.md), with the order in which to pick it
+up once the tools and the board are there.
 
 - **M0 to M8**: the base chain, from NumPy to measurements on the board.
 - **M9.1 to M9.4**: research extensions (hardware post-processing, REQ-YOLO, 4 bits,

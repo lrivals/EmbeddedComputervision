@@ -163,10 +163,8 @@ packed PE also shows in `etat_art`, `ressources` and `roofline_couches`
 
 ## Remaining (waiting for Vitis and the board)
 
-- Synthesis of the packed PE (`make hls-synth-pack`): DSP, LUT and timing at 200 MHz.
-- Tm 64 needs `w_buf` outside the flip-flops (LUTRAM); otherwise Tn 32. To choose after
-  synthesis; `ACC_PACK` stays at 1 by default until then.
-- Measurement on the KV260 with the protocol of [protocole.md](../../results/protocole.md).
+Synthesis of the packed PE, choice between Tm 64 and Tn 32 (`ACC_PACK` stays at 1 until
+then) and measurement on the KV260: [deferred/M23](deferred/M23-dsp-packing.md).
 
 ## Dependencies
 

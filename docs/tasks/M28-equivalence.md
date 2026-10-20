@@ -28,6 +28,7 @@ board.
 
 ### [ ] T28.0 — Equivalence matrix
 - **Spec**: §9, §10.2 · **Depends on**: T5.4, T6.3 · **Size**: M
+  · **Runs on**: PC (C-sim rows); PC + Vitis for co-sim; board for the board row
 - **Deliverables**: `tools/equivalence.py`; `results/equivalence.md`
 - **Acceptance**: for each network (Tiny-YOLOv2, v3, v4) and each layer, the level reached
   between consecutive stages — float → fake-quant: statistical (mAP gap) and proximity
@@ -36,9 +37,11 @@ board.
   from the existing dumps, `--check` mode
 - **Notes**: the C-sim → co-sim and co-sim → board rows stay "pending" until Vitis and the
   board (M6, M7).
+- **Deferred** (Vitis, board): [deferred/M28](deferred/M28-equivalence.md) — T28.0, co-sim and board rows.
 
 ### [ ] T28.1 — Exhaustive operator tests
 - **Spec**: §9.3, §9.4 · **Depends on**: T5.4 · **Size**: M
+  · **Runs on**: PC (Python, golden, C-sim gcc)
 - **Deliverables**: `python/tests/test_exhaustive_ops.py`, C++ counterpart in the golden
   tests, HLS testbench mode
 - **Acceptance**:
@@ -49,7 +52,7 @@ board.
   - the run time and the number of values tested are given.
 
 ### [ ] T28.2 — Formal proof of the scalar kernels
-- **Spec**: §9.3 · **Depends on**: T28.1 · **Size**: M
+- **Spec**: §9.3 · **Depends on**: T28.1 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/prove_kernels.py` (z3 as an optional dependency, test skipped
   without it); section in `results/equivalence.md`
 - **Acceptance**:
@@ -62,14 +65,14 @@ board.
   source is the residual risk, covered by T28.1.
 
 ### [ ] T28.3 — Per-layer traceability
-- **Spec**: §3, §10.3 · **Depends on**: — · **Size**: M
+- **Spec**: §3, §10.3 · **Depends on**: — · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/traceability.py`; `docs/traceability.md` (generated)
 - **Acceptance**: each cfg operation (conv, leaky, maxpool, route, upsample, yolo head) maps
   to its Python function, golden function, HLS function and `LayerDesc` fields, with file and
   line; `--check` in `make ci` fails when a symbol moves or disappears
 
 ### [ ] T28.4 — Tool-chain risks
-- **Spec**: §10.2 · **Depends on**: T28.0 · **Size**: S
+- **Spec**: §10.2 · **Depends on**: T28.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/equivalence.md`
 - **Acceptance**: list of the transformations of Vitis HLS and Vivado that could break
   equivalence (pragmas, `ap_int` / `ap_fixed` rounding and overflow modes, DSP inference,
@@ -78,14 +81,11 @@ board.
   testing the output replaces qualifying the tool here
 
 ### [ ] T28.5 — Equivalence on the board
-- **Spec**: §10.4 · **Depends on**: T7.4, T28.0 · **Size**: M
-- **Deliverables**: per-layer output hash in `sw/app` (debug mode) and its comparison with
-  the golden; row "board" of `results/equivalence.md`
-- **Acceptance**: every layer output byte-identical to the golden on ≥ 1,000 images, for
-  each network on the board; the bitstream and model hashes recorded
+- **Spec**: §10.4 · **Depends on**: T7.4, T28.0 · **Runs on**: board (KV260) · **Size**: M
+- **Deferred** (board): [deferred/M28](deferred/M28-equivalence.md) — T28.5, deliverables and acceptance.
 
 ### [ ] T28.6 — Post-processing equivalence and properties
-- **Spec**: §8.1 · **Depends on**: T9.1.2 · **Size**: S
+- **Spec**: §8.1 · **Depends on**: T9.1.2 · **Runs on**: PC (C-sim gcc) · **Size**: S
 - **Deliverables**: tests in `python/tests/` and the HLS post-processing testbench
 - **Acceptance**: hardware decode + NMS == integer golden on the full test sets already used;
   checked properties: no candidate dropped while below the slot capacity, result independent

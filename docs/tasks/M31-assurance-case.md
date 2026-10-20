@@ -21,7 +21,7 @@ marked "to read" until they are.
 M25 and M27 to M30.
 
 ### [ ] T31.0 — Operational design domain
-- **Spec**: — · **Depends on**: — · **Size**: S
+- **Spec**: — · **Depends on**: — · **Runs on**: PC · **Size**: S
 - **Deliverables**: `docs/safety/odd.md`
 - **Acceptance**: the example use case described by measurable parameters — zone size and
   camera height, person distance and minimum height in pixels, lighting range, dust and
@@ -29,7 +29,7 @@ M25 and M27 to M30.
   [T27.3](M27-safety-metrics.md), or marked "not covered"
 
 ### [ ] T31.1 — Hazard and safety requirements
-- **Spec**: — · **Depends on**: T31.0 · **Size**: S
+- **Spec**: — · **Depends on**: T31.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `docs/safety/requirements.md`
 - **Acceptance**: dreaded event ("person in the zone, not reported during N frames, at
   distance ≤ d"); requirements with numbers and a verification method each: recall at
@@ -37,7 +37,7 @@ M25 and M27 to M30.
   a missing frame
 
 ### [ ] T31.2 — Map of the objectives to the evidence
-- **Spec**: — · **Depends on**: T31.1 · **Size**: M
+- **Spec**: — · **Depends on**: T31.1 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `docs/safety/objectives.md`
 - **Acceptance**: one row per objective — EASA Concept Paper (LM-02, LM-06, IMP-04-2, IMP-05,
   IMP-06, EXP-04 to 07, SRM-02), CoDANN II equivalence levels, AMLAS stages 1 to 6 — with the
@@ -45,7 +45,7 @@ M25 and M27 to M30.
   IEC 61496 / TS 61496-4-3 and ISO/IEC TR 5469 marked "to read" until the texts are read
 
 ### [ ] T31.3 — Dangerous failure rate budget
-- **Spec**: — · **Depends on**: T27.5, T29.1, T29.3, T25.4 · **Size**: M
+- **Spec**: — · **Depends on**: T27.5, T29.1, T29.3, T25.4 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/failure_budget.py`; `results/failure_budget.md`
 - **Acceptance**: per hour, the contributions of model misses (T27.5), hardware faults
   (fault rate assumption × undetected share from M25), monitor coverage (T29.1) and temporal
@@ -53,7 +53,7 @@ M25 and M27 to M30.
   magnitude against SIL 1 to 3 / PL c to e; sensitivity to each assumption
 
 ### [ ] T31.4 — Assurance argument
-- **Spec**: — · **Depends on**: T31.2, T31.3 · **Size**: M
+- **Spec**: — · **Depends on**: T31.2, T31.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `docs/safety/argument.md` (GSN-style goal / strategy / evidence tree in
   mermaid); a check in `make ci` that every evidence leaf points to an existing file
 - **Acceptance**: the top goal ("the zone monitor reports a person within the bound with the
@@ -61,7 +61,7 @@ M25 and M27 to M30.
   goals listed as open work
 
 ### [ ] T31.5 — Perspectives
-- **Spec**: — · **Depends on**: — · **Size**: S
+- **Spec**: — · **Depends on**: — · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `docs/safety/argument.md`
 - **Acceptance**: short notes, each with what would be needed in the repo: continual
   learning under certification (frozen backbone, small adapted head, embedded non-regression

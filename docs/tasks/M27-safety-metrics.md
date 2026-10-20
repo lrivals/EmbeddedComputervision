@@ -24,7 +24,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 **State**: not started (2026-10-20). Everything but T27.6 runs on the PC.
 
 ### [ ] T27.0 — Person metrics
-- **Spec**: §8.3 · **Depends on**: T11.6 · **Size**: M
+- **Spec**: §8.3 · **Depends on**: T11.6 · **Runs on**: PC · **Size**: M
 - **Deliverables**: in `python/yolo/infer/metrics.py`: recall and miss rate at a fixed FPPI
   (false positives per image), log-average miss rate over FPPI ∈ [10⁻², 10⁰], recall per
   box-height bin and per occlusion level (CrowdHuman visible box against full box);
@@ -40,6 +40,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 
 ### [ ] T27.1 — Metrics at the three stages
 - **Spec**: §8.3, §10.4 · **Depends on**: T27.0, T15.14 · **Size**: M
+  · **Runs on**: PC (float, integer, C-sim gcc)
 - **Deliverables**: `tools/person_safety.py`; `results/person_safety.md`
 - **Acceptance**: for `tiny-yolov3-crowdhuman` and the person class of `tiny-yolov3-coco`
   (and `tiny-yolov4-coco` when available): recall at 0.1 and 0.01 FPPI, log-average miss
@@ -50,7 +51,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
   may be a subset that confirms it.
 
 ### [ ] T27.2 — Asymmetric operating point
-- **Spec**: §8.1 · **Depends on**: T27.1 · **Size**: S
+- **Spec**: §8.1 · **Depends on**: T27.1 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/person_safety.md`; figure (miss rate against FPPI,
   float / integer) in `tools/figures/resultats.py` (M13 style)
 - **Acceptance**: threshold chosen for a target recall (0.95, 0.99) on a calibration half,
@@ -58,7 +59,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
   the mAP, 0.5 for the demo) placed on the curve
 
 ### [ ] T27.3 — Degraded conditions (ODD stress)
-- **Spec**: §8.3 · **Depends on**: T27.1 · **Size**: M
+- **Spec**: §8.3 · **Depends on**: T27.1 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/degrade.py` (NumPy, seeded): low light (gamma + noise), fog / dust
   (contrast loss + veil), motion blur, sensor noise, JPEG, partial occlusion patches, each at
   3 severities; `results/person_safety.md` section
@@ -71,7 +72,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
   the question no FPGA paper answers.
 
 ### [ ] T27.4 — Dreaded event on video
-- **Spec**: §8.3 · **Depends on**: T27.0 · **Size**: M
+- **Spec**: §8.3 · **Depends on**: T27.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/dreaded_event.py`; a video set with persons (MOT17 or MOT20 train
   sequences, loader in `python/yolo/data/datasets.py`); `results/person_safety.md` section
 - **Acceptance**: rate of "person present, not reported during N consecutive frames"
@@ -82,7 +83,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
   seen from above. A ground-level person video set is needed.
 
 ### [ ] T27.5 — From per-image errors to failures per hour
-- **Spec**: — · **Depends on**: T27.2, T27.4 · **Size**: S
+- **Spec**: — · **Depends on**: T27.2, T27.4 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/person_safety.md`
 - **Acceptance**: DEEL computation (§4.2.4.4) redone with the measured rates: frame rate,
   rate of presence in the zone, per-image FN at the operating point, independence or
@@ -93,6 +94,7 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 
 ### [ ] T27.6 — Industrial-site images
 - **Spec**: §8.3 · **Depends on**: T22.8 · **Size**: S
+  · **Runs on**: PC (needs the ARCYS images, not hardware)
 - **Deliverables**: loader slot `industrial` (folder of images + YOLO txt) and a procedure
   (autolabel of [M22](M22-autolabel.md), then manual correction) in this file
 - **Acceptance**: an empty folder gives a clear message; a folder of 10 labelled images runs

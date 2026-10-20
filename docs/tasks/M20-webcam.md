@@ -299,3 +299,4 @@ are the `f64` emulation (M4): they show the FPGA's boxes, not its speed.
 
   About 55-60 ms per inference, so ≈ 17 inferences/s with the camera at 30 FPS on
   display: 3 to 4 times the PC. The rows marked "to measure" are filled by T8.1 on the board.
+- **Deferred** (board): [deferred/M20](deferred/M20-webcam.md) — T20.9, measured budget and capture on the KV260.

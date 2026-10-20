@@ -20,7 +20,7 @@ engineering, to be cited from the dependability literature when written up.
 Vitis.
 
 ### [ ] T25.0 — Fault model and injector
-- **Spec**: §9.3 · **Depends on**: T4.5 · **Size**: M
+- **Spec**: §9.3 · **Depends on**: T4.5 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/quant/faults.py` (NumPy only) + `python/tests/test_faults.py`
 - **Acceptance**:
   - fault sites: int8 weights, int32 biases, int8 activations of a layer output, int32
@@ -30,7 +30,7 @@ Vitis.
   - a hook in `IntNetwork` that does not slow the fault-free path.
 
 ### [ ] T25.1 — Sensitivity campaign
-- **Spec**: §8.3 · **Depends on**: T25.0 · **Size**: M
+- **Spec**: §8.3 · **Depends on**: T25.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/fault_campaign.py`; `results/faults.md`; a figure in
   `tools/figures/resultats.py` (M13 style)
 - **Acceptance**: mAP (500 VOC2007 test images, tier M) against the BER, per site and per
@@ -40,7 +40,7 @@ Vitis.
   the campaign before running it.
 
 ### [ ] T25.2 — ABFT checksum in the reference models
-- **Spec**: §4.1, §9.3 · **Depends on**: T25.0 · **Size**: M
+- **Spec**: §4.1, §9.3 · **Depends on**: T25.0 · **Runs on**: PC (golden C++) · **Size**: M
 - **Deliverables**: checksum filter `Σ_f w_f` and bias `Σ_f b_f` per conv (computed at
   export, int32); check in `IntNetwork` and in the C++ golden model; manifest field (schema
   updated)
@@ -55,6 +55,7 @@ Vitis.
 
 ### [ ] T25.3 — ABFT in the HLS kernel
 - **Spec**: §10.2 · **Depends on**: T25.2 · **Size**: L
+  · **Runs on**: PC (C-sim gcc); PC + Vitis for the DSP and cycles after synthesis
 - **Deliverables**: one extra output lane per tile (filter Tm + 1 = checksum), comparison
   with the sum of the Tm lanes, error flag and counter in a status register
   (`sw/driver/regmap.hpp`, `LayerDesc` unchanged if possible); `perf_model` cost
@@ -62,16 +63,19 @@ Vitis.
   testbench raises the flag; extra DSPs and cycles reported
 - **Notes**: conflicts with T23 packing only on the lane count (Tm + 1 is odd): check the
   combination.
+- **Deferred** (Vitis): [deferred/M25](deferred/M25-dependability.md) — T25.3, DSP and cycles after synthesis.
 
 ### [ ] T25.4 — Selective protection
 - **Spec**: §10.4 · **Depends on**: T25.1, T25.2 · **Size**: S
+  · **Runs on**: PC (perf_model estimates); PC + Vitis for the exact BRAM and DSP
 - **Deliverables**: section in `results/faults.md`
 - **Acceptance**: for the most sensitive layers of T25.1, mAP under faults and cost (DSP,
   BRAM, cycles) of: ABFT, ECC on the weights in BRAM, duplication of the sensitive layers;
   recommendation
+- **Deferred** (Vitis): [deferred/M25](deferred/M25-dependability.md) — T25.4, exact BRAM and DSP.
 
 ### [ ] T25.5 — Out-of-distribution monitor
-- **Spec**: §4, §7 · **Depends on**: T11.2 · **Size**: M
+- **Spec**: §4, §7 · **Depends on**: T11.2 · **Runs on**: PC · **Size**: M
 - **Deliverables**: small autoencoder (NumPy, layers of `python/yolo/layers`) on the
   backbone features of Tiny-YOLOv2 (output of L12 or L13), trained on VOC; score =
   reconstruction error; `results/ood_monitor.md`
@@ -89,7 +93,7 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 ≈ 70 % of the critical errors.
 
 ### [ ] T25.6 — Critical error for a person detector
-- **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Size**: S
+- **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/fault_campaign.py --criterion person`; section in
   `results/faults.md`
 - **Acceptance**: a fault is **critical** when it makes a person present in the fault-free
@@ -100,18 +104,18 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
   [T31.3](M31-assurance-case.md).
 
 ### [ ] T25.7 — Faults in the HLS buffers
-- **Spec**: §10.2 · **Depends on**: T25.0, T6.3 · **Size**: M
+- **Spec**: §10.2 · **Depends on**: T25.0, T6.3 · **Runs on**: PC (C-sim gcc) · **Size**: M
 - **Deliverables**: fault hook in the C-sim testbench (`hls/tb/`) on the weight, input and
   output tiles of the on-chip buffers (BRAM) and the line buffer of the fused maxpool;
   section in `results/faults.md`
 - **Acceptance**: a flip in an HLS buffer gives the same output as the corresponding Python
   site of T25.0 (the mapping of buffer addresses to tensor indices is tested); the share of
   faults masked by tiling reuse (a tile reloaded from DDR) is given
-- **Notes**: configuration-memory upsets are out of reach in C-sim; they need the board and
-  a tool such as the Xilinx SEM IP.
+- **Notes**: configuration-memory upsets are out of reach in C-sim.
+- **Deferred** (Vivado, board): [deferred/M25](deferred/M25-dependability.md) — T25.7, configuration-memory upsets (SEM IP).
 
 ### [ ] T25.8 — Fault detection by temporal coherence
-- **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Size**: S
+- **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/faults.md`
 - **Acceptance**: on a video, the critical faults of T25.6 injected in one frame: share
   detected by the temporal vote of [T29.3](M29-runtime-monitors.md), by the ABFT of T25.2,

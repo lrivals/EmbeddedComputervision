@@ -510,4 +510,5 @@ graph LR
 - **At night**: the full T12.9 (`make bench-sim`) alone, then the evaluations of the
   selected variants on the 4,952 images.
 - **Nothing in M12 needs Vitis or the board.** Synthesis and co-simulation stay in M6 and
-  M9.x.
+  M9.x; the board steps that these profiles prepare are gathered in
+  [deferred/](deferred/README.md).
