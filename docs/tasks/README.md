@@ -47,6 +47,10 @@ Work that needs Vitis/Vivado or the KV260, not available yet, is put aside miles
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
 milestone files keep the PC part and a **Deferred** pointer.
 
+Long computations still open (training, full-split mAP, C-sim passes, sweeps, labelling,
+campaigns, large transfers), with their commands and estimated durations:
+[long-runs.md](long-runs.md).
+
 Datasets outside git (export to Google Drive, local or Colab access):
 [donnees-drive.md](donnees-drive.md). Training on a Colab kernel from VS Code (who
 starts, who follows): [colab-vscode.md](colab-vscode.md).
@@ -211,7 +215,7 @@ progress per milestone here.
 | M25 | 9 | 5 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign to run) |
 | M26 | 6 | 2 (T26.1 offline converter: YOLOv5n / v8n NumPy == torch to 2·10⁻⁷; T26.2 integer SiLU table, Python == golden == HLS; T26.0 YOLOv7-tiny in progress) |
 | M27 | 7 | 0 |
-| M28 | 7 | 3 (T28.1 Python == golden == HLS on 105.6 M swept accumulators, int32 leaky overflow found and fixed; T28.2 95 SMT obligations proved with z3; T28.3 traceability in `make ci`) |
+| M28 | 7 | 6 (T28.0 matrix: per layer, fake-quant → integer ≤ 1 LSB, integer == golden == C-sim byte for byte on 20 images × 3 nets, co-sim and board rows pending; T28.1 Python == golden == HLS on 105.6 M swept accumulators, int32 leaky overflow found and fixed; T28.2 95 SMT obligations proved with z3; T28.3 traceability in `make ci`; T28.4 tool-chain risks and tool qualification; T28.6 NMS == golden, capacity and overflow properties hold, the unsorted NMS depends on the order of the cells) |
 | M29 | 6 | 1 (T29.0 six monitors on integer features: max score best on ExDark, activation patterns on FLIR; T29.1-T29.3 wait for M27) |
 | M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |

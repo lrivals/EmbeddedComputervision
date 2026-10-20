@@ -7,6 +7,7 @@
 // En co-sim RTL (cosim.tcl), on le restreint à une image : `--net tiny-yolov2-voc --image 000001`.
 #include <cstdio>
 #include <fstream>
+#include <string>
 
 #include "accel.hpp"
 #include "golden/engine.hpp"
@@ -49,6 +50,7 @@ int main(int argc, char** argv) {
       std::vector<driver::Word> arena;
       uint64_t cycles = 0;
       size_t nd_img = 0;
+      std::string ids;  // couches comparées (T28.0 : celles absentes de la DDR sont sautées)
       size_t next = 1;
       const int64_t abft = driver::run(prog, m, arena, x.data.data(), yolo_conv,
                                        [&](const driver::ConvCall& c) {
@@ -78,11 +80,13 @@ int main(int argc, char** argv) {
           std::snprintf(what, sizeof what, "L%02d %s vs dump", id, layer_type_name(l.type));
           nd_img += tb::compare(what, got.data(), want.data.data(), got.size());
           ++checked;
+          ids += ' ' + std::to_string(id);
         }
       });
       // T25.3 : sans faute, aucune somme de contrôle ABFT ne doit échouer.
       if (abft) std::printf("  ABFT : %lld pixels en échec sans faute\n", (long long)abft);
       nd_img += size_t(abft);
+      std::printf("  couches vérifiées :%s\n", ids.c_str());
       total_diff += nd_img;
       std::printf("%s %s : %s, ≈ %llu cycles (estimation C-sim)\n", net.c_str(), image.c_str(),
                   nd_img ? "ÉCHEC" : "OK", (unsigned long long)cycles);

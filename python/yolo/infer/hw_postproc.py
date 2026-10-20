@@ -159,10 +159,11 @@ def overlaps(b, x1, y1, x2, y2, p, q):
     return (p + q) * inter > p * (area_b + (x2 - x1) * (y2 - y1))
 
 
-def nms_nosort(cands, p, q, cap=CAP):
+def nms_nosort(cands, p, q, cap=CAP, stats=None):
     """NMS sans tri sur des candidates dans l'ordre du flux → (boîtes retenues, débordement).
 
     Boîtes retenues dans l'ordre des emplacements : (x1, y1, x2, y2, score, classe).
+    `stats` (dict) : reçoit `slots`, le nombre d'emplacements occupés (T28.6).
     """
     sel = np.zeros((cap, 6), dtype=np.int64)
     alive = np.zeros(cap, dtype=bool)
@@ -184,6 +185,8 @@ def nms_nosort(cands, p, q, cap=CAP):
             n += 1
         else:
             overflow += 1
+    if stats is not None:
+        stats["slots"] = n
     return [tuple(int(v) for v in r) for r in sel[:n][alive[:n]]], overflow
 
 

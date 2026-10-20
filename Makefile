@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel traceability prove-kernels
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel traceability prove-kernels equivalence
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -23,6 +23,7 @@ help:
 	@echo "hls-cycles  estimation de cycles par couche en C-sim → build/hls/cycles_conv.csv, cycles_post.csv (T30.1)"
 	@echo "traceability  docs/traceability.md : opération cfg → Python, golden, HLS (T28.3)"
 	@echo "prove-kernels preuve SMT de l'étage de sortie (z3, T28.2)"
+	@echo "equivalence   matrice d'équivalence par couche, 20 images par réseau (T28.0)"
 	@echo "csim        C-simulation HLS dans Vitis (BOARD=$(BOARD))"
 	@echo "hls-synth   synthèse Vitis HLS (T6.5)"
 	@echo "hls-synth-pow2  synthèse de la PE à décalages, ACC_WMODE_POW2 (T9.2.4, T13.24)"
@@ -69,6 +70,7 @@ ci:
 	python -m tools.notebooks --check
 	python -m tools.article --check
 	python tools/traceability.py --check
+	python tools/equivalence.py --check
 	$(MAKE) test-cpp
 	$(MAKE) golden-check
 	$(MAKE) csim-gcc
@@ -305,3 +307,7 @@ bench-report:
 
 clean:
 	rm -rf build
+
+equivalence:
+	python tools/equivalence.py run
+	python tools/equivalence.py report

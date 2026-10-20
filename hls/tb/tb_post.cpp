@@ -26,6 +26,8 @@ static bool same(const std::vector<hwpp::Box>& a, const std::vector<hwpp::Box>& 
   return true;
 }
 
+static int last_overflow = 0;  // débordement du noyau au dernier `check` (T28.6)
+
 // Une image : têtes bout à bout dans une arène, appel du noyau, comparaison au golden.
 static bool check(const Model& m, const std::vector<std::vector<int8_t>>& heads, double conf,
                   const char* what, bool verbose) {
@@ -51,6 +53,7 @@ static bool check(const Model& m, const std::vector<std::vector<int8_t>>& heads,
   int ov = 0;
   const auto got = driver::post_boxes(res.data() + 3, &ov);
   const bool ok = same(got, want) && ov == ov_ref;
+  last_overflow = ov;
   if (verbose || !ok) {
     const accel::PostCycles& c = accel::post_cycles;
     std::printf("  %s conf %.3f : %zu boîtes, %d candidates, %d survivantes, débordement %d, "
@@ -134,6 +137,12 @@ int main(int argc, char** argv) {
         heads.push_back(h);
       }
       failed += !check(m, heads, conf, "toutes classes", true);
+      // T28.6 : boîtes séparées (la NMS n'en fusionne aucune), plus de candidates que
+      // d'emplacements : le débordement est signalé, jamais silencieux.
+      if (accel::post_cycles.candidates > accel::POST_CAP && last_overflow <= 0) {
+        std::printf("  ÉCHEC : débordement non signalé\n");
+        ++failed;
+      }
       log(net, "all_classes", conf);
       ++checked;
     }

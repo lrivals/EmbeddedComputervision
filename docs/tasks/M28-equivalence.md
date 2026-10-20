@@ -23,13 +23,18 @@ Formal verification is aimed at **components** (scalar kernels, accumulators, NM
 it scales, not at the whole network (52,650 parameters is the largest bit-exact QNN verified,
 Henzinger 2021).
 
-**State** (2026-10-20): T28.1, T28.2 and T28.3 done
+**State** (2026-10-20): every PC task is done
 ([results/equivalence.md](../../results/equivalence.md), [docs/traceability.md](../traceability.md)).
-Python == golden == HLS on 105.6 M swept accumulators of the four exports. 95 SMT
-obligations are proved for every shift. T28.1 found an int32 overflow in the golden leaky (unreachable
-on the exports, fixed). T28.0, T28.4 and T28.6 remain on the PC; T28.5 needs the board.
+- T28.0: integer == golden == C-sim byte for byte on 20 images × 3 nets; fake-quant →
+  integer ≤ 1 LSB per layer.
+- T28.1: Python == golden == HLS on 105.6 M swept accumulators. It found an int32 overflow in
+  the golden leaky (unreachable on the exports, fixed).
+- T28.2: 95 SMT obligations proved for every shift.
+- T28.6: the unsorted NMS is not invariant to the order of the cells (a finding, not a defect).
 
-### [ ] T28.0 — Equivalence matrix
+The co-sim and board rows of T28.0, and T28.5, need Vitis and the board.
+
+### [x] T28.0 — Equivalence matrix
 - **Spec**: §9, §10.2 · **Depends on**: T5.4, T6.3 · **Size**: M
   · **Runs on**: PC (C-sim rows); PC + Vitis for co-sim; board for the board row
 - **Deliverables**: `tools/equivalence.py`; `results/equivalence.md`
@@ -40,6 +45,18 @@ on the exports, fixed). T28.0, T28.4 and T28.6 remain on the PC; T28.5 needs the
   from the existing dumps, `--check` mode
 - **Notes**: the C-sim → co-sim and co-sim → board rows stay "pending" until Vitis and the
   board (M6, M7).
+- **Done (PC rows)**:
+  - **Tool**: `tools/equivalence.py run` (`make equivalence`, 20 images per net, ≈ 5 min on 16
+    cores) → `results/equivalence.json`; `report` writes the matrix section; `--check`
+    (in `make ci`, 7 s) replays the committed dumps and fails on a stale section.
+  - **Pointwise**: integer == golden == C-sim on every layer that the kernel writes to
+    DDR. `tb_net` now prints the layers it compares; pre-pool maps and in-place routes are
+    "not in DDR".
+  - **Proximity**: fake-quant → integer is ≤ 1 LSB per layer (fed with the same input),
+    and 14 / 17 / 26 LSB end to end on v2 / v3 / v4. Float → fake-quant is 0.5–0.9 LSB on
+    average.
+  - **Statistical**: cited from `map_stades.md` and `map_coco.md`; not measured for v3.
+  - **Test**: `test_equivalence.py`.
 - **Deferred** (Vitis, board): [deferred/M28](deferred/M28-equivalence.md) — T28.0, co-sim and board rows.
 
 ### [x] T28.1 — Exhaustive operator tests
@@ -100,7 +117,7 @@ on the exports, fixed). T28.0, T28.4 and T28.6 remain on the PC; T28.5 needs the
   - **Test**: `test_traceability.py` (a missing symbol is reported, the committed document
     is up to date).
 
-### [ ] T28.4 — Tool-chain risks
+### [x] T28.4 — Tool-chain risks
 - **Spec**: §10.2 · **Depends on**: T28.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/equivalence.md`
 - **Acceptance**: list of the transformations of Vitis HLS and Vivado that could break
@@ -108,17 +125,35 @@ on the exports, fixed). T28.0, T28.4 and T28.6 remain on the PC; T28.5 needs the
   retiming, BRAM initialization), and for each one the check that covers it (C-sim, co-sim,
   board hash of T28.5); a short note on tool qualification (DO-178C §12.2, TQL) and why
   testing the output replaces qualifying the tool here
+- **Done**:
+  - **Table**: eight transformations of Vitis HLS and Vivado, grepped from the kernels,
+    each with the check that covers it.
+  - **Main residual**: `DEPENDENCE inter false` on `out_buf`, which only co-sim and the
+    board can see.
+  - **Qualification**: why verifying the output replaces qualifying the tool (DO-178C
+    §12.2 / DO-330, DO-254), and what this leaves uncovered.
 
 ### [ ] T28.5 — Equivalence on the board
 - **Spec**: §10.4 · **Depends on**: T7.4, T28.0 · **Runs on**: board (KV260) · **Size**: M
 - **Deferred** (board): [deferred/M28](deferred/M28-equivalence.md) — T28.5, deliverables and acceptance.
 
-### [ ] T28.6 — Post-processing equivalence and properties
+### [x] T28.6 — Post-processing equivalence and properties
 - **Spec**: §8.1 · **Depends on**: T9.1.2 · **Runs on**: PC (C-sim gcc) · **Size**: S
 - **Deliverables**: tests in `python/tests/` and the HLS post-processing testbench
 - **Acceptance**: hardware decode + NMS == integer golden on the full test sets already used;
   checked properties: no candidate dropped while below the slot capacity, result independent
   of the order of the cells, overflow flagged (never silent)
+- **Done**:
+  - **Equivalence**: Python == golden == `yolo_post` on the 20 T28.0 images of v2 and v3,
+    and `tb_post` runs on them as well (`--model build/equivalence/model`).
+  - **Capacity**: below capacity, the result equals the one with unlimited slots, for every
+    cap from 1 to 256. `hw_postproc.nms_nosort(stats=)` gives the slots used.
+  - **Overflow**: always counted; `tb_post` asserts it in the all-classes case.
+  - **Order** (finding): the raw unsorted stream is order dependent. A permutation changes
+    the result in 91 % (v2) and 74 % (v3) of cases. The stream sorted by score gives the
+    classic NMS whatever the order. Cost −0.10 mAP ([postproc_hw.md](../../results/postproc_hw.md)).
+    To record in M31.
+  - **Code**: `tools/equivalence.py postproc`, `test_postproc_props.py`.
 
 ## Dependencies
 
