@@ -69,6 +69,21 @@ def test_decode_head_int_matches_float(mode):
     assert rel <= 2**-16 * np.exp(127 * S)
 
 
+def test_decode_head_int_new_coords():
+    # T26.0 : (2σ)² par la table sigmoïde ; erreur relative ≤ 2·2⁻¹⁶/σ_min.
+    rng = np.random.default_rng(1)
+    a, c, s = 3, 4, 5
+    q = rng.integers(-127, 128, (a * (5 + c), s, s)).astype(np.int8)
+    anchors = rng.uniform(0.05, 0.5, (a, 2))
+    boxes, obj, scores = decode_head_int(q, anchors, c, "v3", HeadLuts(S), 0.3, 2.0, True)
+    fb, fo, fs = decode_head(q[None].astype(np.float64) * S, anchors, c, "v3", 2.0, True)
+    keep = fo[0] > 0.3
+    assert keep.sum() == len(obj) > 0
+    assert np.abs(boxes[:, :2] - fb[0][keep, :2]).max() <= 2 * 2**-16
+    sig_min = 1 / (1 + np.exp(127 * S))
+    assert np.abs(boxes[:, 2:] / fb[0][keep, 2:] - 1).max() <= 2 * 2**-16 / sig_min
+
+
 @pytest.mark.parametrize("scale", [1 / 16, 1 / 8, 0.149])
 def test_exp_lut_fits_uint32(scale):
     from yolo.quant.lut import exp_frac_bits

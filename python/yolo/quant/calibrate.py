@@ -126,7 +126,10 @@ def choose_scales(net, stats, choice="mse", head_scale=HEAD_SCALE):
         v = stats.values(i)
         cands = clip_candidates(v, stats.max[i])
         mses = {k: quant_mse(v, c) for k, c in cands.items()}
-        head = layer["act"] == "linear"
+        # A head is the linear conv read by a yolo / region layer (not an identity conv of a
+        # lowered SPP, T26.0).
+        head = (layer["act"] == "linear" and i + 1 < len(net.layers)
+                and net.layers[i + 1]["type"] in ("yolo", "region"))
         if head and head_scale is not None:
             pick, s = "head", head_scale
         else:

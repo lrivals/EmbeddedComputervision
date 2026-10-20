@@ -113,6 +113,9 @@ def test_parse_classes_and_alias_map():
     assert lm.same_class("tvmonitor", "tv monitor") and not lm.same_class("car", "cat")
     with pytest.raises(ValueError):
         lm.parse_classes("dog, dog")
+    # T22.10: exact case first (ExDark `People`, VisDrone `people`)
+    assert [lm.prompt_of(c) for c in ("People", "people", "motor", "Human")] == [
+        "person", "sitting person", "motorcycle", "person"]
 
 
 def test_chunk_prompts():
@@ -251,6 +254,25 @@ def test_presets():
     assert al.session_classes(preset="dataset:asl")[0][-1] == "space"
     with pytest.raises(ValueError):
         al.session_classes()
+
+
+def test_eval_on_a_yolo_dir_dataset(tmp_path):
+    """T22.10: autolabel_eval scores a labeller on any dataset; the fake labeller's boxes
+    written as ground truth give AP 1 and P = R = 1 above its weak box."""
+    import autolabel_eval as ae
+
+    files = _images(tmp_path / "img" / "sub", [f"{k}.jpg" for k in range(4)], size=(640, 480))
+    al.run_folder(FakeLabeller(), files, tmp_path / "img", tmp_path / "gt", ["cat", "dog"],
+                  ["cat", "dog"], conf=0.3)
+    samples = _load_yolo_dir(tmp_path / "img" / "sub", tmp_path / "gt" / "labels" / "sub",
+                             ["cat", "dog"])
+    assert ae.subset(samples, 2, -1) == samples[:2] and len(ae.subset(samples, 3, 0)) == 3
+    assert ae.image_root(samples) == tmp_path / "img" / "sub"
+    r = ae.run("fake", samples, ["cat", "dog"], tmp_path / "eval", labeller=FakeLabeller())
+    assert r["map"] == pytest.approx(1.0) and r["pr"][0.3] == pytest.approx((1.0, 1.0))
+    assert r["n_small"] == 0 and np.isnan(r["map_small"])  # 128 × 144 px boxes: none small
+    assert (tmp_path / "eval" / "fake" / "autolabel.json").exists()
+    assert "| cat | 4 |" in ae.table([r], samples, ["cat", "dog"], "test")
 
 
 def test_gather_copies_inputs(tmp_path):

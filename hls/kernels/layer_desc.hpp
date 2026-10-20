@@ -22,7 +22,7 @@ struct LayerDesc {
   int32_t h, w;            // forme logique de l'entrée
   int32_t shift;           // n de la requantification
   int32_t leaky;           // 0 / 1
-  int32_t pool_k, pool_s;  // maxpool fusionné ; 0 : aucun
+  int32_t pool_k, pool_s;  // maxpool fusionné (2×2, ou 5×5 en stride 1, T26.0) ; 0 : aucun
   int32_t nseg;            // 1 ou 2
   int32_t seg0_off, seg0_c, seg0_h, seg0_w, seg0_up;
   int32_t seg1_off, seg1_c, seg1_h, seg1_w, seg1_up;
@@ -38,6 +38,8 @@ struct LayerDesc {
   bool pooled() const { return pool_k > 0; }
   int pk() const { return pooled() ? pool_k : 1; }
   int ps() const { return pooled() ? pool_s : 1; }
+  // Stride 1 : fenêtre décalée de ⌊(k − 1)/2⌋ (0 pour k = 2, 2 pour le 5×5 du SPP, T26.0).
+  int pool_lo() const { return ps() == 1 ? (pk() - 1) / 2 : 0; }
   int out_h() const { return h + 2 * pad - k + 1; }
   int out_w() const { return w + 2 * pad - k + 1; }
   // §4.4 : stride 1 → complétion par réplication, la taille est conservée.

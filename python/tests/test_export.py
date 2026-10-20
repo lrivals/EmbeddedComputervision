@@ -1,5 +1,6 @@
 """T4.7 : export du modèle entier — manifest valide, blobs relus == modèle, dumps rejoués ;
-T24.3 : YOLOv4-tiny (routes groupées, maxpool après concaténation) et test d'allocation."""
+T24.3 : YOLOv4-tiny (routes groupées, maxpool après concaténation) et test d'allocation ;
+T26.0 : YOLOv7-tiny (concaténations de 4 sources, SPP réécrit en maxpools 5×5 chaînés)."""
 
 import json
 from pathlib import Path
@@ -12,7 +13,7 @@ from yolo.io.export import build_manifest, export_model, layout, load_luts, load
 from yolo.models.specs import NETWORKS, infer_shapes
 from yolo.models.tiny_yolo import build, load_cfg
 from yolo.quant.calibrate import ActStats, choose_scales
-from yolo.quant.fuse_bn import fuse_network
+from yolo.quant.fuse_bn import engine_net, fuse_network
 from yolo.quant.int_model import IntNetwork, QuantModel, head_luts
 from yolo.quant.quantize import INPUT_SCALE, quantize_input
 
@@ -31,7 +32,7 @@ def _qm(name, rng):
 
 
 @pytest.fixture(scope="module", params=["tiny-yolov2-voc", "tiny-yolov3-voc",
-                                        "tiny-yolov4-coco"])
+                                        "tiny-yolov4-coco", "tiny-yolov7-coco"])
 def exported(request, tmp_path_factory):
     qm, qx = _qm(request.param, np.random.default_rng(0))
     d = tmp_path_factory.mktemp(request.param)
@@ -142,9 +143,11 @@ def check_allocation(m):
                         f" lue jusqu'à {end})")
 
 
-@pytest.mark.parametrize("name", ["tiny-yolov2-voc", "tiny-yolov3-voc", "tiny-yolov4-coco"])
+@pytest.mark.parametrize("name", ["tiny-yolov2-voc", "tiny-yolov3-voc", "tiny-yolov4-coco",
+                                  "tiny-yolov7-coco"])
 def test_allocation_no_overlap(name):
-    net = load_cfg(name)  # avec les ancres (la table de specs de v2 n'a pas de [region])
+    # Avec les ancres (la table de specs de v2 n'a pas de [region]) ; graphe du moteur.
+    net = engine_net(load_cfg(name))
     m = build_manifest(net, 1.0 / 127, lambda i: 0.05, lambda i: 16)
     jsonschema.Draft202012Validator(SCHEMA).validate(m)
     check_allocation(m)
@@ -182,6 +185,60 @@ def test_v4_grouped_routes_and_pooled_concat():
     assert e[23]["prepool_out"]["buf"] == e[34]["out"]["buf"]
     assert [e[i]["s"] for i in (0, 1, 2)] == [2, 2, 1]
     assert e[30]["scale_x_y"] == e[37]["scale_x_y"] == 1.05
+
+
+def test_v7_spp_and_four_source_concats():
+    net = engine_net(NETWORKS["tiny-yolov7-coco"])
+    shapes = infer_shapes(net)
+    m = build_manifest(net, 1.0 / 127, lambda i: 0.05, lambda i: 16)
+    e = {x["id"]: x for x in m["layers"]}
+
+    def at(ref):
+        return ref["buf"], ref["offset"]
+
+    # SPP : L35 écrit son pool 5×5 (L36) et sa carte (L35) ; les convs identité 37 et 39
+    # écrivent pool5∘pool5 = pool9 (L38) et pool13 (L40) ; tout bout à bout dans la route 41.
+    assert [e[i]["k"] for i in (36, 38, 40)] == [5, 5, 5]
+    assert [e[i]["fused_into"] for i in (36, 38, 40)] == [35, 37, 39]
+    assert e[37]["in"] == e[35]["out"] and e[39]["in"] == e[37]["out"]
+    order = [e[39]["out"], e[37]["out"], e[35]["out"], e[35]["prepool_out"]]
+    buf, off = at(e[41]["out"])
+    for ref in order:
+        assert at(ref) == (buf, off)
+        off += 256 * 13 * 13
+    # Concaténations de 4 convs : sources bout à bout, aucune copie.
+    for r in (7, 15, 23, 31, 55, 67, 76, 85):
+        buf, off = at(e[r]["out"])
+        for j in net["layers"][r]["from"]:
+            assert at(e[j]["out"]) == (buf, off), (r, j)
+            off += int(np.prod(shapes[j][1]))
+    assert all(e[h]["new_coords"] == 1 and e[h]["scale_x_y"] == 2.0 for h in (90, 94, 98))
+
+
+def test_v7_lowering_keeps_outputs():
+    net = build("tiny-yolov7-coco", dtype=np.float64, rng=2)
+    fused = fuse_network(net)
+    assert [fused.layers[i]["type"] for i in range(35, 42)] == [
+        "conv", "maxpool", "conv", "maxpool", "conv", "maxpool", "route"]
+    assert all(fused.layers[i]["k"] == 5 for i in (36, 38, 40))
+    x = np.random.default_rng(3).uniform(0, 1, (1, 3, 64, 64))
+    a = net.forward(x, train=False, all_outputs=True)
+    b = fused.forward(x, train=False, all_outputs=True)
+    for i in (36, 38, 40, 41, 98):
+        np.testing.assert_allclose(b[i], a[i], rtol=1e-9, atol=1e-9)
+
+
+def test_identity_conv_exact_in_integer():
+    # La conv identité du SPP (W = I, b = 0, s_x = s_y) rend son entrée à l'entier près.
+    from yolo.quant.int_layers import conv_int
+    from yolo.quant.quantize import quantize_weights_per_channel, requant_params
+
+    c, s = 4, 0.0492
+    qW, sw = quantize_weights_per_channel(np.eye(c)[:, :, None, None])
+    M0, n = requant_params(s, sw, s)
+    q = np.arange(-127, 128).reshape(1, 1, 15, 17).repeat(c, axis=1)
+    y, _ = conv_int(q, qW, np.zeros(c, np.int64), M0, n, act="linear")
+    np.testing.assert_array_equal(y, q)
 
 
 def test_v4_concat_sources_share_scale():

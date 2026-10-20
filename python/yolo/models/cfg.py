@@ -4,6 +4,11 @@ Sections reconnues : [net], [convolutional], [maxpool], [route], [upsample], [yo
 Les indices de route négatifs sont rendus absolus. Une route `groups`/`group_id` (CSP de
 YOLOv4-tiny) n'a qu'une source ; `scale_x_y` d'une [yolo] est gardé s'il diffère de 1. Les ancres sont ramenées en pixels pour
 une entrée de 416 (conventions.md) : celles de [region] (YOLOv2) sont en cellules de 32 px.
+
+YOLOv7-tiny (T26.0): a [yolo] with `new_coords=1` follows a conv with `activation=logistic`;
+the conv is kept **linear** and the head gets `new_coords: 1`, the sigmoid moves into the
+decoding (the engine heads stay linear int8). A stride-1 [maxpool] of odd size (SPP, 5 / 9 /
+13) is centred, as in Darknet (padding size − 1, offset −padding/2).
 """
 
 from pathlib import Path
@@ -48,7 +53,7 @@ def _conv(opts, i):
     if pad != k // 2:
         raise ValueError(f"couche {i} : padding {pad} non supporté (attendu k//2)")
     act = opts.get("activation", "logistic")
-    if act not in ("leaky", "linear"):
+    if act not in ("leaky", "linear", "logistic"):
         raise ValueError(f"couche {i} : activation {act!r} non supportée")
     return {"type": "conv", "k": k, "s": int(opts.get("stride", 1)), "cout": int(opts["filters"]),
             "act": act, "bn": bool(int(opts.get("batch_normalize", 0)))}
@@ -75,7 +80,10 @@ def parse_cfg(source, name=None):
             layers.append(_conv(opts, i))
         elif kind in ("maxpool", "max"):
             k = int(opts.get("size", opts.get("stride", 1)))
-            layers.append({"type": "maxpool", "k": k, "s": int(opts.get("stride", 1))})
+            s = int(opts.get("stride", 1))
+            if int(opts.get("padding", k - 1)) != k - 1 or (s != 1 and k != s):
+                raise ValueError(f"couche {i} : maxpool {k}/{s} non supporté")
+            layers.append({"type": "maxpool", "k": k, "s": s})
         elif kind == "route":
             src = [j if j >= 0 else i + j for j in _ints(opts["layers"])]
             if any(not 0 <= j < i for j in src):
@@ -99,6 +107,12 @@ def parse_cfg(source, name=None):
             scale_xy = float(opts.get("scale_x_y", 1))
             if scale_xy != 1:
                 yolo["scale_x_y"] = scale_xy
+            if int(opts.get("new_coords", 0)):
+                # T26.0: the sigmoid of the head conv is applied by the decoding.
+                if not layers or layers[-1].get("act") != "logistic":
+                    raise ValueError(f"couche {i} : new_coords sans conv logistic avant")
+                layers[-1]["act"] = "linear"
+                yolo["new_coords"] = 1
             layers.append(yolo)
         elif kind == "region":
             net["classes"] = int(opts["classes"])
@@ -107,4 +121,7 @@ def parse_cfg(source, name=None):
             layers.append({"type": "region", "num": int(opts["num"])})
         else:
             raise ValueError(f"couche {i} : section [{kind}] non supportée")
+    for i, layer in enumerate(layers):
+        if layer.get("act") == "logistic":
+            raise ValueError(f"couche {i} : activation 'logistic' hors d'une tête new_coords")
     return net

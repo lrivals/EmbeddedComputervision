@@ -16,11 +16,13 @@ STAGE_COLORS = {"flottant": PALETTE[0], "entier": PALETTE[1], "csim": PALETTE[2]
                 "carte": PALETTE[6]}
 STAGE_HATCH = {"flottant": "", "entier": "//", "csim": "..", "carte": "xx"}
 NET_COLORS = {"tiny-yolov2-voc": PALETTE[0], "tiny-yolov3-coco": PALETTE[1],
-              "tiny-yolov4-coco": PALETTE[2]}
+              "tiny-yolov4-coco": PALETTE[2], "tiny-yolov7-coco": PALETTE[3]}
 NET_LABELS = {"tiny-yolov2-voc": "Tiny-YOLOv2 VOC", "tiny-yolov3-coco": "Tiny-YOLOv3 COCO",
-              "tiny-yolov4-coco": "YOLOv4-tiny COCO"}
-NET_SHORT = {"tiny-yolov2-voc": "v2", "tiny-yolov3-coco": "v3", "tiny-yolov4-coco": "v4"}
-NET_HATCH = {"tiny-yolov2-voc": "", "tiny-yolov3-coco": "//", "tiny-yolov4-coco": ".."}
+              "tiny-yolov4-coco": "YOLOv4-tiny COCO", "tiny-yolov7-coco": "YOLOv7-tiny COCO"}
+NET_SHORT = {"tiny-yolov2-voc": "v2", "tiny-yolov3-coco": "v3", "tiny-yolov4-coco": "v4",
+             "tiny-yolov7-coco": "v7"}
+NET_HATCH = {"tiny-yolov2-voc": "", "tiny-yolov3-coco": "//", "tiny-yolov4-coco": "..",
+             "tiny-yolov7-coco": "xx"}
 NETS = tuple(NET_COLORS)
 
 COL = 6.4   # largeur une colonne (pouces)

@@ -65,6 +65,9 @@ class Trainer:
         self.seed = seed
         self.it = 0
         self.head_list = heads(net.net)
+        if any(net.layers[h].get("new_coords") for h, _ in self.head_list):
+            # T26.0: inference only (the loss of the new_coords heads is not written).
+            raise ValueError("entraînement des têtes new_coords (YOLOv7-tiny) non pris en charge")
         region = any(net.layers[h]["type"] == "region" for h, _ in self.head_list)
         self.loss_kwargs = {"class_mode": "softmax" if region else "sigmoid",
                             "anchor_ref": anchor_ref(net.net), **loss_kwargs}

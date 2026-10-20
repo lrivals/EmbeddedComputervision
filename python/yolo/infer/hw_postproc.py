@@ -103,6 +103,9 @@ def make_heads(outputs, net, luts, image=0):
         if net["layers"][hid].get("scale_x_y", 1.0) != 1.0:
             raise ValueError(f"tête {hid} : scale_x_y non pris en charge par le post-traitement "
                              "matériel (YOLOv4-tiny, hors M24)")
+        if net["layers"][hid].get("new_coords"):
+            raise ValueError(f"tête {hid} : new_coords non pris en charge par le post-traitement "
+                             "matériel (YOLOv7-tiny, hors M26)")
         lut = luts[hid]
         out.append(HwHead(np.asarray(outputs[hid][image]), anchors_q8(np.asarray(
             net["anchors"], dtype=np.float64)[mask]), net["classes"],

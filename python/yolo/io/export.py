@@ -10,6 +10,9 @@
   - un maxpool qui suit une concaténation (YOLOv4-tiny) est fusionné dans chaque source, qui
     écrit sa carte poolée bout à bout avec les autres ; une route groupée (CSP) est un
     décalage de canaux dans sa source, sans copie ;
+  - a route source can be a maxpool fused into a conv (SPP of YOLOv7-tiny, T26.0): the conv
+    writes its pooled map into the slot of the pool, and its map before pooling into its own
+    slot if the route reads it too;
   - une conv de stride 2 garde `s: 2` ; le driver et le golden la calculent en stride 1 et
     décimée dans l'étage de sortie (maxpool 1×1 de stride 2, T24.3) ;
   - les têtes vont dans `H<grille>`.
@@ -112,7 +115,11 @@ def layout(net):
             slot = pool_slot if r in pooled_route else plain_slot
             off = 0
             for j in layer["from"]:
-                if j in slot or j < 0 or layers[j]["type"] in ("route", "maxpool"):
+                # A maxpool source: fused into the single conv before it (T26.0).
+                pooled_src = (layers[j]["type"] == "maxpool" and r not in pooled_route
+                              and fused.get(j) == [j - 1])
+                if (j in slot or j < 0 or layers[j]["type"] == "route"
+                        or (layers[j]["type"] == "maxpool" and not pooled_src)):
                     raise ValueError(f"source de route {j} non prise en charge")
                 slot[j] = (buf, off)
                 off += nbytes(pooled_shape(j) if r in pooled_route else shapes[j][1])
@@ -166,11 +173,14 @@ def layout(net):
                     e["prepool_out"] = keep(outs)
             if i in pool_slot:
                 out = reserve(*pool_slot[i], final)
+            elif pool is not None and pool in plain_slot:
+                out = reserve(*plain_slot[pool], final)
             elif i in plain_slot and pool is None:
                 out = reserve(*plain_slot[i], final)
             elif i in head_of:
                 out = reserve(f"H{head_of[i]}", 0, final)
-            elif len(readers) > 1:
+            elif len(readers) > 1 or any(r > (pool or i) + 1 for r in readers):
+                # Read twice, or later than the next layer (a route near the heads, T26.0).
                 out = keep(final)
             else:
                 chain = "B" if chain == "A" else "A"
@@ -270,6 +280,8 @@ def build_manifest(net, input_scale, scale_of, shift_of, lut_offsets=None, exp_f
                      out_shape=list(outs))
             if layer.get("scale_x_y", 1.0) != 1.0:
                 e["scale_x_y"] = layer["scale_x_y"]
+            if layer.get("new_coords"):
+                e["new_coords"] = 1
         elif t == "region":
             e.update(num=layer["num"], scale=scale_of(i), **{"in": p["in"]},
                      out_shape=list(outs))
@@ -427,6 +439,8 @@ def load_model(model_dir):
             yolo = {"type": "yolo", "mask": list(e["mask"])}
             if "scale_x_y" in e:
                 yolo["scale_x_y"] = e["scale_x_y"]
+            if e.get("new_coords"):
+                yolo["new_coords"] = 1
             layers.append(yolo)
         elif t == "region":
             layers.append({"type": "region", "num": e["num"]})

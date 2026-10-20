@@ -4,6 +4,9 @@
 
 YOLOv4-tiny (`scale_x_y` = α de la couche [yolo], T24.2) : σ(t) devient σ(t)·α − (α − 1)/2.
 
+YOLOv7-tiny (`new_coords`, T26.0, as YOLOv5) : b_w = p_w·(2σ(t_w))², b_h = p_h·(2σ(t_h))², the
+centre as above with α = 2 (σ·2 − 0,5) ; the sigmoid of the head conv is applied here.
+
 Score de la classe c : σ(t_o)·σ(t_c) (YOLOv3) ou σ(t_o)·softmax(t)_c (YOLOv2, softmax
 stabilisé). Les boîtes sont rendues en `(cx, cy, w, h)` normalisés dans l'image letterbox ;
 `to_original` les ramène dans l'image d'origine.
@@ -21,9 +24,14 @@ def scale_xy(sig, alpha):
     return sig if alpha == 1 else sig * alpha - (alpha - 1) / 2
 
 
-def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0):
+def wh_new_coords(sig):
+    """(2σ)² : facteur d'ancre des têtes `new_coords` (Darknet : 4·σ²)."""
+    return 4.0 * sig * sig
+
+
+def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0, new_coords=False):
     """`out` : (N, A·(5+C), S_h, S_w) ; `anchors` : (A, 2) en fraction de l'image ; `alpha` :
-    `scale_x_y` de la tête.
+    `scale_x_y` de la tête ; `new_coords` : b_w = p_w·(2σ(t_w))² au lieu de p_w·e^{t_w}.
 
     Rend `boxes` (N, A·S_h·S_w, 4), `obj` (N, A·S_h·S_w), `scores` (N, A·S_h·S_w, C), dans
     l'ordre (ancre, ligne, colonne).
@@ -36,8 +44,10 @@ def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0):
     # §8.1
     bx = (scale_xy(sigmoid(p[:, :, 0]), alpha) + j) / sw
     by = (scale_xy(sigmoid(p[:, :, 1]), alpha) + i) / sh
-    bw = anchors[None, :, 0, None, None] * np.exp(p[:, :, 2])
-    bh = anchors[None, :, 1, None, None] * np.exp(p[:, :, 3])
+    fw, fh = ((wh_new_coords(sigmoid(p[:, :, 2])), wh_new_coords(sigmoid(p[:, :, 3])))
+              if new_coords else (np.exp(p[:, :, 2]), np.exp(p[:, :, 3])))
+    bw = anchors[None, :, 0, None, None] * fw
+    bh = anchors[None, :, 1, None, None] * fh
     obj = sigmoid(p[:, :, 4])
     tc = p[:, :, 5:]
     if mode == "v3":
@@ -61,7 +71,7 @@ def decode(outputs, net):
         layer = net["layers"][hid]
         mode = "v2" if layer["type"] == "region" else "v3"
         parts.append(decode_head(outputs[hid], anchors[mask], net["classes"], mode,
-                                 layer.get("scale_x_y", 1.0)))
+                                 layer.get("scale_x_y", 1.0), bool(layer.get("new_coords"))))
     return tuple(np.concatenate(x, axis=1) for x in zip(*parts))
 
 
@@ -72,13 +82,14 @@ def to_original(boxes, width, height, size):
 
 
 # ------------------------------------------------------------------ décodage entier (§9.4)
-def decode_head_int(q, anchors, num_classes, mode, luts, obj_thr, alpha=1.0):
+def decode_head_int(q, anchors, num_classes, mode, luts, obj_thr, alpha=1.0,
+                    new_coords=False):
     """Une image, une tête int8 `q` (A·(5+C), S_h, S_w) d'échelle `luts.scale`.
 
     §9.4 : on garde d'abord les cellules dont l'entier t_o dépasse le logit du seuil (le
     score σ(t_o)·p_c ≤ σ(t_o) : aucune boîte au-dessus du seuil n'est perdue), puis les
     tables (Q16) ne servent qu'aux survivantes ; `scale_x_y` (`alpha`) s'applique après la
-    table. Rend `boxes` (K, 4), `obj` (K,),
+    table ; `new_coords` : (2σ)² par la table sigmoïde au lieu de l'exponentielle. Rend `boxes` (K, 4), `obj` (K,),
     `scores` (K, C) dans l'ordre (ancre, ligne, colonne), comme `decode_head`.
     """
     from yolo.quant.lut import ONE, SOFTMAX_OFFSET, logit_threshold_q, lookup
@@ -92,8 +103,14 @@ def decode_head_int(q, anchors, num_classes, mode, luts, obj_thr, alpha=1.0):
     t = p[k, :, i, j]  # (K, 5 + C) entiers
     bx = (scale_xy(lookup(luts.sigmoid, t[:, 0]) / ONE, alpha) + j) / sw
     by = (scale_xy(lookup(luts.sigmoid, t[:, 1]) / ONE, alpha) + i) / sh
-    bw = anchors[k, 0] * (lookup(luts.exp, t[:, 2]) / 2.0**luts.exp_frac)
-    bh = anchors[k, 1] * (lookup(luts.exp, t[:, 3]) / 2.0**luts.exp_frac)
+    if new_coords:
+        fw = wh_new_coords(lookup(luts.sigmoid, t[:, 2]) / ONE)
+        fh = wh_new_coords(lookup(luts.sigmoid, t[:, 3]) / ONE)
+    else:
+        fw = lookup(luts.exp, t[:, 2]) / 2.0**luts.exp_frac
+        fh = lookup(luts.exp, t[:, 3]) / 2.0**luts.exp_frac
+    bw = anchors[k, 0] * fw
+    bh = anchors[k, 1] * fh
     obj = lookup(luts.sigmoid, t[:, 4]) / ONE
     tc = t[:, 5:]
     if mode == "v3":
@@ -123,7 +140,8 @@ def decode_int(outputs, net, luts, obj_thr):
             mode = "v2" if layer["type"] == "region" else "v3"
             boxes, _, scores = decode_head_int(outputs[hid][b], anchors[mask], net["classes"],
                                                mode, luts[hid], obj_thr,
-                                               layer.get("scale_x_y", 1.0))
+                                               layer.get("scale_x_y", 1.0),
+                                               bool(layer.get("new_coords")))
             parts.append((boxes, scores))
         out.append(tuple(np.concatenate(x, axis=0) for x in zip(*parts)))
     return out

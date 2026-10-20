@@ -50,6 +50,7 @@ struct Layer {
   std::string layout;
   int groups = 1, group_id = 0;  // route groupée (CSP de YOLOv4-tiny) : un groupe de canaux
   double scale_xy = 1.0;         // yolo : scale_x_y de Darknet
+  bool new_coords = false;       // yolo : new_coords de Darknet (YOLOv7-tiny, T26.0)
   double scale = 0.0;
   std::vector<int> mask;  // yolo
   int num = 0;            // region
@@ -57,6 +58,8 @@ struct Layer {
   int exp_frac = 0;
 
   bool is_head() const { return type == LayerType::Yolo || type == LayerType::Region; }
+  // Tête que yolo_post (post-traitement matériel, M9.1) sait décoder.
+  bool hw_post_ok() const { return scale_xy == 1.0 && !new_coords; }
 };
 
 struct Model {

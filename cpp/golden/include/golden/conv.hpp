@@ -12,7 +12,9 @@
 //   fusionné (k_p, s_p) produit P = ⌊(Tr − k_p)/s_p⌋ + 1 lignes poolées par tuile et avance
 //   de P·s_p lignes conv ; en stride 1 la dernière ligne de la tuile est recalculée par la
 //   suivante, et le bord bas/droit est répliqué (§10.3, conventions.md). Sans pooling, on
-//   prend k_p = s_p = 1 (P = Tr).
+//   prend k_p = s_p = 1 (P = Tr). Stride 1 de k_p impair (SPP de YOLOv7-tiny, T26.0) : fenêtre
+//   centrée, décalée de lo = (k_p − 1)/2 ; la tuile commence lo lignes plus haut (bornée à 0)
+//   et les bords haut/gauche sont répliqués aussi. k_p = 2 : lo = 0, tuiles inchangées.
 // - dans une tuile, l'ordre des MAC (too, tii, i, j, trr, tcc) diffère du §10.2 par simple
 //   commutation : la somme d'entiers est exacte, le résultat est le même que l'arbre
 //   d'additions déroulé du matériel.
@@ -85,6 +87,8 @@ struct ConvParams {
   bool pooled() const { return pool_k > 0; }
   int pk() const { return pooled() ? pool_k : 1; }
   int ps() const { return pooled() ? pool_s : 1; }
+  // Décalage de la fenêtre de stride 1 : ⌊(k − 1)/2⌋ en haut et à gauche (§4.4, T26.0).
+  int pool_lo() const { return ps() == 1 ? (pk() - 1) / 2 : 0; }
   // §4.4 : stride 1 → complétion par réplication, la taille est conservée.
   int pool_h() const { return ps() == 1 ? out_h() : (out_h() - pk()) / ps() + 1; }
   int pool_w() const { return ps() == 1 ? out_w() : (out_w() - pk()) / ps() + 1; }
@@ -155,6 +159,7 @@ struct Tiles {
 
 namespace detail {
 inline int imin(int a, int b) { return a < b ? a : b; }
+inline int imax(int a, int b) { return a > b ? a : b; }
 }
 
 // Une couche conv complète : nid de boucles tuilé, puis étage de sortie biais +
@@ -167,21 +172,23 @@ template <class T>
 void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const int32_t* bias,
                 const int32_t* m0, int8_t* out, int8_t* prepool, int8_t* tap,
                 AccessStats* stats, typename T::Buffers& b) {
+  using detail::imax;
   using detail::imin;
   const int K = p.k, S = S_CONV;
   const int R = p.out_h(), C = p.out_w();
-  const int pk = p.pk(), ps = p.ps();
+  const int pk = p.pk(), ps = p.ps(), lo = p.pool_lo();
   const int Rp = p.pool_h(), Cp = p.pool_w();
   const int Pr = (T::Tr - pk) / ps + 1, Pc = (T::Tc - pk) / ps + 1;  // lignes poolées / tuile
   AccessStats st;
 
   for (int prow0 = 0; prow0 < Rp; prow0 += Pr) {
-    const int row = prow0 * ps;
-    const int tr_n = imin((Pr - 1) * ps + pk, R - row);  // lignes conv calculées
+    const int row = imax(prow0 * ps - lo, 0);
+    // Lignes conv calculées : jusqu'à la dernière de la fenêtre de la dernière ligne poolée.
+    const int tr_n = imin((prow0 + Pr - 1) * ps - lo + pk - 1, R - 1) - row + 1;
     const int np_r = imin(Pr, Rp - prow0);               // lignes poolées produites
     for (int pcol0 = 0; pcol0 < Cp; pcol0 += Pc) {
-      const int col = pcol0 * ps;
-      const int tc_n = imin((Pc - 1) * ps + pk, C - col);
+      const int col = imax(pcol0 * ps - lo, 0);
+      const int tc_n = imin((pcol0 + Pc - 1) * ps - lo + pk - 1, C - 1) - col + 1;
       const int np_c = imin(Pc, Cp - pcol0);
       // ABFT (T25.2): Σ over every channel tile `to` of the int32 accumulators + bias,
       // against the checksum lane computed once (to == 0) from the same in_buf.
@@ -258,11 +265,14 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
               if (p.leaky) y = leaky_int(y);
               b.out_buf[too][trr][tcc] = clip_q(y, p.qmax);
             }
-          // Carte avant pooling : lignes et colonnes propres à la tuile (hors recouvrement).
-          const int own_r = imin(tr_n, Pr * ps), own_c = imin(tc_n, Pc * ps);
+          // Carte avant pooling : lignes et colonnes propres à la tuile (hors recouvrement) ;
+          // en stride 1, celles des lignes poolées de la tuile.
+          const int own_r0 = prow0 * ps - row, own_c0 = pcol0 * ps - col;
+          const int own_r = ps == 1 ? own_r0 + np_r : imin(tr_n, Pr * ps);
+          const int own_c = ps == 1 ? own_c0 + np_c : imin(tc_n, Pc * ps);
           if (p.pooled() && (prepool || tap))
-            for (int trr = 0; trr < own_r; ++trr)
-              for (int tcc = 0; tcc < own_c; ++tcc) {
+            for (int trr = own_r0; trr < own_r; ++trr)
+              for (int tcc = own_c0; tcc < own_c; ++tcc) {
                 const int64_t a = (int64_t(o) * R + row + trr) * C + col + tcc;
                 const int8_t v = int8_t(b.out_buf[too][trr][tcc]);
                 if (prepool) {
@@ -277,8 +287,8 @@ void conv_layer(const ConvParams& p, const InView& in, const int8_t* w, const in
               int32_t m = -128;
               for (int a = 0; a < pk; ++a)
                 for (int c = 0; c < pk; ++c) {
-                  const int r = imin((prow0 + pr) * ps + a, R - 1) - row;
-                  const int q = imin((pcol0 + pc) * ps + c, C - 1) - col;
+                  const int r = imin(imax((prow0 + pr) * ps - lo + a, 0), R - 1) - row;
+                  const int q = imin(imax((pcol0 + pc) * ps - lo + c, 0), C - 1) - col;
                   const int32_t v = b.out_buf[too][r][q];
                   m = v > m ? v : m;
                 }

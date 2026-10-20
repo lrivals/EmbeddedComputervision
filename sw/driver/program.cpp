@@ -51,8 +51,10 @@ static int32_t i32(int64_t x, const char* what) {
 accel::LayerDesc conv_desc(const Layer& l, const View& in, int64_t out_off, int64_t prepool_off,
                            int64_t b_index, int64_t m0_index, int64_t w_off) {
   const golden::ConvParams p = golden::conv_params(l, in.h, in.w);
-  if (p.pooled() && (p.pool_k > 2 || p.pool_s > 2))
-    throw std::runtime_error("maxpool fusionné : 2×2 seulement");
+  // 2×2 de stride 1 ou 2, décimation 1×1 de stride 2 (T24.3), 5×5 de stride 1 (SPP, T26.0).
+  if (p.pooled() && !(p.pool_k <= 2 && p.pool_s <= 2) &&
+      !(p.pool_k <= accel::PK_MAX && p.pool_s == 1))
+    throw std::runtime_error("maxpool fusionné : 2×2, ou 5×5 en stride 1 seulement");
   if (in.nseg < 1 || in.nseg > accel::MAX_SEGMENTS || in.c != l.cin)
     throw std::runtime_error("conv " + std::to_string(l.id) + " : entrée invalide");
   accel::LayerDesc d{};

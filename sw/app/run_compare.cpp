@@ -187,11 +187,11 @@ int main(int argc, char** argv) {
           std::printf("  détections DIFFÉRENTES de %s\n", ref.c_str());
           ++nd_img;
         }
-        // yolo_post ne connaît pas scale_x_y (YOLOv4-tiny, hors M24) : comparaison sautée.
+        // yolo_post ne connaît ni scale_x_y ni new_coords (YOLOv4-tiny, YOLOv7-tiny) : sauté.
         bool post_ok = true;
-        for (int id : m.heads()) post_ok = post_ok && m.layers[size_t(id)].scale_xy == 1.0;
+        for (int id : m.heads()) post_ok = post_ok && m.layers[size_t(id)].hw_post_ok();
         if (a.hw_post && !post_ok)
-          std::printf("  yolo_post : sauté (scale_x_y non pris en charge)\n");
+          std::printf("  yolo_post : sauté (scale_x_y / new_coords non pris en charge)\n");
         if (a.hw_post && post_ok)
           for (double conf : {0.25, 0.005}) {
             std::vector<hwpp::HeadData> heads;

@@ -168,6 +168,7 @@ Model Model::load(const std::string& dir) {
         if (l.type == LayerType::Yolo) {
           l.mask = ints(e["mask"]);
           if (e.has("scale_x_y")) l.scale_xy = e["scale_x_y"].num();
+          if (e.has("new_coords")) l.new_coords = e["new_coords"].integer() != 0;
         }
         else l.num = static_cast<int>(e["num"].integer());
         l.scale = e["scale"].num();

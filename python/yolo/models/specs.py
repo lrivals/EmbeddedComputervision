@@ -105,7 +105,80 @@ TINY_YOLOV4_COCO = {
     ],
 }
 
-NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC, TINY_YOLOV4_COCO)}
+
+
+def _route(*src):
+    return {"type": "route", "from": list(src)}
+
+
+def _elan(c, base):
+    """ELAN block of YOLOv7-tiny at layer `base` (input: layer base − 1): two 1×1 convs of c,
+    two 3×3 convs of c chained on the second, 4-source concat, 1×1 conv of 2c."""
+    return [
+        _conv(c, k=1),                                                     # base
+        _route(base - 1),                                                  # base + 1
+        _conv(c, k=1),                                                     # base + 2
+        _conv(c),                                                          # base + 3
+        _conv(c),                                                          # base + 4
+        _route(base, base + 2, base + 3, base + 4),                        # base + 5
+        _conv(2 * c, k=1),                                                 # base + 6
+    ]
+
+
+def _v7_head(src, c, mask):
+    return [_route(src), _conv(c), _head(3, COCO_CLASSES),
+            {"type": "yolo", "mask": mask, "scale_x_y": 2.0, "new_coords": 1}]
+
+
+# YOLOv7-tiny COCO (AlexeyAB yolov7-tiny.cfg, outside the base, T26.0): leaky, ELAN blocks
+# with 4-source concats, SPP with stride-1 maxpools 5 / 9 / 13 (layers 36-41), three heads
+# (52, 26, 13 at 416) with `new_coords` (sigmoid in the decoding, wh = (2σ)²·p) and
+# scale_x_y = 2.
+TINY_YOLOV7_COCO = {
+    "name": "tiny-yolov7-coco",
+    "input": (3, 416, 416),
+    "classes": COCO_CLASSES,
+    "anchors": [[10, 13], [16, 30], [33, 23], [30, 61], [62, 45], [59, 119], [116, 90],
+                [156, 198], [373, 326]],
+    "layers": [_conv(32, s=2), _conv(64, s=2)] + _elan(32, 2) + [_pool()] + _elan(64, 10)
+    + [_pool()] + _elan(128, 18) + [_pool()] + _elan(256, 26) + [
+        _conv(256, k=1),                                                   # 33
+        _route(32),                                                        # 34
+        _conv(256, k=1),                                                   # 35
+        {"type": "maxpool", "k": 5, "s": 1},                               # 36
+        _route(35),                                                        # 37
+        {"type": "maxpool", "k": 9, "s": 1},                               # 38
+        _route(35),                                                        # 39
+        {"type": "maxpool", "k": 13, "s": 1},                              # 40
+        _route(40, 38, 36, 35),                                            # 41 : SPP
+        _conv(256, k=1),                                                   # 42
+        _route(33, 42),                                                    # 43
+        _conv(256, k=1),                                                   # 44
+        _conv(128, k=1),                                                   # 45
+        {"type": "upsample", "s": 2},                                      # 46
+        _route(24),                                                        # 47
+        _conv(128, k=1),                                                   # 48
+        _route(48, 46),                                                    # 49
+    ] + _elan(64, 50) + [
+        _conv(64, k=1),                                                    # 57
+        {"type": "upsample", "s": 2},                                      # 58
+        _route(16),                                                        # 59
+        _conv(64, k=1),                                                    # 60
+        _route(60, 58),                                                    # 61
+    ] + _elan(32, 62) + [
+        _conv(128, s=2),                                                   # 69
+        _route(69, 56),                                                    # 70
+    ] + _elan(64, 71) + [
+        _conv(256, s=2),                                                   # 78
+        _route(78, 44),                                                    # 79
+    ] + _elan(128, 80)
+    + _v7_head(68, 128, [0, 1, 2])                                         # 87-90 : 52×52
+    + _v7_head(77, 256, [3, 4, 5])                                         # 91-94 : 26×26
+    + _v7_head(86, 512, [6, 7, 8]),                                        # 95-98 : 13×13
+}
+
+NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC, TINY_YOLOV4_COCO,
+                                         TINY_YOLOV7_COCO)}
 
 
 def infer_shapes(net):
@@ -121,7 +194,7 @@ def infer_shapes(net):
             out = (layer["cout"], (h + 2 * pad - layer["k"]) // s + 1,
                    (w + 2 * pad - layer["k"]) // s + 1)
         elif t == "maxpool":
-            # §4.4 : stride 1 complété à droite et en bas, la taille est conservée.
+            # §4.4 : stride 1 complété par réplication (centré pour k impair), taille conservée.
             out = (c, h, w) if layer["s"] == 1 else (c, h // 2, w // 2)
         elif t == "upsample":
             out = (c, h * layer["s"], w * layer["s"])

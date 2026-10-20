@@ -20,8 +20,16 @@ to any class that can be named.
 v1 runs on the PC (CPU, CUDA if present). The open-vocabulary model is a large PyTorch
 network: it is a labelling tool, never something that goes on the FPGA.
 
-**State**: 9 of 10 tasks done (2026-10-12): T22.0-T22.8. T22.9 (closing the loop with an
-M15 fine-tuning) remains; the editor's mouse interactions are still to be tried in a browser.
+**State**: 9 of 12 tasks done (2026-10-12): T22.0-T22.8. What remains (2026-10-20):
+
+- T22.10: the only quality measurement (T22.7) is on VOC, i.e. everyday photos. The
+  project's domains are aerial (VisDrone, AU-AIR), thermal (HIT-UAV, FLIR) and low light
+  (ExDark); the labellers must be measured there before they label a new set.
+- T22.11: choose the datasets worth labelling, using the T22.10 numbers.
+- T22.9: closing the loop (auto-labelled set → M15 fine-tuning → webcam / board), on the
+  T22.11 choice.
+- The editor's mouse interactions (draw, move, resize, delete a box) were only exercised
+  through `gradio_client`; they are still to be tried by hand in a browser.
 
 ## User guide (target behaviour)
 
@@ -294,7 +302,7 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   the install hint. User guide: [docs/autolabel.md](../autolabel.md).
 
 ### [ ] T22.9 — Outlook: closing the loop
-- **Spec**: — · **Depends on**: T22.7, M15 · **Size**: L
+- **Spec**: — · **Depends on**: T22.7, T22.11, M15 · **Size**: L
 - **Deliverables**: plan (and a first trial) for: auto-labelled folder → `DATASETS`
   entry through `_load_yolo_dir` → M15 fine-tuning of Tiny-YOLO → integer model (M4) →
   webcam (M20) and board.
@@ -304,6 +312,35 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   boxes); active learning (label first what the current Tiny-YOLO is least sure of);
   OWLv2 image queries for classes that are hard to name; COCO JSON / VOC XML export if
   another tool needs them; keyboard shortcuts in the editor for fast review.
+- **First trial**: the first dataset of the T22.11 list; labeller and threshold from the
+  T22.10 row of its domain; a val split of about 100 images checked by hand in the editor.
+
+### [ ] T22.10 — Labelling quality by domain
+- **Spec**: §8.3 · **Depends on**: T22.7, M11, M18 · **Size**: M
+- **Deliverables**: `tools/autolabel_eval.py --dataset <name>` on any `DATASETS` entry
+  (classes of the dataset as prompts, alias map; random subset with a fixed seed, as
+  VisDrone and AU-AIR are video sequences); `results/autolabel_<dataset>-<split>.md`; a
+  table in this document: mAP@0.5, AP of small objects (< 32² px), P / R by threshold and
+  seconds per image, for `grounding-dino-tiny` and `owlv2-base`, on 100 images each of
+  VisDrone val (aerial RGB, tiny objects), AU-AIR val (aerial RGB, low altitude), HIT-UAV
+  test (aerial thermal), FLIR val (road thermal), ExDark test (low light).
+- **Acceptance**: the table is filled for at least 4 of the 5 datasets; for each domain a
+  labeller and a threshold are advised, or the domain is declared unfit for auto-labelling.
+- **Notes**: zero-shot, as on VOC: the mAP is a labelling quality, not a training
+  result. The VOC row of T22.7 is the reference. Dataset class names that are bad prompts
+  (`people`, `motor`, `Human`, `OtherVehicle`, …) go through the alias map. VOC keeps its
+  historical file names (`results/autolabel_voc.md`, cached predictions).
+
+### [ ] T22.11 — Datasets worth labelling
+- **Spec**: — · **Depends on**: T22.10 · **Size**: S
+- **Deliverables**: a ranked list in this document: source, licence, size, classes, why it
+  serves the project (new class for the webcam / board demo, a class missing from a
+  project dataset, a drone scenario), labeller and threshold from T22.10, effort estimate.
+- **Acceptance**: at least 3 candidates, the first one chosen for T22.9.
+- **Notes**: candidate families: own photos / webcam captures of a new class (M20);
+  completing the classes missing from a project dataset (UAVDT and DroneVehicle have
+  vehicles only, CrowdHuman persons only); classification-only image sets turned into
+  detection sets, as ASL in M21; unlabelled aerial frames (search and rescue).
 
 ## Design notes
 

@@ -209,6 +209,7 @@ std::vector<postproc::Head> make_heads(const Engine& e) {
     h.exp = m.head_lut(l, 1);
     h.softmax_exp = m.head_lut(l, 2);
     h.scale_xy = l.scale_xy;
+    h.new_coords = l.new_coords;
     if (h.softmax)
       for (int a = 0; a < l.num; ++a) h.anchors.push_back(m.anchors[size_t(a)]);
     else

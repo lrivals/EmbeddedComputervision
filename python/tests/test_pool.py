@@ -44,3 +44,40 @@ def test_gradient_routed_to_argmax_only(s):
     assert np.all(dx[~winners] == 0)
     assert np.all(dx[winners] > 0)
     assert dx.sum() == y.size
+
+
+# T26.0 : maxpools centrés de stride 1 (SPP de YOLOv7-tiny, 5 / 9 / 13).
+def _pool_ref(x, k):
+    # Darknet : fenêtre [i − (k − 1)//2, i + k − 1 − (k − 1)//2], hors carte ignoré (−∞).
+    lo = (k - 1) // 2
+    h, w = x.shape[2:]
+    y = np.empty_like(x)
+    for i in range(h):
+        for j in range(w):
+            r = slice(max(i - lo, 0), min(i - lo + k, h))
+            c = slice(max(j - lo, 0), min(j - lo + k, w))
+            y[:, :, i, j] = x[:, :, r, c].max(axis=(2, 3))
+    return y
+
+
+@pytest.mark.parametrize("k", [2, 3, 5, 9, 13])
+def test_stride1_centred_matches_darknet(k):
+    x = _distinct((1, 3, 13, 11), rng=k)
+    np.testing.assert_array_equal(maxpool_forward(x, k=k, s=1)[0], _pool_ref(x, k))
+
+
+@pytest.mark.parametrize("k", [3, 5])
+def test_gradcheck_centred(k):
+    x = _distinct((2, 2, 7, 6), rng=k)
+    errors = check_layer(lambda x, p: maxpool_forward(x, k=k, s=1), maxpool_backward, x, {})
+    assert errors["x"] <= 1e-7
+
+
+def test_sppf_identity():
+    # pool9 = pool5 ∘ pool5 et pool13 = pool5 ∘ pool9 (fenêtres de fenêtres, bords compris).
+    x = _distinct((1, 4, 13, 13), rng=7)
+    p5 = maxpool_forward(x, k=5, s=1)[0]
+    p9 = maxpool_forward(p5, k=5, s=1)[0]
+    np.testing.assert_array_equal(p9, maxpool_forward(x, k=9, s=1)[0])
+    np.testing.assert_array_equal(maxpool_forward(p9, k=5, s=1)[0],
+                                  maxpool_forward(x, k=13, s=1)[0])

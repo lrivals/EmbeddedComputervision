@@ -11,9 +11,9 @@ namespace golden {
 
 inline hwpp::HeadData make_hw_head(const Model& m, const Layer& l, const int8_t* data,
                                    double conf) {
-  if (l.scale_xy != 1.0)
-    throw std::runtime_error("post-traitement matériel : scale_x_y non pris en charge "
-                             "(YOLOv4-tiny, hors M24)");
+  if (!l.hw_post_ok())
+    throw std::runtime_error("post-traitement matériel : scale_x_y / new_coords non pris en "
+                             "charge (YOLOv4-tiny, YOLOv7-tiny, hors M24 / M26)");
   hwpp::HeadData hd;
   hwpp::HeadDesc& h = hd.desc;
   h.grid_h = l.out_h;

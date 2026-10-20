@@ -199,10 +199,8 @@ static void count_cycles(const LayerDesc& d, const TileInfo& t, bool first_tile,
   const int nti = n_ti(d);
   const uint64_t lr = uint64_t(d.tr) + K_MAX - 1, nw = row_words(d.tc + K_MAX - 1);
   const uint64_t comp = uint64_t(kern_h(d)) * d.k * d.tr * d.tc;
-  const int pk = d.pk(), ps = d.ps();
-  const int Pr = (d.tr - pk) / ps + 1, Pc = (d.tc - pk) / ps + 1;
   const uint64_t own = d.pooled() && d.prepool_off >= 0
-                           ? uint64_t(imin(t.tr_n, Pr * ps)) * row_words(imin(t.tc_n, Pc * ps))
+                           ? uint64_t(own_rows(d, t)) * row_words(own_cols(d, t))
                            : 0;
   const uint64_t st = uint64_t(cdiv(t.tm_n, RQ)) * d.tr * d.tc +
                       uint64_t(t.tm_n) * (own + uint64_t(t.np_r) * row_words(t.np_c));
@@ -236,7 +234,7 @@ static void conv_layer(const word_t* act_in, word_t* act_out, const word_t* wts,
                        w_t w_b[TM][TN][K_MAX][K_MAX], acc_t out_a[TM][TRB][TCB],
                        acc_t out_b[TM][TRB][TCB]) {
   const int R = d.out_h(), C = d.out_w();
-  const int pk = d.pk(), ps = d.ps();
+  const int pk = d.pk(), ps = d.ps(), lo = d.pool_lo();
   const int Rp = d.pool_h(), Cp = d.pool_w();
   const int Pr = (d.tr - pk) / ps + 1, Pc = (d.tc - pk) / ps + 1;  // lignes poolées / tuile
   const int n_r = (Rp + Pr - 1) / Pr, n_c = (Cp + Pc - 1) / Pc, n_m = (d.cout + TM - 1) / TM;
@@ -256,11 +254,12 @@ tiles:
     TileInfo cur;
     cur.prow0 = ir * Pr;
     cur.pcol0 = ic * Pc;
-    cur.row = cur.prow0 * ps;
-    cur.col = cur.pcol0 * ps;
+    // Stride 1 de k impair (T26.0) : la tuile commence lo lignes plus haut, bornée à 0.
+    cur.row = imax(cur.prow0 * ps - lo, 0);
+    cur.col = imax(cur.pcol0 * ps - lo, 0);
     cur.to = im * TM;
-    cur.tr_n = imin((Pr - 1) * ps + pk, R - cur.row);
-    cur.tc_n = imin((Pc - 1) * ps + pk, C - cur.col);
+    cur.tr_n = imin((cur.prow0 + Pr - 1) * ps - lo + pk - 1, R - 1) - cur.row + 1;
+    cur.tc_n = imin((cur.pcol0 + Pc - 1) * ps - lo + pk - 1, C - 1) - cur.col + 1;
     cur.np_r = imin(Pr, Rp - cur.prow0);
     cur.np_c = imin(Pc, Cp - cur.pcol0);
     cur.tm_n = imin(TM, d.cout - cur.to);

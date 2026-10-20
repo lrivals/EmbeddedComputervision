@@ -198,7 +198,7 @@ progress per milestone here.
 | M19 | 12 | 5 (T19.0-T19.4: rules, specification, docs, milestones and hand-written results in English; generators, code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
 | M21 | 12 | 6 (pseudo-boxes, loader, 4 notebooks generated; detection rate 87.5 % below target; stats run, Drive, fine-tuning, webcam remain) |
-| M22 | 10 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.9 closing the loop remains) |
+| M22 | 12 | 9 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC measurement; T22.10 quality by domain, T22.11 datasets to label, T22.9 closing the loop remain) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
 | M25 | 9 | 0 |

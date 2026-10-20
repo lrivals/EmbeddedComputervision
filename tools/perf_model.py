@@ -144,7 +144,14 @@ def layer_cycles(d, tm=TILES["tm"], tn=TILES["tn"], tr=TILES["tr"], tc=TILES["tc
                 np_c = min(Pc, Cp - ic_ * Pc)
                 tm_n = min(tm, cout - im * tm)
                 pre = pooled and (d["prepool"] or prepool_all)
-                own = min(tr_n, Pr * ps) * words(min(tc_n, Pc * ps)) if pre else 0
+                # Carte avant pooling : lignes propres de la tuile ; en stride 1, celles de ses
+                # lignes poolées (5×5 centré du SPP compris, T26.0).
+                if not pre:
+                    own = 0
+                elif ps == 1:
+                    own = np_r * words(np_c)
+                else:
+                    own = min(tr_n, Pr * ps) * words(min(tc_n, Pc * ps))
                 # Étage de sortie : passe de requantification Tr·Tc par groupe de `requant`
                 # canaux, puis écritures canal par canal, ligne par ligne.
                 st = _cdiv(tm_n, requant) * tr * tc + tm_n * (own + np_r * words(np_c))

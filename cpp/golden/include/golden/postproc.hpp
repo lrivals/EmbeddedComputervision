@@ -35,6 +35,7 @@ struct Head {
   const uint32_t* softmax_exp = nullptr;  // e^{d s} en Q16
   std::vector<std::pair<double, double>> anchors;  // pixels (repère ref_w × ref_h)
   double scale_xy = 1.0;  // scale_x_y de Darknet (YOLOv4-tiny) : σ·α − (α − 1)/2
+  bool new_coords = false;  // YOLOv7-tiny (T26.0) : b_w = p_w (2σ(t_w))², table σ
 };
 
 // Centre dans la cellule : σ, ou σ·α − (α − 1)/2 (même calcul que yolo.infer.decode).
@@ -78,9 +79,17 @@ inline void decode_head(const Head& h, double obj_thr, std::vector<Candidate>& o
         // §8.1 : b_x = (σ(t_x) + j)/S_w, b_w = p_w e^{t_w}
         c.box[0] = (scale_xy(h.sigmoid[t(0) + LUT_OFFSET] / LUT_ONE, h.scale_xy) + j) / gw;
         c.box[1] = (scale_xy(h.sigmoid[t(1) + LUT_OFFSET] / LUT_ONE, h.scale_xy) + i) / gh;
-        const double ef = std::ldexp(1.0, h.exp_frac);
-        c.box[2] = aw * (h.exp[t(2) + LUT_OFFSET] / ef);
-        c.box[3] = ah * (h.exp[t(3) + LUT_OFFSET] / ef);
+        if (h.new_coords) {
+          // (2σ)², même ordre d'opérations que yolo.infer.decode.wh_new_coords.
+          const double sw = h.sigmoid[t(2) + LUT_OFFSET] / LUT_ONE;
+          const double sh = h.sigmoid[t(3) + LUT_OFFSET] / LUT_ONE;
+          c.box[2] = aw * (4.0 * sw * sw);
+          c.box[3] = ah * (4.0 * sh * sh);
+        } else {
+          const double ef = std::ldexp(1.0, h.exp_frac);
+          c.box[2] = aw * (h.exp[t(2) + LUT_OFFSET] / ef);
+          c.box[3] = ah * (h.exp[t(3) + LUT_OFFSET] / ef);
+        }
         const double obj = h.sigmoid[t(4) + LUT_OFFSET] / LUT_ONE;
         c.scores.resize(size_t(nc));
         if (h.softmax) {

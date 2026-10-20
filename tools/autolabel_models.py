@@ -36,6 +36,12 @@ ALIASES = {
     "aeroplane": "airplane", "diningtable": "dining table", "motorbike": "motorcycle",
     "pottedplant": "potted plant", "tvmonitor": "tv monitor", "person_sitting": "sitting person",
     "othervehicle": "vehicle", "small-vehicle": "car", "large-vehicle": "truck",
+    # T22.10: names of the drone, thermal and low-light datasets
+    "human": "person", "bike": "bicycle", "motor": "motorcycle", "light": "traffic light",
+    "hydrant": "fire hydrant", "sign": "traffic sign", "awning-tricycle": "tricycle with awning",
+    # exact case first: ExDark `People` is any person, VisDrone `people` a person who is not
+    # walking or standing (sitting, riding), next to its `pedestrian`
+    "People": "person", "people": "sitting person",
 }
 
 

@@ -104,15 +104,17 @@
       "minItems": 3
     },
     "pool": {
-      "description": "Maxpool 2×2 exécuté dans l'étage de sortie de la conv (§10.3). s = 1 : complétion par réplication à droite et en bas (§4.4).",
+      "description": "Maxpool 2×2 exécuté dans l'étage de sortie de la conv (§10.3). s = 1 : complétion par réplication, ⌊(k − 1)/2⌋ en haut et à gauche, le reste en bas et à droite (§4.4) ; k = 5, s = 1 : SPP de YOLOv7-tiny, fenêtre centrée (T26.0).",
       "type": "object",
       "required": ["layer", "k", "s"],
       "additionalProperties": false,
       "properties": {
         "layer": {"$ref": "#/$defs/id"},
-        "k": {"const": 2},
+        "k": {"enum": [2, 5]},
         "s": {"enum": [1, 2]}
-      }
+      },
+      "if": {"properties": {"k": {"const": 5}}},
+      "then": {"properties": {"s": {"const": 1}}}
     },
     "conv": {
       "type": "object",
@@ -168,7 +170,7 @@
       "properties": {
         "id": {"$ref": "#/$defs/id"},
         "type": {"const": "maxpool"},
-        "k": {"const": 2},
+        "k": {"enum": [2, 5]},
         "s": {"enum": [1, 2]},
         "fused_into": {
           "description": "La conv qui précède, ou la route qui précède : le maxpool est alors fusionné dans chacune de ses sources (T24.3).",
@@ -219,6 +221,10 @@
         "scale_x_y": {
           "description": "Darknet scale_x_y = α (YOLOv4-tiny) : centre σ(t)·α − (α − 1)/2 ; absent : 1.",
           "type": "number", "exclusiveMinimum": 0
+        },
+        "new_coords": {
+          "description": "Darknet new_coords (YOLOv7-tiny, T26.0) : la tête est linéaire, la sigmoïde est dans le décodage, b_w = p_w·(2σ(t_w))² ; absent : 0.",
+          "const": 1
         },
         "scale": {"$ref": "#/$defs/scale"},
         "in": {"$ref": "#/$defs/bufref"},

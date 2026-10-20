@@ -1,4 +1,4 @@
-"""Construction de Tiny-YOLOv2, Tiny-YOLOv3 et YOLOv4-tiny à partir des `.cfg` Darknet (§3.1, §3.2).
+"""Construction de Tiny-YOLOv2, Tiny-YOLOv3, YOLOv4-tiny et YOLOv7-tiny à partir des `.cfg` Darknet (§3.1, §3.2).
 
 Les `.cfg` de `cfg/` sont hors base (Darknet) ; le réseau construit est vérifié contre
 `yolo.models.specs`, lui-même testé contre les tableaux du §3.
@@ -19,6 +19,7 @@ CFG_FILES = {
     "tiny-yolov3-voc": "yolov3-tiny-voc.cfg",
     "tiny-yolov3-coco": "yolov3-tiny.cfg",
     "tiny-yolov4-coco": "yolov4-tiny.cfg",
+    "tiny-yolov7-coco": "yolov7-tiny.cfg",
 }
 
 
@@ -46,9 +47,14 @@ def tiny_yolov4_coco(dtype=np.float32, rng=None, **kwargs):
     return build("tiny-yolov4-coco", dtype=dtype, rng=rng, **kwargs)
 
 
+def tiny_yolov7_coco(dtype=np.float32, rng=None, **kwargs):
+    return build("tiny-yolov7-coco", dtype=dtype, rng=rng, **kwargs)
+
+
 # Poids Darknet pré-entraînés (`make get-weights`), relatifs à `weights/`.
 PRETRAINED = {
     "tiny-yolov2-voc": "yolov2-tiny-voc.weights",
     "tiny-yolov3-coco": "yolov3-tiny.weights",
     "tiny-yolov4-coco": "yolov4-tiny.weights",
+    "tiny-yolov7-coco": "yolov7-tiny.weights",
 }

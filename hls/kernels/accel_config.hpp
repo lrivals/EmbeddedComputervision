@@ -56,6 +56,7 @@ constexpr bool FOLD = ACC_FOLD != 0;
 constexpr int TILE_POOL = ACC_TILE_POOL;
 constexpr int PACK = ACC_PACK;
 constexpr int K_MAX = 3;
+constexpr int PK_MAX = 5;  // maxpool fusionné le plus large (5×5 stride 1 du SPP, T26.0)
 // Tampons sur puce : la plus grande des tuiles utilisées.
 constexpr int TRB = TILE_POOL > TR ? TILE_POOL : TR;
 constexpr int TCB = TILE_POOL > TC ? TILE_POOL : TC;

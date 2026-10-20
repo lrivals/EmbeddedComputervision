@@ -25,7 +25,8 @@ struct Args {
   int random = -1;  // tb_post : têtes aléatoires par réseau (-1 : défaut du banc)
 };
 
-inline const char* const ALL_NETS[] = {"tiny-yolov2-voc", "tiny-yolov3-coco", "tiny-yolov4-coco"};
+inline const char* const ALL_NETS[] = {"tiny-yolov2-voc", "tiny-yolov3-coco", "tiny-yolov4-coco",
+                                         "tiny-yolov7-coco"};
 inline const char* const ALL_IMAGES[] = {"000001", "000002", "000003"};
 
 // --model DIR  --net NAME (répétable)  --image ID (répétable)  --layer N  --csv FICHIER

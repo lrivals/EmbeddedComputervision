@@ -79,6 +79,16 @@ def test_decode_scale_x_y():
     np.testing.assert_allclose(boxes[0, 1, :2], [(1.025 + 1) / 2, -0.025 / 2], atol=1e-12)
 
 
+def test_decode_new_coords():
+    # T26.0 (YOLOv7-tiny) : centre σ·2 − 0,5, taille p·(2σ)², la sigmoïde est dans le décodage.
+    out = np.zeros((1, 5 + 1, 2, 2))
+    out[0, 0, 0, 1] = 50.0   # σ → 1 : centre à +1,5 cellule
+    out[0, 2, 0, 1] = 50.0   # σ → 1 : (2σ)² = 4
+    boxes, _, _ = decode_head(out, [[0.1, 0.2]], 1, alpha=2.0, new_coords=True)
+    np.testing.assert_allclose(boxes[0, 0], [0.25, 0.25, 0.1, 0.2])  # σ = 0,5 : (2σ)² = 1
+    np.testing.assert_allclose(boxes[0, 1], [(1.5 + 1) / 2, 0.25, 0.4, 0.2], atol=1e-12)
+
+
 def test_to_original_inverts_letterbox():
     boxes = np.array([[0.3, 0.6, 0.2, 0.1], [0.9, 0.1, 0.05, 0.08]])
     lb = boxes_to_letterbox(boxes, 500, 333, 416)

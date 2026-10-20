@@ -68,10 +68,11 @@ int main(int argc, char** argv) {
       continue;
     }
     const Model m = Model::load(tb::net_dir(a, net));
-    bool supported = true;  // yolo_post ne connaît pas scale_x_y (YOLOv4-tiny, hors M24)
-    for (int id : m.heads()) supported = supported && m.layers[size_t(id)].scale_xy == 1.0;
+    bool supported = true;  // yolo_post : ni scale_x_y ni new_coords (YOLOv4-tiny, YOLOv7-tiny)
+    for (int id : m.heads()) supported = supported && m.layers[size_t(id)].hw_post_ok();
     if (!supported) {
-      std::printf("%s : scale_x_y non pris en charge par yolo_post, sauté\n", net.c_str());
+      std::printf("%s : scale_x_y / new_coords non pris en charge par yolo_post, sauté\n",
+                  net.c_str());
       continue;
     }
     std::printf("%s\n", net.c_str());
