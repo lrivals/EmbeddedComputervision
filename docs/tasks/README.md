@@ -41,6 +41,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M29](M29-runtime-monitors.md) | Runtime monitors (optional) | monitors compared on missed persons, conformal threshold, temporal vote, integer monitor in C-sim == golden, fallback logic |
 | [M30](M30-latency-bound.md) | Latency bound and determinism (optional) | static cycle bound of the accelerator, reached in simulation; p99.9, maximum and jitter on the board |
 | [M31](M31-assurance-case.md) | Assurance case (optional) | ODD, requirements, objectives → evidence map, failure-rate budget, assurance argument checked in CI |
+| [M32](M32-trashnet-pets.md) | TrashNet and Oxford-IIIT Pet (optional) | two classification-style sets turned into detection sets: TrashNet boxes from the M22 labeller, Pet whole-body boxes from the trimaps (and the M22 labeller scored against them); loaders, notebooks, fine-tuning, webcam |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -92,6 +93,12 @@ graph LR
   M20 -.-> M22
   M11 -.-> M22
   M22 -.-> M15
+  M11 --> M32[M32]
+  M22 --> M32
+  M21 -.-> M32
+  M32 -.-> M15
+  M32 -.-> M20
+  M32 -.-> M22
   M10 --> M23[M23]
   M93 -.-> M23
   M11 --> M24[M24]
@@ -208,3 +215,4 @@ progress per milestone here.
 | M29 | 6 | 0 |
 | M30 | 4 | 0 |
 | M31 | 6 | 0 |
+| M32 | 14 | 0 |

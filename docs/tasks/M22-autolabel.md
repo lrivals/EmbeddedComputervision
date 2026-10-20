@@ -28,6 +28,8 @@ What remains:
 - T22.9: closing the loop (auto-labelled set → M15 fine-tuning → webcam / board), on the
   first T22.11 choice.
 - Tiling for aerial images (T22.10), before any aerial set is labelled.
+- TrashNet and Oxford-IIIT Pet (T22.11 ranks 2 and 3) are planned in
+  [M32](M32-trashnet-pets.md).
 - The editor's mouse interactions (draw, move, resize, delete a box) were only exercised
   through `gradio_client`; they are still to be tried by hand in a browser.
 
@@ -403,6 +405,8 @@ P / R at the default thresholds of T22.7 (0.55 for Grounding DINO, 0.4 for OWLv2
 
   First choice for T22.9: rank 1, as its domain is the one measured as usable and it
   ends on the webcam; TrashNet is the second trial (no capture work).
+  Ranks 2 and 3 are planned in [M32](M32-trashnet-pets.md): TrashNet boxed by the
+  labeller, Pet boxed from its trimaps, with the labeller scored against them (T32.7).
 
 ## Design notes
 
