@@ -1,0 +1,173 @@
+# Long runs still to do
+
+Every computation of more than a few minutes that is still open in the milestone files
+(training, full-split mAP, C-sim passes, sweeps, labelling, campaigns, large transfers),
+with its command, its prerequisites and a duration, so the runs can be scheduled: nights on
+the PC, Colab sessions. State on 2026-10-20.
+
+- Out of scope: what needs Vitis, Vivado or the KV260, listed in
+  [deferred/](deferred/README.md).
+- Tiers as in [M12](M12-profils-pc.md#cost-tiers): **R** < 5 min, **M** < 1 h, **N**
+  several hours.
+- **Estimate**: a value stated in the milestone file (with its source), or computed from
+  the reference speeds below and marked *(est.)*, with the arithmetic in the **Basis**
+  column. "unmeasured" means no speed exists to compute it from.
+- When a run is done, fold the result into the task's **Done** and remove its row here.
+
+## Reference speeds
+
+| Measurement | Value | Source |
+|---|---|---|
+| PC CPU training, Tiny-YOLOv2/v3, 416, batch 8 | ≈ 5.8 s/iteration, ≈ 0.7 s/image (QAT 600 it 3,494 s, ADMM 600 it 3,442 s); the docs still say 0.45 s/image | `build/train/{qat-w4a4,admm-mixed6}/loss.csv`, [M12](M12-profils-pc.md) |
+| PC CPU training, pruned models, 300 it | r30 8.2, r50 7.8, r70 2.8 s/iteration | `build/m10/prune/*/train/loss.csv` |
+| Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59; 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
+| Colab T4, 6,000 iterations at batch 32 | ≈ 1 h 45; ×2.1 per iteration at 608, ×4 at 832 | [M15](M15-campagne-entrainement.md) T15.4, T15.9 |
+| PC evaluation, VOC2007 test (4,952) | float ≈ 170 ms/image (≈ 15 min), int ≈ 120 ms/image (≈ 10 min), float + int 150-300 ms/image (12-25 min), 66 ms/image with 16 jobs | [M12](M12-profils-pc.md), [M14](M14-notebooks.md), `build/eval/*.log` |
+| PC evaluation, COCO val2017 (5,000) | v3-tiny float 60 ms/image, v4-tiny float 42-51 ms/image, v4-tiny float + int 124 ms/image | `build/m24/coco*/*.log` |
+| Colab CPU evaluation | ≈ 0.27 s/image: VOC test ≈ 22 min, VisDrone val ≈ 2.5 min, KITTI val ≈ 7 min | [M15](M15-campagne-entrainement.md) |
+| Calibration, 500 images | 1-2.5 min | `build/quant/calib*.log` |
+| C-sim `yolo_bench` | VOC 4,952 images ≈ 40 min (22 threads), i.e. ≈ 0.5 s/image; COCO 5,000 with v4-tiny ≈ 1.5 h (18 cores) | [M12](M12-profils-pc.md), [M24](M24-yolov4-tiny.md) |
+| Grounding DINO tiny, PC CPU | ≈ 5 s/image with 1-2 prompts; 3 processes × 6 threads: 8-15 s/image per process, 4-5 s/image of throughput | [M22](M22-autolabel.md), [M32](M32-trashnet-pets.md) |
+| Fault campaign, 500 images, 16 jobs | ≈ 50 s per run | `build/m25/faults/log.txt` |
+| Drive transfers | sizes in [donnees-drive.md](donnees-drive.md); no speed measured; > 10 GB is slow and sometimes freezes | [donnees-drive.md](donnees-drive.md) |
+
+Unmeasured: training and evaluation speed of YOLOv7-tiny, YOLOv5n, YOLOv8n (estimated
+below from their MACs against v4-tiny); YOLOv4-tiny training on the T4 (taken as
+Tiny-YOLOv3, the CPU smoke runs are within 10 %); QAT on the GPU; the gain of the local
+GPU (T12.11-e).
+
+## PC, CPU (NumPy)
+
+| Task | Run | Data | Estimate | Basis | Waits for |
+|---|---|---|---|---|---|
+| [T12.1](M12-profils-pc.md) | `tools/m12.sh fumee \| bitexact \| avant-carte` | — | R + `make test-slow` | tier R; `test-slow` not timed alone | — |
+| [T12.2](M12-profils-pc.md) a-e | `tools/m12.sh map-c` first, then `map-a`, `map-b`, `map-d`, `map-e` | VOC07 test, subsets 100 / 500 / 1,000 / all | ≈ 1.5-2 h *(est.)* | map-c: 6,552 images × 2 models × 0.12 s ≈ 26 min; map-b full split ≈ 25 min; map-d 9 × (calib 2 min + eval 500 1-2 min) ≈ 30 min; a, e ≈ 10 min each | — |
+| [T12.3](M12-profils-pc.md) | `tools/m12.sh fq` | VOC 500 | ≈ 20 min *(est.)* | tier M, a few evals of 500 at 0.2 s | — |
+| [T12.4](M12-profils-pc.md) | `tools/m12.sh ptq`, then `tools/m12.sh ptq-full <v1> <v2>` | VOC 500, then 4,952 | ≈ 30 min + ≈ 20 min *(est.)* | 8 × (calib 1.5 min + 500 × 0.15 s); 2 × 4,952 × 0.12 s | — |
+| [T12.5](M12-profils-pc.md) | `tools/m12.sh qat ref \| lr3e-4 \| lr1e-3 \| it300 \| it2000 \| b16 \| nosteps` | VOC | ≈ 8-10 h *(est.)*, two nights | 5 runs × 600 it × 5.8 s ≈ 4.8 h; it300 ≈ 30 min; it2000 ≈ 3.2 h; b16 ≈ 2× a 600 run ≈ 1.9 h | — |
+| [T12.6](M12-profils-pc.md), [T9.2.3](M9.2-req-yolo.md) | `tools/m12.sh admm ref \| A \| B \| C \| D \| E` | VOC | ≈ 4 h | stated in M12 (≈ 50 min per 600 it, measured 5.7 s/it) | — |
+| [T12.7](M12-profils-pc.md) | `tools/m12.sh hwpp`; long version `RANDOM_HEADS=100000` (`tb_post`) | VOC | M (≈ 30 min *(est.)*) + one night | tier M stated; night run stated | — |
+| [T12.9](M12-profils-pc.md) | `tools/m12.sh sim` (100 and 500 images, `ACC_NO_APINT`, `--hw-post`) | VOC | ≈ 30 min *(est.)* | ≈ 1,500 C-sim images × 0.5 s, tier M | — |
+| [T12.10](M12-profils-pc.md) | `tools/m12.sh repetition` (`COUNT=100`) | — | M | stated | — |
+| [T12.11](M12-profils-pc.md) | `make test-py`, `make test-slow-gpu`, speed on the RTX 1000 Ada | — | unmeasured | — | NVIDIA driver, `pip install cupy-cuda12x` |
+| [T13.30](M13-figures.md) | `make test-durations` (whole suite, slow tests included) | — | N | stated | — |
+| [T14.9](M14-notebooks.md) | `make notebooks-smoke` for the `_train` notebooks (voc, visdrone; `SUBSET=4`, `ITERS=2`) | — | ≈ 5 min *(est.)* | inference smoke 1 min 44 s; CPU 2 s/it | — |
+| [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-int`, `coco-calib` | COCO val2017 5,000 + calib2017 500 | ≈ 30 min *(est.)* | 5,000 × 0.12-0.3 s + calibration | — |
+| [T11.2](M11-jeux-de-donnees.md), [T14.5](M14-notebooks.md) | `tools/m11.sh hors-domaine` | ExDark, KITTI val 1,496, VisDrone val 548; VOC and COCO weights; float and int | ≈ 1-1.5 h *(est.)* | ≈ 4,500 images × 4 passes × 0.2-0.3 s | `data/kitti` link or tree |
+| [T11.3](M11-jeux-de-donnees.md) | `tools/m11.sh exdark` (calibration, `act_hist`) | ExDark | ≈ 15 min *(est.)* | calibration + one eval | — |
+| [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman` (`int`, `int-hwpp`, capacities 256 and 1,024) | CrowdHuman val 4,370 | ≈ 35-45 min *(est.)* | 4 × 4,370 × 0.12-0.15 s | `data/crowdhuman` (missing on the PC, pull 11 GB) |
+| [T16.13](M16-presentation-jeux.md) | `notebooks/coco/coco_stats.ipynb`, then `stats-jeux.md` | COCO 5,000 images, 36,781 objects | unmeasured, R-M | — | — |
+| [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
+| [T18.8](M18-jeux-drone.md) | `tools/m11.sh <ds>-prep`, then the four `_stats` notebooks, `tools/data_stats.py --report` | auair, dronevehicle, hituav, uavdt (1.2 M objects) | unmeasured, M *(est.)* | prep ≈ 20 s each (DroneVehicle) | — |
+| [T21.3](M21-asl-alphabet.md) (optional) | `rm data/asl/detections.json; python tools/prep_datasets.py asl --preview build/asl_preview.png` | ASL ≈ 87k images | ≈ 10 min | stated (18 cores, MediaPipe) | — |
+| [T21.7](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `asl_stats` notebook | 69,984 + 6,538 | unmeasured, M | — | — |
+| [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
+| [T25.1](M25-dependability.md) | `tools/fault_campaign.py run --net tiny-yolov2-voc --subset 500 --jobs 16 --seeds 0,1,2 --grid ber \| layer \| bit` (`tools/m25.sh`) | VOC 500 | ≈ 5.4 h (ber 1.0 h, layer 3.0 h, bit 1.4 h) | `plan` output in `build/m25/faults/log.txt`; the ber run of 14:11 left 0 results | — |
+| [T25.6](M25-dependability.md) | `tools/fault_campaign.py --criterion person` | CrowdHuman | ≈ 5 h *(est.)* | same grids as T25.1 | T25.1, T27.0, CrowdHuman data |
+| [T25.8](M25-dependability.md) | faults injected on video, temporal coherence | video | unmeasured | — | T25.6, T29.3 |
+| [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py`: tiny-yolov3-crowdhuman, person of v3-coco and v4-coco | CrowdHuman val 4,370 | ≈ 1 h *(est.)* | 3 nets × 4,370 × 0.3 s (float + int) | T27.0, T15.14 |
+| [T27.3](M27-safety-metrics.md) | `tools/degrade.py`, 6 degradations × 3 severities, float and int | CrowdHuman val | ≈ 1.5-7 h *(est.)* | 36 evals × 4,370 images at 66 ms (16 jobs) to 170 ms | T27.1 |
+| [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 train, float and int inference | ≈ 5,300 frames (MOT17 train) | ≈ 30 min *(est.)* | 2 × 5,300 × 0.17 s | MOT download |
+| [T29.1, T29.2](M29-runtime-monitors.md) | monitors on CrowdHuman val, T27.3 sets, ExDark; conformal threshold over 20 splits | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
+| [T32.1](M32-trashnet-pets.md) | `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png --handcheck build/trashnet_handcheck` (resumes from `data/trashnet/autolabel.json`) | TrashNet, 2,427 of 2,527 images left | ≈ 1.5-2 h with 3 processes, ≈ 3.5 h with one | stated; measured 8 s/image per process × 2,427 / 3 ≈ 1.8 h | — |
+| [T32.6](M32-trashnet-pets.md) | `python tools/eval_voc.py --dataset pets`, VOC and COCO weights → `build/m32/pets_ood.md` | Pet test 3,662 | ≈ 20 min *(est.)* | 2 × 3,662 × 0.17 s | — |
+| [T32.7](M32-trashnet-pets.md) | `python tools/autolabel_eval.py --dataset pets --n 200 --models grounding-dino-tiny --map voc` | Pet 200 | ≈ 20 min *(est.)* | 200 × 5-7 s | — |
+| [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | T32.1 |
+| [T26.0](M26-recent-models.md), [T26.3, T26.4](M26-recent-models.md) float, int | calibration, float and integer COCO mAP (v5n, v8n at letterbox 640 and 416) | COCO val2017 5,000 | ≈ 15 min per model and size *(est.)* | v4-tiny float + int 621 s for 5,000; scaled by MACs | T26.1 (weights, AGPL licence), T26.2 |
+
+## PC, C-sim (gcc)
+
+These share the CPU with the table above: one at a time, at night.
+
+| Task | Run | Data | Estimate | Basis | Waits for |
+|---|---|---|---|---|---|
+| [T12.9](M12-profils-pc.md) | `make bench-sim` | VOC 4,952 | ≈ 40 min | stated | — |
+| [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-fpga` | COCO 5,000 | ≈ 45 min *(est.)* | Tiny-YOLOv3 ≈ VOC v2 rate, 5,000 × 0.5 s | `coco-int` |
+| [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | CrowdHuman data |
+| [T24.5](M24-yolov4-tiny.md) | `notebooks/coco/tiny-yolov4-coco_infer.ipynb`, `SUBSET = 0`, `INT8 = True`, `HW = True` | COCO 5,000 | ≈ 1.5 h | stated | — |
+| [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
+| [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |
+| [T27.1](M27-safety-metrics.md) C-sim column | `tools/person_safety.py`, C-sim stage (a subset is acceptable) | CrowdHuman val 4,370 | ≈ 2-3 h full *(est.)* | v2/v3 rate 0.5 s/image, v4 1.1 s/image | T27.0, T15.14 |
+| [T30.1](M30-latency-bound.md) | cycle distribution over ≥ 10,000 real images | e.g. VOC test + COCO val | ≈ 1.5 h *(est.)* | 10,000 × 0.5 s | — |
+
+## Colab (GPU training, CPU evaluation)
+
+| Task | Run | Data | Estimate | Basis | Waits for |
+|---|---|---|---|---|---|
+| [T15.1](M15-campagne-entrainement.md) | `_infer` notebooks, `SUBSET=0`, `COMPARE=True`, `INT8=False` (regenerate with `python -m tools.notebooks <ds>/tiny-yolov3-<ds>_infer --force`) | VOC, KITTI (VisDrone maybe done) | VOC ≈ 2 h 15 (6 runs) or 3 h 40 (10 runs after T15.2), KITTI ≈ 40 min, VisDrone ≈ 15 min | stated | — |
+| [T15.2](M15-campagne-entrainement.md) | `voc/tiny-yolov3-voc_sweep`, `BATCHES=[16,32]`, `TRAIN_SUBSETS=[0]`, `SEEDS=[1,2]` | VOC | ≈ 40 min GPU | stated | — |
+| [T15.4](M15-campagne-entrainement.md), [T2.9](M2-cibles-perte-entrainement.md) | VOC long run: batch 32, 6,000 it, `--burn-in 200 --steps 4800,5400 --scales 0.1,0.1`, `SAVE_EVERY=500` | VOC07+12 | ≈ 1 h 45 GPU + ≈ 22 min eval; + ≈ 4 h to extend to 20,000 *(est.)* | stated; 14,000 it × 1 s | T15.1, T15.2 |
+| [T15.5](M15-campagne-entrainement.md) | LR {5e-4, 1e-3, 2e-3} × burn-in {100, 500} | VOC | ≈ 1 h GPU | stated | code: `LRS` / `BURN_INS`, `run_name` |
+| [T15.6](M15-campagne-entrainement.md) | batch 64 against batch 32 | VOC | ≈ 20 min at 600 it, ≈ 3.5 h at 6,000 *(est.)* | ≈ 2 s/it at batch 64 | T15.4 |
+| [T15.7](M15-campagne-entrainement.md) | `_infer`, `INT8=True` on the selected run | VOC test | ≈ 30 min *(est.)* | 4,952 × 0.27 s + int | T15.4-T15.6 |
+| [T15.8](M15-campagne-entrainement.md), [T11.5](M11-jeux-de-donnees.md) | `visdrone/tiny-yolov3-visdrone_train`, 6,000 it, batch 16, `OUT=…/runs/long-416` | VisDrone 6,471 / 548 | ≈ 1 h 45 GPU | stated | — |
+| [T15.9](M15-campagne-entrainement.md) | `tools/m11.sh visdrone-size` first; long runs at 608 and 832 | VisDrone | ≈ 10 min, then ≈ 3.7 h and ≈ 7 h | stated (×2.1, ×4) | T15.8 |
+| [T15.10](M15-campagne-entrainement.md) | mAP with and without `--no-ignore` | VisDrone val | ≈ 5 min *(est.)* | 2 × 2.5 min | T15.8 |
+| [T15.11](M15-campagne-entrainement.md) | `NET=tiny-yolov2 tools/m11.sh visdrone-prep \| visdrone-train`, same iterations | VisDrone | ≈ 1 h 45 GPU | stated | — |
+| [T15.15](M15-campagne-entrainement.md) | `_infer`, `SUBSET=0`, `RESIZE='letterbox'`, `COMPARE=True` | VisDrone val | ≈ 15 min CPU | stated | T15.8 |
+| [T15.16](M15-campagne-entrainement.md) | `_train`, `CROP=640` → `long-416-crop640`, then `_infer` with `TILES=640` | VisDrone | ≈ 1 h 45 + ≈ 20 min *(est.)* | ≈ 7 passes × 548 × 0.27 s | T15.8 |
+| [T15.12](M15-campagne-entrainement.md), [T11.4](M11-jeux-de-donnees.md), [T14.6](M14-notebooks.md), [T14.8](M14-notebooks.md) | long runs at 416 letterbox and 640×192 (kill and resume once for T14.8); sweep `SIZE='640x192'`; rerun the 416 sweep with Run All | KITTI 5,985 / 1,496 | ≈ 3 h long runs + 2 × 1 h sweeps + 7 min per eval *(est.)* | 6,000 it ≈ 1 h 45 at 416, ≈ 0.7× at 640×192; sweep 6 × 10 min stated | — |
+| [T15.13](M15-campagne-entrainement.md), [T11.7](M11-jeux-de-donnees.md) | 3-channel sweep, `COMPARE` of `b8-sall`, `b16-sall`; long runs `CH=1` and 3 channels; full-split AP | FLIR 10,742 / 1,144 | ≈ 1 h + 10 min + 3.5 h + 10 min *(est.)* | sweep 6 runs, 2 × 1 h 45, 1,144 × 0.27 s | FLIR on Drive (`kaggle-download flir` on Colab, then `tools/get_datasets.sh push flir`) |
+| [T15.14](M15-campagne-entrainement.md) | full-split mAP of COCO, VOC and fine-tuned weights; `b16-sall` inference; `tools/m11.sh crowdhuman` person recall | ExDark, CrowdHuman val 4,370 | ≈ 2 h CPU *(est.)* | 3 weights × (≈ 2,500 + 4,370) × 0.27 s + one pass | — |
+| [T9.3.6](M9.3-quant-4bits.md) | long 4-bit QAT: several epochs at 4 bits, 8→6→4 ramp, float baseline; full VOC07 test mAP | VOC07+12 | ≈ 5 h *(est.)* | ≈ 10 min per epoch (16,551 × 0.033 s) × 3 variants × 10 epochs; QAT speed on GPU unmeasured | T15.1 |
+| [T10.10](M10-ameliorations.md) | per-layer QAT (mixed precision) | VOC | unmeasured, ≈ 1-2 h *(est.)* | — | — |
+| [T10.11, T10.15](M10-ameliorations.md) | long fine-tune of the r30, r50, r70 exports (`tools/prune_study.sh`), full VOC07 mAP | VOC | ≈ 5 h + ≈ 1 h *(est.)* | 3 × 6,000 it × 1 s; 3 × 22 min | T15.1 |
+| [T18.10](M18-jeux-drone.md) | `_infer` with VOC and COCO weights, `_sweep`, `_train` | auair, dronevehicle, hituav, uavdt (subsample frames) | ≈ 14 h *(est.)* | per dataset: sweep 1 h + long run 1 h 45 + evals ≤ 45 min | T18.8 |
+| [T21.9](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `_sweep` and `_train`; mAP on val 6,538 and the 28 test images | ASL | ≈ 3.5 h *(est.)* | sweep 1 h + long 1 h 45 + 6,538 × 0.27 s | T21.7, T21.8 |
+| [T21.11](M21-asl-alphabet.md) | `SIZE=224x224 tools/m11.sh asl-prep`, `asl-train` | ASL | ≈ 1 h *(est.)* | 3.4× fewer MACs than 416 + eval | T21.9 |
+| [T24.6](M24-yolov4-tiny.md) | `notebooks/<ds>/tiny-yolov4-<ds>_{sweep,train,infer}.ipynb` with `INT8` and `HW` stages | the 11 `TRAINABLE` datasets | ≈ 30-35 h *(est.)* | per dataset ≈ 3 h (sweep, long run, evals); C-sim stage on the PC | — |
+| [M24](M24-yolov4-tiny.md) QAT | QAT of v4-tiny (integer model loses 1.3 AP50) | COCO | unmeasured | — | — |
+| [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | T32.10, T32.11 |
+| [T19.5](M19-english.md) | re-execute the notebooks after the template translation: stats, `analyse_balayages`, sweeps | every dataset | ≈ 1 h GPU per sweep *(est.)*, stats on the PC | sweep 6 runs × 10 min | do not run `python -m tools.notebooks all` before M26 is settled (M32) |
+
+## Transfers
+
+| Task | Transfer | Size | Estimate | Waits for |
+|---|---|---|---|---|
+| [T16.14](M16-presentation-jeux.md), T11.2, T11.4 | finish KITTI `training/image_2` (`data/kitti/data_object_image_2.zip.part` incomplete) | ≈ 12 GB | unmeasured | — |
+| [T11.6](M11-jeux-de-donnees.md), T25.6, T27 | CrowdHuman to the PC (`tools/get_datasets.sh pull crowdhuman`) | 11 GB | unmeasured | — |
+| [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
+| [T21.8](M21-asl-alphabet.md) | `tools/get_datasets.sh push asl` | 1.2 GB | unmeasured | — |
+| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | T32.1 for trashnet |
+| [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 | to check | unmeasured | — |
+
+## Totals and order
+
+Rough sums of the estimates above (unmeasured rows not counted):
+
+| Machine | Total | Largest items |
+|---|---|---|
+| PC CPU | ≈ 40 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
+| PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
+| Colab | ≈ 110-120 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T15.9 ≈ 11 h |
+
+Suggested order, unblockers first:
+
+```mermaid
+graph LR
+  T321["T32.1 TrashNet labels"] --> T3210[T32.10] --> T3212[T32.12]
+  PETS["push pets"] --> T3212
+  CH["pull CrowdHuman"] --> T116[T11.6] & T1514[T15.14]
+  T1514 --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
+  T251[T25.1] --> T256[T25.6] --> T258[T25.8]
+  KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
+  T152[T15.2] --> T151["T15.1 VOC"] --> T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
+  T151 --> T936[T9.3.6] & T1011["T10.11, T10.15"]
+  T158[T15.8] --> T159["T15.9, T15.10, T15.15, T15.16"]
+  T188[T18.8] --> T1810[T18.10]
+  T217[T21.7] --> T219[T21.9] --> T2111[T21.11]
+```
+
+## Inconsistencies found while listing
+
+To fix in the milestone files:
+
+- T11.1 still says "download COCO", but COCO is on the PC and the float stage is done.
+- T11.3 still says "manual download of ExDark", but `data/exdark` exists.
+- T11.6 says CrowdHuman is in place; `data/crowdhuman` is missing on the PC (Drive only).
+- The PC GPU: [M12](M12-profils-pc.md) T12.11 sees an RTX 1000 Ada, while
+  [colab-vscode.md](colab-vscode.md) and [M22](M22-autolabel.md) say there is no GPU / no
+  CUDA (no driver installed).
+- T15.1: the VisDrone full-split figures (b16-sall, b32-sall) already appear in the M15
+  header; the VisDrone part may be done.
+- CPU training speed: M12 still gives 0.45 s/image, the later logs give ≈ 0.7 s/image.
