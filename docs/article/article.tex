@@ -3,6 +3,9 @@
 % macros of generated.tex (\chiffre, \articletable, \articlefig, \articleetat…), rewritten
 % by `make article`. Never type a result by hand: `python -m tools.article --check`
 % (make ci) rejects a decimal number written in the abstract or in sections 4 to 12.
+% Links: every acronym and lexicon term of glossary.tex is \gls{key}, every milestone or
+% task id \ms{M28}, every repository path \repo{results/x.md}; `python -m tools.article
+% link` wraps the bare ones and --check rejects them.
 % PDF: `make article-pdf` (xelatex + bibtex) → docs/article/article.pdf.
 \documentclass[11pt,a4paper]{article}
 
@@ -23,7 +26,11 @@
 \usepackage{xcolor}
 \usepackage[numbers,square,sort]{natbib}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=green!35!black,
-            urlcolor=blue!50!black]{hyperref}
+            urlcolor=blue!50!black,backref=page]{hyperref}
+\usepackage[abbreviations,toc,nopostdot,nogroupskip]{glossaries-extra}
+\setabbreviationstyle{short-nolong}
+\makenoidxglossaries
+\input{glossary}
 \usepackage{enumitem}
 \setlist{nosep,leftmargin=*}
 \setlength{\parskip}{0.35em}
@@ -42,86 +49,85 @@ accelerator driven by an ARM SoC}
 \begin{abstract}
 We rewrite the Tiny-YOLOv2 and Tiny-YOLOv3 detectors from scratch in NumPy, without any
 deep-learning library, with forward and backward passes checked by finite differences.
-With the published Darknet weights, the float model reaches \chiffre{map.voc.float} mAP on
-VOC2007 test (\chiffre{map.voc.images} images). We fuse batch normalization, quantize
-weights per channel and activations per layer to INT8, and run the network in integer
+With the published Darknet weights, the float model reaches \chiffre{map.voc.float} \gls{map} on
+\gls{voc}2007 test (\chiffre{map.voc.images} images). We fuse batch normalization, quantize
+weights per channel and activations per layer to \gls{int8}, and run the network in integer
 arithmetic only: the gap to the float model is \chiffre{map.voc.drop} point
-(\chiffre{map.voc.int8} mAP), without quantization-aware training. A C++ golden model and
-a single-engine Vitis HLS accelerator reproduce the integer model byte for byte; driven by
-the ARM driver over the C-simulated kernel, the whole test set gives
-\chiffre{map.voc.identical} identical images, hence \chiffre{map.voc.csim} mAP. On a Kria
+(\chiffre{map.voc.int8} \gls{map}), without quantization-aware training. A C++ \gls{golden} and
+a single-engine Vitis \gls{hls} accelerator reproduce the integer model byte for byte; driven by
+the \gls{arm} driver over the \glslink{csim}{C-simulated} kernel, the whole test set gives
+\chiffre{map.voc.identical} identical images, hence \chiffre{map.voc.csim} \gls{map}. On a Kria
 KV260 at 200~MHz, the cycle model of the optimized kernel projects
-\chiffre{perf.kv260.v2.ms}~ms per image, i.e.\ \chiffre{perf.kv260.v2.gops} GOPS for
-\chiffre{model.v2.gmacs} GMAC; the board itself has not been measured yet. Extensions
+\chiffre{perf.kv260.v2.ms}~ms per image, i.e.\ \chiffre{perf.kv260.v2.gops} \gls{gops} for
+\chiffre{model.v2.gmacs} \gls{gmac}; the board itself has not been measured yet. Extensions
 compare power-of-two weights, 4-bit quantization, integer hardware post-processing
-(\chiffre{map.formats.hwpp} mAP) and a streaming architecture (\chiffre{stream.w8.fps}
-images/s); packing two INT8 multiplications per DSP brings the projection to
-\chiffre{pack.v2.tm64.ms}~ms with the same DSP count. The same chain runs YOLOv4-tiny on COCO
-(\chiffre{map.coco.v4.ap50} AP50 in float, \chiffre{map.coco.v4.drop} point in INT8), and
+(\chiffre{map.formats.hwpp} \gls{map}) and a streaming architecture (\chiffre{stream.w8.fps}
+images/s); packing two \gls{int8} multiplications per \gls{dsp} brings the projection to
+\chiffre{pack.v2.tm64.ms}~ms with the same \gls{dsp} count. The same chain runs YOLOv4-tiny on \gls{coco}
+(\chiffre{map.coco.v4.ap50} \gls{ap}50 in float, \chiffre{map.coco.v4.drop} point in \gls{int8}), and
 YOLOv7-tiny is being brought onto it. A dependability layer injects bit flips into the
 integer model and the kernel buffers, checks every convolution with an exact int32 checksum
-(ABFT) down to the HLS kernel, and flags out-of-distribution inputs from the backbone
-features (AUROC \chiffre{ood.norm.auroc.flir} on thermal images). Safety evidence follows:
-an equivalence matrix per layer and stage, with the integer model, the golden model and the
-kernel equal byte for byte and \chiffre{equiv.smt.proved} SMT obligations proved on the
+(\gls{abft}) down to the \gls{hls} kernel, and flags out-of-distribution inputs from the backbone
+features (\gls{auroc} \chiffre{ood.norm.auroc.flir} on thermal images). Safety evidence follows:
+an equivalence matrix per layer and stage, with the integer model, the \gls{golden} and the
+kernel equal byte for byte and \chiffre{equiv.smt.proved} \gls{smt} obligations proved on the
 scalar kernels, and a static latency bound that does not depend on the image
 (\chiffre{wcet.v2.frame.ms}~ms per frame for Tiny-YOLOv2). First sweeps fine-tune
 Tiny-YOLOv3 on five other datasets.
 
 \smallskip
 \noindent\textit{Status of the numbers.} A superscript marks a number that is not a
-measurement on the full test set: \textsuperscript{C-sim} computed by the HLS kernel in C
-simulation, \textsuperscript{proj.} cycle or resource model without synthesis,
+measurement on the full test set: \textsuperscript{C-sim} computed by the \gls{hls} kernel in \gls{csim}, \textsuperscript{proj.} cycle or resource model without synthesis,
 \textsuperscript{est.} analytical estimate, \textsuperscript{tier R} subset of images
-(M12 rule), \textsuperscript{pub.} figure taken from a paper. Figure captions come from
-the figure registry of the repository and are still in French until milestone M19
+(\ms{M12} rule), \textsuperscript{pub.} figure taken from a paper. Figure captions come from
+the figure registry of the repository and are still in French until milestone \ms{M19}
 translates them.
 \end{abstract}
 
 % ---------------------------------------------------------------------------------------
 \section{Introduction and contributions}
 
-Object detection on embedded FPGAs is usually reached through vendor toolchains: a network
+Object detection on embedded \glspl{fpga} is usually reached through vendor toolchains: a network
 trained in a deep-learning framework is quantized by a vendor tool and mapped to a
-preconfigured processing unit, as with the Vitis AI DPU used by \citet{2026-fata} on the
+preconfigured processing unit, as with the Vitis AI \gls{dpu} used by \citet{2026-fata} on the
 same board as ours. Every layer of that stack hides choices that change the result:
 preprocessing, rounding, the integer approximation of the activation, the head decoding.
 This work takes the opposite route and rebuilds each layer by hand, so that every number
 can be traced to a line of code and checked against the stage before it.
 
-The YOLO family predicts boxes on a grid in a single pass over the image
+The \gls{yolo} family predicts boxes on a grid in a single pass over the image
 \cite[\#002.0]{1506.02640}; Tiny-YOLOv2 keeps one $13\times13$ output map
 \cite[\#002.2]{1612.08242} and Tiny-YOLOv3 adds a second one at $26\times26$
 \cite[\#004.1]{2023-zhai}. These two networks are small enough for a mid-range Zynq
-UltraScale+ and are the reference workload of most FPGA papers of the base
-(Section~\ref{sec:related}). YOLOv4-tiny and YOLOv7-tiny, more accurate on COCO at a
+UltraScale+ and are the reference workload of most \gls{fpga} papers of the \gls{base}
+(Section~\ref{sec:related}). YOLOv4-tiny and YOLOv7-tiny, more accurate on \gls{coco} at a
 similar cost, keep the leaky activation and the Darknet format, and test how far the same
-engine goes (outside the base).
+engine goes (outside the \gls{base}).
 
 Contributions:
 \begin{enumerate}
 \item \textbf{A complete chain without a learning library}: layers, losses, training,
-  decoding, NMS and VOC evaluation in NumPy, each gradient checked by finite differences
+  decoding, \gls{nms} and \gls{voc} evaluation in NumPy, each gradient checked by finite differences
   (Sections~\ref{sec:networks} and~\ref{sec:inference}).
-\item \textbf{Bit-exactness from the NumPy integer model to the HLS kernel}: the integer
-  model, the C++ golden model and the C-simulated kernel behind the ARM driver produce the
-  same bytes, verified on the whole VOC2007 test set (Sections~\ref{sec:quant},
+\item \textbf{\glslink{bitexact}{Bit-exactness} from the NumPy integer model to the \gls{hls} kernel}: the integer
+  model, the C++ \gls{golden} and the \glslink{csim}{C-simulated} kernel behind the \gls{arm} driver produce the
+  same bytes, verified on the whole \gls{voc}2007 test set (Sections~\ref{sec:quant},
   \ref{sec:golden} and~\ref{sec:results}).
 \item \textbf{One engine for v2, v3 and YOLOv4-tiny}: a single parameterized
-  layer-by-layer accelerator runs the three networks from a manifest, with route,
-  grouped route and upsample handled by addressing (Section~\ref{sec:hls}).
-\item \textbf{Formats compared on the same model}: INT8, power-of-two weights after
+  layer-by-layer accelerator runs the three networks from a \gls{manifest}, with route,
+  \gls{groupedroute} and \gls{upsample} handled by addressing (Section~\ref{sec:hls}).
+\item \textbf{Formats compared on the same model}: \gls{int8}, power-of-two weights after
   REQ-YOLO, 4-bit weights and activations, and integer post-processing, all evaluated on
   the same test set with the same protocol (Section~\ref{sec:extensions}).
-\item \textbf{Dependability checks on the integer model}: fault injection, an exact ABFT
-  checksum per convolution in Python, in the golden model and in the HLS kernel, and an
+\item \textbf{Dependability checks on the integer model}: fault injection, an exact \gls{abft}
+  checksum per convolution in Python, in the \gls{golden} and in the \gls{hls} kernel, and an
   out-of-distribution monitor that costs a negligible share of the detector
   (Section~\ref{sec:dependability}).
 \item \textbf{Safety evidence}: a model $\leftrightarrow$ circuit equivalence matrix per
-  layer and stage, exhaustive operator tests, an SMT proof of the scalar kernels,
-  traceability checked in CI, and a static latency bound of the accelerator
+  layer and stage, exhaustive operator tests, an \gls{smt} proof of the scalar kernels,
+  traceability checked in \gls{ci}, and a static latency bound of the accelerator
   (Section~\ref{sec:safety}).
-\item \textbf{Reproducible tooling}: tiers of test profiles, figures, notebooks and this
+\item \textbf{Reproducible tooling}: \glspl{tier} of test profiles, figures, notebooks and this
   article are regenerated from the repository by \texttt{make} targets
   (Section~\ref{sec:repro}).
 \end{enumerate}
@@ -132,39 +138,39 @@ Section~\ref{sec:limits}).
 % ---------------------------------------------------------------------------------------
 \section{Related work}\label{sec:related}
 
-Two families of CNN accelerators coexist on FPGAs \cite[\#004.0]{2018-venieris}. A
+Two families of \gls{cnn} accelerators coexist on \glspl{fpga} \cite[\#004.0]{2018-venieris}. A
 \emph{streaming} architecture instantiates one hardware stage per layer and pipelines
-them, which gives latency and throughput but needs one bitstream per network; SATAY keeps
+them, which gives latency and throughput but needs one \gls{bitstream} per network; SATAY keeps
 all parameters on chip this way \cite[\#006.0]{2023-montgomerie-corcoran}. A \emph{single
 engine} runs the layers one after the other on a systolic array or a matrix unit,
 scheduled by software \cite[\#007.1]{2018-venieris}; it fits a small Zynq and serves
-several networks with one bitstream, at the price of DDR traffic at every layer. The
-tiling of the convolution loop nest and its roofline analysis come from
+several networks with one \gls{bitstream}, at the price of \gls{ddr} traffic at every layer. The
+\glslink{tile}{tiling} of the convolution loop nest and its \gls{roofline} analysis come from
 \citet[\#009.0, \#010.2]{2015-zhang}.
 
-Table~\ref{tab:benchmarks} lists the results of the base (specification §10.4) next to
+Table~\ref{tab:benchmarks} lists the results of the \gls{base} (specification §10.4) next to
 ours. Most rows cannot be compared directly with this work, for reasons the numbers alone
 do not show:
 \begin{itemize}
-\item \textbf{2024-zhang} is the only reference on the same model (Tiny-YOLOv2 416, INT8,
-  batch of 1). It runs on an FPGA without an ARM core, packs two multiplications per DSP
+\item \textbf{2024-zhang} is the only reference on the same model (Tiny-YOLOv2 416, \gls{int8},
+  batch of 1). It runs on an \gls{fpga} without an \gls{arm} core, packs two multiplications per \gls{dsp}
   \cite[\#011.0]{2024-zhang} and includes hardware post-processing
   \cite[\#013.1]{2024-zhang}.
-\item \textbf{2026-fata} runs on the same KV260, but with a preconfigured DPU, a
-  YOLOv3-tiny pruned at 70\,\% and QAT \cite[\#015.0]{2026-fata}: pruning divides the MACs
+\item \textbf{2026-fata} runs on the same KV260, but with a preconfigured \gls{dpu}, a
+  YOLOv3-tiny pruned at 70\,\% and \gls{qat} \cite[\#015.0]{2026-fata}: pruning divides the \glspl{mac}
   by about three, so images per second do not convert.
-\item \textbf{2023-zhai} uses INT16 and a pruned network on a vehicle dataset; only the
-  order of magnitude of its GOPS compares \cite[\#004.1]{2023-zhai}.
+\item \textbf{2023-zhai} uses \gls{int16} and a pruned network on a vehicle dataset; only the
+  order of magnitude of its \gls{gops} compares \cite[\#004.1]{2023-zhai}.
 \item \textbf{2019-ding} (REQ-YOLO) uses FFT-based convolutions and power-of-two weights
-  chosen by ADMM \cite[\#008.1, \#009.4]{2019-ding}, on another architecture.
+  chosen by \gls{admm} \cite[\#008.1, \#009.4]{2019-ding}, on another architecture.
 \item \textbf{2025-kim} is a slow functional prototype of the full YOLOv2 on a Zybo, with
-  decoding on the ARM \cite[\#026.0]{2025-kim}: not a performance reference.
+  decoding on the \gls{arm} \cite[\#026.0]{2025-kim}: not a performance reference.
 \item Power is reported with different perimeters (chip estimate, board, unspecified);
-  ours will be measured both on the chip (\texttt{report\_power}) and on the SOM (INA260).
+  ours will be measured both on the chip (\texttt{report\_power}) and on the \gls{som} (INA260).
 \end{itemize}
 
 \begin{table}[htbp]
-\caption{Published results (\texttt{results/benchmarks.csv}) and this work.}
+\caption{Published results (\repo{results/benchmarks.csv}) and this work.}
 \label{tab:benchmarks}
 \scriptsize\articletable{benchmarks}
 \end{table}
@@ -175,57 +181,57 @@ do not show:
 \section{Networks and NumPy building blocks}\label{sec:networks}
 
 Tiny-YOLOv2 is a stack of nine $3\times3$ convolutions with batch normalization and leaky
-ReLU, six max-pooling layers (the last one $2\times2$ with stride 1) and a linear
+\gls{relu}, six max-pooling layers (the last one $2\times2$ with stride 1) and a linear
 $1\times1$ head with $5\times(5+C)$ filters; Tiny-YOLOv3 adds a second head at
-$26\times26$ fed by an upsample and a route that concatenates an earlier map
+$26\times26$ fed by an \gls{upsample} and a route that concatenates an earlier map
 \cite[\#005.0]{1804.02767}, \cite[\#016.2]{2023-zhai}. Counted by \texttt{make count-macs}
-from the network descriptions, Tiny-YOLOv2 VOC has \chiffre{model.v2.mparams}~M parameters
-and \chiffre{model.v2.gmacs} GMAC at $416\times416$, in agreement with the count of
-CoDeNet \cite[\#025.0]{2006.08357}; Tiny-YOLOv3 VOC has \chiffre{model.v3.mparams}~M
-parameters and \chiffre{model.v3.gmacs} GMAC (Figures~\ref{fig:graphe/graphe_tiny-yolov2-voc}
+from the network descriptions, Tiny-YOLOv2 \gls{voc} has \chiffre{model.v2.mparams}~M parameters
+and \chiffre{model.v2.gmacs} \gls{gmac} at $416\times416$, in agreement with the count of
+CoDeNet \cite[\#025.0]{2006.08357}; Tiny-YOLOv3 \gls{voc} has \chiffre{model.v3.mparams}~M
+parameters and \chiffre{model.v3.gmacs} \gls{gmac} (Figures~\ref{fig:graphe/graphe_tiny-yolov2-voc}
 and~\ref{fig:fiche/fiche_tiny-yolov2-voc}).
 
 \articlefig{graphe/graphe_tiny-yolov2-voc}
 \articlefig{fiche/fiche_tiny-yolov2-voc}
 
-YOLOv4-tiny (\texttt{tiny-yolov4-coco}, outside the base) replaces the plain backbone by
-CSP blocks: a \emph{grouped route} takes the second half of the channels of a map, and the
+YOLOv4-tiny (\texttt{tiny-yolov4-coco}, outside the \gls{base}) replaces the plain backbone by
+\gls{csp} blocks: a \emph{\gls{groupedroute}} takes the second half of the channels of a map, and the
 heads rescale the box centres by \texttt{scale\_x\_y}. It has \chiffre{model.v4.mparams}~M
-parameters and \chiffre{model.v4.gmacs} GMAC (Figure~\ref{fig:graphe/graphe_tiny-yolov4-coco}).
-The grouped route is one more addressing mode of the engine: it reads a channel range of an
+parameters and \chiffre{model.v4.gmacs} \gls{gmac} (Figure~\ref{fig:graphe/graphe_tiny-yolov4-coco}).
+The \gls{groupedroute} is one more addressing mode of the engine: it reads a channel range of an
 existing buffer, so it costs no compute and no copy. YOLOv7-tiny
 (\texttt{tiny-yolov7-coco}, \chiffre{model.v7.mparams}~M parameters,
-\chiffre{model.v7.gmacs} GMAC) adds ELAN blocks, whose concatenations have four sources, and a
+\chiffre{model.v7.gmacs} \gls{gmac}) adds \gls{elan} blocks, whose concatenations have four sources, and a
 spatial pyramid pooling with stride-1 max pools of $5\times5$, $9\times9$ and
 $13\times13$. The export rewrites the two larger pools as chained $5\times5$ pools and
 copies the pooled input by an identity $1\times1$ convolution; this network is work in
-progress (float, calibration and export done, accuracy not yet measured). YOLOv5n and
-YOLOv8n (Ultralytics, SiLU activation, anchor-free head for v8n, outside the base) are read
+progress (float, \gls{calibration} and export done, accuracy not yet measured). YOLOv5n and
+YOLOv8n (Ultralytics, \gls{silu} activation, \glslink{anchor}{anchor-free} head for v8n, outside the \gls{base}) are read
 from their checkpoints without PyTorch: a reader of the pickle format and the network
 rebuilt from its YAML description give a trainable NumPy YOLOv5n equal to the reference to
-about $10^{-14}$ (M33).
+about $10^{-14}$ (\ms{M33}).
 
 \articlefig{graphe/graphe_tiny-yolov4-coco}
 
 Every layer exposes the same interface, \texttt{forward(x) -> (y, cache)} and
 \texttt{backward(dy, cache) -> (dx, grads)}. The convolution exists in a naive version,
-kept as the test reference, and an im2col version used for training; both agree to
+kept as the test reference, and an \gls{im2col} version used for training; both agree to
 $10^{-12}$ (Figure~\ref{fig:convolution}). The weight gradient is the correlation of the
 output gradient with the input \cite[\#013.0]{2202.10935}. Each layer passes a gradient
 check with centered differences in float64, using the max norm over the tensor so that a
-gradient that happens to be small is not drowned in rounding noise (outside the base;
+gradient that happens to be small is not drowned in rounding noise (outside the \gls{base};
 Figure~\ref{fig:retropropagation}).
 
 \articlefig{convolution}
 \articlefig{retropropagation}
 
 The loss is the YOLOv3 one: direct regression of the box offsets, whose gradient is
-``ground truth minus prediction'' \cite[\#003.0]{1804.02767}, logistic objectness with an
+``ground truth minus prediction'' \cite[\#003.0]{1804.02767}, logistic \gls{objectness} with an
 \emph{ignore} rule for predictions that overlap a ground truth without being responsible
 for it \cite[\#003.1]{1804.02767}, and multi-label binary cross-entropy for the classes
-\cite[\#004.0]{1804.02767}. Targets are assigned to the best anchor by IoU of the shapes;
-anchors come from k-means with the distance $1-\mathrm{IoU}$ \cite[\#002.4]{1612.08242}.
-The training loop (SGD, burn-in, multi-scale inputs \cite[\#003.2]{1612.08242}) overfits a
+\cite[\#004.0]{1804.02767}. Targets are assigned to the best \gls{anchor} by \gls{iou} of the shapes;
+\glspl{anchor} come from k-means with the distance $1-\mathrm{IoU}$ \cite[\#002.4]{1612.08242}.
+The training loop (\gls{sgd}, \gls{burnin}, multi-scale inputs \cite[\#003.2]{1612.08242}) overfits a
 single image, which validates targets, loss and optimizer together
 (Figure~\ref{fig:perte}).
 
@@ -235,16 +241,16 @@ single image, which validates targets, loss and optimizer together
 \section{Inference and evaluation}\label{sec:inference}
 
 Inference decodes each head with the YOLOv2 parameterization \cite[\#003.1]{1612.08242},
-filters predictions by confidence, then applies a per-class NMS at IoU 0.45. Evaluation
-follows the VOC2007 protocol: 11-point AP, \texttt{difficult} objects ignored, confidence
+filters predictions by confidence, then applies a per-class \gls{nms} at \gls{iou} 0.45. Evaluation
+follows the \gls{voc}2007 protocol: 11-point \gls{ap}, \texttt{difficult} objects ignored, confidence
 threshold 0.005; our implementation matches the official devkit to $10^{-12}$
-(\texttt{python/tests/test\_metrics.py}).
+(\repo{python/tests/test\_metrics.py}).
 
-With the published Darknet weights the reference mAP is \chiffre{map.voc.float}, against
+With the published Darknet weights the reference \gls{map} is \chiffre{map.voc.float}, against
 \chiffre{map.voc.darknet} published by Darknet. Preprocessing explains most of what
 separates the variants (Table~\ref{tab:float}): these weights were trained by the Darknet
 of the YOLOv2 era, which resizes the image to a square without keeping its aspect ratio.
-A letterbox, as in our training pipeline, shrinks and distorts the objects differently
+A \gls{letterbox}, as in our training pipeline, shrinks and distorts the objects differently
 than in training and loses about two points; reproducing the Darknet bilinear
 interpolation instead of Pillow's barely changes the result. The reference therefore uses
 the direct resize (\texttt{stretch}), which is also the simplest one to reproduce on
@@ -254,7 +260,7 @@ are not measured. Figures~\ref{fig:pr/pr_variantes} and~\ref{fig:nms_map} show t
 precision-recall curves and the evaluation steps.
 
 \begin{table}[htbp]
-\caption{Float mAP on VOC2007 test by preprocessing (\texttt{results/map\_float.md}).}
+\caption{Float \gls{map} on \gls{voc}2007 test by preprocessing (\repo{results/map\_float.md}).}
 \label{tab:float}
 \small\articletable{map.voc.float.table}
 \end{table}
@@ -262,17 +268,17 @@ precision-recall curves and the evaluation steps.
 \articlefig{pr/pr_variantes}
 \articlefig{nms_map}
 
-The COCO networks are evaluated on val2017 with the COCO metric (101-point interpolation,
-equal to \texttt{pycocotools} to $10^{-4}$), same threshold and NMS
+The \gls{coco} networks are evaluated on val2017 with the \gls{coco} metric (101-point interpolation,
+equal to \texttt{pycocotools} to $10^{-4}$), same threshold and \gls{nms}
 (Table~\ref{tab:coco}, Figure~\ref{fig:map_coco}). The configuration of YOLOv4-tiny has no
-letterbox, and the direct resize is again the better preprocessing for it. Its float AP50,
+\gls{letterbox}, and the direct resize is again the better preprocessing for it. Its float \gls{ap}50,
 \chiffre{map.coco.v4.ap50}, is above the \chiffre{map.coco.v4.published} published on
-test-dev, a different image set. Tiny-YOLOv3 reaches \chiffre{map.coco.v3.ap50} AP50, but its
-weights were trained on COCO 2014 images from which val2017 is partly drawn, so this value is
+test-dev, a different image set. Tiny-YOLOv3 reaches \chiffre{map.coco.v3.ap50} \gls{ap}50, but its
+weights were trained on \gls{coco} 2014 images from which val2017 is partly drawn, so this value is
 optimistic and the comparison favours it.
 
 \begin{table}[htbp]
-\caption{Float AP on COCO val2017 (\texttt{results/map\_coco.md}).}
+\caption{Float \gls{ap} on \gls{coco} val2017 (\repo{results/map\_coco.md}).}
 \label{tab:coco}
 \small\articletable{map.coco.table}
 \end{table}
@@ -285,11 +291,11 @@ optimistic and the comparison favours it.
 The integer model follows the usual post-training quantization path
 \cite[\#008.0]{2607.13106}. Batch normalization is first folded into the convolution
 weights and biases \cite[\#039.0]{2023-zhai}. Weights are quantized symmetrically per
-output channel; activations per layer, with scales calibrated on 500 VOC2007 trainval
+output channel; activations per layer, with scales calibrated on 500 \gls{voc}2007 trainval
 images (percentile \texttt{p99.99} of $|x|$, chosen by a mean-squared-error criterion).
-Each convolution accumulates in 32 bits and requantizes its output with an integer
+Each convolution accumulates in 32 bits and \glslink{requant}{requantizes} its output with an integer
 multiplier $M_0$ and a shift, so that no floating point remains in the network (outside
-the base). The leaky ReLU slope becomes $13/128$, computed as $(13y+64)\gg7$: rounding
+the \gls{base}). The leaky \gls{relu} slope becomes $13/128$, computed as $(13y+64)\gg7$: rounding
 instead of flooring avoids a bias of half a step on every negative value, which
 accumulates from layer to layer. The heads are decoded by 256-entry tables for the sigmoid
 and the exponential, as in 2024-zhang \cite[\#014.0]{2024-zhang}; their input step is
@@ -310,35 +316,35 @@ no single layer dominates the loss, which spreads over the network
 (Figure~\ref{fig:erreur_couches/erreur_couches_tiny-yolov2-voc}).
 
 \begin{table}[htbp]
-\caption{mAP of the float and INT8 models on VOC2007 test
-(\texttt{results/map\_int8.md}).}
+\caption{\gls{map} of the float and \gls{int8} models on \gls{voc}2007 test
+(\repo{results/map\_int8.md}).}
 \label{tab:int8}
 \small\articletable{map.voc.int8.table}
 \end{table}
 
 \articlefig{erreur_couches/erreur_couches_tiny-yolov2-voc}
 
-YOLOv4-tiny, calibrated in the same way on 500 COCO train2017 images, loses more:
-\chiffre{map.coco.v4.drop} point of AP50 (\chiffre{map.coco.v4.int8.ap50} in integer), above
-the one-point target. Fake-quantizing the two heads alone costs nothing, so the loss is again
+YOLOv4-tiny, calibrated in the same way on 500 \gls{coco} train2017 images, loses more:
+\chiffre{map.coco.v4.drop} point of \gls{ap}50 (\chiffre{map.coco.v4.int8.ap50} in integer), above
+the one-point target. \glslink{fakequant}{Fake-quantizing} the two heads alone costs nothing, so the loss is again
 spread over the backbone; a coarser head scale would clip less but overflows the exponential
 table of the post-processing. Quantization-aware training is left as follow-up.
 
 % ---------------------------------------------------------------------------------------
 \section{Golden C++ model and verification chain}\label{sec:golden}
 
-The quantized network is exported as a manifest and binary blobs
+The quantized network is exported as a \gls{manifest} and binary blobs
 (\texttt{model/<net>/}), with the integer activations of every layer on a few images as
-dumps. A C++ golden model reads the same export and runs the network \emph{as the hardware
-will}: tiled convolution with fixed-size buffers, output stage with bias, requantization,
-leaky and fused max pooling, route by addressing. It is the testbench of the HLS stage.
+\glspl{dump}. A C++ \gls{golden} reads the same export and runs the network \emph{as the hardware
+will}: \glslink{tile}{tiled} convolution with fixed-size buffers, output stage with bias, \gls{requant},
+leaky and fused max pooling, route by addressing. It is the testbench of the \gls{hls} stage.
 
 Equality is checked at every hand-over (Figure~\ref{fig:chaine_verif}).
-\texttt{make golden-check} runs the golden model on \chiffre{verif.dumps} dumps (three
-images per quantized network) and compares every layer to the Python dumps; the HLS kernel
-in C simulation is compared to the golden model layer by layer (\texttt{make csim-gcc});
-the ARM driver, built with a simulation backend that calls the C-simulated kernel, is
-compared to the golden model on the final heads (\texttt{make sw-sim}). The integer
+\texttt{make golden-check} runs the \gls{golden} on \chiffre{verif.dumps} \glspl{dump} (three
+images per quantized network) and compares every layer to the Python \glspl{dump}; the \gls{hls} kernel
+in \gls{csim} is compared to the \gls{golden} layer by layer (\texttt{make csim-gcc});
+the \gls{arm} driver, built with a simulation backend that calls the \glslink{csim}{C-simulated} kernel, is
+compared to the \gls{golden} on the final heads (\texttt{make sw-sim}). The integer
 post-processing kernel of Section~\ref{sec:extensions} is compared to its golden mirror on
 \chiffre{verif.hwpp.cases} cases. All of these run in \texttt{make ci} on every commit, on
 a synthetic export when the Darknet weights are absent.
@@ -348,19 +354,19 @@ a synthetic export when the Darknet weights are absent.
 % ---------------------------------------------------------------------------------------
 \section{HLS accelerator and SoC integration}\label{sec:hls}
 
-The board was chosen with a roofline explorer before writing any HLS (ADR 0003): the Kria
-KV260 offers, at the same price, about six times the roofline performance of a Zynq-7020
+The board was chosen with a \gls{roofline} explorer before writing any \gls{hls} (\gls{adr} 0003): the Kria
+KV260 offers, at the same price, about six times the \gls{roofline} performance of a Zynq-7020
 board for these networks. The accelerator is a single layer-by-layer engine
-(Figure~\ref{fig:moteur}): the convolution loop nest is tiled over output channels, input
+(Figure~\ref{fig:moteur}): the convolution loop nest is \glslink{tile}{tiled} over output channels, input
 channels, rows and columns \cite[\#010.2]{2015-zhang}, with $T_m=32$, $T_n=24$ and
-$T_r=T_c=13$, i.e.\ 768 MACs per cycle at 200~MHz (Figure~\ref{fig:tuilage}). One engine
-runs every layer of both networks; upsample and route need no compute, they change the
+$T_r=T_c=13$, i.e.\ 768 \glspl{mac} per cycle at 200~MHz (Figure~\ref{fig:tuilage}). One engine
+runs every layer of both networks; \gls{upsample} and route need no compute, they change the
 read address of the next layer.
 
 \articlefig{moteur}
 \articlefig{tuilage}
 
-The ARM side loads the manifest and the blobs in contiguous memory, programs the AXI-Lite
+The \gls{arm} side loads the \gls{manifest} and the blobs in contiguous memory, programs the AXI-Lite
 registers of the kernel layer after layer and waits for its interrupt
 (Figure~\ref{fig:soc}). The block design, the device-tree overlay and the firmware
 packaging are scripted (\texttt{make vivado-build}, \texttt{make fpga-firmware}) but have
@@ -369,22 +375,22 @@ above the hardware runs on the PC through the simulation backend.
 
 \articlefig{soc}
 
-A cycle model in Python (\texttt{tools/perf\_model.py}) reproduces the cycle counters of
-the C-simulated kernel exactly, layer by layer (\texttt{make perf-model} checks it in CI).
-It shows where the first kernel (M6) lost its time: with 8-bit memory ports it spent most
-of its cycles outside the MAC loop, waiting for its ports and its output stage, and its
+A cycle model in Python (\repo{tools/perf\_model.py}) reproduces the cycle counters of
+the \glslink{csim}{C-simulated} kernel exactly, layer by layer (\texttt{make perf-model} checks it in \gls{ci}).
+It shows where the first kernel (\ms{M6}) lost its time: with 8-bit memory ports it spent most
+of its cycles outside the \gls{mac} loop, waiting for its ports and its output stage, and its
 projection was \chiffre{perf.kv260.m6.ms}~ms per image. The optimization cascade of
-milestone M10 (Table~\ref{tab:cascade}, Figure~\ref{fig:cascade_m10}) widens the ports to
-64 bits, loads only the valid input channels, requantizes eight channels per cycle, folds
-the first layer onto the input lanes and uses $14\times14$ tiles for the pooled
-convolutions; each step is C-sim equal to the golden model. The current kernel projects
+milestone \ms{M10} (Table~\ref{tab:cascade}, Figure~\ref{fig:cascade_m10}) widens the ports to
+64 bits, loads only the valid input channels, \glslink{requant}{requantizes} eight channels per cycle, folds
+the first layer onto the input lanes and uses $14\times14$ \glspl{tile} for the pooled
+convolutions; each step is \glslink{csim}{C-sim} equal to the \gls{golden}. The current kernel projects
 \chiffre{perf.kv260.v2.ms}~ms, against a compute bound of \chiffre{perf.kv260.bound.ms}~ms
-and a roofline point of \chiffre{perf.kv260.roofline.ms}~ms
+and a \gls{roofline} point of \chiffre{perf.kv260.roofline.ms}~ms
 (Figures~\ref{fig:roofline_couches/roofline_couches_kv260} and~\ref{fig:cycles_couches}).
 
 \begin{table}[htbp]
 \caption{Optimization cascade of the kernel, Tiny-YOLOv2, accelerator only
-(\texttt{results/rapport.md}).}
+(\repo{results/rapport.md}).}
 \label{tab:cascade}
 \small\articletable{perf.cascade}
 \end{table}
@@ -395,22 +401,22 @@ and a roofline point of \chiffre{perf.kv260.roofline.ms}~ms
 
 \paragraph{Two INT8 multiplications per DSP.} The compute bound only falls if the
 multiplications per cycle rise. As in 2024-zhang \cite[\#011.0]{2024-zhang}, the weights of
-two output channels that share an input are packed into the 27-bit port of a DSP48E2,
+two output channels that share an input are packed into the 27-bit port of a \gls{dsp}48E2,
 $A = w_a 2^{18} + w_b$, and one product gives both (Figure~\ref{fig:dsp_packing}). The low
 lane stays exact for a sum of eight products under the contract of the integer model
 (weights and inputs within $\pm127$), so the 24-lane adder tree is cut into three groups of
-eight, each unpacked to int32. Only the multiplication changes: the C-simulated kernel equals
-the golden model byte for byte on every testbench, and its cycles are unchanged. With the same
-tiles, packing frees half of the DSPs; with $T_m=64$ on the same DSPs it projects
+eight, each unpacked to int32. Only the multiplication changes: the \glslink{csim}{C-simulated} kernel equals
+the \gls{golden} byte for byte on every testbench, and its cycles are unchanged. With the same
+\glspl{tile}, packing frees half of the \glspl{dsp}; with $T_m=64$ on the same \glspl{dsp} it projects
 \chiffre{pack.v2.tm64.ms}~ms for Tiny-YOLOv2, but doubles the weight registers beyond the
-flip-flops of the board unless they move to LUTRAM, and $T_n=32$ gives
+flip-flops of the board unless they move to \gls{lutram}, and $T_n=32$ gives
 \chiffre{pack.v2.tn32.ms}~ms within the budget (Table~\ref{tab:pack},
 Figure~\ref{fig:pack_options}). The YOLOv4-tiny projection with the current kernel is
 \chiffre{perf.kv260.v4.ms}~ms (Table~\ref{tab:perf}).
 
 \begin{table}[htbp]
-\caption{Packed PE options, accelerator only, KV260 at 200~MHz
-(\texttt{results/dsp\_packing.md}).}
+\caption{Packed \gls{pe} options, accelerator only, KV260 at 200~MHz
+(\repo{results/dsp\_packing.md}).}
 \label{tab:pack}
 \footnotesize\articletable{pack.table}
 \end{table}
@@ -423,11 +429,11 @@ of the multiplications of the $3\times3$ convolutions \cite[\#004.0]{2023-zhai} 
 slightly ahead of packing on the compute bound alone. Once the loads are counted it is not
 (Table~\ref{tab:winograd}, Figure~\ref{fig:winograd}): the transformed weights are wider and
 consumed faster, its weight buffer exceeds the flip-flops of the board, and its products do
-not fit two to a DSP. It is studied, not implemented.
+not fit two to a \gls{dsp}. It is studied, not implemented.
 
 \begin{table}[htbp]
 \caption{Winograd against packing, milliseconds, Tiny-YOLOv2 and Tiny-YOLOv3
-(\texttt{results/winograd.md}).}
+(\repo{results/winograd.md}).}
 \label{tab:winograd}
 \footnotesize\articletable{winograd.table}
 \end{table}
@@ -437,16 +443,16 @@ not fit two to a DSP. It is studied, not implemented.
 % ---------------------------------------------------------------------------------------
 \section{Results}\label{sec:results}
 
-Table~\ref{tab:stades} gives the mAP at the three stages of the chain. The float model and
-the Python integer model are evaluated on the full test set; the FPGA stage runs the ARM
-driver over the C-simulated kernel, compiled with native integers (same arithmetic as
+Table~\ref{tab:stades} gives the \gls{map} at the three stages of the chain. The float model and
+the Python integer model are evaluated on the full test set; the \gls{fpga} stage runs the \gls{arm}
+driver over the \glslink{csim}{C-simulated} kernel, compiled with native integers (same arithmetic as
 \texttt{ap\_int}, which was also checked on part of the set). Its detections are identical
 to those of the integer model image by image, so the whole accuracy loss comes from
-quantization, and the board will give the integer mAP if \texttt{run\_compare} confirms
+quantization, and the board will give the integer \gls{map} if \texttt{run\_compare} confirms
 zero mismatch there (Figure~\ref{fig:map_stades}).
 
 \begin{table}[htbp]
-\caption{mAP at the stages of the chain, VOC2007 test (\texttt{results/map\_stades.md}).}
+\caption{\gls{map} at the stages of the chain, \gls{voc}2007 test (\repo{results/map\_stades.md}).}
 \label{tab:stades}
 \small\articletable{map.stades}
 \end{table}
@@ -454,13 +460,13 @@ zero mismatch there (Figure~\ref{fig:map_stades}).
 \articlefig{map_stades}
 
 Table~\ref{tab:perf} gives the performance of the accelerator. These are projections of
-the cycle model, a lower bound of the accelerator time: they assume an initiation interval
-of one in the inner loop and ignore pipeline depths, DDR latency and the ARM control.
+the cycle model, a lower bound of the accelerator time: they assume an \gls{ii}
+of one in the inner loop and ignore pipeline depths, \gls{ddr} latency and the \gls{arm} control.
 Resources will only be known after synthesis; Figure~\ref{fig:ressources} compares the
-roofline model with the streaming plan of Section~\ref{sec:extensions}.
+\gls{roofline} model with the streaming plan of Section~\ref{sec:extensions}.
 
 \begin{table}[htbp]
-\caption{Projected performance on the KV260 at 200~MHz (\texttt{results/mesures.md}).}
+\caption{Projected performance on the KV260 at 200~MHz (\repo{results/mesures.md}).}
 \label{tab:perf}
 \footnotesize\articletable{perf.kv260}
 \end{table}
@@ -469,49 +475,48 @@ roofline model with the streaming plan of Section~\ref{sec:extensions}.
 
 Against 2024-zhang, the only reference on the same model, packing closes the gap in
 multipliers (Section~\ref{sec:hls}); what remains is the share of time our kernel still
-spends outside the MAC loop, in the weight and input loads of the $1\times1$ and
+spends outside the \gls{mac} loop, in the weight and input loads of the $1\times1$ and
 $13\times13$ layers and in the output stage of the first layer. On the same board, the projected throughput of the current
-kernel exceeds the DPU of 2026-fata in images per second, without pruning
+kernel exceeds the \gls{dpu} of 2026-fata in images per second, without pruning
 (Table~\ref{tab:benchmarks}).
 
 % ---------------------------------------------------------------------------------------
 \section{Extensions}\label{sec:extensions}
 
 \paragraph{Hardware post-processing.} Following 2024-zhang
-\cite[\#013.1, \#014.0]{2024-zhang}, a separate HLS kernel decodes the heads and runs the
-NMS in integers only: the objectness threshold is applied to the integer logit, the
-softmax uses one reciprocal per cell, box corners are Q4 pixels, the IoU test becomes an
-integer inequality, and the NMS keeps 256 slots in stream order without sorting. This NMS
+\cite[\#013.1, \#014.0]{2024-zhang}, a separate \gls{hls} kernel decodes the heads and runs the
+\gls{nms} in integers only: the \gls{objectness} threshold is applied to the integer logit, the
+softmax uses one reciprocal per cell, box corners are Q4 pixels, the \gls{iou} test becomes an
+integer inequality, and the \gls{nms} keeps 256 slots in stream order without sorting. This \gls{nms}
 does not always give the result of the sorted one (a chain of three overlapping boxes
 keeps only one); on the test set the integer post-processing reaches
-\chiffre{map.formats.hwpp} mAP (Figure~\ref{fig:hw_postproc}). The kernel equals its
-golden mirror in C simulation; its synthesis is pending.
+\chiffre{map.formats.hwpp} \gls{map} (Figure~\ref{fig:hw_postproc}). The kernel equals its
+golden mirror in \gls{csim}; its synthesis is pending.
 
 \articlefig{hw_postproc}
 
 \paragraph{Power-of-two weights (REQ-YOLO).} We reproduce the ``mixed powers of two''
 levels of 2019-ding \cite[\#008.1]{2019-ding}: each weight is a sum of at most two powers
 of two, so a multiplication becomes two shifts and an addition, and the engine needs no
-DSP for its MACs (estimate). The direct projection of the trained weights gives
-\chiffre{map.formats.mixed6} mAP, against \chiffre{map.formats.uniform6} for uniform 6-bit
-levels. The ADMM fine-tuning \cite[\#009.1]{2019-ding} \emph{did not converge}: the
+\gls{dsp} for its \glspl{mac} (estimate). The direct projection of the trained weights gives
+\chiffre{map.formats.mixed6} \gls{map}, against \chiffre{map.formats.uniform6} for uniform 6-bit
+levels. The \gls{admm} fine-tuning \cite[\#009.1]{2019-ding} \emph{did not converge}: the
 residual between the weights and their projection grew instead of vanishing, the
-detection loss rose, and the result, \chiffre{map.formats.admm} mAP, is worse than the
-projection alone. The likely causes (fine-tuning without BN, small batches, a penalty too
-weak) are not verified. The power-of-two variant of the PE is C-sim equal to the golden
-model.
+detection loss rose, and the result, \chiffre{map.formats.admm} \gls{map}, is worse than the
+projection alone. The likely causes (fine-tuning without \gls{bn}, small batches, a penalty too
+weak) are not verified. The power-of-two variant of the \gls{pe} is \glslink{csim}{C-sim} equal to the \gls{golden}.
 
 \paragraph{4-bit weights and activations.} With 4-bit weights per channel and 4-bit
 activations on power-of-two steps \cite[\#006.0]{2024-yan}, keeping the input and the head
-on 8 bits, post-training quantization collapses to \chiffre{map.formats.w4a4.ptq} mAP. A
-short quantization-aware training (600 iterations, a fraction of an epoch, on CPU)
-recovers part of it, to \chiffre{map.formats.w4a4.qat} mAP; the loss was still decreasing,
+on 8 bits, post-training quantization collapses to \chiffre{map.formats.w4a4.ptq} \gls{map}. A
+short quantization-aware training (600 iterations, a fraction of an epoch, on \gls{cpu})
+recovers part of it, to \chiffre{map.formats.w4a4.qat} \gls{map}; the loss was still decreasing,
 so a longer run should do better. The 4-bit export is reproduced byte for byte by the
-golden model and the C-simulated kernel. Table~\ref{tab:formats} and
+\gls{golden} and the \glslink{csim}{C-simulated} kernel. Table~\ref{tab:formats} and
 Figure~\ref{fig:map_formats} sum up the formats.
 
 \begin{table}[htbp]
-\caption{Formats on the same model, VOC2007 test (\texttt{results/req\_yolo.md},
+\caption{Formats on the same model, \gls{voc}2007 test (\repo{results/req\_yolo.md},
 \texttt{quant\_4bits.md}, \texttt{postproc\_hw.md}).}
 \label{tab:formats}
 \small\articletable{map.formats}
@@ -523,58 +528,56 @@ Figure~\ref{fig:map_formats} sum up the formats.
 \cite[\#004.0]{2018-venieris} is planned with one stage per convolution and line buffers
 \cite[\#011.0]{2023-montgomerie-corcoran}. The weights of Tiny-YOLOv2 do not fit on the
 chip of the KV260, so the plan is hybrid: the small layers stream with their weights on
-chip, the two largest read theirs from DDR once per image. The resource model estimates
-\chiffre{stream.w8.fps} images/s with \chiffre{stream.w8.dsp} DSPs, at a latency of
+chip, the two largest read theirs from \gls{ddr} once per image. The resource model estimates
+\chiffre{stream.w8.fps} images/s with \chiffre{stream.w8.dsp} \glspl{dsp}, at a latency of
 \chiffre{stream.w8.latency}~ms, and \chiffre{stream.w4.fps} images/s with 4-bit weights
-(Figure~\ref{fig:streaming}). The streaming kernel equals the golden model in C
-simulation, stage by stage; these figures are estimates until synthesis.
+(Figure~\ref{fig:streaming}). The streaming kernel equals the \gls{golden} in \gls{csim}, stage by stage; these figures are estimates until synthesis.
 
 \articlefig{streaming}
 
 % ---------------------------------------------------------------------------------------
 \section{Dependability}\label{sec:dependability}
 
-The bit-exact integer model is a fault-free reference: any difference in its output is caused
-by an injected fault. This section is engineering outside the base.
+The \gls{bitexact} integer model is a fault-free reference: any difference in its output is caused
+by an injected fault. This section is engineering outside the \gls{base}.
 
-\paragraph{Fault injection.} An injector flips bits in the INT8 weights, the int32 biases, the
-INT8 activations and the int32 accumulator of a chosen layer, either one given bit or at random
+\paragraph{Fault injection.} An injector flips bits in the \gls{int8} weights, the int32 biases, the
+\gls{int8} activations and the int32 accumulator of a chosen layer, either one given bit or at random
 with a bit error rate, or holds them stuck at a value; every run is seeded, and with no fault the
 output equals the integer model exactly. A campaign tool sweeps the error rate, the layer and the
-bit position against the mAP. Only a smoke run has been made so far; the full grids are to run.
+bit position against the \gls{map}. Only a \gls{smokerun} has been made so far; the full grids are to run.
 
 \paragraph{Exact checksum (ABFT).} The sum of the output channels of a convolution equals the
-convolution of its input by the sum of its filters. Before requantization everything is an
+convolution of its input by the sum of its filters. Before \gls{requant} everything is an
 integer, so the check holds exactly modulo $2^{32}$: no tolerance and no false alarm. The
 summed filter and bias are exported with each layer, and the check runs in the integer model,
-in the golden model and in the HLS kernel. The kernel computes the checksum as one more
-output lane in the same pipelined loop and compares it in the requantization pass; the
-failing pixels go to a status register read by the ARM driver. Without fault, every
-bit-exact test passes with no ABFT error (\chiffre{abft.hls.layers} layers of the four
-exports, \chiffre{abft.hls.outputs} layer outputs of the network test bench, in C
-simulation), and every injected accumulator fault is detected. The cost of the lane waits
+in the \gls{golden} and in the \gls{hls} kernel. The kernel computes the checksum as one more
+output lane in the same pipelined loop and compares it in the \gls{requant} pass; the
+failing pixels go to a status register read by the \gls{arm} driver. Without fault, every
+\gls{bitexact} test passes with no \gls{abft} error (\chiffre{abft.hls.layers} layers of the four
+exports, \chiffre{abft.hls.outputs} layer outputs of the network test bench, in \gls{csim}), and every injected accumulator fault is detected. The cost of the lane waits
 for synthesis.
 
-\paragraph{Faults in the kernel buffers.} A fault hook of the C simulation, absent from the
-synthesis, flips one bit per kernel run in an on-chip buffer of the convolution: input tile,
-weights, int32 accumulators, requantized tile or checksum lane. A Python reference maps each
+\paragraph{Faults in the kernel buffers.} A fault hook of the \gls{csim}, absent from the
+synthesis, flips one bit per kernel run in an on-chip buffer of the convolution: input \gls{tile},
+weights, int32 accumulators, \glslink{requant}{requantized} \gls{tile} or checksum lane. A Python reference maps each
 buffer address back to its tensor element through the lane mapping of the kernel and
-recomputes the outputs of the tile: the faulty outputs match it byte for byte, and the
-outputs outside the tile equal the fault-free dump.
+recomputes the outputs of the \gls{tile}: the faulty outputs match it byte for byte, and the
+outputs outside the \gls{tile} equal the fault-free \gls{dump}.
 
-\paragraph{Out-of-distribution monitor.} The monitor reads the INT8 output of the last backbone
-layer of Tiny-YOLOv2, which the accelerator already writes, and scores each image on the ARM.
-Dark (ExDark) and thermal (FLIR) images give \emph{weaker} features than VOC: they fall inside
+\paragraph{Out-of-distribution monitor.} The monitor reads the \gls{int8} output of the last backbone
+layer of Tiny-YOLOv2, which the accelerator already writes, and scores each image on the \gls{arm}.
+Dark (ExDark) and thermal (\gls{flir}) images give \emph{weaker} features than \gls{voc}: they fall inside
 the shell on which in-domain features lie, so a raw distance score is lower out of domain. The
-monitor therefore uses the typicality of the score, its distance to the median on held-out
-VOC images in either direction. The plain norm of the pooled features is the best score
-(AUROC \chiffre{ood.norm.auroc.exdark} on low light, \chiffre{ood.norm.auroc.flir} on thermal),
+monitor therefore uses the \gls{typicality} of the score, its distance to the median on held-out
+\gls{voc} images in either direction. The plain norm of the pooled features is the best score
+(\gls{auroc} \chiffre{ood.norm.auroc.exdark} on low light, \chiffre{ood.norm.auroc.flir} on thermal),
 ahead of a Mahalanobis distance and of a NumPy autoencoder that costs ten times more
 (Table~\ref{tab:ood}). It is a domain alarm, not a per-image predictor of accuracy.
 
 \begin{table}[htbp]
-\caption{OOD monitor on the features of the integer Tiny-YOLOv2, typicality scores, VOC test
-against ExDark and FLIR (\texttt{results/ood\_monitor.md}).}
+\caption{\gls{ood} monitor on the features of the integer Tiny-YOLOv2, \gls{typicality} scores, \gls{voc} test
+against ExDark and \gls{flir} (\repo{results/ood\_monitor.md}).}
 \label{tab:ood}
 \small\articletable{ood.table}
 \end{table}
@@ -583,75 +586,75 @@ against ExDark and FLIR (\texttt{results/ood\_monitor.md}).}
 \section{Safety evidence}\label{sec:safety}
 
 Dependability detects faults at run time; this section collects the design-time evidence that
-the circuit computes the model, and how long it may take. It is engineering outside the base.
+the circuit computes the model, and how long it may take. It is engineering outside the \gls{base}.
 
 \paragraph{Model $\leftrightarrow$ circuit equivalence.} Each hand-over of the chain is
-qualified at one of three levels: \emph{pointwise} (same output), \emph{bounded proximity}
+qualified at one of three levels: \emph{\gls{pointwise}} (same output), \emph{\gls{boundedprox}}
 (a measured bound on the gap) or \emph{statistical} (same task metric). The float model and
-its fake-quantized copy differ by a few LSB of the layer scale, which accumulate through the
+its \glslink{fakequant}{fake-quantized} copy differ by a few \gls{lsb} of the layer scale, which accumulate through the
 layers; the statistical gap of Section~\ref{sec:quant} is the one that counts. From the
-fake-quantized model to the integer model, the only difference is the requantization by an
-integer multiplier and shift and the rounded leaky activation: at most one LSB per layer.
-From the integer model on, the golden model and the C-simulated kernel produce the same
-byte for every layer output (Table~\ref{tab:equiv}). This pointwise level rests on three
+\glslink{fakequant}{fake-quantized} model to the integer model, the only difference is the \gls{requant} by an
+integer multiplier and shift and the rounded leaky activation: at most one \gls{lsb} per layer.
+From the integer model on, the \gls{golden} and the \glslink{csim}{C-simulated} kernel produce the same
+byte for every layer output (Table~\ref{tab:equiv}). This \gls{pointwise} level rests on three
 further pieces of evidence: exhaustive and boundary tests of the operators in Python, C++
-and HLS, which found and fixed an int32 overflow of the golden leaky; a proof with the z3
-SMT solver of the requantization, leaky and clipping kernels for every layer
+and \gls{hls}, which found and fixed an int32 overflow of the golden leaky; a proof with the z3
+\gls{smt} solver of the \gls{requant}, leaky and clipping kernels for every layer
 (\chiffre{equiv.smt.proved} obligations, no int32 overflow of the accumulator); and a
 per-layer traceability table checked in \texttt{make ci}. The integer post-processing equals
-its golden mirror and keeps its capacity and overflow properties, but its unsorted NMS
-depends on the order of the cells. The co-simulation and board rows wait for Vitis and the
+its golden mirror and keeps its capacity and overflow properties, but its unsorted \gls{nms}
+depends on the order of the cells. The \gls{cosim} and board rows wait for Vitis and the
 KV260.
 
 \begin{table}[htbp]
-\caption{Equivalence per stage on 20 images per network (\texttt{results/equivalence.md}):
-gaps in LSB of the layer output scale, then the level of the later stages. The co-simulation
+\caption{Equivalence per stage on 20 images per network (\repo{results/equivalence.md}):
+gaps in \gls{lsb} of the layer output scale, then the level of the later stages. The \gls{cosim}
 and board stages are pending.}
 \label{tab:equiv}
 \footnotesize\articletable{equiv.table}
 \end{table}
 
 \paragraph{A latency bound independent of the image.} The engine runs a fixed schedule of
-layer descriptors: every loop bound comes from a descriptor field or a tile constant, and
+layer descriptors: every loop bound comes from a descriptor field or a \gls{tile} constant, and
 activations and weights are never a loop or branch condition. The cycle count of a layer is
 therefore a function of its shape only. The static bound gives up every overlap of the
-ping-pong schedule and adds the DDR traffic at the effective bandwidth of the board and an
-assumed burst latency per transfer phase. For Tiny-YOLOv2, it gives
+\gls{pingpong} schedule and adds the \gls{ddr} traffic at the effective bandwidth of the board and an
+assumed \gls{burst} latency per transfer phase. For Tiny-YOLOv2, it gives
 \chiffre{wcet.v2.acc.ms}~ms for the accelerator, against \chiffre{perf.kv260.v2.ms}~ms for
 the overlapped cycle model. The post-processing is the data-dependent part: bounded by its
 256 slots and by the candidates that can pass the threshold, it brings the frame bound to
-\chiffre{wcet.v2.frame.ms}~ms, hence a watchdog of \chiffre{wcet.v2.watchdog.ms}~ms.
-Adversarial inputs in C simulation stay under the bound. On the sigmoid heads of
-Tiny-YOLOv3 and YOLOv4-tiny, the uncapped NMS dominates the worst case: a demonstrable
-bound there needs a cap on the candidates. The burst latency and the end-to-end latency on
+\chiffre{wcet.v2.frame.ms}~ms, hence a \gls{watchdog} of \chiffre{wcet.v2.watchdog.ms}~ms.
+Adversarial inputs in \gls{csim} stay under the bound. On the sigmoid heads of
+Tiny-YOLOv3 and YOLOv4-tiny, the uncapped \gls{nms} dominates the worst case: a demonstrable
+bound there needs a cap on the candidates. The \gls{burst} latency and the end-to-end latency on
 the board remain to be measured.
 
 % ---------------------------------------------------------------------------------------
 \section{Beyond VOC}\label{sec:beyond}
 
-Milestones M11, M15 and M16 take Tiny-YOLOv3 to other datasets: VisDrone (aerial views),
-KITTI (driving), FLIR (thermal), ExDark (low light) and CrowdHuman (crowds). Each dataset
+Milestones \ms{M11}, \ms{M15} and \ms{M16} take Tiny-YOLOv3 to other datasets: VisDrone (aerial views),
+\gls{kitti} (driving), \gls{flir} (thermal), ExDark (low light) and CrowdHuman (crowds). Each dataset
 has generated notebooks for statistics, inference and a sweep of batch size $\times$
-training subset, run on a Colab GPU from COCO weights. The first sweeps use short runs of
-600 iterations and score them on 50 images (tier R): these scores \emph{rank} runs and are
-not publishable results. On VOC itself, the published Tiny-YOLOv2 weights score higher on
+training subset, run on a Colab \gls{gpu} from \gls{coco} weights. The first sweeps use short runs of
+600 iterations and score them on 50 images (\gls{tier} R): these scores \emph{rank} runs and are
+not publishable results. On \gls{voc} itself, the published Tiny-YOLOv2 weights score higher on
 these 50 images than on the full split, which gives the order of magnitude of the bias.
 
 \begin{table}[htbp]
 \caption{Best run of the first sweep of each dataset
-(\texttt{docs/tasks/resultats-balayages.md}).}
+(\repo{docs/tasks/resultats-balayages.md}).}
 \label{tab:sweeps}
 \footnotesize\articletable{balayages.meilleurs}
 \end{table}
 
 The scores of Table~\ref{tab:sweeps} show that none of these runs has converged. On
 VisDrone, objects are tiny at 416 pixels, many targets collide in the same cell, and the
-50-image ranking does not hold on the full split; the M15 campaign replaces the sweep by
-longer runs, matching resize between training and evaluation, and tiles. FLIR uses the
-COCO metric, which does not compare with the 11-point AP of the others. The sweep figures
+50-image ranking does not hold on the full split; the \ms{M15} campaign replaces the sweep by
+longer runs, matching resize between training and evaluation, and \glspl{tile}. \gls{flir} uses the
+\gls{coco} metric, which does not compare with the 11-point \gls{ap} of the others. The sweep figures
 (\texttt{balayage}, \texttt{balayages}) are not yet published in
-\texttt{results/figures/} and will be cited here once they are.
-Figure~\ref{fig:detections} shows detections of the three VOC stages.
+\repo{results/figures/} and will be cited here once they are.
+Figure~\ref{fig:detections} shows detections of the three \gls{voc} stages.
 
 \articlefig{detections}
 
@@ -659,31 +662,30 @@ Figure~\ref{fig:detections} shows detections of the three VOC stages.
 \section{Limitations and future work}\label{sec:limits}
 
 The main limitation is that no number of this article has been measured on the board. The
-KV260, Vivado and Vitis are not available yet (milestones M6 to M8): performance is a
-cycle-model projection, resources are estimates, and the FPGA mAP is a C simulation. The
-keys still in that state are listed below; milestone task T17.19 switches them to
+KV260, Vivado and Vitis are not available yet (milestones \ms{M6} to \ms{M8}): performance is a
+cycle-model projection, resources are estimates, and the \gls{fpga} \gls{map} is a \gls{csim}. The
+keys still in that state are listed below; milestone task \ms{T17.19} switches them to
 measurements and rewrites the abstract, Section~\ref{sec:results} and this section.
 
 \articlestatuslist
 
-Other limits: the power-of-two ADMM did not converge and the 4-bit QAT ran for a fraction
+Other limits: the power-of-two \gls{admm} did not converge and the 4-bit \gls{qat} ran for a fraction
 of an epoch (Section~\ref{sec:extensions}); the training from scratch in NumPy
-(fine-tuning on VOC, M2) is not finished, so the reference mAP uses the published Darknet
-weights; the datasets beyond VOC have only been explored at tier R
-(Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on COCO and
+(fine-tuning on \gls{voc}, \ms{M2}) is not finished, so the reference \gls{map} uses the published Darknet
+weights; the datasets beyond \gls{voc} have only been explored at \gls{tier} R
+(Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on \gls{coco} and
 quantization-aware training to come within one point; YOLOv7-tiny has no accuracy yet, and
 YOLOv5n and YOLOv8n are read without PyTorch, but their decoding, targets, losses and
-training in NumPy are still to write (M33 to M35). The fault campaign has only run as a smoke
-test, and the ABFT lane of the kernel is not synthesized. The equivalence evidence and the
-latency bound of Section~\ref{sec:safety} stop at the C simulation: the co-simulation and
-board rows, the measured burst latency and the latency distribution on the board are
+training in NumPy are still to write (\ms{M33} to \ms{M35}). The fault campaign has only run as a \glslink{smokerun}{smoke test}, and the \gls{abft} lane of the kernel is not synthesized. The equivalence evidence and the
+latency bound of Section~\ref{sec:safety} stop at the \gls{csim}: the \gls{cosim} and
+board rows, the measured \gls{burst} latency and the latency distribution on the board are
 pending. The person-detection safety metrics, the runtime monitors and the assurance case
-(M27, M29, M31) wait for the CrowdHuman data on the PC; the explanation of the decisions
-(M36) is planned. The long runs still open are listed with their durations in
-\texttt{docs/tasks/long-runs.md}. Table~\ref{tab:etat} gives the progress by milestone.
+(\ms{M27}, \ms{M29}, \ms{M31}) wait for the CrowdHuman data on the PC; the explanation of the decisions
+(\ms{M36}) is planned. The long runs still open are listed with their durations in
+\repo{docs/tasks/long-runs.md}. Table~\ref{tab:etat} gives the progress by milestone.
 
 \begin{table}[htbp]
-\caption{Progress by milestone (\texttt{docs/tasks/README.md}).}
+\caption{Progress by milestone (\repo{docs/tasks/README.md}).}
 \label{tab:etat}
 \centering\small\articleetat
 \end{table}
@@ -692,9 +694,9 @@ pending. The person-detection safety metrics, the runtime monitors and the assur
 \section{Reproducibility}\label{sec:repro}
 
 Every number of this article is regenerated from the repository: \texttt{make article}
-reads the results (\texttt{collect}) into \texttt{docs/article/chiffres.json}, which
+reads the results (\texttt{collect}) into \repo{docs/article/chiffres.json}, which
 records for each key its value, status, source file, command and the revision where it
-last changed, then rewrites \texttt{docs/article/generated.tex} (\texttt{render}), the
+last changed, then rewrites \repo{docs/article/generated.tex} (\texttt{render}), the
 only file this article takes its numbers from. \texttt{python -m tools.article --check}
 runs in \texttt{make ci}, and \texttt{make article-pdf} compiles this document. The main
 commands are:
@@ -705,13 +707,13 @@ commands are:
 \textbf{Stage} & \textbf{Command} \\
 \midrule
 tests (Python, C++) & \texttt{make test}, \texttt{make ci} \\
-float and integer mAP & \texttt{make eval-float}, \texttt{make eval-int} \\
-export and golden model & \texttt{make export}, \texttt{make golden-check} \\
-HLS kernel in C simulation & \texttt{make csim-gcc}, \texttt{make hls-cycles} \\
-ARM driver on PC & \texttt{make sw-sim} \\
-mAP at the three stages & \texttt{make m8-inputs m8-int bench-sim map-stades} \\
-COCO, YOLOv4-tiny & \texttt{tools/m11.sh coco-v4} \\
-faults, OOD monitor & \texttt{tools/m25.sh}, \texttt{tools/m25.sh ood} \\
+float and integer \gls{map} & \texttt{make eval-float}, \texttt{make eval-int} \\
+export and \gls{golden} & \texttt{make export}, \texttt{make golden-check} \\
+\gls{hls} kernel in \gls{csim} & \texttt{make csim-gcc}, \texttt{make hls-cycles} \\
+\gls{arm} driver on PC & \texttt{make sw-sim} \\
+\gls{map} at the three stages & \texttt{make m8-inputs m8-int bench-sim map-stades} \\
+\gls{coco}, YOLOv4-tiny & \texttt{tools/m11.sh coco-v4} \\
+faults, \gls{ood} monitor & \repo{tools/m25.sh}, \texttt{tools/m25.sh ood} \\
 equivalence, proofs, traceability & \texttt{make equivalence}, \texttt{make prove-kernels},
   \texttt{make traceability} \\
 latency bound & \texttt{python tools/perf\_model.py --wcet} \\
@@ -722,9 +724,9 @@ this article & \texttt{make article}, \texttt{make article-pdf} \\
 \end{tabularx}
 \end{center}
 
-Each evaluation has a test profile (M12): tier R on a few images for development, tier M
-on a mid-size subset, tier N on the full split; only tier N numbers go to
-\texttt{results/}. The notebooks of M14 run the same tools on Colab and are versioned with
+Each evaluation has a test profile (\ms{M12}): \gls{tier} R on a few images for development, \gls{tier} M
+on a mid-size subset, \gls{tier} N on the full split; only \gls{tier} N numbers go to
+\repo{results/}. The notebooks of \ms{M14} run the same tools on Colab and are versioned with
 their outputs (Figures~\ref{fig:tests} and~\ref{fig:code}). This document was rendered at
 \articlerev.
 
@@ -732,14 +734,18 @@ their outputs (Figures~\ref{fig:tests} and~\ref{fig:code}). This document was re
 \articlefig{code}
 
 % ---------------------------------------------------------------------------------------
+\printnoidxglossary[type=abbreviations,title={Glossary of acronyms}]
+\printnoidxglossary[type=main,title={Lexicon}]
+
+% ---------------------------------------------------------------------------------------
 \section*{References}
 \addcontentsline{toc}{section}{References}
 
-Papers of the article base, cited with the chunk that supports the statement
-(\texttt{[n, \#chunk]}), checkable with \texttt{bin/pdb verify}, a tool of the base outside
-this repository. Statements no paper of the base supports are marked ``outside the base'':
+Papers of the \glslink{base}{article base}, cited with the chunk that supports the statement
+(\texttt{[n, \#chunk]}), checkable with \texttt{bin/pdb verify}, a tool of the \gls{base} outside
+this repository. Statements no paper of the \gls{base} supports are marked ``outside the \gls{base}'':
 the hardware handling of the $2\times2$ stride-1 max pooling, the Darknet \texttt{.cfg}
-files (exact channels, Tiny-YOLOv3 anchors), the integer requantization chain and the BN
+files (exact channels, Tiny-YOLOv3 \glspl{anchor}), the integer \gls{requant} chain and the \gls{bn}
 derivatives. YOLOv3 is a technical report that was never published at a conference, but
 it is the de facto reference; preprints have not been peer reviewed.
 
@@ -752,23 +758,26 @@ it is the de facto reference; preprints have not been peer reviewed.
 \section{Version log}
 
 Written by hand, one entry per update of the article (procedure ``Mise à jour à chaque
-jalon'' of M17).
+jalon'' of \ms{M17}).
 
 \begin{center}\small
 \begin{tabularx}{\linewidth}{@{}llX@{}}
 \toprule
 \textbf{Version} & \textbf{Date} & \textbf{Changes} \\
 \midrule
-v0 & 2026-10-07 & Infrastructure (\texttt{tools/article.py}, \texttt{make article},
-  \texttt{--check} in CI) and first draft of every section, in English (M19 rule). Board
+v0 & 2026-10-07 & Infrastructure (\repo{tools/article.py}, \texttt{make article},
+  \texttt{--check} in \gls{ci}) and first draft of every section, in English (\ms{M19} rule). Board
   measurements pending. \\
 v1 & 2026-10-07 & Source moved from Markdown to LaTeX (\texttt{article.tex},
   \texttt{generated.tex}, \texttt{refs.bib}); PDF compiled by xelatex. \\
-v2 & 2026-10-20 & Two MACs per DSP and the Winograd study (M23), YOLOv4-tiny on COCO
-  (M24), new section on dependability (M25), YOLOv7-tiny in progress (M26). \\
-v3 & 2026-10-22 & New section on safety evidence: equivalence matrix, operator tests, SMT
-  proof and traceability (M28), static latency bound (M30); ABFT lane and buffer faults in
-  the HLS kernel (M25); YOLOv5n read without PyTorch (M33). \\
+v2 & 2026-10-20 & Two \glspl{mac} per \gls{dsp} and the Winograd study (\ms{M23}), YOLOv4-tiny on \gls{coco}
+  (\ms{M24}), new section on dependability (\ms{M25}), YOLOv7-tiny in progress (\ms{M26}). \\
+v3 & 2026-10-22 & New section on safety evidence: equivalence matrix, operator tests, \gls{smt}
+  proof and traceability (\ms{M28}), static latency bound (\ms{M30}); \gls{abft} lane and buffer faults in
+  the \gls{hls} kernel (\ms{M25}); YOLOv5n read without PyTorch (\ms{M33}). \\
+v4 & 2026-10-22 & Glossary of acronyms and lexicon (\texttt{glossary.tex}); every term,
+  milestone, task and repository path of the text is a link, references link back to the
+  pages that cite them; checked by --check. \\
 \bottomrule
 \end{tabularx}
 \end{center}

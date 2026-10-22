@@ -252,3 +252,64 @@ def test_compiles(env, tmp_path):
                        text=True, timeout=300, check=False)
     assert r.returncode == 0, r.stdout[-2000:]
     assert (env["article"].parent / "article.pdf").exists()
+
+
+GLOSSARY = r"""% comment \newabbreviation{zz}{ZZ}{ignored}
+\newabbreviation{nms}{NMS}{non-maximum suppression}
+\newabbreviation[sort={map}]{map}{mAP}{mean average precision}
+\newglossaryentry{golden}{name={golden model},
+  description={reference}}
+\newglossaryentry{csim}{name={C simulation}, user1={C-sim|C-simulated},
+  description={kernel as C++}}
+"""
+
+LINKED = r"""\documentclass{article}
+\newcommand\x{NMS in the preamble}
+\begin{document}
+The NMS and two NMSs; the golden
+model and Golden models; \texttt{NMS} $NMS$ % NMS in a comment
+\section{NMS heading} the C-simulated kernel, C-sim, mAP but not mAPs-like AP.
+\cite[\#NMS]{k} See \texttt{results/x.md}, \texttt{model/<net>/}, M28 and T28.0, not M99.
+\end{document}
+"""
+
+
+def test_glossary_terms(tmp_path):
+    (tmp_path / "glossary.tex").write_text(GLOSSARY)
+    forms = {t.form: t.macro for t in A.glossary_terms(tmp_path / "glossary.tex")}
+    assert "ZZ" not in forms
+    assert forms["NMSs"] == r"\glspl{nms}" and forms["mAP"] == r"\gls{map}"
+    assert forms["Golden models"] == r"\Glspl{golden}"
+    assert forms["C-simulated"] == r"\glslink{csim}{C-simulated}"
+    assert A.glossary_terms(tmp_path / "absent.tex") == []
+
+
+def test_links(tmp_path):
+    (tmp_path / "glossary.tex").write_text(GLOSSARY)
+    (tmp_path / "results").mkdir()
+    (tmp_path / "results" / "x.md").write_text("x")
+    tasks = tmp_path / "docs" / "tasks"
+    tasks.mkdir(parents=True)
+    (tasks / "M28-equivalence.md").write_text("# M28\n\n### [x] T28.0 — Equivalence matrix\n")
+    links = A.task_links(tmp_path)
+    assert links["M28"].endswith("/docs/tasks/M28-equivalence.md")
+    assert links["T28.0"].endswith("M28-equivalence.md#x-t280--equivalence-matrix")
+    terms = A.glossary_terms(tmp_path / "glossary.tex")
+    out = A.link(LINKED, terms, links, tmp_path)
+    assert r"\newcommand\x{NMS in the preamble}" in out
+    assert r"The \gls{nms} and two \glspl{nms}; the \gls{golden}" in out
+    assert r"\Glspl{golden}; \texttt{NMS} $NMS$ % NMS in a comment" in out
+    assert r"\section{NMS heading} the \glslink{csim}{C-simulated} kernel, " \
+           r"\glslink{csim}{C-sim}, \gls{map} but not mAPs-like AP." in out
+    assert r"\cite[\#NMS]{k} See \repo{results/x.md}, \texttt{model/<net>/}, \ms{M28} and " \
+           r"\ms{T28.0}, not M99." in out
+    assert A.bare_links(out, terms, links, tmp_path) == []
+
+
+def test_check_links(env):
+    (env["article"].parent / "glossary.tex").write_text(GLOSSARY)
+    text = TEXT.replace("Narrative", "The NMS narrative")
+    probs = _check(text, _render(text, env), env)
+    assert [p.split(" is not")[0] for p in probs] == ["line 5: 'mAP'", "line 8: 'NMS'"]
+    with pytest.raises(A.ArticleError, match="no milestone or task M99"):
+        _render(TEXT + r"\ms{M99}", env)

@@ -1,0 +1,135 @@
+% Glossary of acronyms and lexicon of the article (M17), \input by article.tex after
+% glossaries-extra. Hand-written. Every occurrence of an entry in the prose of article.tex
+% is a link to it: `python -m tools.article link` wraps the bare ones and `--check`
+% (make ci) rejects them. Forms recognised: the short form or the name, its plural (`s` or
+% `plural=`), and the variants of `user1`, separated by `|`. Acronyms match case-sensitively;
+% lexicon entries also match with a capital first letter.
+
+% ---- acronyms (type abbreviations): short form in the text, long form in the glossary
+\newabbreviation{abft}{ABFT}{algorithm-based fault tolerance: a checksum computed alongside the result and compared with it}
+\newabbreviation{adr}{ADR}{architecture decision record (\texttt{docs/adr/})}
+\newabbreviation{admm}{ADMM}{alternating direction method of multipliers}
+\newabbreviation{ap}{AP}{average precision: area under the precision-recall curve of one class}
+\newabbreviation{arm}{ARM}{the Arm Cortex-A53 cores of the processing system of the Zynq}
+\newabbreviation{auroc}{AUROC}{area under the receiver operating characteristic curve}
+\newabbreviation{axi}{AXI}{Advanced eXtensible Interface, the on-chip bus of the Zynq (AXI-Lite: its register variant)}
+\newabbreviation{bn}{BN}{batch normalization}
+\newabbreviation{ci}{CI}{continuous integration (\texttt{make ci})}
+\newabbreviation{cnn}{CNN}{convolutional neural network}
+\newabbreviation{coco}{COCO}{Common Objects in Context, the 80-class detection dataset}
+\newabbreviation{cpu}{CPU}{central processing unit}
+\newabbreviation{csp}{CSP}{cross-stage partial block, which splits the channels of a map into two paths}
+\newabbreviation{ddr}{DDR}{double data rate memory: the external DRAM of the board}
+\newabbreviation{dpu}{DPU}{deep-learning processing unit, the preconfigured engine of Vitis AI}
+\newabbreviation{dsp}{DSP}{DSP48E2 slice of the FPGA: a $27\times18$-bit multiplier with a 48-bit accumulator}
+\newabbreviation{elan}{ELAN}{efficient layer aggregation network block}
+\newabbreviation{fft}{FFT}{fast Fourier transform}
+\newabbreviation{flir}{FLIR}{forward-looking infrared; here the FLIR ADAS thermal dataset}
+\newabbreviation{fpga}{FPGA}{field-programmable gate array}
+\newabbreviation{gmac}{GMAC}{$10^9$ multiply-accumulates}
+\newabbreviation{gops}{GOPS}{$10^9$ operations per second (one MAC counts as two operations)}
+\newabbreviation{gpu}{GPU}{graphics processing unit}
+\newabbreviation{hls}{HLS}{high-level synthesis: hardware generated from C++ by Vitis HLS}
+\newabbreviation{int8}{INT8}{8-bit signed integer}
+\newabbreviation{int16}{INT16}{16-bit signed integer}
+\newabbreviation[sort={iou}]{iou}{IoU}{intersection over union of two boxes}
+\newabbreviation{kitti}{KITTI}{Karlsruhe Institute of Technology and Toyota Technological Institute driving dataset}
+\newabbreviation{lsb}{LSB}{least significant bit: one step of the integer grid of a tensor}
+\newabbreviation{lutram}{LUTRAM}{distributed memory built from the look-up tables of the FPGA}
+\newabbreviation{mac}{MAC}{multiply-accumulate}
+\newabbreviation[sort={map}]{map}{mAP}{mean average precision: the AP averaged over the classes}
+\newabbreviation{nms}{NMS}{non-maximum suppression: removal of the boxes that overlap a better one}
+\newabbreviation{ood}{OOD}{out of distribution: an input unlike the training data}
+\newabbreviation{pe}{PE}{processing element: the multiply-accumulate array of the engine}
+\newabbreviation{qat}{QAT}{quantization-aware training}
+\newabbreviation[sort={relu}]{relu}{ReLU}{rectified linear unit; leaky ReLU keeps a small slope for negative inputs}
+\newabbreviation{sgd}{SGD}{stochastic gradient descent}
+\newabbreviation[sort={silu}]{silu}{SiLU}{sigmoid linear unit, $x\,\sigma(x)$}
+\newabbreviation{smt}{SMT}{satisfiability modulo theories: the logic of the z3 solver}
+\newabbreviation[sort={soc}]{soc}{SoC}{system on chip: processor and programmable logic on one die}
+\newabbreviation{som}{SOM}{system on module: the Kria K26 card of the KV260 board}
+\newabbreviation{voc}{VOC}{PASCAL Visual Object Classes, the 20-class detection dataset}
+\newabbreviation{yolo}{YOLO}{You Only Look Once, the one-pass grid detector family}
+
+% ---- lexicon (type main): the terms of the project and of the field
+\newglossaryentry{anchor}{name={anchor}, user1={anchor-free},
+  description={prior box shape of a YOLO head; each cell predicts offsets relative to its
+  anchors, chosen by k-means on the training boxes}}
+\newglossaryentry{base}{name={base}, user1={article base},
+  description={the set of papers the article cites with the chunk that supports each
+  statement; ``outside the base'' marks a statement none of them supports}}
+\newglossaryentry{bitexact}{name={bit-exact}, user1={Bit-exactness|bit-exactness},
+  description={equal byte for byte: two implementations give the same integer output for
+  every input, with no tolerance}}
+\newglossaryentry{bitstream}{name={bitstream},
+  description={configuration file of the programmable logic of the FPGA}}
+\newglossaryentry{boundedprox}{name={bounded proximity},
+  description={equivalence level where the gap between two stages is not zero but bounded
+  by a measured value}}
+\newglossaryentry{burnin}{name={burn-in},
+  description={first training iterations, with a learning rate ramped up from zero}}
+\newglossaryentry{burst}{name={burst},
+  description={consecutive AXI transfers issued from a single address request}}
+\newglossaryentry{calibration}{name={calibration},
+  description={choice of the activation scales of the integer model from the activations of
+  a few hundred images (here a percentile of $|x|$)}}
+\newglossaryentry{csim}{name={C simulation}, user1={C-sim|C-simulated},
+  description={execution of the HLS source of the kernel compiled as ordinary C++, here with
+  g++ and the open-source \texttt{ap\_int} headers: same function, no RTL}}
+\newglossaryentry{cosim}{name={co-simulation}, user1={co-sim},
+  description={simulation of the RTL generated by HLS against the C test bench; gives the
+  exact cycles; needs Vitis}}
+\newglossaryentry{dump}{name={dump},
+  description={integer activations of every layer, saved on a few images by the Python
+  integer model and used as reference by the later stages}}
+\newglossaryentry{fakequant}{name={fake quantization},
+  user1={fake-quantized|Fake-quantized|fake-quantizing|Fake-quantizing},
+  description={float model whose weights and activations are rounded to the integer grid
+  and scaled back to float, so that it sees the quantization error}}
+\newglossaryentry{golden}{name={golden model},
+  description={the C++ reference (\texttt{cpp/golden}) that runs the integer network as the
+  hardware will: tiles, fixed buffers, same output stage}}
+\newglossaryentry{groupedroute}{name={grouped route},
+  description={route layer that reads one group of the channels of a map (CSP blocks of
+  YOLOv4-tiny); here an addressing mode of the engine}}
+\newglossaryentry{ii}{name={initiation interval},
+  description={number of cycles between two iterations of a pipelined loop; one means a new
+  iteration every cycle}}
+\newglossaryentry{im2col}{name={im2col},
+  description={rearrangement of the input patches into the columns of a matrix, so that a
+  convolution becomes a matrix product}}
+\newglossaryentry{letterbox}{name={letterbox},
+  description={resize that keeps the aspect ratio and pads the image to a square, as
+  opposed to the direct \texttt{stretch} resize}}
+\newglossaryentry{manifest}{name={manifest},
+  description={JSON description of an exported network (layers, shapes, scales, offsets of
+  the blobs), read by the golden model, the test benches and the ARM driver}}
+\newglossaryentry{objectness}{name={objectness},
+  description={score of a YOLO prediction that its box contains an object}}
+\newglossaryentry{pingpong}{name={ping-pong},
+  description={double buffering: the engine computes on one buffer while the next tile is
+  loaded into the other}}
+\newglossaryentry{pointwise}{name={pointwise},
+  description={equivalence level where two stages give the same output, byte for byte}}
+\newglossaryentry{requant}{name={requantization}, user1={requantizes|requantized},
+  description={conversion of the int32 accumulator back to int8: multiplication by an
+  integer $M_0$, rounding right shift, saturation}}
+\newglossaryentry{roofline}{name={roofline},
+  description={performance model that bounds the throughput by the compute peak and by the
+  memory bandwidth times the arithmetic intensity}}
+\newglossaryentry{smokerun}{name={smoke run}, user1={smoke test},
+  description={short run on a few inputs that only checks that a pipeline runs end to end}}
+\newglossaryentry{tier}{name={tier},
+  description={test profile of the project (M12): R on a few images ranks runs and is not
+  published, M on a mid-size subset, N on the full split}}
+\newglossaryentry{tile}{name={tile}, user1={tiled|tiling},
+  description={block of the convolution loop nest held in on-chip buffers and computed at
+  once: $T_m$ output channels, $T_n$ input channels, $T_r$ rows, $T_c$ columns}}
+\newglossaryentry{typicality}{name={typicality},
+  description={distance of a score to its median on held-out in-domain images, in either
+  direction}}
+\newglossaryentry{upsample}{name={upsample},
+  description={layer that repeats each pixel $2\times2$; here a change of read address, no
+  compute}}
+\newglossaryentry{watchdog}{name={watchdog},
+  description={timer that flags a frame exceeding its latency budget}}

@@ -63,6 +63,17 @@ risks, with links to the plot folders on GitHub. Its durations are plans copied 
 [long-runs.md](long-runs.md), marked "(estimates)" and cited on each frame. When a long
 run is done, update long-runs.md first, then the deck.
 
+**Glossary and links (2026-10-22, article v4).** `docs/article/glossary.tex` holds the
+glossary of acronyms (`\newabbreviation`) and the lexicon (`\newglossaryentry`, variants in
+`user1`), printed before the references (glossaries-extra, `\makenoidxglossaries`: no
+external indexer, pdflatex and xelatex alike). Every occurrence in the prose is a link: a
+term is `\gls{key}` (to its entry, which lists the pages back), a milestone or task id is
+`\ms{M28}` / `\ms{T28.0}` (its task file on GitHub, the task anchor for a task), a path of
+the repository in `\texttt` is `\repo{results/x.md}`; citations link to the references,
+which link back to the citing pages (`backref`). `python -m tools.article link` wraps the
+bare occurrences, `--check` (make ci) rejects them. Headings, captions of the figure
+registry and generated tables are not linked.
+
 **LaTeX (2026-10-07).** The source is now `docs/article/article.tex`, compiled by xelatex
 and bibtex (`make article-pdf`) into `docs/article/article.pdf`. LaTeX comments run to the
 end of the line, so the inline blocks below are replaced by macros: the hand-written

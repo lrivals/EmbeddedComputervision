@@ -5,7 +5,60 @@
 \newcommand\chiffre[1]{\artget{n}{#1}}
 \newcommand\articletable[1]{\artget{table}{#1}}
 \newcommand\articlefig[1]{\artget{fig}{#1}}
+\newcommand\artrepo{https://github.com/lrivals/EmbeddedComputervision}
+\DeclareRobustCommand\repo[1]{\begingroup\def\_{\string_}\xdef\artu{\artrepo/blob/main/#1}%
+  \endgroup\href{\artu}{\texttt{#1}}}
+\DeclareRobustCommand\ms[1]{\href{\artget{ms}{#1}}{#1}}
 
+% ---- milestones and tasks linked by \ms
+\expandafter\def\csname artms:M12\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M12-profils-pc.md}
+\expandafter\def\csname artms:M19\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M19-english.md}
+\expandafter\def\csname artms:M33\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M33-yolov5n.md}
+\expandafter\def\csname artms:M6\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M6-accelerateur-hls.md}
+\expandafter\def\csname artms:M10\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M10-ameliorations.md}
+\expandafter\def\csname artms:M11\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M11-jeux-de-donnees.md}
+\expandafter\def\csname artms:M15\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M15-campagne-entrainement.md}
+\expandafter\def\csname artms:M16\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M16-presentation-jeux.md}
+\expandafter\def\csname artms:M8\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M8-mesures.md}
+\expandafter\def\csname artms:T17.19\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M17-article.md\#--t1719--switch-projection--measurement-board}
+\expandafter\def\csname artms:M2\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M2-cibles-perte-entrainement.md}
+\expandafter\def\csname artms:M35\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M35-yolov8n.md}
+\expandafter\def\csname artms:M27\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M27-safety-metrics.md}
+\expandafter\def\csname artms:M29\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M29-runtime-monitors.md}
+\expandafter\def\csname artms:M31\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M31-assurance-case.md}
+\expandafter\def\csname artms:M36\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M36-explanation.md}
+\expandafter\def\csname artms:M14\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M14-notebooks.md}
+\expandafter\def\csname artms:M17\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M17-article.md}
+\expandafter\def\csname artms:M23\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M23-dsp-packing.md}
+\expandafter\def\csname artms:M24\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M24-yolov4-tiny.md}
+\expandafter\def\csname artms:M25\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M25-dependability.md}
+\expandafter\def\csname artms:M26\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M26-recent-models.md}
+\expandafter\def\csname artms:M28\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M28-equivalence.md}
+\expandafter\def\csname artms:M30\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M30-latency-bound.md}
 % ---- numbers
 \expandafter\def\csname artn:abft.hls.layers\endcsname{%
 103\textsuperscript{C-sim}}  % csim, results/faults.md
@@ -624,4 +677,4 @@ M36 & 12 & 0 & 0\,\% \\
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
 \item \textbf{csim} (6): \texttt{abft.hls.layers}, \texttt{abft.hls.outputs}, \texttt{equiv.table}, \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{9fd9562-dirty}, 2026-10-22}
+\newcommand\articlerev{rev.~\texttt{a38df9b-dirty}, 2026-10-22}

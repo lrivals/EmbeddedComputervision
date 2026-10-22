@@ -5,6 +5,7 @@
     python -m tools.article render     # chiffres.json + figure registry → generated.tex
     python -m tools.article --check    # make ci: generated.tex up to date, keys, figures
     python -m tools.article pdf        # all, then xelatex → docs/article/article.pdf
+    python -m tools.article link       # wrap the bare glossary terms, ids and paths
 
 The hand-written source `docs/article/article.tex` holds the narrative only. Every
 number, table, figure and the milestone status come from macros defined in
@@ -286,7 +287,13 @@ def render(tex, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI
             raise ArticleError(f"line {line}: '{key}' is a table (\\articletable)")
         if kind == "articletable" and not isinstance(data[key]["value"], dict):
             raise ArticleError(f"line {line}: '{key}' is a number (\\chiffre)")
-    out = [HEADER, "% ---- numbers"]
+    tasks = task_links(root)
+    out = [HEADER + LINK_MACROS, "% ---- milestones and tasks linked by \\ms"]
+    for i in dict.fromkeys(_ids(uncomment(tex), r"\\ms\{([^}]*)\}")):
+        if i not in tasks:
+            raise ArticleError(f"\\ms{{{i}}}: no milestone or task {i} in docs/tasks/")
+        out.append(_def("ms", i, tasks[i].replace("#", r"\#")))
+    out.append("% ---- numbers")
     keys = [k for k in sorted(data) if not k.startswith("_")]
     for k in keys:
         e = data[k]
@@ -309,6 +316,172 @@ def render(tex, data, figures=None, article=ARTICLE, root=ROOT, suivi_path=SUIVI
             r"\newcommand\articlestatuslist{%" + "\n" + render_list(data) + "}",
             rf"\newcommand\articlerev{{{render_rev(data)}}}", ""]
     return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------- links
+# Every occurrence of a glossary entry, a milestone or task id, or a repository path in the
+# prose of article.tex is a link: \gls{key} (glossary.tex), \ms{M28} / \ms{T28.0} (task
+# file on GitHub), \repo{results/x.md}. `link` wraps the bare ones, `--check` rejects them.
+
+REPO_URL = "https://github.com/lrivals/EmbeddedComputervision"
+LINK_MACROS = r"""\newcommand\artrepo{%s}
+\DeclareRobustCommand\repo[1]{\begingroup\def\_{\string_}\xdef\artu{\artrepo/blob/main/#1}%%
+  \endgroup\href{\artu}{\texttt{#1}}}
+\DeclareRobustCommand\ms[1]{\href{\artget{ms}{#1}}{#1}}
+""" % REPO_URL
+
+# Commands whose arguments are not prose (never searched for terms).
+_NOPROSE = {"texttt", "ref", "label", "cite", "citet", "citep", "url", "href", "chiffre",
+            "articletable", "articlefig", "includegraphics", "eqref", "gls", "glspl", "Gls",
+            "Glspl", "glslink", "repo", "ms", "section", "subsection", "paragraph", "title",
+            "author", "date", "input", "bibliography", "bibliographystyle", "textsuperscript",
+            "printnoidxglossary", "addcontentsline", "renewcommand", "newcommand", "vspace",
+            "hspace", "begin", "end", "setabbreviationstyle", "usepackage", "documentclass"}
+_TABULAR = {"tabularx", "tabular"}
+
+
+def _group(s, i, open_="{", close="}"):
+    """End index (exclusive) of the balanced group of `s` that opens at `i`, else None."""
+    if i >= len(s) or s[i] != open_:
+        return None
+    depth = 0
+    for j in range(i, len(s)):
+        if s[j] == "\\":
+            continue
+        if s[j] == open_ and (j == 0 or s[j - 1] != "\\"):
+            depth += 1
+        elif s[j] == close and s[j - 1] != "\\":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+    return None
+
+
+def protected(tex):
+    """Boolean mask of `tex`: True where the text is not prose (preamble, comments, maths,
+    control sequences and the arguments of the commands of `_NOPROSE`)."""
+    mask = [False] * len(tex)
+
+    def cover(a, b):
+        mask[a:b] = [True] * (b - a)
+
+    start = tex.find(r"\begin{document}")
+    cover(0, max(start, 0))
+    for m in re.finditer(r"(?<!\\)%.*", tex):
+        cover(*m.span())
+    for m in re.finditer(r"(?<!\\)\$[^$]*(?<!\\)\$|\\\(.*?\\\)|\\\[.*?\\\]", tex, re.S):
+        cover(*m.span())
+    for m in re.finditer(r"\\([A-Za-z]+)\*?", tex):
+        cover(*m.span())
+        name, j = m.group(1), m.end()
+        if name not in _NOPROSE:
+            continue
+        env = None
+        while True:
+            k = _group(tex, j, "[", "]") or _group(tex, j)
+            if k is None:
+                break
+            if env is None and name == "begin":
+                env = tex[j + 1:k - 1]
+            cover(j, k)
+            j = k
+            if name in ("begin", "end") and env not in _TABULAR:
+                break
+    return mask
+
+
+def _ids(text, rx):
+    return [m.group(1) for m in re.finditer(rx, text)]
+
+
+def github_slug(heading):
+    """GitHub anchor of a Markdown heading: lower case, punctuation dropped, spaces → -."""
+    s = re.sub(r"[^\w\- ]", "", heading.strip().lower())
+    return s.replace(" ", "-")
+
+
+def task_links(root=ROOT):
+    """{id: URL} of the milestones (`M28`, `M9.1`) and tasks (`T28.0`) of docs/tasks/."""
+    out = {}
+    for f in sorted((Path(root) / "docs" / "tasks").glob("M*.md")):
+        url = f"{REPO_URL}/blob/main/docs/tasks/{f.name}"
+        out[f.name.split("-")[0]] = url
+        for m in re.finditer(r"^### (.*\b(T\d+(?:\.\d+)+)\b.*)$", f.read_text(), re.M):
+            out.setdefault(m.group(2), f"{url}#{github_slug(m.group(1))}")
+    return out
+
+
+@dataclass
+class Term:
+    key: str
+    form: str
+    macro: str          # replacement of the bare form
+
+
+def glossary_terms(path):
+    """Forms of the entries of glossary.tex, longest first; [] when there is no glossary."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    text, terms = uncomment(path.read_text()), []
+    for m in re.finditer(r"\\newabbreviation(?:\[[^\]]*\])?\{(\w+)\}\{([^}]*)\}", text):
+        key, short = m.groups()
+        terms += [Term(key, short, rf"\gls{{{key}}}"), Term(key, short + "s", rf"\glspl{{{key}}}")]
+    for m in re.finditer(r"\\newglossaryentry\{(\w+)\}", text):
+        key, end = m.group(1), _group(text, m.end())
+        body = text[m.end() + 1:end - 1]
+        field = {f: re.search(rf"\b{f}=\{{([^}}]*)\}}", body) for f in ("name", "plural", "user1")}
+        name = field["name"].group(1)
+        plural = field["plural"].group(1) if field["plural"] else name + "s"
+        forms = [(name, rf"\gls{{{key}}}"), (plural, rf"\glspl{{{key}}}"),
+                 (name[0].upper() + name[1:], rf"\Gls{{{key}}}"),
+                 (plural[0].upper() + plural[1:], rf"\Glspl{{{key}}}")]
+        if field["user1"]:
+            forms += [(v, rf"\glslink{{{key}}}{{{v}}}") for v in field["user1"].group(1).split("|")]
+        terms += [Term(key, f, mac) for f, mac in forms]
+    return sorted(terms, key=lambda t: -len(t.form))
+
+
+def _term_rx(form):
+    words = r"\s+".join(re.escape(w) for w in form.split())
+    return rf"(?<![\w\-/.\\]){words}(?![A-Za-z\-])"
+
+
+def bare_links(tex, terms, tasks, root=ROOT):
+    """[(start, end, replacement, line)] of the bare glossary terms, milestone and task ids
+    and repository paths in the prose of `tex`, without overlap."""
+    mask, found, taken = protected(tex), [], [False] * len(tex)
+
+    def add(a, b, rep):
+        if any(mask[a:b]) or any(taken[a:b]):
+            return
+        taken[a:b] = [True] * (b - a)
+        found.append((a, b, rep, tex.count("\n", 0, a) + 1))
+
+    body = tex.find(r"\begin{document}")
+    comments = [m.span() for m in re.finditer(r"(?<!\\)%.*", tex)]
+    for m in re.finditer(r"\\texttt\{([^{}]*)\}", tex):
+        path = m.group(1).replace(r"\_", "_").rstrip("/")
+        if m.start() < body or any(a <= m.start() < b for a, b in comments):
+            continue
+        if path and not re.search(r"[<> ]", path) and (Path(root) / path).exists():
+            found.append((m.start(), m.end(), rf"\repo{{{m.group(1)}}}",
+                          tex.count("\n", 0, m.start()) + 1))
+            taken[m.start():m.end()] = [True] * (m.end() - m.start())
+    for t in terms:
+        for m in re.finditer(_term_rx(t.form), tex):
+            add(m.start(), m.end(), t.macro)
+    for m in re.finditer(r"(?<![\w./\-\\#§])([MT]\d+(?:\.\d+)?)(?![\w])", tex):
+        if m.group(1) in tasks:
+            add(m.start(), m.end(), rf"\ms{{{m.group(1)}}}")
+    return sorted(found)
+
+
+def link(tex, terms, tasks, root=ROOT):
+    """`tex` with every bare occurrence replaced by its link."""
+    for a, b, rep, _ in sorted(bare_links(tex, terms, tasks, root), reverse=True):
+        tex = tex[:a] + rep + tex[b:]
+    return tex
 
 
 # --------------------------------------------------------------------------- checks
@@ -359,6 +532,10 @@ def check(tex, generated, data, figures=None, article=ARTICLE, root=ROOT, suivi_
                         f"expected '{exp[:80]}', found '{got[:80]}'")
     problems += [f"line {i}: number {n} written by hand in a result section (use \\chiffre)"
                  for i, n in stray_numbers(tex)]
+    terms = glossary_terms(Path(article).parent / "glossary.tex")
+    problems += [f"line {line}: '{tex[a:b]}' is not a link, expected {rep} "
+                 "(python -m tools.article link)"
+                 for a, b, rep, line in bare_links(tex, terms, task_links(root), root)]
     return problems
 
 
@@ -1141,7 +1318,7 @@ def export(article=ARTICLE, out=BUILD, versioned=VERSIONED_PDF):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m tools.article", description=__doc__.split(
         "\n\n")[0])
-    ap.add_argument("action", nargs="?", choices=("collect", "render", "all", "pdf"))
+    ap.add_argument("action", nargs="?", choices=("collect", "render", "all", "pdf", "link"))
     ap.add_argument("--check", action="store_true",
                     help="fail if generated.tex differs from render, a key or a figure is "
                     "missing, or a result section quotes a number by hand")
@@ -1162,7 +1339,14 @@ def main(argv=None):
               f"{_rel(args.article)})")
         return 0
     if args.action is None:
-        ap.error("collect, render, all, pdf or --check")
+        ap.error("collect, render, all, pdf, link or --check")
+    if args.action == "link":
+        tex = args.article.read_text()
+        terms = glossary_terms(args.article.parent / "glossary.tex")
+        done = bare_links(tex, terms, task_links())
+        args.article.write_text(link(tex, terms, task_links()))
+        print(f"{_rel(args.article)}: {len(done)} links added")
+        return 0
     if args.action in ("collect", "all", "pdf"):
         data = load(args.data)
         changed, stale = collect(data)

@@ -25,8 +25,8 @@
 \newcommand\plan{\textcolor{orange!80!black}{\small(estimates)}}
 \newcommand\done{\textcolor{mLightGreen!80!black}{\textbf{done}}}
 \newcommand\todo{\textcolor{orange!80!black}{\textbf{open}}}
-% \repo{path in the GitHub repository}{text}
-\newcommand\repo[2]{\href{https://github.com/lrivals/EmbeddedComputervision/#1}{\textcolor{mLightBrown!80!black}{\texttt{#2}}}}
+% \repolink{path in the GitHub repository}{text}
+\newcommand\repolink[2]{\href{https://github.com/lrivals/EmbeddedComputervision/#1}{\textcolor{mLightBrown!80!black}{\texttt{#2}}}}
 
 \title{Embedded YOLO from scratch}
 \subtitle{Status, current results and the next training and test campaigns}
@@ -499,20 +499,20 @@
     \toprule
     What & Link \\
     \midrule
-    Gallery of every figure & \repo{blob/main/results/figures.md}{results/figures.md} \\
-    mAP, formats, calibration, QAT / ADMM curves & \repo{tree/main/results/figures/resultats}{results/figures/resultats/} \\
-    Progress, timeline, tests & \repo{tree/main/results/figures/projet}{results/figures/projet/} \\
-    Metric tables & \repo{tree/main/results}{results/} (\texttt{map\_*.md}, \texttt{faults.md}, \texttt{equivalence.md}) \\
-    Sweeps: loss curves, rankings, AP per class & \repo{tree/main/docs/tasks/figures/resultats}{docs/tasks/figures/resultats/},
-      \repo{blob/main/notebooks/analyse_balayages.ipynb}{analyse\_balayages.ipynb} \\
-    Executed notebooks per dataset & \repo{tree/main/notebooks}{notebooks/} \\
-    Open long runs & \repo{blob/main/docs/tasks/long-runs.md}{docs/tasks/long-runs.md} \\
+    Gallery of every figure & \repolink{blob/main/results/figures.md}{results/figures.md} \\
+    mAP, formats, calibration, QAT / ADMM curves & \repolink{tree/main/results/figures/resultats}{results/figures/resultats/} \\
+    Progress, timeline, tests & \repolink{tree/main/results/figures/projet}{results/figures/projet/} \\
+    Metric tables & \repolink{tree/main/results}{results/} (\texttt{map\_*.md}, \texttt{faults.md}, \texttt{equivalence.md}) \\
+    Sweeps: loss curves, rankings, AP per class & \repolink{tree/main/docs/tasks/figures/resultats}{docs/tasks/figures/resultats/},
+      \repolink{blob/main/notebooks/analyse_balayages.ipynb}{analyse\_balayages.ipynb} \\
+    Executed notebooks per dataset & \repolink{tree/main/notebooks}{notebooks/} \\
+    Open long runs & \repolink{blob/main/docs/tasks/long-runs.md}{docs/tasks/long-runs.md} \\
     \midrule
     Colab runs (local, \texttt{make harvest}) & \texttt{build/notebooks/<dataset>/<model>/runs/<run>/} \\
     PC training runs (local) & \texttt{build/train/<run>/loss.csv} \\
     \bottomrule
   \end{tabularx}
-  \medskip\scriptsize Same list in the \repo{blob/main/README.md\#where-to-find-the-plots}{README}.
+  \medskip\scriptsize Same list in the \repolink{blob/main/README.md\#where-to-find-the-plots}{README}.
 \end{frame}
 
 \end{document}
