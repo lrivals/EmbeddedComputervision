@@ -45,6 +45,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M33](M33-yolov5n.md) | YOLOv5n without PyTorch (optional) | torch-free `.pt` reader; C3 / SPPF in forward and backward; v5 targets, CIoU loss and training recipe; float, fine-tuned and integer mAP |
 | [M34](M34-yolov7-tiny.md) | YOLOv7-tiny without PyTorch (optional) | backward of the ELAN 4-source routes and stride-1 pools; v5 / OTA loss on the Darknet graph; COCO mAP, VOC fine-tuning, integer chain |
 | [M35](M35-yolov8n.md) | YOLOv8n without PyTorch (optional) | C2f, decoupled head and DFL in forward and backward; task-aligned assigner, BCE + CIoU + DFL loss; training and integer DFL |
+| [M36](M36-explanation.md) | Decision explanation (optional) | why a box is detected or a person missed: gradient, perturbation and exact integer attributions at the three stages, miss causes, concepts, training recorder and CKA, `make explain` viewer, on-chip CAM |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -136,6 +137,12 @@ graph LR
   M28 -.-> M31
   M29 --> M31
   M30 -.-> M31
+  M3 --> M36[M36]
+  M4 --> M36
+  M25 -.-> M36
+  M27 -.-> M36
+  M29 -.-> M36
+  M36 -.-> M31
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
@@ -231,3 +238,4 @@ progress per milestone here.
 | M33 | 9 | 0 |
 | M34 | 6 | 0 |
 | M35 | 8 | 0 |
+| M36 | 12 | 0 |

@@ -25,7 +25,7 @@ Details: [docs/architecture.md](docs/architecture.md) · conventions:
 
 ## Work plan
 
-The work is split into milestones M0 to M22 in [docs/tasks/](docs/tasks/README.md). Each
+The work is split into milestones M0 to M36 in [docs/tasks/](docs/tasks/README.md). Each
 task gives the section of the spec, its dependencies, its deliverables and a measurable
 acceptance criterion. What needs Vitis/Vivado or the KV260, not available yet, is put aside
 in [docs/tasks/deferred/](docs/tasks/deferred/README.md), with the order in which to pick it
@@ -61,6 +61,14 @@ up once the tools and the board are there.
 - **[M22](docs/tasks/M22-autolabel.md)**: photo auto-labelling on the PC (`make
   autolabel`): open-vocabulary boxes from typed class names, manual correction, YOLO txt
   labels for new training sets; user guide in [docs/autolabel.md](docs/autolabel.md).
+- **M23 to M35**: two MACs per DSP, YOLOv4-tiny, dependability, safety metrics, model ↔
+  circuit equivalence, runtime monitors, latency bound, assurance case, more datasets and
+  the recent YOLOs without PyTorch; one line each in the
+  [milestone table](docs/tasks/README.md).
+- **[M36](docs/tasks/M36-explanation.md)**: decision explanation: why a box is detected or a
+  person missed (gradient, perturbation and exact integer attributions at the three
+  stages, miss causes, concepts), how the choices form during training (recorder, CKA), a
+  `make explain` viewer and an on-chip CAM.
 
 ## Layout
 
