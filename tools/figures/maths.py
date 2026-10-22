@@ -47,6 +47,8 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "backend": ("NumPy / CuPy au choix", "torch.device", "test_backend.py", ""),
     "data/anchors": ("k-means des ancres", "sklearn.cluster.KMeans", "test_anchors.py", "T13.40"),
     "data/augment": ("augmentations", "albumentations, cv2", "test_data_pipeline.py", "T13.42"),
+    "data/augment_v5": ("mosaïque, perspective (v5)", "cv2, ultralytics", "test_recipe_v5.py",
+                        "T33.7"),
     "data/datasets": ("jeux de données", "torchvision.datasets", "test_datasets.py", ""),
     "data/letterbox": ("letterbox", "cv2.resize", "test_data_pipeline.py", "T13.42"),
     "data/loader": ("chargement par lots", "torch.utils.data", "test_data_pipeline.py", ""),
@@ -96,11 +98,16 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "quant/quantize": ("quantification", "torch.quantization", "test_quantize.py", "T13.43"),
     "testing/gradcheck": ("gradcheck", "torch.autograd.gradcheck", "test_gradcheck.py", "T13.33"),
     "train/admm": ("ADMM", "—", "test_admm.py", "T13.46"),
+    "train/ema": ("EMA des poids", "ultralytics ModelEMA", "test_recipe_v5.py", "T33.7"),
     "train/loss": ("perte YOLO", "torch.nn.BCEWithLogitsLoss", "test_loss.py", "T13.38"),
+    "train/loss_v5": ("perte YOLOv5, CIoU, OTA", "ultralytics ComputeLoss", "test_loss_v5.py",
+                      "T33.6"),
     "train/optim": ("SGD", "torch.optim.SGD", "test_train.py", "T13.39"),
     "train/schedule": ("taux d'apprentissage", "torch.optim.lr_scheduler", "test_train.py",
                        "T13.39"),
     "train/trainer": ("boucle d'entraînement", "pytorch-lightning", "test_train.py", "T13.39"),
+    "train/trainer_v5": ("recette YOLOv5", "ultralytics train.py", "test_recipe_v5.py",
+                         "T33.7"),
 }
 
 

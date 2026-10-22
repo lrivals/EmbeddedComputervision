@@ -15,6 +15,9 @@ from collections import deque
 import numpy as np
 
 from yolo.data.augment import IDENTITY, augment, random_crop, random_params
+from yolo.data.augment_v5 import (AUG_V5, augment_hsv, fliplr, load_resized, mosaic4,
+                                  random_perspective, to_cxcywh_norm, to_xyxy_px)
+from yolo.data.letterbox import boxes_to_letterbox, letterbox_image
 
 
 class VOCDataset:
@@ -52,6 +55,69 @@ class VOCDataset:
             out, boxes, labels = augment(img, boxes, labels, size, params, self.channels,
                                          self.resize)
         return np.ascontiguousarray(out.transpose(2, 0, 1)), boxes, labels
+
+
+class V5Dataset:
+    """YOLOv5 / YOLOv7 training samples (T33.7, `yolo.data.augment_v5`), same interface as
+    `VOCDataset`: `load(index, size, rng)` → (CHW float32 in [0, 1], normalized boxes,
+    labels) at the square input `size`.
+
+    Training: mosaic of the image and 3 random others warped from 2S to S (probability
+    `hyp["mosaic"]`), else the image letterboxed to S and warped from S to S, as the
+    reference; then HSV and horizontal flip. Evaluation (`train=False`): the v5 letterbox.
+    """
+
+    def __init__(self, samples, train=True, keep_difficult=False, hyp=None):
+        self.samples = samples
+        self.train = train
+        self.keep_difficult = keep_difficult
+        self.hyp = {**AUG_V5, **(hyp or {})}
+
+    def __len__(self):
+        return len(self.samples)
+
+    def _kept(self, s):
+        keep = np.ones(len(s["labels"]), bool) if self.keep_difficult else ~s["difficult"]
+        return s["boxes"][keep], np.asarray(s["labels"])[keep]
+
+    def _item(self, index, size):
+        from PIL import Image
+
+        boxes, labels = self._kept(self.samples[index])
+        with Image.open(self.samples[index]["image"]) as img:
+            arr, _ = load_resized(img, size)
+        h, w = arr.shape[:2]
+        return arr, to_xyxy_px(boxes, w, h), labels
+
+    def _letterboxed(self, index, size):
+        from PIL import Image
+
+        boxes, labels = self._kept(self.samples[index])
+        with Image.open(self.samples[index]["image"]) as img:
+            x, _ = letterbox_image(img, size, 3, "v5")
+            b = boxes_to_letterbox(boxes, img.width, img.height, size, "v5")
+        return x, b, labels
+
+    def load(self, index, size, rng=None):
+        size = int(size)
+        if not self.train:
+            x, b, labels = self._letterboxed(index, size)
+            return np.ascontiguousarray(x.transpose(2, 0, 1)), b, labels
+        hyp = self.hyp
+        if rng.random() < hyp["mosaic"]:
+            others = rng.integers(0, len(self), 3)
+            canvas, boxes, labels = mosaic4([self._item(int(k), size)
+                                             for k in (index, *others)], size, rng)
+        else:
+            x, b, labels = self._letterboxed(index, size)
+            canvas = np.round(x * 255).astype(np.uint8)
+            boxes = to_xyxy_px(b, size, size)
+        img, boxes, labels = random_perspective(canvas, boxes, labels, size, rng, hyp)
+        img = augment_hsv(img, rng, hyp["hsv_h"], hyp["hsv_s"], hyp["hsv_v"])
+        if rng.random() < hyp["fliplr"]:
+            img, boxes = fliplr(img, boxes)
+        x = np.ascontiguousarray(img.transpose(2, 0, 1), dtype=np.float32) / 255
+        return x, to_cxcywh_norm(boxes, size, size), labels.astype(np.int64)
 
 
 _WORKER_DATASET = None

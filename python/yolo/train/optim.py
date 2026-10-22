@@ -104,3 +104,49 @@ class AdamW:
 
 
 OPTIMIZERS = {"sgd": SGD, "adamw": AdamW}
+
+
+# ---------------------------------------------------------------- YOLOv5 recipe (T33.7)
+V5_GROUPS = ("weights", "bn", "bias")
+
+
+def param_group(key):
+    """Group of a parameter in the YOLOv5 recipe: conv weights (decay), BN γ (no decay),
+    biases (no decay, warmup from `warmup_bias_lr`). BN β is a torch `bias`: bias group."""
+    if key == "gamma":
+        return "bn"
+    if key in ("beta", "b"):
+        return "bias"
+    return "weights"
+
+
+class SGDGroups:
+    """SGD as `torch.optim.SGD(nesterov=True)` with the three groups of `param_group`.
+
+        g ← ∇ + wd·p (weights group only);  v ← μ v + g;  p ← p − lr_group (g + μ v)
+
+    (without Nesterov: p ← p − lr_group v). `step(grads, lrs, momentum)`: `lrs` {group: lr}
+    and the momentum of the step, set by the warmup (`yolo.train.schedule.V5Schedule`).
+    """
+
+    def __init__(self, params, momentum=0.937, weight_decay=5e-4, nesterov=True):
+        self.params = params
+        self.momentum = momentum
+        self.weight_decay = weight_decay
+        self.nesterov = nesterov
+        self.velocity = [{k: get_xp(v).zeros_like(v) for k, v in p.items()} for p in params]
+
+    def step(self, grads, lrs, momentum=None):
+        mu = self.momentum if momentum is None else momentum
+        for p, g, v in zip(self.params, grads, self.velocity):
+            for k in p:
+                group = param_group(k)
+                d = g[k]
+                if self.weight_decay and group == "weights":
+                    d = d + self.weight_decay * p[k]
+                v[k] *= mu
+                v[k] += d
+                p[k] -= lrs[group] * (d + mu * v[k] if self.nesterov else v[k])
+
+    state_dict = SGD.state_dict
+    load_state_dict = SGD.load_state_dict

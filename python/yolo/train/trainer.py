@@ -66,8 +66,8 @@ class Trainer:
         self.it = 0
         self.head_list = heads(net.net)
         if any(net.layers[h].get("new_coords") for h, _ in self.head_list):
-            # T26.0: inference only (the loss of the new_coords heads is not written).
-            raise ValueError("entraînement des têtes new_coords (YOLOv7-tiny) non pris en charge")
+            # The YOLOv3 loss does not apply to the new_coords heads (T34.4).
+            raise ValueError("têtes new_coords (YOLOv7-tiny) : yolo.train.trainer_v5.TrainerV5")
         region = any(net.layers[h]["type"] == "region" for h, _ in self.head_list)
         self.loss_kwargs = {"class_mode": "softmax" if region else "sigmoid",
                             "anchor_ref": anchor_ref(net.net), **loss_kwargs}
@@ -140,14 +140,19 @@ class Trainer:
                         f"{seconds:.3f}"])
 
     # ---------------------------------------------------------------- checkpoints
-    def save_checkpoint(self, path):
-        """Paramètres, état BN, état de l'optimiseur et itération dans un `.npz`."""
+    def checkpoint_arrays(self):
+        """Paramètres, état BN, état de l'optimiseur et itération (clés du `.npz`)."""
         arrays = {"it": np.array(self.it), "seed": np.array(self.seed)}
         for i, (p, s) in enumerate(zip(self.net.params, self.net.state)):
             arrays.update({f"param/{i}/{k}": to_numpy(v) for k, v in p.items()})
             arrays.update({f"state/{i}/{k}": to_numpy(v) for k, v in s.items()})
         arrays.update({f"velocity/{k}": to_numpy(v)
                        for k, v in self.optimizer.state_dict().items()})
+        return arrays
+
+    def save_checkpoint(self, path):
+        """`checkpoint_arrays` dans un `.npz`, écrit puis renommé."""
+        arrays = self.checkpoint_arrays()
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp.npz")

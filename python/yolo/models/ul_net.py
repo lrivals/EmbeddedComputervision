@@ -27,10 +27,28 @@ UL_FIELDS = ("type", "from", "k", "s", "p", "cin", "cout", "act", "start", "stop
 
 
 def description(name):
-    """Description (`specs` / `ul_yaml` format) of a network name such as `yolov5n-coco`."""
+    """Description (`specs` / `ul_yaml` format) of a network name such as `yolov5n-coco`;
+    `<arch>-<dataset>` (e.g. `yolov5n-voc`, T33.7) is the `ul_yaml` architecture with the
+    classes of the dataset."""
     from yolo.models.specs import NETWORKS
 
-    return NETWORKS[name]
+    if name in NETWORKS:
+        return NETWORKS[name]
+    arch, _, dataset = name.partition("-")
+    if arch in ul_yaml.CONFIGS and dataset:
+        from yolo.data.datasets import DATASETS
+
+        return ul_yaml.parse(ul_yaml.CONFIGS[arch], nc=len(DATASETS[dataset].classes),
+                             name=name)
+    raise KeyError(name)
+
+
+def is_ul_name(name):
+    """True for the names of `description` (Ultralytics networks)."""
+    try:
+        return description(str(name)).get("head") is not None
+    except KeyError:
+        return False
 
 
 def _keys(layer):

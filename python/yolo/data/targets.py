@@ -58,15 +58,16 @@ def v5_levels(net):
     """[(output id, stride, anchors (A, 2) in pixels)] of a YOLOv5-style network, small
     stride first. The anchors are pixels of the input at any input size (no reference size,
     unlike `anchors_frac`); the stride gives the input size of a head map: S·stride."""
-    if net.get("head") == "anchor":
-        return [(hid, int(s), np.asarray(a, dtype=np.float64).reshape(-1, 2))
-                for hid, s, a in zip(net["outputs"], net["stride"], net["anchors"])]
     from yolo.models.specs import infer_shapes
 
     shapes = infer_shapes(net)
-    anchors = np.asarray(net["anchors"], dtype=np.float64).reshape(-1, 2)
-    levels = [(hid, net["input"][1] // shapes[hid][1][1], anchors[mask])
-              for hid, mask in heads(net)]
+    if net.get("head") == "anchor":
+        pairs = [(hid, np.asarray(a, dtype=np.float64).reshape(-1, 2))
+                 for hid, a in zip(net["outputs"], net["anchors"])]
+    else:
+        anchors = np.asarray(net["anchors"], dtype=np.float64).reshape(-1, 2)
+        pairs = [(hid, anchors[mask]) for hid, mask in heads(net)]
+    levels = [(hid, net["input"][1] // shapes[hid][1][1], a) for hid, a in pairs]
     return sorted(levels, key=lambda lv: lv[1])
 
 

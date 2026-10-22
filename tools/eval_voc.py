@@ -58,12 +58,12 @@ DEFAULTS = {"resize": "letterbox", "conf": 0.005, "iou": IOU_THR, "max_det": Non
 
 
 def description(name):
-    """Description of a Darknet cfg name / path or of a `specs` Ultralytics network."""
+    """Description of a Darknet cfg name / path or of an Ultralytics network (`ul_net`)."""
     if name in CFG_FILES or name.endswith(".cfg"):
         return load_cfg(name)
-    from yolo.models.specs import NETWORKS
+    from yolo.models import ul_net
 
-    return NETWORKS[name]
+    return ul_net.description(name)
 
 
 def load_net(name, weights=None):
@@ -90,7 +90,7 @@ def load_net(name, weights=None):
 def ul_net_file(name):
     from yolo.models.ul_net import PRETRAINED
 
-    return PRETRAINED[name]
+    return PRETRAINED.get(name, "?")
 
 
 def _load(task):
