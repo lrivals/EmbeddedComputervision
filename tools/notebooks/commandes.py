@@ -141,6 +141,8 @@ def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric
     jobs = auto_jobs(jobs)
     cmd = ["python", "tools/eval_voc.py", "--net", str(net), "--weights", str(weights),
            "--dataset", dataset, "--resize", resize, "--subset", str(subset)]
+    if resize == "v5":  # YOLOv5 / YOLOv7 settings: conf 0.001, NMS 0.65, max 300 (T33.4)
+        cmd += ["--preset", "v5"]
     _opt(cmd, "--metric", metric)
     _opt(cmd, "--split", split)
     _opt(cmd, "--size", _size(size))
@@ -151,6 +153,20 @@ def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric
     _opt(cmd, "--out", out)
     _opt(cmd, "--markdown", markdown)
     return _opt(cmd, "--jobs", jobs if jobs > 1 else None)
+
+
+def cmd_train_v5(net, out, dataset="voc", init="coco", resume=False, epochs=30, iters=0,
+                 batch=16, size=640, workers=4, device="cpu", data_root=None, subset=0,
+                 lr0=0.01):
+    """`tools/train_v5.py` (YOLOv5n, YOLOv7-tiny: recipe of T33.7, T34.4)."""
+    cmd = ["python", "tools/train_v5.py", "--net", str(net), "--dataset", dataset,
+           "--init", str(init), "--epochs", str(epochs), "--batch", str(batch),
+           "--size", str(size), "--lr0", str(lr0), "--workers", str(workers),
+           "--device", device, "--out", str(out)]
+    _opt(cmd, "--iters", iters or None)
+    _opt(cmd, "--subset", subset or None)
+    _opt(cmd, "--data-root", data_root)
+    return cmd + (["--resume"] if resume else [])
 
 
 def cmd_calibrate(net, weights, dataset, out, markdown, images=500, split=None,

@@ -87,7 +87,10 @@ def test_structure_fixe():
         for k in ("NET", "DATASET", "SPLIT", "WEIGHTS", "DEVICE", "SUBSET", "SIZE", "RESIZE"):
             assert k in p
         if nb.role == "train":
-            for k in ("ITERS", "BATCH", "LR", "INIT", "QAT", "ADMM", "DRIVE_DIR"):
+            # The YOLOv5-recipe notebooks (M33, M34) have no QAT / ADMM variants.
+            keys = ("ITERS", "BATCH", "LR", "INIT", "DRIVE_DIR") + (
+                () if nb.arch == "v5" else ("QAT", "ADMM"))
+            for k in keys:
                 assert k in p
         if nb.role == "sweep":
             for k in ("BATCHES", "TRAIN_SUBSETS", "ITERS", "LR", "INIT", "SKIP_DONE"):

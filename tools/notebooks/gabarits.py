@@ -13,8 +13,8 @@ import textwrap
 from tools.notebooks import ROOT
 from tools.notebooks.colab import DRIVE_DIR
 from tools.notebooks.commandes import M11_TRAIN
-from tools.notebooks.matrice import (SPLIT_IMAGES, V4_ARCH, V4_INIT_NET, how_to_get, palier_of,
-                                     prerequis)
+from tools.notebooks.matrice import (SPLIT_IMAGES, V4_ARCH, V4_INIT_NET, V5_ARCH, how_to_get,
+                                     palier_of, prerequis)
 
 REPO_URL = "https://github.com/lrivals/EmbeddedComputervision.git"
 REV = "main"
@@ -103,7 +103,11 @@ def _task_links(tasks):
 
 def header(nb):
     first = palier_of(nb, SUBSET_FIRST, 0)
-    if nb.role == "train":
+    if nb.role == "train" and nb.arch == V5_ARCH:
+        cost = ("palier **N** (`EPOCHS` epochs of `tools/train_v5.py`, days on CPU: "
+                "[long runs](../../docs/tasks/long-runs.md)) ; évaluation finale sur `SUBSET` "
+                "images")
+    elif nb.role == "train":
         full = palier_of(nb, 0, M11_TRAIN["iters"])
         cost = (f"palier **{full}** ({M11_TRAIN['iters']} itérations par défaut, "
                 "plusieurs heures sur CPU) ; évaluation finale sur `SUBSET` images")
@@ -232,7 +236,19 @@ def _assign(pairs):
     return "\n".join(f"{k:{width}s} = {v!r}" + (f"  # {c}" if c else "") for k, v, c in pairs)
 
 
+def _v5(nb):
+    """YOLOv5-style decoding (T33.4): the `v5` notebooks and the Darknet YOLOv7-tiny."""
+    return nb.arch == V5_ARCH or nb.net == "tiny-yolov7-coco"
+
+
+def _final(nb):
+    """Weights written by `tools/train_v5.py` (Ultralytics state dict or Darknet)."""
+    return "final.weights" if nb.model.startswith("tiny-") else "final.npz"
+
+
 def _weights_param(nb):
+    if nb.role == "train" and nb.arch == V5_ARCH:
+        return ("WEIGHTS", f"{nb.out_dir}/{_final(nb)}", "EMA weights, evaluated at the end")
     if nb.role == "infer" and nb.finetuned:
         return ("WEIGHTS", None, "None : final.weights du run RUN ; ou un chemin")
     if nb.role == "infer":
@@ -251,7 +267,9 @@ def params(nb):
           "cpu | gpu (entraînement seulement ; le reste sur CPU)"),
          ("SUBSET", SUBSET_FIRST, "images évaluées ; 0 : split complet (palier N)"),
          ("SIZE", nb.size, "entrée LxH (ex. '640x192') ; None : celle de la cfg"),
-         ("RESIZE", "stretch", "stretch (référence M12) | letterbox"),
+         ("RESIZE", "v5" if _v5(nb) else "stretch",
+          "v5 (letterbox and thresholds of YOLOv5, T33.4)" if _v5(nb)
+          else "stretch (référence M12) | letterbox"),
          ("METRIC", None, "None : celle du jeu (coco pour coco et flir)"),
          ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)")]
     if nb.role == "infer" and nb.finetuned:
@@ -262,7 +280,18 @@ def params(nb):
             p += [("TILES", 0, "tuiles N px de l'image d'origine (runs à CROP = N) ; "
                    "0 : image entière"),
                   ("OVERLAP", 0.2, "recouvrement des tuiles")]
-    if nb.role == "infer":
+    if nb.role == "train" and nb.arch == V5_ARCH:
+        p += [("INIT", "coco", "coco (heads reinitialized) | he"),
+              ("EPOCHS", 30, "epochs of the recipe (warmup 3, linear lr)"),
+              ("ITERS", 0, "stop after n batches (0: all epochs; a short try: 20)"),
+              ("BATCH", 16, "batch (gradients accumulated to 64)"),
+              ("LR", 0.01, "lr0 (final lr: 0.01·lr0)"),
+              ("SIZE_TRAIN", 640, "square training input"),
+              ("TRAIN_SUBSET", 0, "first n training images (0: all)"),
+              ("WORKERS", 4, None)]
+    elif nb.role == "infer" and nb.arch == V5_ARCH:
+        pass  # float only: the integer model of YOLOv5n is T33.8
+    elif nb.role == "infer":
         p += [("INT8", False, "volet entier : calibration et mAP INT8 (T14.4)"),
               ("CALIB_IMAGES", 500, "images de calibration (split calib du jeu)"),
               ("ACT_HIST", False, "histogrammes d'activations L00-L04 (T11.3)"),
@@ -345,6 +374,8 @@ def environment(nb):
             print(f"run choisi : {{CHOSEN.name}} ({{WEIGHTS}})")"""
     elif nb.role == "stats":  # ni poids ni cfg exigés : la cfg manquante est remplacée
         needs = ("()", "None", "''")
+    elif nb.arch == V5_ARCH:  # COCO weights of the fine-tuning
+        needs = (repr(nb.weights) + " if INIT == 'coco' else ()", "None", "''")
     else:
         needs = ("INIT if str(INIT).endswith('.weights') else "
                  "'weights/yolov3-tiny.weights' if INIT == 'coco' else ()", "None", "''")
@@ -426,6 +457,24 @@ def environment(nb):
 # ---------------------------------------------------------------------------- infer
 
 def infer_body(nb):
+    cells = _infer_cells(nb)
+    if nb.arch == V5_ARCH:  # `tools.eval_voc.load_net`: Ultralytics checkpoint, no torch
+        for c in cells:
+            if c["cell_type"] == "code":
+                c["source"] = _lines("".join(c["source"]).replace(
+                    "from yolo.io.darknet_weights import load_darknet_weights\n"
+                    "from yolo.models.tiny_yolo import build\n",
+                    "from tools.eval_voc import load_net\n").replace(
+                    "@NET@", "net = load_net(NET, WEIGHTS)"))
+    else:
+        for c in cells:
+            if c["cell_type"] == "code":
+                c["source"] = _lines("".join(c["source"]).replace(
+                    "@NET@", "net = build(NET)\nload_darknet_weights(net, WEIGHTS)"))
+    return cells
+
+
+def _infer_cells(nb):
     cells = [md("""
         ## Réseau et poids
 
@@ -445,8 +494,7 @@ def infer_body(nb):
         from yolo.io.darknet_weights import load_darknet_weights
         from yolo.models.tiny_yolo import build
 
-        net = build(NET)
-        load_darknet_weights(net, WEIGHTS)
+        @NET@
         size = input_size(net.net, parse_size(SIZE) if SIZE else None)
         channels = net.net["input"][0]
         family, names = datasets.model_family(DATASET, net.net["classes"])
@@ -551,6 +599,14 @@ def infer_body(nb):
                 print("COMPARE = False : comparaison sautée ; runs trouvés :")
                 print(runs.listing(RUNS))
             """))]
+    if nb.arch == V5_ARCH:  # float only (the integer YOLOv5n is T33.8)
+        return cells + [md("## Résumé"), code("""
+            print(map_float.read_text())
+            print(f"sorties : {OUT}/ ; révision {TRACE['rev']}")
+            print("commandes équivalentes :")
+            for c in C.HISTORY:
+                print("  " + c)
+            """)]
     cells += [md("""
         ## Volet entier (T14.4)
 
@@ -715,7 +771,57 @@ def _prep_preview_cells():
         """)]
 
 
+def train_v5_body(nb):
+    """Fine-tuning with the YOLOv5 recipe (`tools/train_v5.py`, T33.7, T34.4)."""
+    net_eval = ("RUN / 'net.cfg'" if nb.model.startswith("tiny-") else "NET")
+    return [md("""
+        ## Fine-tuning
+
+        `tools/train_v5.py` in a subprocess: SGD Nesterov with three parameter groups,
+        warmup then linear lr, gradients accumulated to a nominal batch of 64, weight EMA,
+        mosaic / random perspective / HSV / flip, heads reinitialized from the COCO weights
+        with the bias prior of the reference (YOLOv7-tiny: the OTA loss of
+        `hyp.scratch.tiny.yaml`). A `checkpoint.npz` is written every 200 batches; running
+        the cell again resumes (`--resume`).
+        """), code("""
+        import csv
+
+        from IPython.display import Markdown, display
+
+        RUN = Path(OUT)
+        RUN.mkdir(parents=True, exist_ok=True)
+        resume = (RUN / "checkpoint.npz").exists()
+        C.run(C.cmd_train_v5(NET, RUN, DATASET, INIT, resume, EPOCHS, ITERS, BATCH, SIZE_TRAIN,
+                             WORKERS, DEVICE, DATA_ROOT, TRAIN_SUBSET, LR), log=RUN / "log.txt")
+        """), md("""
+        ## Losses
+
+        Last rows of `loss.csv` (per batch: box, objectness and class terms per image).
+        """), code("""
+        rows = list(csv.DictReader((RUN / "loss.csv").open())) if (RUN / "loss.csv").exists() else []
+        for r in rows[-10:]:
+            print(", ".join(f"{k} {r[k]}" for k in ("it", "lr", "loss", "box", "obj", "cls")))
+        """), md("""
+        ## Evaluation
+
+        The EMA weights by `tools/eval_voc.py --preset v5` (T33.4) on `SUBSET` images.
+        """), code("""
+        result = RUN / "map_float.md"
+        result.unlink(missing_ok=True)
+        C.run(C.cmd_eval_voc(@NET_EVAL@, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+                             DATA_ROOT, out=RUN / "dets", markdown=result, jobs=JOBS))
+        display(Markdown(result.read_text()))
+        """.replace("@NET_EVAL@", net_eval)), md("## Résumé"), code("""
+        print(f"outputs: {RUN}/ (checkpoint.npz, loss.csv, final weights) ; révision {TRACE['rev']}")
+        print("commandes équivalentes :")
+        for c in C.HISTORY:
+            print("  " + c)
+        """)]
+
+
 def train_body(nb):
+    if nb.arch == V5_ARCH:
+        return train_v5_body(nb)
     qat = _assign([(k, v, None) for k, v in M12_QAT.items()])
     admm = _assign([(k, v, None) for k, v in M12_ADMM.items()])
     variants = ""

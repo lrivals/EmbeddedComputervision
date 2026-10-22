@@ -77,6 +77,16 @@ V4_ARCH = "tiny-yolov4"
 V4_INIT_NET = "tiny-yolov4-coco"
 V4_TASKS = ("T24.6",)
 
+# YOLOv5n and YOLOv7-tiny with the YOLOv5 recipe (M33, M34): COCO inference of YOLOv5n
+# (the YOLOv7-tiny one is the Darknet `tiny-yolov7-coco_infer`) and VOC fine-tuning of both
+# from their COCO weights. The Ultralytics checkpoint is local only (AGPL, not on Drive).
+V5_ARCH = "v5"
+V5_NOTEBOOKS = (
+    ("coco", "yolov5n-coco", "infer", "weights/ultralytics/yolov5n.pt", ("T33.4",)),
+    ("voc", "yolov5n-voc", "train", "weights/ultralytics/yolov5n.pt", ("T33.7",)),
+    ("voc", "tiny-yolov7-voc", "train", "weights/yolov7-tiny.weights", ("T34.4",)),
+)
+
 # Tâche M11 de chaque jeu et tâche d'exécution M16 (en-tête des notebooks `stats`).
 STATS_TASKS = {"voc": ("T13.7", "T16.12"), "coco": ("T11.1", "T16.13"),
                "kitti": ("T11.4", "T16.14"), "visdrone": ("T11.5", "T16.15"),
@@ -151,6 +161,9 @@ def build_registry():
             tasks = V4_TASKS + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
             weights = f"{OUT}/{ds}/{model}/final.weights" if role == "infer" else init
             out.append(Notebook(ds, model, role, cfg, weights, ds, tasks, arch=v4, **inp))
+    for ds, model, role, weights, tasks in V5_NOTEBOOKS:
+        out.append(Notebook(ds, model, role, model, weights, ds if role == "train" else "coco",
+                            tasks, arch=V5_ARCH))
     return {f"{nb.dataset}/{nb.name}": nb for nb in out}
 
 
