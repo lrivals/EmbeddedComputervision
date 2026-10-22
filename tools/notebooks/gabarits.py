@@ -25,6 +25,13 @@ SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
 REFERENCE = {"voc/tiny-yolov2-voc_infer.ipynb": {"SUBSET": 0, "INT8": True}}
+# YOLOv4-tiny runs to do first (M24): full split by default. T24.5: C-sim pass over the
+# 5,000 COCO images (on the PC, ≈ 1.5 h on 18 cores); T24.6: VOC, then VisDrone.
+FULL_RUN = {"coco/tiny-yolov4-coco_infer.ipynb": {"SUBSET": 0, "INT8": True, "HW": True},
+            "voc/tiny-yolov4-voc_train.ipynb": {"SUBSET": 0},
+            "voc/tiny-yolov4-voc_infer.ipynb": {"SUBSET": 0, "INT8": True},
+            "visdrone/tiny-yolov4-visdrone_train.ipynb": {"SUBSET": 0},
+            "visdrone/tiny-yolov4-visdrone_infer.ipynb": {"SUBSET": 0, "INT8": True}}
 # Run long VisDrone (M15, T15.8) : géométrie de l'éval (stretch) à l'entraînement, 6 000
 # itérations (≈ 15 époques à lot 16), LR ÷ 10 à 80 % et 90 %.
 VISDRONE_TRAIN = {"ITERS": 6000, "STEPS": "4800,5400", "SCALES": "0.1,0.1",
@@ -116,6 +123,14 @@ def header(nb):
                      "`INT8 = True`) : mAP attendues 56,30 en flottant (T14.3) et 55,66 en "
                      "entier (T14.4), `results/map_int8.md` ; mettre `SUBSET = "
                      f"{SUBSET_FIRST}` pour un essai rapide")
+    full_run = FULL_RUN.get(nb.path.as_posix())
+    if full_run:
+        settings = ", ".join(f"`{k} = {v!r}`" for k, v in full_run.items())
+        cost += (f". **Full run by default** ({settings}); set `SUBSET = {SUBSET_FIRST}` for "
+                 "a quick try")
+        if full_run.get("HW"):
+            cost += (". The `HW` stage compiles the golden model and the C-sim with cmake and "
+                     "g++: run it on the PC, not on Colab")
     req = prerequis(nb)
     reqs = "\n".join(f"- {k} : `{v}` — {how_to_get(k, nb)}" for k, v in req.items()
                      if not (nb.trains and k == "cfg"))
@@ -301,7 +316,7 @@ def params(nb):
           ("OUT", nb.out_dir, "sorties du notebook"),
           ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
           ("REV", REV, "Colab : révision")]
-    ref = REFERENCE.get(nb.path.as_posix(), {})
+    ref = {**REFERENCE.get(nb.path.as_posix(), {}), **FULL_RUN.get(nb.path.as_posix(), {})}
     if nb.role == "train" and _tiled(nb):
         ref = {**VISDRONE_TRAIN, **ref}
     p = [(k, ref.get(k, v), c) for k, v, c in p]
