@@ -1,4 +1,4 @@
-.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf webcam autolabel traceability prove-kernels equivalence
+.PHONY: help test test-py test-slow test-slow-gpu test-cpp golden-check roofline winograd lint count-macs bench-conv get-weights anchors detect eval-float calibrate eval-int export csim csim-gcc hls-cycles hls-synth hls-synth-pow2 hls-synth-pack hls-cosim hls-export hls-synth-post hls-export-post hls-synth-stream hls-cosim-stream hls-export-stream stream-rom hls-report check-regmap vivado-build fpga-firmware sw-sim sw-board perf-model m8-inputs m8-int bench-sim map-stades bench-report ci-model ci clean figures test-durations notebooks notebooks-smoke harvest article article-pdf presentation-pdf status-pdf webcam autolabel traceability prove-kernels equivalence
 
 help:
 	@echo "test-py     tests du modèle NumPy (pytest)"
@@ -52,6 +52,7 @@ help:
 	@echo "article     M17 article: collect numbers → docs/article/chiffres.json, render docs/article/generated.tex"
 	@echo "article-pdf article, then xelatex + bibtex → build/article/, copied to docs/article/article.pdf"
 	@echo "presentation-pdf  slides (beamer, pdflatex) with the article numbers → docs/presentation/presentation.pdf"
+	@echo "status-pdf        status slides: results and next campaigns → docs/presentation/status.pdf"
 	@echo "harvest     runs Colab du Drive → build/notebooks/ (json, csv, md, png ; sans poids), puis synthèse des balayages"
 	@echo "notebooks-smoke  exécution de fumée des notebooks dont les données sont là (T14.9, entraînements compris)"
 	@echo "test-durations  suite pytest complète (slow compris, palier N) → build/figures/pytest.xml (T13.30)"
@@ -134,6 +135,13 @@ presentation-pdf: article
 	  pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/presentation presentation.tex >/dev/null \
 	  || { tail -20 ../../build/presentation/presentation.log; exit 1; }; done
 	cp build/presentation/presentation.pdf docs/presentation/presentation.pdf
+
+status-pdf: article
+	mkdir -p build/presentation
+	cd docs/presentation && for i in 1 2; do \
+	  pdflatex -interaction=nonstopmode -halt-on-error -output-directory=../../build/presentation status.tex >/dev/null \
+	  || { tail -20 ../../build/presentation/status.log; exit 1; }; done
+	cp build/presentation/status.pdf docs/presentation/status.pdf
 
 # T14.8 : récolte sur le PC des sorties copiées sur le Drive par les notebooks Colab
 # (colab.autosync, sync_outputs) : résumés, journaux, tables et figures, sans poids ni
