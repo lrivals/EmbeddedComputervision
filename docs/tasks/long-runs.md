@@ -23,7 +23,8 @@ the PC, Colab sessions. State on 2026-10-20.
 | Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59; 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
 | Colab T4, 6,000 iterations at batch 32 | ≈ 1 h 45; ×2.1 per iteration at 608, ×4 at 832 | [M15](M15-campagne-entrainement.md) T15.4, T15.9 |
 | PC evaluation, VOC2007 test (4,952) | float ≈ 170 ms/image (≈ 15 min), int ≈ 120 ms/image (≈ 10 min), float + int 150-300 ms/image (12-25 min), 66 ms/image with 16 jobs | [M12](M12-profils-pc.md), [M14](M14-notebooks.md), `build/eval/*.log` |
-| PC evaluation, COCO val2017 (5,000) | v3-tiny float 60 ms/image, v4-tiny float 42-51 ms/image, v4-tiny float + int 124 ms/image | `build/m24/coco*/*.log` |
+| PC evaluation, COCO val2017 (5,000) | v3-tiny float 60 ms/image, v4-tiny float 42-51 ms/image, v4-tiny float + int 124 ms/image; `--preset v5`, 5 jobs: v7-tiny 113 ms/image at 416, 192 at 640, v5n 58 at 416 (one process: 453 ms/image at 640) | `build/m24/coco*/*.log`, `build/eval/logs/*-v5-*.log` |
+| PC CPU training, YOLOv5 recipe, 640, batch 16 | YOLOv5n 16.9 s/batch, YOLOv7-tiny (OTA) 29.0 s/batch | `tools/train_v5.py --iters 6`, 2026-10-22 |
 | Colab CPU evaluation | ≈ 0.27 s/image: VOC test ≈ 22 min, VisDrone val ≈ 2.5 min, KITTI val ≈ 7 min | [M15](M15-campagne-entrainement.md) |
 | Calibration, 500 images | 1-2.5 min | `build/quant/calib*.log` |
 | C-sim `yolo_bench` | VOC 4,952 images ≈ 40 min (22 threads), i.e. ≈ 0.5 s/image; COCO 5,000 with v4-tiny ≈ 1.5 h (18 cores) | [M12](M12-profils-pc.md), [M24](M24-yolov4-tiny.md) |
@@ -31,8 +32,8 @@ the PC, Colab sessions. State on 2026-10-20.
 | Fault campaign, 500 images, 16 jobs | ≈ 50 s per run | `build/m25/faults/log.txt` |
 | Drive transfers | sizes in [donnees-drive.md](donnees-drive.md); no speed measured; > 10 GB is slow and sometimes freezes | [donnees-drive.md](donnees-drive.md) |
 
-Unmeasured: training and evaluation speed of YOLOv7-tiny, YOLOv5n, YOLOv8n (estimated
-below from their MACs against v4-tiny); YOLOv4-tiny training on the T4 (taken as
+Unmeasured: training and evaluation speed of YOLOv8n; training speed of YOLOv5n and
+YOLOv7-tiny is in the table above (T33.7); YOLOv4-tiny training on the T4 (taken as
 Tiny-YOLOv3, the CPU smoke runs are within 10 %); QAT on the GPU; the gain of the local
 GPU (T12.11-e).
 
@@ -73,6 +74,9 @@ GPU (T12.11-e).
 | [T32.6](M32-trashnet-pets.md) | `python tools/eval_voc.py --dataset pets`, VOC and COCO weights → `build/m32/pets_ood.md` | Pet test 3,662 | ≈ 20 min *(est.)* | 2 × 3,662 × 0.17 s | — |
 | [T32.7](M32-trashnet-pets.md) | `python tools/autolabel_eval.py --dataset pets --n 200 --models grounding-dino-tiny --map voc` | Pet 200 | ≈ 20 min *(est.)* | 200 × 5-7 s | — |
 | [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | T32.1 |
+| [T33.7](M33-yolov5n.md) | `tools/train_v5.py --net yolov5n-voc --init coco --epochs 30 --out build/train/yolov5n-voc`, then `tools/eval_voc.py --net yolov5n-voc --weights build/train/yolov5n-voc/final.npz --preset v5 --dataset voc` | VOC07+12 trainval 16,551 | ≈ 4.9 h per epoch, ≈ 6 days for 30 epochs *(est.)* | measured 16.9 s per batch of 16 at 640 (step only, 6 workers loading in parallel); 16,551 / 16 = 1,034 batches per epoch; `--size 416` ≈ ×0.42, `--device gpu` unmeasured | — |
+| [T34.4](M34-yolov7-tiny.md) | `tools/train_v5.py --net tiny-yolov7-voc --init coco --epochs 30 --out build/train/tiny-yolov7-voc`, then `tools/eval_voc.py --net build/train/tiny-yolov7-voc/net.cfg --weights …/final.weights --preset v5 --dataset voc` | VOC07+12 trainval 16,551 | ≈ 8.3 h per epoch, ≈ 10 days for 30 epochs *(est.)* | measured 29.0 s per batch of 16 at 640, OTA loss included; 1,034 batches per epoch; `--size 416` ≈ ×0.42, `--device gpu` unmeasured | — |
+| [T33.6](M33-yolov5n.md), [T34.3](M34-yolov7-tiny.md) | throwaway torch script (not in the repo): `ComputeLoss` of YOLOv5 on a fixture batch → `weights/m33/yolov5n_loss.npz` (`out0-2`, `anchors`, `targets`, `loss`) | 2 images | R | one forward | torch environment (outside the repo) |
 | [T26.0](M26-recent-models.md), [T26.3, T26.4](M26-recent-models.md) float, int | calibration, float and integer COCO mAP (v5n, v8n at letterbox 640 and 416) | COCO val2017 5,000 | ≈ 15 min per model and size *(est.)* | v4-tiny float + int 621 s for 5,000; scaled by MACs | T26.1 (weights, AGPL licence), T26.2 |
 
 ## PC, C-sim (gcc)

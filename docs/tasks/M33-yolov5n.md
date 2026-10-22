@@ -26,9 +26,18 @@ Related backlog: [M1](M1-briques-numpy.md) (layers, gradcheck), [M2](M2-cibles-p
 [T26.2](M26-recent-models.md) (float and integer SiLU), [T26.3](M26-recent-models.md)
 (YOLOv5n on the hardware chain).
 
-**State** (2026-10-22): T33.0-T33.3 done: the official `yolov5n.pt` is read without torch,
-described from its YAML and run as a trainable NumPy network equal to torch to 4·10⁻¹⁴.
-T33.4-T33.8 open. The official checkpoints (`weights/ultralytics/`) and the torch reference
+**State** (2026-10-22):
+- **Done**:
+  - T33.0-T33.3: the official `yolov5n.pt` is read without torch, described from its
+    YAML and run as a trainable NumPy network equal to torch to 4·10⁻¹⁴.
+  - T33.4: v5 decoding and evaluation, COCO 28.1 AP at 640 (published 28.0).
+  - T33.5: targets.
+- **Code done, check open**:
+  - T33.6: the loss, with gradchecks; the comparison with a torch value waits for the
+    `yolov5n_loss.npz` fixture.
+  - T33.7: the training recipe and its tests; the VOC fine-tuning (≈ 6 days on CPU)
+    is in [long-runs.md](long-runs.md).
+- **Open**: T33.8. The official checkpoints (`weights/ultralytics/`) and the torch reference
 fixtures (`weights/m33/`) are local only (gitignored, AGPL, not on Drive); they were made
 once by a throwaway torch script that is not in the repo, and the tests that need them are
 skipped without them.
@@ -215,7 +224,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     + SPPF + head network is checked on every parameter, and the graph's flat list equals
     `blocks.c3` / `blocks.sppf` to 1e-12.
 
-### [ ] T33.4 — Decoding, letterbox and COCO mAP
+### [x] T33.4 — Decoding, letterbox and COCO mAP
 - **Spec**: §8 · **Depends on**: T33.3 · **Size**: M
 - **Deliverables**: `mode="v5"` in `python/yolo/infer/decode.py`; letterbox 640 (gray 114,
   `auto=False`, stride 32) in `data/letterbox.py`; v5 NMS settings in `infer/nms.py`;
@@ -230,8 +239,24 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     YOLOv7-tiny (`wh_new_coords`).
   - Multi-label NMS: a box keeps every class with score > conf; class-aware NMS by offsetting
     the boxes by `class · 4096`.
+- **Done**:
+  - **Decoding**: `decode_head(mode="v5")` and `decode_v5`. The anchors are pixels of the
+    actual input (S·stride of each map), not of the 416 reference of the Darknet nets.
+    `decode` takes this path for every `is_v5` network (YOLOv5n and the `new_coords`
+    YOLOv7-tiny; unchanged for v7 at 416).
+  - **Letterbox and NMS**: `letterbox_params_v5` and `mode="v5"` (gray 114, bands
+    `round(d ∓ 0.1)`); `max_det` in `filter_and_nms`. The per-class loop is already the
+    multi-label, class-offset NMS.
+  - **Evaluation**: `tools/eval_voc.py --preset v5` (conf 0.001, IoU 0.65, max 300), with
+    Ultralytics networks loadable by name (`yolov5n-coco`, `yolov5n-<dataset>`) from a
+    `.pt` or a `.npz` state dict.
+  - **COCO val2017** ([map_coco.md](../../results/map_coco.md)): **28.1 AP / 45.6 AP50 at
+    640** (published 28.0 / 45.7), 25.3 / 41.4 at 416.
+  - **Notebook**: `notebooks/coco/yolov5n-coco_infer.ipynb` (arch `v5` of the generator,
+    float only).
+  - **Tests**: `test_v5_infer.py`.
 
-### [ ] T33.5 — Targets
+### [x] T33.5 — Targets
 - **Spec**: §5 · **Depends on**: T33.4 · **Size**: M
 - **Deliverables**: `build_targets_v5` in `python/yolo/data/targets.py`; test
 - **Acceptance**: on hand-built cases, the selected (image, anchor, cell, class) tuples and
@@ -245,6 +270,18 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     (or right) neighbour when the fractional part of $x$ is < 0.5 (or > 0.5), same for $y$:
     3 cells per match. The regression targets are the offsets relative to each chosen cell
     (they lie in [−0.5, 1.5], the range of $2σ - 0.5$).
+- **Done**:
+  - **Code**: `build_targets_v5(boxes, labels, levels, grids, anchor_t=4)` in
+    `data/targets.py`, with `v5_levels(net)` (output id, stride, pixel anchors; shared by
+    `ul_net` and the Darknet YOLOv7-tiny). The rule is the reference one: a neighbour is
+    taken only if it exists (x > 1, S − x > 1), and the cell is clamped before the offsets
+    (x = S gives cell S − 1, offset 1).
+  - **Tests** (`test_targets_v5.py`):
+    - three cells and their offsets; the ratio test per anchor;
+    - corner and border boxes; multi-level matches;
+    - random boxes on non-square grids: inside the grid, offsets in [−0.5, 1.5];
+    - a centre on a cell corner gives 5 matches, 3 of them on the own cell (the
+      reference keeps the duplicates).
 
 ### [ ] T33.6 — Loss and its gradients
 - **Spec**: §6 · **Depends on**: T33.5 · **Size**: L
@@ -265,6 +302,23 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
   - Gains (`hyp.scratch-low`): box 0.05·3/nl, cls 0.5·(C/80)·3/nl, obj 1.0·(img/640)²·3/nl;
     total multiplied by the batch size.
   - Reuse `bce_logits` and `softplus` of `train/loss.py`.
+- **Done**:
+  - **CIoU**: `ciou(p, g)` in `infer/boxes.py`, with the ε of the reference (union, c²),
+    the analytic backward through the box edges, and α constant (`ciou_alpha`).
+  - **Loss**: `yolo_v5_loss(outputs, boxes, labels, levels, C, hyp, img_size,
+    targets_from)` in `train/loss_v5.py`. It returns the loss total × N and its gradients
+    with respect to the raw logits, and the hyp gains are scaled as `train.py` (3/n_l,
+    C/80, (S/640)²). When two matches share a cell, the last one sets the IoU target,
+    and their box and class gradients add up.
+  - **Tests** (`test_loss_v5.py`):
+    - CIoU gradcheck ≤ 1e-7 on random, nested and disjoint pairs;
+    - the loss equals an element-by-element reference loop to 1e-10;
+    - gradcheck ≤ 1e-7 of the full loss (every matched cell plus random ones), with the
+      backward constants held fixed by `targets_from`;
+    - a batch without boxes; the gain scaling.
+  - **Not done**: equality with the torch `ComputeLoss` value. The test
+    (`weights/m33/yolov5n_loss.npz`: head outputs, targets, loss) is written and skipped
+    until the throwaway torch script makes that fixture.
 
 ### [ ] T33.7 — Training recipe
 - **Spec**: §7 · **Depends on**: T33.6 · **Size**: L
@@ -290,6 +344,33 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     flip 0.5; boxes clipped, those under 2 px or with an aspect ratio > 100 dropped.
   - Time: the conv cost is the bottleneck; record the time of an epoch on the PC in
     [long-runs.md](long-runs.md).
+- **Done so far** (code and overfit; the VOC run is open, [long-runs.md](long-runs.md)):
+  - **Optimizer**: `SGDGroups` in `optim.py` (torch `SGD(nesterov=True)` formula; groups
+    conv W with decay, BN γ, biases + BN β as the torch `bias`).
+  - **Schedule**: `V5Schedule` in `schedule.py` (linear or one-cycle lf; warmup
+    `max(3 epochs, 100 it)` of lr, bias lr 0.1 → lr and momentum 0.8 → 0.937; accumulation
+    1 → 64/N).
+  - **EMA**: `ModelEMA` in `ema.py` (parameters and BN buffers, `swapped(net)` for
+    evaluating and saving).
+  - **Augmentation**: `data/augment_v5.py` + `loader.V5Dataset`: mosaic 4, random
+    perspective (scale ±0.5, translate 0.1), HSV, flip, `box_candidates`. Mixup, copy-paste
+    and rotation / shear are left out (0 in `hyp.scratch-low`).
+  - **Loop**: `train/trainer_v5.py`:
+    - `TrainerV5` sums the gradients over the accumulated batches and scales the weight
+      decay by N·accumulate/64;
+    - `init_head_biases` applies the bias prior;
+    - its checkpoints add the EMA and the pending gradients, so resuming is exact
+      (`Trainer.checkpoint_arrays` factored out for it).
+  - **CLI and notebook**: `tools/train_v5.py --net yolov5n-voc --init coco` (COCO weights
+    except the heads, EMA weights saved as a torch-named `final.npz`, read by
+    `tools/eval_voc.py --net yolov5n-voc --weights`); notebook `voc/yolov5n-voc_train`.
+  - **Tests** (`test_recipe_v5.py`):
+    - the optimizer step against the torch formula; the warmup and lf values; the EMA
+      formula; the bias prior;
+    - boxes still on their pixels after mosaic + perspective; `box_candidates`;
+    - an exact resume;
+    - overfit of one image (slow): box loss to 0.05 % of its start, the decoded box at
+      IoU 0.998.
 
 ### [ ] T33.8 — Integer model and hardware chain
 - **Spec**: §9, §10 · **Depends on**: T33.3, T26.2 · **Size**: L

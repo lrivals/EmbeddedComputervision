@@ -1,4 +1,4 @@
-# COCO val2017 AP (T11.1, T24.2, T24.5)
+# COCO val2017 AP (T11.1, T24.2, T24.5, T33.4, T34.2)
 
 COCO val2017 (5,000 images, 36,781 objects), Darknet weights, 416×416 input, confidence
 threshold 0.005, per-class NMS 0.45, COCO metric (101-point interpolation, `iscrowd`
@@ -46,6 +46,39 @@ Published values (AP50, COCO test-dev, 416): **YOLOv4-tiny 40.2**
   measured: the `5k.part` list of the Darknet scripts is no longer online. The published 33.1
   stays the external reference; the comparison between the two networks on val2017 is
   biased in favour of Tiny-YOLOv3.
+
+## YOLOv5n and YOLOv7-tiny, YOLOv5 protocol (T33.4, T34.2)
+
+Protocol of the published values of these networks: the Ultralytics letterbox to a square
+input (gray 114, `letterbox_params_v5`), confidence 0.001, class-aware multi-label NMS at
+IoU 0.65, at most 300 detections per image; same COCO metric as above. Weights: the
+official `yolov5n.pt` (v7.0, read without torch, T33.0) and the Darknet
+`yolov7-tiny.weights` (AlexeyAB).
+
+```
+python tools/eval_voc.py --net yolov5n-coco --dataset coco --preset v5 --size 640
+python tools/eval_voc.py --net tiny-yolov7-coco --weights weights/yolov7-tiny.weights \
+    --dataset coco --preset v5 --size 416 --jobs 5 --blas-threads 4
+```
+
+| Model | Input | AP | AP50 | AP75 | APs | APm | APl | AR100 | Published AP / AP50 |
+|---|---|---|---|---|---|---|---|---|---|
+| **YOLOv7-tiny** (`tiny-yolov7-coco`) | 640 | **34.8** | **52.9** | 37.3 | 19.0 | 40.0 | 45.3 | 56.3 | — (leaky not published at 640) |
+| YOLOv7-tiny | 416 | 34.3 | 51.6 | 36.0 | 13.8 | 36.7 | 53.8 | 53.2 | 35.2 / 52.8 |
+| YOLOv5n (`yolov5n-coco`) | 640 | 28.1 | 45.6 | 29.5 | 14.0 | 32.0 | 36.7 | 49.0 | 28.0 / 45.7 |
+| YOLOv5n | 416 | 25.3 | 41.4 | 26.3 | 8.7 | 26.8 | 40.5 | 44.5 | — |
+
+Published: YOLOv5n from the Ultralytics README (val2017, 640); YOLOv7-tiny (leaky) from the
+YOLOv7 paper, arXiv 2207.02696, Table 1 (val2017, 416). The 38.7 AP at 640 of the paper is
+YOLOv7-tiny-SiLU, another network.
+
+- **YOLOv5n**: within 0.1 point of both published values; the decoding, letterbox and
+  NMS of T33.4 reproduce the reference evaluation.
+- **YOLOv7-tiny, −0.9 AP at 416**: the same pipeline as YOLOv5n, so the gap is not in
+  the decoding. Two differences remain, neither measured: the Darknet weights are a
+  conversion of the PyTorch `yolov7-tiny.pt` evaluated in the paper; and the paper's
+  `test.py` uses rectangular batches (letterbox to the smallest multiple of 32, pad 0.5)
+  where this evaluation uses a square letterbox.
 
 ## YOLOv4-tiny: float, integer, FPGA C-sim (T24.5)
 

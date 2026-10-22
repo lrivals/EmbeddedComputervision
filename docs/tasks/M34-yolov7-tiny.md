@@ -22,10 +22,17 @@ export, C-sim), [M24](M24-yolov4-tiny.md) (stride-2 lowering, `scale_x_y`, COCO
 evaluation), [M1](M1-briques-numpy.md) (route, maxpool, leaky), [M2](M2-cibles-perte-entrainement.md)
 (trainer).
 
-**State** (2026-10-22): not started. Available: `python/yolo/models/cfg/yolov7-tiny.cfg`
-(100 sections), `new_coords` and `scale_x_y` decoding (`infer/decode.py`), stride-1
-maxpools with padding (`layers/pool.py`), route forward / backward (`layers/route.py`);
-T26.0 in progress (SPP 5×5 stride-1 pool, `new_coords` heads, calibration).
+**State** (2026-10-22):
+- **Done**: T34.0 (layer table, weights) and T34.1 (backward of the routes and stride-1
+  pools, ELAN / SPP-CSP gradchecks).
+- **T34.2**: the whole network is gradchecked, but COCO is 34.3 AP at 416 against the
+  published 35.2, outside the 0.5-point acceptance.
+- **T34.3**: OTA loss on the Darknet heads, gradchecked; the torch reference value is
+  open.
+- **T34.4**: training code and notebook done; the VOC run (≈ 10 days on CPU) is in
+  [long-runs.md](long-runs.md).
+- **T34.5**: waits for the T34.4 weights.
+- The M33 pieces it reuses (T33.4-T33.7) are written.
 
 ## Architecture reference
 
@@ -47,7 +54,7 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
   (10, 13) … (373, 326), 3 per level.
 - **Size**: 2.89 GMAC at 416 (`make count-macs`), 6.2 M parameters.
 
-### [ ] T34.0 — Layer table and parameter check
+### [x] T34.0 — Layer table and parameter check
 - **Spec**: §3 · **Depends on**: T26.0 (cfg, weights) · **Size**: S
 - **Deliverables**: `tiny-yolov7-coco` in `specs.NETWORKS` with per-layer shapes and MACs;
   test that the weight file is read to the last byte (as `test_darknet_weights.py` for v4)
@@ -55,8 +62,20 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
   equal to the published 6.2 M (with C = 80)
 - **Notes**: published COCO numbers of the leaky model (YOLOv7 README) recorded with their
   input size, to compare with T34.2.
+- **Done**:
+  - **Table**: `specs.NETWORKS["tiny-yolov7-coco"]` equals the parsed cfg (99 layers);
+    `make count-macs` gives 6,227,101 parameters (6.23 M with C = 80) and 2.89 GMAC at 416,
+    i.e. 5.78 GFLOPs. Published (YOLOv7 paper, arXiv 2207.02696, Table 1): 6.2 M and
+    5.8 G at 416 (test `test_v7_tiny.py::test_layer_table_matches_published`). Darknet
+    itself was not run, so the per-layer BFLOPs are checked through the total only.
+  - **Weights**: `weights/yolov7-tiny.weights` (24,967,560 bytes) is read to the last byte:
+    20-byte header + 4 bytes per parameter and BN statistic (test).
+  - **Published accuracy** of the leaky model (same Table 1, COCO val2017): AP 35.2,
+    AP50 52.8, AP75 37.3 at 416; AP 30.8 at 320. Neither README (YOLOv7, AlexeyAB
+    Darknet) lists the tiny model. The 38.7 AP at 640 of the paper is the SiLU variant
+    (YOLOv7-tiny-SiLU), not these weights: there is no published leaky value at 640.
 
-### [ ] T34.1 — Backward of the multi-source route and of the stride-1 pools
+### [x] T34.1 — Backward of the multi-source route and of the stride-1 pools
 - **Spec**: §4 · **Depends on**: T34.0 · **Size**: M
 - **Deliverables**: `route_backward` for N sources (split of `dy` by the source widths) in
   `layers/route.py`; maxpool backward for k = 5, 9, 13, s = 1, padding $k/2$ in
@@ -75,6 +94,17 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
     $\mathrm{mp}_{13} = \mathrm{mp}_5^{∘3}$) holds in the forward; in the backward the two
     forms give the same gradient only without ties: keep the direct form for training, the
     chained one for the hardware.
+- **Done**: no code change. `route_backward` already splits `dy` by the N source widths,
+  `maxpool_backward` handles k = 5 / 9 / 13 at stride 1 (edge padding, equal to −∞ for a
+  max, its gradient folded back on the border cell), and `graph.Network.backward` sums the
+  gradient of a map read by several layers. Tests in `test_v7_tiny.py`:
+  - the stride-1 forward equals a naive window max over the valid cells, and the backward
+    equals a brute-force "first valid maximum in raster order" on distinct and on
+    constant inputs (mass conserved, nothing kept on the padded border);
+  - gradcheck ≤ 1e-7 of an ELAN block (width 3) and of the SPP-CSP block (width 4) on
+    8 × 8 maps, every parameter and the input, train and eval BN;
+  - a map read by the 5 / 9 / 13 pools and the route gets the sum of the four
+    contributions (graph backward against the hand sum seeded at the map).
 
 ### [ ] T34.2 — Float network and COCO mAP
 - **Spec**: §8 · **Depends on**: T34.1 · **Size**: M
@@ -83,6 +113,21 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
   `results/map_coco.md`; `tiny-yolov7-coco_infer` notebook (M14)
 - **Acceptance**: mAP at 640 within 0.5 point of the published value; gradcheck of the full
   network on a 2-image 64×64 batch (sampled indices)
+- **Done so far**:
+  - **Network**: the Darknet graph trains and evaluates in both BN modes. The whole
+    YOLOv7-tiny is gradchecked on 2 images 64 × 64 in train mode, ≤ 1e-7 on sampled
+    entries of x and of 6 parameters (stem, ELAN γ, SPP-CSP, PAN, head bias), marked
+    `slow` (≈ 1 min). In eval mode an image's output does not depend on its batch.
+  - **COCO val2017**, `--preset v5` ([map_coco.md](../../results/map_coco.md)):
+    **34.3 AP / 51.6 AP50 at 416** (published 35.2 / 52.8, Table 1 of the paper) and
+    34.8 / 52.9 at 640.
+  - **Acceptance not met**: the leaky model has no published 640 value (T34.0), and at
+    416 the gap is −0.9 AP. The same pipeline gives YOLOv5n within 0.1 point, so the
+    gap is not in the decoding. Not measured yet: the Darknet weights against the
+    PyTorch `yolov7-tiny.pt` of the paper, and rectangular batches (pad 0.5) as in its
+    `test.py`.
+  - **Notebook**: `notebooks/coco/tiny-yolov7-coco_infer.ipynb` (`RESIZE = "v5"` by
+    default for v7).
 - **Notes**:
   - Decoding (logistic already applied by the head conv, `scale_x_y = 2`, `new_coords = 1`):
     $b_{xy} = (2p_{xy} - 0.5 + c_{xy})·s$, $b_{wh} = (2p_{wh})^2·A$, score $= p_o·p_c$: the
@@ -112,6 +157,30 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
     (`loss_ota` in the hyp file) before choosing the default.
   - Hyperparameters (`hyp.scratch.tiny.yaml`): box 0.05, cls 0.5, obj 1.0, `anchor_t = 4`,
     balance [4.0, 1.0, 0.4]; read them from the file and record them in the notebook.
+- **Done**:
+  - **Default**: `hyp.scratch.tiny.yaml` (yolov7 repo, read 2026-10-22) has `loss_ota: 1`,
+    so the published tiny weights were trained with OTA; `HYP_V7_TINY` in
+    `train/loss_v5.py` is `HYP_V5` (box 0.05, cls 0.5, obj 1.0, `anchor_t` 4, balance
+    4 / 1 / 0.4, no label smoothing) with `ota: True`. The file also sets mixup 0.05 and
+    paste-in 0.05, not implemented (`augment_v5` doc).
+  - **Loss**: `yolo_v5_loss` of T33.6 runs unchanged on the Darknet head outputs through
+    `v5_levels` (the head convs are linear after `cfg.py`, so the outputs are logits and
+    the sigmoid is in the loss: the "mark the head `linear`" option of T34.2).
+  - **OTA**: `build_targets_ota` (in `train/loss_v5.py`, it needs the predictions) and
+    `ota_match`. The T33.5 candidates of each image (all levels) are decoded in pixels.
+    Cost = BCE(logit √(σ_cls σ_obj), one-hot) + 3·(−ln IoU), dynamic k = max(1,
+    ⌊Σ top-10 IoU⌋), with conflicts going to the cheapest ground truth. The reference
+    `ComputeLossOTA` was not readable verbatim here; this follows its published algorithm.
+  - **Tests**:
+    - the dynamic k and the conflict rule on hand-built matrices; the OTA matches are a
+      subset of the candidates with their image's labels;
+    - gradcheck ≤ 1e-7 of the OTA loss through the three heads of the real network,
+      every matched cell plus others, with the assignment, IoU targets and CIoU α held
+      fixed (`targets_from`).
+  - **Not done**: the comparison with a torch reference value. The v5 loss equals an
+    element-by-element reference loop to 1e-10, and the torch fixture test
+    (`weights/m33/yolov5n_loss.npz`) is skipped until that file is made by the throwaway
+    torch script.
 
 ### [ ] T34.4 — Training
 - **Spec**: §7 · **Depends on**: T34.3, T33.7 · **Size**: M
@@ -122,6 +191,17 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
   weights improves on the out-of-domain mAP; float VOC mAP recorded for M15
 - **Notes**: the Darknet trainer of M2 (burn-in, steps) stays for the v2 / v3 / v4 networks;
   the v7-tiny path uses the M33 schedule because its weights come from the PyTorch recipe.
+- **Done so far** (code; the VOC run is open, [long-runs.md](long-runs.md)):
+  - **Trainer**: `TrainerV5` of T33.7 trains the Darknet graph unchanged (`v5_levels`,
+    OTA loss by default). `Trainer` (M2) now refuses `new_coords` heads with a pointer to
+    it.
+  - **CLI**: `tools/train_v5.py --net tiny-yolov7-voc --init coco` writes the VOC cfg
+    (`<out>/net.cfg`, `make_cfg`). It copies the Darknet COCO weights except the three
+    head convs (layers 89, 93, 97), which get the bias prior, and saves the EMA weights as
+    `final.weights`. A smoke run (16 images, 3 batches at 320) trains, saves and evaluates.
+  - **Notebook**: `voc/tiny-yolov7-voc_train`.
+  - **Overfit**: the one-image overfit of the recipe is the T33.7 test, on a small
+    network; YOLOv7-tiny itself is not overfitted.
 
 ### [ ] T34.5 — Integer model and hardware chain
 - **Spec**: §9, §10 · **Depends on**: T34.2, T26.0 · **Size**: M
