@@ -39,6 +39,15 @@ sections checked for hand-typed numbers to 4 to 11 (`RESULT_SECTIONS`). The slid
 YOLOv4/v7 frame, a COCO frame, three packing frames, a Winograd frame and a Dependability
 section.
 
+**Status slides (2026-10-22).** A second deck, `docs/presentation/status.tex`
+(`make status-pdf` → `docs/presentation/status.pdf`), gives the state of the project
+rather than its method: progress per milestone (`\articleetat`, `projet/avancement.png`),
+current results through the same `\chiffre` and `\articletable` keys, then the training,
+evaluation and C-sim campaigns still open, their dependencies, a 4-week schedule and the
+risks, with links to the plot folders on GitHub. Its durations are plans copied from
+[long-runs.md](long-runs.md), marked "(estimates)" and cited on each frame. When a long
+run is done, update long-runs.md first, then the deck.
+
 **LaTeX (2026-10-07).** The source is now `docs/article/article.tex`, compiled by xelatex
 and bibtex (`make article-pdf`) into `docs/article/article.pdf`. LaTeX comments run to the
 end of the line, so the inline blocks below are replaced by macros: the hand-written
