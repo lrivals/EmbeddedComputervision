@@ -39,6 +39,13 @@ sections checked for hand-typed numbers to 4 to 11 (`RESULT_SECTIONS`). The slid
 YOLOv4/v7 frame, a COCO frame, three packing frames, a Winograd frame and a Dependability
 section.
 
+**Slides up to M36 (2026-10-22).** `presentation.tex` gains a "Safety evidence" section
+(M28 equivalence, M30 static latency bound, cited from `results/equivalence.md` and
+`results/latency_bound.md`); the work plan lists M27-M36 with their state, the fault frame
+has the ABFT lane in the HLS kernel (T25.3, C-sim), and the limitations point to
+[long-runs.md](long-runs.md) and the status deck below. The article itself does not cover
+M28 and M30 yet.
+
 **Status slides (2026-10-22).** A second deck, `docs/presentation/status.tex`
 (`make status-pdf` → `docs/presentation/status.pdf`), gives the state of the project
 rather than its method: progress per milestone (`\articleetat`, `projet/avancement.png`),
