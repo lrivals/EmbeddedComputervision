@@ -19,6 +19,11 @@ courbe précision/rappel ; le 0,25 de la démo couperait les rappels élevés.
 `--jobs N` (N > 1) : N processus, un thread BLAS chacun, qui traitent les mêmes lots que le
 chemin série, dans le même ordre (machines à beaucoup de cœurs, runtime TPU de Colab).
 
+`--preset v5` (T33.4, YOLOv5 / YOLOv7) : Ultralytics letterbox, conf 0.001, NMS 0.65, at
+most 300 detections per image (the settings of the published COCO mAP); an option given
+explicitly wins over the preset. `--net yolov5n-coco` reads `weights/ultralytics/yolov5n.pt`
+(or `--weights` .pt / .npz state dict) without torch.
+
 `--tiles N` (VisDrone, M15) : inférence par tuiles N × N px de l'image d'origine, recouvrement
 `--overlap`, plus l'image entière sauf `--no-full` ; NMS par classe sur le tout
 (`yolo.infer.tiles`). À associer à un réseau entraîné avec `train.py --crop N`.
@@ -41,11 +46,51 @@ from yolo.data.letterbox import input_size, parse_size, size_label  # noqa: E402
 from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import (evaluate, read_detections, to_voc_pixels,  # noqa: E402
                                 write_detections)
-from yolo.infer.nms import IOU_THR  # noqa: E402
+from yolo.infer.nms import IOU_THR, V5_CONF_THR, V5_IOU_THR, V5_MAX_DET  # noqa: E402
 from yolo.infer.pipeline import INTERPS, MODES, detect, preprocess  # noqa: E402
 from yolo.infer.tiles import merge, tile_grid, tile_to_image  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
-from yolo.models.tiny_yolo import build, load_cfg  # noqa: E402
+from yolo.models.tiny_yolo import CFG_FILES, build, load_cfg  # noqa: E402
+
+PRESETS = {"v5": {"resize": "v5", "conf": V5_CONF_THR, "iou": V5_IOU_THR,
+                  "max_det": V5_MAX_DET}}
+DEFAULTS = {"resize": "letterbox", "conf": 0.005, "iou": IOU_THR, "max_det": None}
+
+
+def description(name):
+    """Description of a Darknet cfg name / path or of a `specs` Ultralytics network."""
+    if name in CFG_FILES or name.endswith(".cfg"):
+        return load_cfg(name)
+    from yolo.models.specs import NETWORKS
+
+    return NETWORKS[name]
+
+
+def load_net(name, weights=None):
+    """Darknet network + `.weights`, or Ultralytics network (`ul_net`) from a `.pt`, a `.npz`
+    state dict, or its official checkpoint when `weights` is None."""
+    desc = description(name)
+    if desc.get("head") == "anchor":
+        from yolo.io.torch_pickle import load_checkpoint
+        from yolo.models import ul_net
+
+        if weights is None:
+            return ul_net.build(desc, pretrained=True, dtype=np.float32)
+        if Path(weights).suffix == ".npz":
+            with np.load(weights) as f:
+                sd = dict(f)
+        else:
+            sd, _ = load_checkpoint(weights)
+        return ul_net.build(desc, state_dict=sd, dtype=np.float32)
+    net = build(name)
+    load_darknet_weights(net, weights)
+    return net
+
+
+def ul_net_file(name):
+    from yolo.models.ul_net import PRETRAINED
+
+    return PRETRAINED[name]
 
 
 def _load(task):
@@ -72,31 +117,29 @@ def _load_tiles(task):
     return np.stack(xs), grid, (w, h)
 
 
-def _detect_tiles(net, item, mode, conf, iou):
+def _detect_tiles(net, item, mode, conf, iou, max_det=None):
     """Détections d'une image tuilée, normalisées dans l'image d'origine, après fusion."""
     x, grid, (w, h) = item
-    dets = detect(net, x, [(tw, th) for _, _, tw, th in grid], mode, conf, iou)
+    dets = detect(net, x, [(tw, th) for _, _, tw, th in grid], mode, conf, iou, max_det)
     return merge([(tile_to_image(b, g, w, h), s, c) for (b, s, c), g in zip(dets, grid)], iou)
 
 
-def _detect_items(net, items, mode, conf, iou, tiled):
+def _detect_items(net, items, mode, conf, iou, tiled, max_det=None):
     """Détections (boîtes normalisées d'origine, scores, labels) des images chargées."""
     if tiled:
-        return [_detect_tiles(net, item, mode, conf, iou) for item in items]
+        return [_detect_tiles(net, item, mode, conf, iou, max_det) for item in items]
     x = np.stack([x for x, _ in items])
-    return detect(net, x, [wh for _, wh in items], mode, conf, iou)
+    return detect(net, x, [wh for _, wh in items], mode, conf, iou, max_det)
 
 
 _W = {}  # réseau de chaque processus de --jobs
 
 
-def _init(name, weights, conf, iou):
+def _init(name, weights, conf, iou, max_det=None):
     # Une exception dans l'initialiseur ferait relancer les fils sans fin : on la garde
     # pour la relever dans la première tâche (comme eval_quant.py).
     try:
-        net = build(name)
-        load_darknet_weights(net, weights)
-        _W.update(net=net, conf=conf, iou=iou)
+        _W.update(net=load_net(name, weights), conf=conf, iou=iou, max_det=max_det)
     except Exception as exc:  # noqa: BLE001
         _W["error"] = exc
 
@@ -107,40 +150,43 @@ def _batch(task):
         raise _W["error"]
     loads, mode, sizes = task
     items = [_load(t) for t in loads]
-    dets = _detect_items(_W["net"], items, mode, _W["conf"], _W["iou"], len(loads[0]) > 5)
+    dets = _detect_items(_W["net"], items, mode, _W["conf"], _W["iou"], len(loads[0]) > 5,
+                         _W["max_det"])
     return [(to_voc_pixels(boxes, w, h), scores, labels)
             for (boxes, scores, labels), (w, h) in zip(dets, sizes)]
 
 
-def _serial(net, samples, tasks, mode, conf, iou, batch, workers):
+def _serial(net, samples, tasks, mode, conf, iou, batch, workers, max_det=None):
     with mp.Pool(workers) as pool:
         it = pool.imap(_load, tasks, chunksize=4)
         for start in range(0, len(samples), batch):
             chunk = samples[start:start + batch]
             items = [next(it) for _ in chunk]
-            dets = _detect_items(net, items, mode, conf, iou, len(tasks[0]) > 5)
+            dets = _detect_items(net, items, mode, conf, iou, len(tasks[0]) > 5, max_det)
             yield chunk, [(to_voc_pixels(boxes, s["width"], s["height"]), scores, labels)
                           for s, (boxes, scores, labels) in zip(chunk, dets)]
 
 
-def _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs, blas_threads):
+def _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs, blas_threads,
+              max_det=None):
     os.environ.setdefault("OPENBLAS_NUM_THREADS", str(blas_threads))
     os.environ.setdefault("OMP_NUM_THREADS", str(blas_threads))
     ctx = mp.get_context("spawn")  # les variables d'environnement BLAS valent pour les fils
     starts = range(0, len(samples), batch)
     work = [(tasks[i:i + batch], mode, [(s["width"], s["height"]) for s in samples[i:i + batch]])
             for i in starts]
-    with ctx.Pool(jobs, initializer=_init, initargs=(name, weights, conf, iou)) as pool:
+    with ctx.Pool(jobs, initializer=_init, initargs=(name, weights, conf, iou, max_det)) as pool:
         for i, res in zip(starts, pool.imap(_batch, work)):
             yield samples[i:i + batch], res
 
 
 def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers, jobs=1,
-                  name=None, weights=None, blas_threads=1, tiling=None):
+                  name=None, weights=None, blas_threads=1, tiling=None, max_det=None):
     """Détections de tout le split : {c: (ids, scores, coins pixels VOC)}, c classe du modèle.
     `jobs` > 1 : lots répartis sur `jobs` processus (réseau `name` + `weights` rechargé dans
     chacun) ; mêmes lots, même ordre que le chemin série. `tiling` : (tuile px, recouvrement,
-    image entière en plus) pour l'inférence par tuiles, None sinon."""
+    image entière en plus) pour l'inférence par tuiles, None sinon ; `max_det` : détections
+    gardées par image (toutes si None)."""
     per_class = {c: ([], [], []) for c in range(net.net["classes"])}
     channels = net.net["input"][0]
     extra = (tuple(tiling),) if tiling else ()
@@ -148,9 +194,9 @@ def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers, j
     t0 = time.time()
     if jobs > 1:
         chunks = _parallel(name, weights, samples, tasks, mode, conf, iou, batch, jobs,
-                           blas_threads)
+                           blas_threads, max_det)
     else:
-        chunks = _serial(net, samples, tasks, mode, conf, iou, batch, workers)
+        chunks = _serial(net, samples, tasks, mode, conf, iou, batch, workers, max_det)
     done = 0
     for chunk, res in chunks:
         for s, (px, scores, labels) in zip(chunk, res):
@@ -196,15 +242,18 @@ def main():
                     help="défaut : celle du jeu (coco pour coco et flir)")
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
-    ap.add_argument("--resize", choices=MODES, default="letterbox")
+    ap.add_argument("--preset", choices=tuple(PRESETS), default=None,
+                    help="v5 : letterbox, seuils et max-det de YOLOv5 / YOLOv7 (T33.4)")
+    ap.add_argument("--resize", choices=MODES, default=None, help="défaut : letterbox")
     ap.add_argument("--interp", choices=INTERPS, default="pil")
     ap.add_argument("--tiles", type=int, default=0,
                     help="inférence par tuiles N×N px de l'image d'origine (0 : image entière)")
     ap.add_argument("--overlap", type=float, default=0.2, help="recouvrement des tuiles")
     ap.add_argument("--no-full", action="store_true",
                     help="tuiles seules, sans la passe sur l'image entière")
-    ap.add_argument("--conf", type=float, default=0.005)
-    ap.add_argument("--iou", type=float, default=IOU_THR, help="seuil de la NMS")
+    ap.add_argument("--conf", type=float, default=None, help="défaut : 0.005")
+    ap.add_argument("--iou", type=float, default=None, help=f"seuil de la NMS (défaut {IOU_THR})")
+    ap.add_argument("--max-det", type=int, default=None, help="détections gardées par image")
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--jobs", type=int, default=1,
@@ -218,13 +267,16 @@ def main():
     ap.add_argument("--no-figures", action="store_true",
                     help="pas de courbes PR à côté des détections (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
+    for k, v in {**DEFAULTS, **PRESETS.get(args.preset, {})}.items():
+        if getattr(args, k) is None:
+            setattr(args, k, v)
 
     split = datasets.split_of(args)
     metric = args.metric or datasets.DATASETS[args.dataset].metric
     samples = datasets.load_args(args)
     if args.subset:
         samples = samples[:args.subset]
-    view = datasets.eval_view(args.dataset, load_cfg(args.net)["classes"])
+    view = datasets.eval_view(args.dataset, description(args.net)["classes"])
     samples = datasets.remap(samples, view.gt_lut)
     where = (f"VOC{split.replace(':', ' ')}" if args.dataset == "voc"
              else f"{args.dataset} {split}")
@@ -233,15 +285,16 @@ def main():
         dets = read_detections(view.names, args.dets)
         title = f"{args.dets.name} — {where}"
     else:
-        if args.weights is None:
+        ul = description(args.net).get("head") == "anchor"
+        if args.weights is None and not ul:
             ap.error("--weights ou --dets requis")
-        net = build(args.net)
-        load_darknet_weights(net, args.weights)
+        net = load_net(args.net, args.weights)
         args.size = input_size(net.net, args.size)
         dets = run_inference(net, samples, args.size, args.resize, args.interp, args.conf,
                              args.iou, args.batch, args.workers, args.jobs, args.net,
                              args.weights, args.blas_threads,
-                             (args.tiles, args.overlap, not args.no_full) if args.tiles else None)
+                             (args.tiles, args.overlap, not args.no_full) if args.tiles else None,
+                             args.max_det)
         dets = datasets.remap_detections(dets, view.det_lut)
         run = (f"{args.net}-{args.resize}" + ("-darknet" if args.interp == "darknet" else "")
                + (f"-tiles{args.tiles}" if args.tiles else ""))
@@ -249,9 +302,10 @@ def main():
         out = args.out or ROOT / "build" / "eval" / (f"{run}-{tag}" if tag else run)
         write_detections(dets, view.names, out)
         print(f"détections : {out}")
-        title = (f"{args.net} ({args.weights.name}), {where}, {len(samples)} images, "
+        wname = args.weights.name if args.weights else ul_net_file(args.net)
+        title = (f"{args.net} ({wname}), {where}, {len(samples)} images, "
                  f"{size_label(args.size)} {args.resize} ({args.interp}), conf {args.conf}, "
-                 f"NMS {args.iou}")
+                 f"NMS {args.iou}" + (f", max {args.max_det}" if args.max_det else ""))
         if args.tiles:
             title += (f", tuiles {args.tiles} px (recouvrement {args.overlap:g}"
                       + (", sans l'image entière)" if args.no_full else ", + image entière)"))

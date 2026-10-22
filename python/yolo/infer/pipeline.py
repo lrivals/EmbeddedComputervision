@@ -5,16 +5,18 @@ Deux prétraitements : `letterbox` (rapport d'aspect conservé, celui de l'entra
 l'époque YOLOv2, hors base). Deux interpolations : `pil` (bilinéaire de Pillow, avec
 anti-crénelage en réduction, celle de l'entraînement) et `darknet` (`resize_image` de
 Darknet : bilinéaire à coins alignés, sans anti-crénelage), pour comparer à Darknet.
+`v5` (T33.4) : the Ultralytics letterbox (gray 114, bands rounded as `letterbox_params_v5`),
+for the YOLOv5 / YOLOv7 networks.
 """
 
 import numpy as np
 
-from yolo.data.letterbox import (GRAY, as_hw, image_mode, letterbox_image, letterbox_params,
-                                 to_array)
+from yolo.data.letterbox import (GRAY, GRAY_V5, RESIZE_MODES, as_hw, image_mode,
+                                 letterbox_image, resize_params, to_array)
 from yolo.infer.decode import to_original
 from yolo.infer.nms import CONF_THR, IOU_THR, postprocess, postprocess_int
 
-MODES = ("letterbox", "stretch")
+MODES = RESIZE_MODES
 INTERPS = ("pil", "darknet")
 
 
@@ -47,15 +49,16 @@ def preprocess(img, size, mode="letterbox", interp="pil", channels=3):
     if mode not in MODES:
         raise ValueError(f"prétraitement inconnu : {mode!r}")
     if interp == "pil":
-        if mode == "letterbox":
-            x, _ = letterbox_image(img, size, channels)
+        if mode != "stretch":
+            x, _ = letterbox_image(img, size, channels, mode)
         else:
             x = to_array(img.resize((sw, sh), Image.BILINEAR), channels)
     elif interp == "darknet":
         src = to_array(img, channels)
-        if mode == "letterbox":
-            nw, nh, dx, dy = letterbox_params(img.width, img.height, size)
-            x = np.full((sh, sw, channels), GRAY, dtype=np.float32)
+        if mode != "stretch":
+            nw, nh, dx, dy = resize_params(img.width, img.height, size, mode)
+            x = np.full((sh, sw, channels), GRAY_V5 if mode == "v5" else GRAY,
+                        dtype=np.float32)
             x[dy:dy + nh, dx:dx + nw] = resize_darknet(src, nw, nh)
         else:
             x = resize_darknet(src, sw, sh)
@@ -64,16 +67,17 @@ def preprocess(img, size, mode="letterbox", interp="pil", channels=3):
     return np.ascontiguousarray(x.transpose(2, 0, 1)), img.size
 
 
-def detect(net, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_THR):
+def detect(net, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, iou_thr=IOU_THR,
+           max_det=None):
     """`x` (N, C, H, W) prétraité ; `orig_sizes` [(w, h)]. Rend par image `(boxes, scores,
     labels)`, boîtes `(cx, cy, w, h)` normalisées dans l'image d'origine.
     """
     size = x.shape[-2:]
-    dets = postprocess(net.forward(x, train=False), net.net, conf_thr, iou_thr)
+    dets = postprocess(net.forward(x, train=False), net.net, conf_thr, iou_thr, max_det)
     out = []
     for (b, s, lab), (w, h) in zip(dets, orig_sizes):
         # §8.1 : letterbox inverse ; en `stretch`, le repère normalisé est déjà celui d'origine
-        out.append((to_original(b, w, h, size) if mode == "letterbox" else b, s, lab))
+        out.append((to_original(b, w, h, size, mode) if mode != "stretch" else b, s, lab))
     return out
 
 
@@ -88,5 +92,5 @@ def detect_int(inet, luts, x, orig_sizes, mode="letterbox", conf_thr=CONF_THR, i
     size = x.shape[-2:]
     dets = (post or postprocess_int)(inet.forward(quantize_input(x)), inet.qm.net, luts,
                                      conf_thr, iou_thr)
-    return [(to_original(b, w, h, size) if mode == "letterbox" else b, s, lab)
+    return [(to_original(b, w, h, size, mode) if mode != "stretch" else b, s, lab)
             for (b, s, lab), (w, h) in zip(dets, orig_sizes)]

@@ -47,6 +47,29 @@ def heads(net):
     return out
 
 
+def is_v5(net):
+    """True for the networks decoded and trained the YOLOv5 way (T33.4): the Ultralytics
+    descriptions (`head: "anchor"`) and the Darknet `new_coords` heads (YOLOv7-tiny)."""
+    return net.get("head") == "anchor" or any(
+        layer.get("new_coords") for layer in net["layers"] if layer["type"] == "yolo")
+
+
+def v5_levels(net):
+    """[(output id, stride, anchors (A, 2) in pixels)] of a YOLOv5-style network, small
+    stride first. The anchors are pixels of the input at any input size (no reference size,
+    unlike `anchors_frac`); the stride gives the input size of a head map: S·stride."""
+    if net.get("head") == "anchor":
+        return [(hid, int(s), np.asarray(a, dtype=np.float64).reshape(-1, 2))
+                for hid, s, a in zip(net["outputs"], net["stride"], net["anchors"])]
+    from yolo.models.specs import infer_shapes
+
+    shapes = infer_shapes(net)
+    anchors = np.asarray(net["anchors"], dtype=np.float64).reshape(-1, 2)
+    levels = [(hid, net["input"][1] // shapes[hid][1][1], anchors[mask])
+              for hid, mask in heads(net)]
+    return sorted(levels, key=lambda lv: lv[1])
+
+
 def build_targets(boxes_list, labels_list, anchors_px, head_list, grid_sizes, ref=ANCHOR_REF):
     """Cibles de chaque tête pour un lot.
 

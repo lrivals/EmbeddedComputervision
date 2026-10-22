@@ -7,6 +7,10 @@ YOLOv4-tiny (`scale_x_y` = α de la couche [yolo], T24.2) : σ(t) devient σ(t)�
 YOLOv7-tiny (`new_coords`, T26.0, as YOLOv5) : b_w = p_w·(2σ(t_w))², b_h = p_h·(2σ(t_h))², the
 centre as above with α = 2 (σ·2 − 0,5) ; the sigmoid of the head conv is applied here.
 
+YOLOv5 (`mode="v5"`, T33.4) : the same formulas, b_xy = (2σ(t_xy) − 0.5 + c_xy)·s,
+b_wh = (2σ(t_wh))²·A, score σ(t_o)·σ(t_c). The anchors of these networks are pixels of the
+actual input (`v5_levels`), not of a 416 reference: `decode` divides them by S·stride.
+
 Score de la classe c : σ(t_o)·σ(t_c) (YOLOv3) ou σ(t_o)·softmax(t)_c (YOLOv2, softmax
 stabilisé). Les boîtes sont rendues en `(cx, cy, w, h)` normalisés dans l'image letterbox ;
 `to_original` les ramène dans l'image d'origine.
@@ -15,7 +19,7 @@ stabilisé). Les boîtes sont rendues en `(cx, cy, w, h)` normalisés dans l'ima
 import numpy as np
 
 from yolo.data.letterbox import boxes_from_letterbox
-from yolo.data.targets import anchor_ref, anchors_frac, heads
+from yolo.data.targets import anchor_ref, anchors_frac, heads, is_v5, v5_levels
 from yolo.layers.activations import sigmoid
 
 
@@ -31,11 +35,14 @@ def wh_new_coords(sig):
 
 def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0, new_coords=False):
     """`out` : (N, A·(5+C), S_h, S_w) ; `anchors` : (A, 2) en fraction de l'image ; `alpha` :
-    `scale_x_y` de la tête ; `new_coords` : b_w = p_w·(2σ(t_w))² au lieu de p_w·e^{t_w}.
+    `scale_x_y` de la tête ; `new_coords` : b_w = p_w·(2σ(t_w))² au lieu de p_w·e^{t_w} ;
+    `mode="v5"` : sigmoid classes with α = 2 and `new_coords` forced (YOLOv5, T33.4).
 
     Rend `boxes` (N, A·S_h·S_w, 4), `obj` (N, A·S_h·S_w), `scores` (N, A·S_h·S_w, C), dans
     l'ordre (ancre, ligne, colonne).
     """
+    if mode == "v5":
+        mode, alpha, new_coords = "v3", 2.0, True
     anchors = np.asarray(anchors, dtype=np.float64).reshape(-1, 2)
     n, _, sh, sw = out.shape
     a = len(anchors)
@@ -64,7 +71,10 @@ def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0, new_coords=Fals
 
 
 def decode(outputs, net):
-    """Toutes les têtes de `net` (format `specs`) concaténées ; mode v2 pour `region`."""
+    """Toutes les têtes de `net` (format `specs`) concaténées ; mode v2 pour `region`,
+    `decode_v5` pour les réseaux YOLOv5 / YOLOv7 (`is_v5`)."""
+    if is_v5(net):
+        return decode_v5(outputs, net)
     anchors = anchors_frac(net["anchors"], anchor_ref(net))
     parts = []
     for hid, mask in heads(net):
@@ -75,10 +85,21 @@ def decode(outputs, net):
     return tuple(np.concatenate(x, axis=1) for x in zip(*parts))
 
 
-def to_original(boxes, width, height, size):
+def decode_v5(outputs, net):
+    """Heads of a YOLOv5-style network (`v5_levels`), concatenated, small stride first;
+    anchors in pixels of the input size S·stride of each map."""
+    parts = []
+    for hid, stride, anchors in v5_levels(net):
+        sh, sw = outputs[hid].shape[-2:]
+        frac = anchors / np.array([sw * stride, sh * stride], dtype=np.float64)
+        parts.append(decode_head(outputs[hid], frac, net["classes"], "v5"))
+    return tuple(np.concatenate(x, axis=1) for x in zip(*parts))
+
+
+def to_original(boxes, width, height, size, mode="letterbox"):
     """Boîtes de l'image letterbox `size` (S ou (H, W)) → normalisées dans l'image d'origine
-    (w × h)."""
-    return boxes_from_letterbox(boxes, width, height, size)
+    (w × h) ; `mode` : `letterbox` ou `v5`."""
+    return boxes_from_letterbox(boxes, width, height, size, mode)
 
 
 # ------------------------------------------------------------------ décodage entier (§9.4)
