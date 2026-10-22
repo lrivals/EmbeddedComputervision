@@ -123,3 +123,56 @@ def build_targets(boxes_list, labels_list, anchors_px, head_list, grid_sizes, re
             t["scale"][n, a, i, j] = 2.0 - gw * gh  # §6.2 : ω = 2 − g_w g_h
             t["cls"][n, a, i, j] = int(label)
     return targets
+
+
+# Neighbour cells of the YOLOv5 assignment (T33.5): the cell itself, left, up, right, down.
+V5_OFFSETS = np.array([[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]], dtype=np.float64) * 0.5
+
+
+def build_targets_v5(boxes_list, labels_list, levels, grid_sizes, anchor_t=4.0):
+    """YOLOv5 targets (T33.5, `ComputeLoss.build_targets` of the reference) for a batch.
+
+    `boxes_list[n]`: (k, 4) normalized `(cx, cy, w, h)`; `labels_list[n]`: (k,); `levels`:
+    `v5_levels(net)`; `grid_sizes`: {id: S or (S_h, S_w)}.
+
+    For each level, a box (in grid units) matches anchor a when max(r, 1/r) < `anchor_t` for
+    r = w / A_w and r = h / A_h (several anchors and levels can match). Each match is
+    assigned to its cell and to the two nearest neighbours: left when frac(x) < 0.5 and
+    x > 1, right when frac(x) > 0.5 and x < S_w − 1, same in y, i.e. 3 cells inside the
+    grid. Returns {id: dict} of flat arrays over the matches: `b` (image), `a` (anchor in the
+    level), `gj`, `gi` (row, column), `tbox` (K, 4) = (x − gi, y − gj, w, h) in grid units
+    (offsets in [−0.5, 1.5]), `cls`, `anch` (K, 2) anchors in grid units.
+    """
+    rows = [(n, int(c), *box) for n, (boxes, labels) in enumerate(zip(boxes_list, labels_list))
+            for box, c in zip(np.asarray(boxes, dtype=np.float64).reshape(-1, 4),
+                              np.asarray(labels).reshape(-1))]
+    t_all = np.array(rows, dtype=np.float64).reshape(-1, 6)  # (img, cls, x, y, w, h)
+    out = {}
+    for hid, stride, anchors_px in levels:
+        sh, sw = grid_hw(grid_sizes[hid])
+        anchors = np.asarray(anchors_px, dtype=np.float64) / stride
+        na = len(anchors)
+        t = np.repeat(t_all[None], na, axis=0)              # (A, k, 6)
+        t[..., 2:6] *= np.array([sw, sh, sw, sh])
+        a = np.repeat(np.arange(na)[:, None], len(t_all), axis=1)
+        r = t[..., 4:6] / anchors[:, None]
+        keep = np.maximum(r, 1 / r).max(axis=2) < anchor_t
+        t, a = t[keep], a[keep]
+        gxy = t[:, 2:4]
+        gxi = np.array([sw, sh]) - gxy
+        left, up = ((gxy % 1 < 0.5) & (gxy > 1)).T
+        right, down = ((gxi % 1 < 0.5) & (gxi > 1)).T
+        sel = np.stack([np.ones_like(left), left, up, right, down])   # (5, K)
+        t = np.repeat(t[None], 5, axis=0)[sel]
+        a = np.repeat(a[None], 5, axis=0)[sel]
+        offsets = np.repeat(V5_OFFSETS[:, None], sel.shape[1], axis=1)[sel]
+        gxy = t[:, 2:4]
+        gij = np.floor(gxy - offsets).astype(np.int64)
+        gi = np.clip(gij[:, 0], 0, sw - 1)
+        gj = np.clip(gij[:, 1], 0, sh - 1)
+        # The reference clamps gij in place before taking the offsets (x = S_w: offset 1).
+        tbox = np.concatenate([gxy - np.stack([gi, gj], axis=1), t[:, 4:6]], axis=1)
+        out[hid] = {"b": t[:, 0].astype(np.int64), "a": a.astype(np.int64), "gj": gj, "gi": gi,
+                    "tbox": tbox,
+                    "cls": t[:, 1].astype(np.int64), "anch": anchors[a]}
+    return out
