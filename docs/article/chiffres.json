@@ -1,6 +1,24 @@
 {
  "_rev": {
-  "rev": "dcd39a0-dirty",
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
+ },
+ "abft.hls.layers": {
+  "value": 103,
+  "status": "csim",
+  "source": "results/faults.md",
+  "command": "make csim-gcc",
+  "nd": 0,
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
+ },
+ "abft.hls.outputs": {
+  "value": 158,
+  "status": "csim",
+  "source": "results/faults.md",
+  "command": "make csim-gcc",
+  "nd": 0,
+  "rev": "9fd9562-dirty",
   "date": "2026-10-22"
  },
  "balayage.crowdhuman.meilleur.map": {
@@ -356,6 +374,71 @@
   "command": "make bench-report",
   "rev": "7db966a-dirty",
   "date": "2026-10-20"
+ },
+ "equiv.smt.proved": {
+  "value": 95,
+  "status": "measured",
+  "source": "results/equivalence.md",
+  "command": "python tools/prove_kernels.py",
+  "nd": 0,
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
+ },
+ "equiv.table": {
+  "value": {
+   "header": [
+    "Network",
+    "Float → fake-quant, mean",
+    "max",
+    "Fake-quant → integer, per layer",
+    "end to end",
+    "Integer → golden",
+    "Golden → C-sim"
+   ],
+   "rows": [
+    [
+     "`tiny-yolov2-voc`",
+     0.5,
+     126,
+     1,
+     14,
+     "identical",
+     "identical"
+    ],
+    [
+     "`tiny-yolov3-coco`",
+     0.78,
+     93,
+     1,
+     17,
+     "identical",
+     "identical"
+    ],
+    [
+     "`tiny-yolov4-coco`",
+     0.91,
+     102,
+     1,
+     26,
+     "identical",
+     "identical"
+    ]
+   ],
+   "nd": [
+    null,
+    2,
+    0,
+    0,
+    0,
+    null,
+    null
+   ]
+  },
+  "status": "csim",
+  "source": "results/equivalence.md",
+  "command": "python tools/equivalence.py run",
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
  },
  "map.coco.table": {
   "value": {
@@ -1367,6 +1450,33 @@
   "nd": 0,
   "rev": "1808467",
   "date": "2026-10-07"
+ },
+ "wcet.v2.acc.ms": {
+  "value": 83.4,
+  "status": "projection",
+  "source": "results/latency_bound.md",
+  "command": "python tools/perf_model.py --wcet",
+  "nd": 1,
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
+ },
+ "wcet.v2.frame.ms": {
+  "value": 92.4,
+  "status": "projection",
+  "source": "results/latency_bound.md",
+  "command": "python tools/perf_model.py --wcet",
+  "nd": 1,
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
+ },
+ "wcet.v2.watchdog.ms": {
+  "value": 116,
+  "status": "projection",
+  "source": "results/latency_bound.md",
+  "command": "python tools/perf_model.py --wcet",
+  "nd": 0,
+  "rev": "9fd9562-dirty",
+  "date": "2026-10-22"
  },
  "winograd.table": {
   "value": {

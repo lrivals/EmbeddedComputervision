@@ -7,6 +7,10 @@
 \newcommand\articlefig[1]{\artget{fig}{#1}}
 
 % ---- numbers
+\expandafter\def\csname artn:abft.hls.layers\endcsname{%
+103\textsuperscript{C-sim}}  % csim, results/faults.md
+\expandafter\def\csname artn:abft.hls.outputs\endcsname{%
+158\textsuperscript{C-sim}}  % csim, results/faults.md
 \expandafter\def\csname artn:balayage.crowdhuman.meilleur.map\endcsname{%
 35.87\textsuperscript{tier R}}  % tier-R, docs/tasks/resultats-balayages.md
 \expandafter\def\csname artn:balayage.exdark.meilleur.map\endcsname{%
@@ -19,6 +23,8 @@
 2.24\textsuperscript{tier R}}  % tier-R, docs/tasks/resultats-balayages.md
 \expandafter\def\csname artn:balayage.voc.meilleur.map\endcsname{%
 36.27\textsuperscript{tier R}}  % tier-R, docs/tasks/resultats-balayages.md
+\expandafter\def\csname artn:equiv.smt.proved\endcsname{%
+95}  % measured, results/equivalence.md
 \expandafter\def\csname artn:map.coco.v3.ap50\endcsname{%
 37.2}  % measured, results/map_coco.md
 \expandafter\def\csname artn:map.coco.v4.ap50\endcsname{%
@@ -113,6 +119,12 @@ L10\textsuperscript{tier R}}  % tier-R, results/map_int8.md
 12}  % measured, Makefile (DUMP_IMAGES × QNETS)
 \expandafter\def\csname artn:verif.hwpp.cases\endcsname{%
 1,014\textsuperscript{C-sim}}  % csim, results/postproc_hw.md
+\expandafter\def\csname artn:wcet.v2.acc.ms\endcsname{%
+83.4\textsuperscript{proj.}}  % projection, results/latency_bound.md
+\expandafter\def\csname artn:wcet.v2.frame.ms\endcsname{%
+92.4\textsuperscript{proj.}}  % projection, results/latency_bound.md
+\expandafter\def\csname artn:wcet.v2.watchdog.ms\endcsname{%
+116\textsuperscript{proj.}}  % projection, results/latency_bound.md
 % ---- tables
 \expandafter\def\csname arttable:balayages.meilleurs\endcsname{%
 \setlength{\tabcolsep}{4pt}
@@ -151,6 +163,17 @@ this work (C-sim projection, 2 MACs/DSP, Tm 64) & Tiny-YOLOv3 COCO 416 & Kria KV
 this work (C-sim projection, 2 MACs/DSP, Tn 32) & Tiny-YOLOv3 COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 33.06 & 30.2 & 184.0 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tm 64) & YOLOv4-tiny COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 30.79 & 32.5 & 212.7 & — & projection \\
 this work (C-sim projection, 2 MACs/DSP, Tn 32) & YOLOv4-tiny COCO 416 & Kria KV260 (XCK26) & INT8 (W8A8, per channel) & 23.51 & 42.5 & 162.4 & — & projection \\
+\bottomrule
+\end{tabularx}}
+\expandafter\def\csname arttable:equiv.table\endcsname{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrrr>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Network} & \textbf{\begin{tabular}[b]{@{}r@{}}Float $\to$\\fake-quant, mean\end{tabular}} & \textbf{max} & \textbf{\begin{tabular}[b]{@{}r@{}}Fake-quant $\to$\\integer, per layer\end{tabular}} & \textbf{\begin{tabular}[b]{@{}r@{}}end to\\end\end{tabular}} & \textbf{Integer $\to$ golden} & \textbf{Golden $\to$ C-sim} \\
+\midrule
+\texttt{tiny-yolov2-voc} & 0.50 & 126 & 1 & 14 & identical & identical \\
+\texttt{tiny-yolov3-coco} & 0.78 & 93 & 1 & 17 & identical & identical \\
+\texttt{tiny-yolov4-coco} & 0.91 & 102 & 1 & 26 & identical & identical \\
 \bottomrule
 \end{tabularx}}
 \expandafter\def\csname arttable:map.coco.table\endcsname{%
@@ -596,9 +619,9 @@ M36 & 12 & 0 & 0\,\% \\
 \newcommand\articlestatuslist{%
 {\raggedright
 \begin{itemize}
-\item \textbf{projection} (14): \texttt{pack.table}, \texttt{pack.v2.tm64.ms}, \texttt{pack.v2.tn32.ms}, \texttt{perf.cascade}, \texttt{perf.kv260}, \texttt{perf.kv260.bound.ms}, \texttt{perf.kv260.m6.ms}, \texttt{perf.kv260.roofline.ms}, \texttt{perf.kv260.v2.eff}, \texttt{perf.kv260.v2.fps}, \texttt{perf.kv260.v2.gops}, \texttt{perf.kv260.v2.ms}, \texttt{perf.kv260.v3.ms}, \texttt{perf.kv260.v4.ms}
+\item \textbf{projection} (17): \texttt{pack.table}, \texttt{pack.v2.tm64.ms}, \texttt{pack.v2.tn32.ms}, \texttt{perf.cascade}, \texttt{perf.kv260}, \texttt{perf.kv260.bound.ms}, \texttt{perf.kv260.m6.ms}, \texttt{perf.kv260.roofline.ms}, \texttt{perf.kv260.v2.eff}, \texttt{perf.kv260.v2.fps}, \texttt{perf.kv260.v2.gops}, \texttt{perf.kv260.v2.ms}, \texttt{perf.kv260.v3.ms}, \texttt{perf.kv260.v4.ms}, \texttt{wcet.v2.acc.ms}, \texttt{wcet.v2.frame.ms}, \texttt{wcet.v2.watchdog.ms}
 \item \textbf{estimate} (5): \texttt{stream.w4.fps}, \texttt{stream.w8.dsp}, \texttt{stream.w8.fps}, \texttt{stream.w8.latency}, \texttt{winograd.table}
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
-\item \textbf{csim} (3): \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
+\item \textbf{csim} (6): \texttt{abft.hls.layers}, \texttt{abft.hls.outputs}, \texttt{equiv.table}, \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{dcd39a0-dirty}, 2026-10-22}
+\newcommand\articlerev{rev.~\texttt{9fd9562-dirty}, 2026-10-22}

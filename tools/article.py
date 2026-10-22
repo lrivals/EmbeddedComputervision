@@ -47,11 +47,11 @@ BUILD = ROOT / "build" / "article"
 # Status of a number (M17, "Statut de chaque chiffre"); `measured` carries no mark.
 STATUSES = {"measured": "", "csim": "C-sim", "projection": "proj.", "estimate": "est.",
             "tier-R": "tier R", "published": "pub."}
-PENDING = ("projection", "estimate", "tier-R", "csim")  # \articlestatuslist (§11)
+PENDING = ("projection", "estimate", "tier-R", "csim")  # \articlestatuslist (§13)
 
 # Sections whose prose may not quote a decimal number outside a macro (the abstract and
-# sections 4 to 11), and the constants of the network or of the protocol allowed there.
-RESULT_SECTIONS = range(4, 12)
+# sections 4 to 12), and the constants of the network or of the protocol allowed there.
+RESULT_SECTIONS = range(4, 13)
 WHITELIST = {"0.1", "0.45", "0.005", "0.5", "0.25", "0.3", "1.0"}
 
 USES = re.compile(r"\\(chiffre|articletable|articlefig)\{([^}]*)\}|\\(articleetat(?:resume)?)\b")
@@ -323,7 +323,7 @@ _DECIMAL = re.compile(r"(?<![\w#§.\-/])\d+\.\d+(?![\w.])")
 
 def stray_numbers(tex):
     """[(line, number)] of decimal numbers written by hand in the abstract and in
-    sections 4 to 11."""
+    sections 4 to 12."""
     found, section, abstract = [], 0, False
     for i, line in enumerate(uncomment(tex).split("\n"), 1):
         if re.search(r"\\section\{", line):
@@ -836,6 +836,69 @@ def ood_auroc(score, col):
     return lambda root: num(row_with(ood_rows(root), score)[col], True)
 
 
+def abft_hls(bench):
+    """Count of the `tb_conv` (layers) or `tb_net` (outputs) line of faults.md."""
+    def read(root):
+        m = re.search(rf"`{bench}`: ([\d,]+)", need(_results("faults.md", root)).read_text())
+        if not m:
+            raise MissingSource(f"faults.md: no `{bench}` count")
+        return num(m.group(1), True)
+    return read
+
+
+def wcet_section(net, root):
+    """Text of the `### <net>` section of latency_bound.md (per-network bounds)."""
+    text = need(_results("latency_bound.md", root)).read_text()
+    m = re.search(rf"^### {net}\n(.*?)(?=^#)", text, re.S | re.M)
+    if not m:
+        raise MissingSource(f"latency_bound.md: no section {net}")
+    return m.group(1)
+
+
+def wcet(net, what):
+    """Static bound of `net` in ms: `acc` (accelerator, **total** row), `frame` (with the
+    post-processing at conf 0.25) or `watchdog`."""
+    pattern = {"acc": r"\*\*total\*\*.*\(([\d.]+) ms\)",
+               "frame": r"Frame bound \(conf 0\.25\)\*\*: [\d,]+ cycles = ([\d.]+) ms",
+               "watchdog": r"watchdog ([\d.]+) ms"}[what]
+
+    def read(root):
+        m = re.search(pattern, wcet_section(net, root))
+        if not m:
+            raise MissingSource(f"latency_bound.md: no {what} bound for {net}")
+        return num(m.group(1), True)
+    return read
+
+
+def smt_proved(root):
+    m = re.search(r"proves (\d+) / (\d+) obligations",
+                  need(_results("equivalence.md", root)).read_text())
+    if not m or m.group(1) != m.group(2):
+        raise MissingSource("equivalence.md: SMT obligations not all proved")
+    return int(m.group(1))
+
+
+def t_equiv(root):
+    """Summary per stage of equivalence.md: LSB gaps of the two proximity stages, then the
+    level of the two PC stages after the integer model (co-sim and board: pending)."""
+    _, rows = table_with(_results("equivalence.md", root), "Network", "integer → golden")
+
+    def lsb(cell, rx):
+        m = re.search(rx, cell)
+        return num(m.group(1), True) if m else None
+
+    def level(cell):
+        return en(cell.replace("**", "").split(";")[0]).replace("pointwise: ", "")
+
+    out = [[f"`{r[0]}`", lsb(r[2], r"mean ([\d.]+) LSB"), lsb(r[2], r"max ([\d.]+) LSB"),
+            lsb(r[3], r"per layer ≤ ([\d.]+) LSB"), lsb(r[3], r"end to end ≤ ([\d.]+) LSB"),
+            level(r[4]), level(r[5])] for r in rows]
+    return {"header": ["Network", "Float → fake-quant, mean", "max",
+                       "Fake-quant → integer, per layer", "end to end",
+                       "Integer → golden", "Golden → C-sim"],
+            "rows": out, "nd": [None, 2, 0, 0, 0, None, None]}
+
+
 # ------------------------------------------------------------------------- registry
 
 @dataclass
@@ -967,6 +1030,19 @@ CLES: dict[str, Key] = {
                                  "tools/m25.sh ood", "measured", 2),
     "ood.norm.auroc.flir": Key(ood_auroc("norm", 4), R + "ood_monitor.md",
                                "tools/m25.sh ood", "measured", 2),
+    "abft.hls.layers": Key(abft_hls("tb_conv"), R + "faults.md", "make csim-gcc", "csim", 0),
+    "abft.hls.outputs": Key(abft_hls("tb_net"), R + "faults.md", "make csim-gcc", "csim", 0),
+    # safety evidence (M28, M30)
+    "equiv.table": Key(t_equiv, R + "equivalence.md", "python tools/equivalence.py run",
+                       "csim"),
+    "equiv.smt.proved": Key(smt_proved, R + "equivalence.md", "python tools/prove_kernels.py",
+                            "measured", 0),
+    "wcet.v2.acc.ms": Key(wcet(NET, "acc"), R + "latency_bound.md",
+                          "python tools/perf_model.py --wcet", "projection", 1),
+    "wcet.v2.frame.ms": Key(wcet(NET, "frame"), R + "latency_bound.md",
+                            "python tools/perf_model.py --wcet", "projection", 1),
+    "wcet.v2.watchdog.ms": Key(wcet(NET, "watchdog"), R + "latency_bound.md",
+                               "python tools/perf_model.py --wcet", "projection", 0),
     # §2 related work
     "benchmarks": Key(t_bench, R + "benchmarks.csv", "make bench-report", "published"),
     # §10 beyond VOC

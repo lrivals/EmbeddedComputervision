@@ -227,6 +227,11 @@ def test_repository_sources():
     assert len(data["map.coco.table"]["value"]["rows"]) == 4
     assert data["pack.v2.tm64.ms"]["value"] == pytest.approx(24.7)
     assert data["ood.table"]["value"]["rows"][0][0] == "norm"
+    # M25, M28, M30: ABFT in the kernel, equivalence, latency bound
+    assert data["abft.hls.layers"]["value"] == 103
+    assert data["equiv.smt.proved"]["value"] == 95
+    assert data["wcet.v2.acc.ms"]["value"] == pytest.approx(83.4)
+    assert len(data["equiv.table"]["value"]["rows"]) == 3
 
 
 @pytest.mark.skipif(not shutil.which("xelatex"), reason="xelatex absent")

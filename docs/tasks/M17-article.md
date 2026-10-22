@@ -39,12 +39,20 @@ sections checked for hand-typed numbers to 4 to 11 (`RESULT_SECTIONS`). The slid
 YOLOv4/v7 frame, a COCO frame, three packing frames, a Winograd frame and a Dependability
 section.
 
+**Update v3 (2026-10-22).** The article follows M25, M28, M30 and M33: §10 Dependability has
+the ABFT lane in the HLS kernel and the faults in the kernel buffers (`abft.hls.*`, C-sim);
+a new §11 Safety evidence gives the equivalence matrix, operator tests, SMT proof and
+traceability (`equiv.table`, `equiv.smt.proved`) and the static latency bound
+(`wcet.v2.acc.ms`, `wcet.v2.frame.ms`, `wcet.v2.watchdog.ms`); §3 mentions YOLOv5n read
+without PyTorch. The new section moves the sections checked for hand-typed numbers to 4 to
+12 (`RESULT_SECTIONS`); Beyond VOC is now §12, Limitations §13, Reproducibility §14.
+
 **Slides up to M36 (2026-10-22).** `presentation.tex` gains a "Safety evidence" section
 (M28 equivalence, M30 static latency bound, cited from `results/equivalence.md` and
 `results/latency_bound.md`); the work plan lists M27-M36 with their state, the fault frame
 has the ABFT lane in the HLS kernel (T25.3, C-sim), and the limitations point to
-[long-runs.md](long-runs.md) and the status deck below. The article itself does not cover
-M28 and M30 yet.
+[long-runs.md](long-runs.md) and the status deck below. The article covers M28 and M30
+since v3.
 
 **Status slides (2026-10-22).** A second deck, `docs/presentation/status.tex`
 (`make status-pdf` → `docs/presentation/status.pdf`), gives the state of the project
@@ -76,7 +84,7 @@ thousands separator, minus sign −). Differences from the plan below:
   when present); performance comes from `results/mesures.md` and `rapport.md`, which
   `make perf-model bench-report` write, and sweeps from
   [resultats-balayages.md](resultats-balayages.md), which `make harvest` refreshes;
-- the result sections checked for stray numbers are the abstract and §4 to §10; a decimal
+- the result sections checked for stray numbers are the abstract and §4 to §12; a decimal
   inside code, maths, a citation or a link is ignored;
 - the `rev` block shows the revision stored in `chiffres.json` (`_rev`), stamped by
   `render` only when the article changes, so `--check` does not depend on the current

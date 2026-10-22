@@ -2,7 +2,7 @@
 % Narrative only: every number, table, figure and the milestone status come from the
 % macros of generated.tex (\chiffre, \articletable, \articlefig, \articleetat…), rewritten
 % by `make article`. Never type a result by hand: `python -m tools.article --check`
-% (make ci) rejects a decimal number written in the abstract or in sections 4 to 11.
+% (make ci) rejects a decimal number written in the abstract or in sections 4 to 12.
 % PDF: `make article-pdf` (xelatex + bibtex) → docs/article/article.pdf.
 \documentclass[11pt,a4paper]{article}
 
@@ -59,9 +59,14 @@ images/s); packing two INT8 multiplications per DSP brings the projection to
 \chiffre{pack.v2.tm64.ms}~ms with the same DSP count. The same chain runs YOLOv4-tiny on COCO
 (\chiffre{map.coco.v4.ap50} AP50 in float, \chiffre{map.coco.v4.drop} point in INT8), and
 YOLOv7-tiny is being brought onto it. A dependability layer injects bit flips into the
-integer model, checks every convolution with an exact int32 checksum (ABFT), and flags
-out-of-distribution inputs from the backbone features (AUROC \chiffre{ood.norm.auroc.flir} on
-thermal images). First sweeps fine-tune Tiny-YOLOv3 on five other datasets.
+integer model and the kernel buffers, checks every convolution with an exact int32 checksum
+(ABFT) down to the HLS kernel, and flags out-of-distribution inputs from the backbone
+features (AUROC \chiffre{ood.norm.auroc.flir} on thermal images). Safety evidence follows:
+an equivalence matrix per layer and stage, with the integer model, the golden model and the
+kernel equal byte for byte and \chiffre{equiv.smt.proved} SMT obligations proved on the
+scalar kernels, and a static latency bound that does not depend on the image
+(\chiffre{wcet.v2.frame.ms}~ms per frame for Tiny-YOLOv2). First sweeps fine-tune
+Tiny-YOLOv3 on five other datasets.
 
 \smallskip
 \noindent\textit{Status of the numbers.} A superscript marks a number that is not a
@@ -109,8 +114,13 @@ Contributions:
   REQ-YOLO, 4-bit weights and activations, and integer post-processing, all evaluated on
   the same test set with the same protocol (Section~\ref{sec:extensions}).
 \item \textbf{Dependability checks on the integer model}: fault injection, an exact ABFT
-  checksum per convolution in Python and in the golden model, and an out-of-distribution
-  monitor that costs a negligible share of the detector (Section~\ref{sec:dependability}).
+  checksum per convolution in Python, in the golden model and in the HLS kernel, and an
+  out-of-distribution monitor that costs a negligible share of the detector
+  (Section~\ref{sec:dependability}).
+\item \textbf{Safety evidence}: a model $\leftrightarrow$ circuit equivalence matrix per
+  layer and stage, exhaustive operator tests, an SMT proof of the scalar kernels,
+  traceability checked in CI, and a static latency bound of the accelerator
+  (Section~\ref{sec:safety}).
 \item \textbf{Reproducible tooling}: tiers of test profiles, figures, notebooks and this
   article are regenerated from the repository by \texttt{make} targets
   (Section~\ref{sec:repro}).
@@ -189,7 +199,11 @@ existing buffer, so it costs no compute and no copy. YOLOv7-tiny
 spatial pyramid pooling with stride-1 max pools of $5\times5$, $9\times9$ and
 $13\times13$. The export rewrites the two larger pools as chained $5\times5$ pools and
 copies the pooled input by an identity $1\times1$ convolution; this network is work in
-progress (float, calibration and export done, accuracy not yet measured).
+progress (float, calibration and export done, accuracy not yet measured). YOLOv5n and
+YOLOv8n (Ultralytics, SiLU activation, anchor-free head for v8n, outside the base) are read
+from their checkpoints without PyTorch: a reader of the pickle format and the network
+rebuilt from its YAML description give a trainable NumPy YOLOv5n equal to the reference to
+about $10^{-14}$ (M33).
 
 \articlefig{graphe/graphe_tiny-yolov4-coco}
 
@@ -532,9 +546,21 @@ bit position against the mAP. Only a smoke run has been made so far; the full gr
 \paragraph{Exact checksum (ABFT).} The sum of the output channels of a convolution equals the
 convolution of its input by the sum of its filters. Before requantization everything is an
 integer, so the check holds exactly modulo $2^{32}$: no tolerance and no false alarm. The
-summed filter and bias are exported with each layer, and the check runs in the integer model
-and in the golden model. On the dumps of the three exports it reports no error, and every
-injected accumulator fault is detected. The hardware lane and its cost are pending synthesis.
+summed filter and bias are exported with each layer, and the check runs in the integer model,
+in the golden model and in the HLS kernel. The kernel computes the checksum as one more
+output lane in the same pipelined loop and compares it in the requantization pass; the
+failing pixels go to a status register read by the ARM driver. Without fault, every
+bit-exact test passes with no ABFT error (\chiffre{abft.hls.layers} layers of the four
+exports, \chiffre{abft.hls.outputs} layer outputs of the network test bench, in C
+simulation), and every injected accumulator fault is detected. The cost of the lane waits
+for synthesis.
+
+\paragraph{Faults in the kernel buffers.} A fault hook of the C simulation, absent from the
+synthesis, flips one bit per kernel run in an on-chip buffer of the convolution: input tile,
+weights, int32 accumulators, requantized tile or checksum lane. A Python reference maps each
+buffer address back to its tensor element through the lane mapping of the kernel and
+recomputes the outputs of the tile: the faulty outputs match it byte for byte, and the
+outputs outside the tile equal the fault-free dump.
 
 \paragraph{Out-of-distribution monitor.} The monitor reads the INT8 output of the last backbone
 layer of Tiny-YOLOv2, which the accelerator already writes, and scores each image on the ARM.
@@ -552,6 +578,53 @@ against ExDark and FLIR (\texttt{results/ood\_monitor.md}).}
 \label{tab:ood}
 \small\articletable{ood.table}
 \end{table}
+
+% ---------------------------------------------------------------------------------------
+\section{Safety evidence}\label{sec:safety}
+
+Dependability detects faults at run time; this section collects the design-time evidence that
+the circuit computes the model, and how long it may take. It is engineering outside the base.
+
+\paragraph{Model $\leftrightarrow$ circuit equivalence.} Each hand-over of the chain is
+qualified at one of three levels: \emph{pointwise} (same output), \emph{bounded proximity}
+(a measured bound on the gap) or \emph{statistical} (same task metric). The float model and
+its fake-quantized copy differ by a few LSB of the layer scale, which accumulate through the
+layers; the statistical gap of Section~\ref{sec:quant} is the one that counts. From the
+fake-quantized model to the integer model, the only difference is the requantization by an
+integer multiplier and shift and the rounded leaky activation: at most one LSB per layer.
+From the integer model on, the golden model and the C-simulated kernel produce the same
+byte for every layer output (Table~\ref{tab:equiv}). This pointwise level rests on three
+further pieces of evidence: exhaustive and boundary tests of the operators in Python, C++
+and HLS, which found and fixed an int32 overflow of the golden leaky; a proof with the z3
+SMT solver of the requantization, leaky and clipping kernels for every layer
+(\chiffre{equiv.smt.proved} obligations, no int32 overflow of the accumulator); and a
+per-layer traceability table checked in \texttt{make ci}. The integer post-processing equals
+its golden mirror and keeps its capacity and overflow properties, but its unsorted NMS
+depends on the order of the cells. The co-simulation and board rows wait for Vitis and the
+KV260.
+
+\begin{table}[htbp]
+\caption{Equivalence per stage on 20 images per network (\texttt{results/equivalence.md}):
+gaps in LSB of the layer output scale, then the level of the later stages. The co-simulation
+and board stages are pending.}
+\label{tab:equiv}
+\footnotesize\articletable{equiv.table}
+\end{table}
+
+\paragraph{A latency bound independent of the image.} The engine runs a fixed schedule of
+layer descriptors: every loop bound comes from a descriptor field or a tile constant, and
+activations and weights are never a loop or branch condition. The cycle count of a layer is
+therefore a function of its shape only. The static bound gives up every overlap of the
+ping-pong schedule and adds the DDR traffic at the effective bandwidth of the board and an
+assumed burst latency per transfer phase. For Tiny-YOLOv2, it gives
+\chiffre{wcet.v2.acc.ms}~ms for the accelerator, against \chiffre{perf.kv260.v2.ms}~ms for
+the overlapped cycle model. The post-processing is the data-dependent part: bounded by its
+256 slots and by the candidates that can pass the threshold, it brings the frame bound to
+\chiffre{wcet.v2.frame.ms}~ms, hence a watchdog of \chiffre{wcet.v2.watchdog.ms}~ms.
+Adversarial inputs in C simulation stay under the bound. On the sigmoid heads of
+Tiny-YOLOv3 and YOLOv4-tiny, the uncapped NMS dominates the worst case: a demonstrable
+bound there needs a cap on the candidates. The burst latency and the end-to-end latency on
+the board remain to be measured.
 
 % ---------------------------------------------------------------------------------------
 \section{Beyond VOC}\label{sec:beyond}
@@ -599,11 +672,15 @@ of an epoch (Section~\ref{sec:extensions}); the training from scratch in NumPy
 weights; the datasets beyond VOC have only been explored at tier R
 (Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on COCO and
 quantization-aware training to come within one point; YOLOv7-tiny has no accuracy yet, and
-YOLOv5n and YOLOv8n (SiLU, anchor-free heads) are planned behind it. The fault campaign has
-only run as a smoke test, and the ABFT lane of the kernel is not synthesized. Safety work
-built on these blocks (safety metrics, equivalence proofs, runtime monitors, a static latency
-bound and an assurance case) is planned. Table~\ref{tab:etat} gives the progress by
-milestone.
+YOLOv5n and YOLOv8n are read without PyTorch, but their decoding, targets, losses and
+training in NumPy are still to write (M33 to M35). The fault campaign has only run as a smoke
+test, and the ABFT lane of the kernel is not synthesized. The equivalence evidence and the
+latency bound of Section~\ref{sec:safety} stop at the C simulation: the co-simulation and
+board rows, the measured burst latency and the latency distribution on the board are
+pending. The person-detection safety metrics, the runtime monitors and the assurance case
+(M27, M29, M31) wait for the CrowdHuman data on the PC; the explanation of the decisions
+(M36) is planned. The long runs still open are listed with their durations in
+\texttt{docs/tasks/long-runs.md}. Table~\ref{tab:etat} gives the progress by milestone.
 
 \begin{table}[htbp]
 \caption{Progress by milestone (\texttt{docs/tasks/README.md}).}
@@ -635,6 +712,9 @@ ARM driver on PC & \texttt{make sw-sim} \\
 mAP at the three stages & \texttt{make m8-inputs m8-int bench-sim map-stades} \\
 COCO, YOLOv4-tiny & \texttt{tools/m11.sh coco-v4} \\
 faults, OOD monitor & \texttt{tools/m25.sh}, \texttt{tools/m25.sh ood} \\
+equivalence, proofs, traceability & \texttt{make equivalence}, \texttt{make prove-kernels},
+  \texttt{make traceability} \\
+latency bound & \texttt{python tools/perf\_model.py --wcet} \\
 performance projection & \texttt{make perf-model bench-report} \\
 figures, notebooks & \texttt{make figures}, \texttt{make notebooks} \\
 this article & \texttt{make article}, \texttt{make article-pdf} \\
@@ -686,6 +766,9 @@ v1 & 2026-10-07 & Source moved from Markdown to LaTeX (\texttt{article.tex},
   \texttt{generated.tex}, \texttt{refs.bib}); PDF compiled by xelatex. \\
 v2 & 2026-10-20 & Two MACs per DSP and the Winograd study (M23), YOLOv4-tiny on COCO
   (M24), new section on dependability (M25), YOLOv7-tiny in progress (M26). \\
+v3 & 2026-10-22 & New section on safety evidence: equivalence matrix, operator tests, SMT
+  proof and traceability (M28), static latency bound (M30); ABFT lane and buffer faults in
+  the HLS kernel (M25); YOLOv5n read without PyTorch (M33). \\
 \bottomrule
 \end{tabularx}
 \end{center}
