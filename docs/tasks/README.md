@@ -42,6 +42,9 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M30](M30-latency-bound.md) | Latency bound and determinism (optional) | static cycle bound of the accelerator, reached in simulation; p99.9, maximum and jitter on the board |
 | [M31](M31-assurance-case.md) | Assurance case (optional) | ODD, requirements, objectives → evidence map, failure-rate budget, assurance argument checked in CI |
 | [M32](M32-trashnet-pets.md) | TrashNet and Oxford-IIIT Pet (optional) | two classification-style sets turned into detection sets: TrashNet boxes from the M22 labeller, Pet whole-body boxes from the trimaps (and the M22 labeller scored against them); loaders, notebooks, fine-tuning, webcam |
+| [M33](M33-yolov5n.md) | YOLOv5n without PyTorch (optional) | torch-free `.pt` reader; C3 / SPPF in forward and backward; v5 targets, CIoU loss and training recipe; float, fine-tuned and integer mAP |
+| [M34](M34-yolov7-tiny.md) | YOLOv7-tiny without PyTorch (optional) | backward of the ELAN 4-source routes and stride-1 pools; v5 / OTA loss on the Darknet graph; COCO mAP, VOC fine-tuning, integer chain |
+| [M35](M35-yolov8n.md) | YOLOv8n without PyTorch (optional) | C2f, decoupled head and DFL in forward and backward; task-aligned assigner, BCE + CIoU + DFL loss; training and integer DFL |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -109,6 +112,11 @@ graph LR
   M4 --> M25[M25]
   M11 -.-> M25
   M24 --> M26[M26]
+  M26 --> M33[M33]
+  M2 --> M33
+  M26 --> M34[M34]
+  M33 --> M34
+  M33 --> M35[M35]
   M11 --> M27[M27]
   M15 --> M27
   M22 -.-> M27
@@ -220,3 +228,6 @@ progress per milestone here.
 | M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 0 |
+| M33 | 9 | 0 |
+| M34 | 6 | 0 |
+| M35 | 8 | 0 |

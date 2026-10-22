@@ -15,6 +15,9 @@ weights is in scope; training these networks is not.
 
 Related backlog: [M24](M24-yolov4-tiny.md) brings grouped routes, `scale_x_y` and the COCO
 evaluation of T11.1, which this milestone reuses.
+The from-scratch, torch-free versions (weight reading, backward passes, loss, training) are
+[M33](M33-yolov5n.md) (YOLOv5n), [M34](M34-yolov7-tiny.md) (YOLOv7-tiny) and
+[M35](M35-yolov8n.md) (YOLOv8n); T26.0, T26.3 and T26.4 stay the inference and hardware view.
 
 **State** (2026-10-20): T26.0 in progress (SPP 5×5 stride-1 pool, `new_coords` heads,
 calibration). T26.1 (converter) and T26.2 (SiLU) done; the export, driver and engine wiring
