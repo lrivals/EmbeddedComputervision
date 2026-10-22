@@ -26,10 +26,12 @@ Related backlog: [M1](M1-briques-numpy.md) (layers, gradcheck), [M2](M2-cibles-p
 [T26.2](M26-recent-models.md) (float and integer SiLU), [T26.3](M26-recent-models.md)
 (YOLOv5n on the hardware chain).
 
-**State** (2026-10-22): not started. Already available: SiLU forward / backward and integer
-table (T26.2), the flat layer list run by `python/yolo/models/ul_graph.py` (forward only),
-stride-2 convs in `layers/conv.py` (gradcheck s = 2, T1.2), stride-1 maxpools with padding
-(`layers/pool.py`, T1.5), `route`, `upsample`, the v3 loss and trainer (`train/`).
+**State** (2026-10-22): T33.0-T33.3 done: the official `yolov5n.pt` is read without torch,
+described from its YAML and run as a trainable NumPy network equal to torch to 4·10⁻¹⁴.
+T33.4-T33.8 open. The official checkpoints (`weights/ultralytics/`) and the torch reference
+fixtures (`weights/m33/`) are local only (gitignored, AGPL, not on Drive); they were made
+once by a throwaway torch script that is not in the repo, and the tests that need them are
+skipped without them.
 
 ## Architecture reference
 
@@ -67,7 +69,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
   P5 (116, 90) (156, 198) (373, 326).
 - **Published**: 1.9 M parameters, 4.5 GFLOPs at 640, COCO val2017 mAP50-95 28.0, mAP50 45.7.
 
-### [ ] T33.0 — Torch-free `.pt` reader
+### [x] T33.0 — Torch-free `.pt` reader
 - **Spec**: §9.1 · **Depends on**: — · **Size**: M
 - **Deliverables**: `python/yolo/io/torch_pickle.py` (`load_pt(path) -> dict[str, np.ndarray]`,
   names as in a torch `state_dict`); `tools/convert_ultralytics.py` rewritten on top of it
@@ -107,8 +109,28 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
   - Security: a `.pt` from the web is untrusted data (pickle). The whitelist is the
     protection; open it with `python -I`, in its own download folder (environment note of
     the repo).
+- **Done**:
+  - **Reader**: `yolo.io.torch_pickle`: `unpickle`, `load_checkpoint(path) -> (state dict,
+    meta)`, `load_pt`. The two official files use only these globals: `_rebuild_tensor_v2`,
+    `_rebuild_parameter`, `OrderedDict`, `set`, `torch.Size`, Float / Half / Double / Long
+    storages, and module classes. Modules are rebuilt by NEWOBJ + BUILD, so no
+    `copyreg` entry is needed.
+  - **Equality**: on `yolov5n.pt` (v7.0, 349 tensors) and `yolov8n.pt` (v8.2.0, 355
+    tensors), every array is bit-equal to the state dict read by torch, with the same names,
+    shapes and dtypes. Neither file has `ema` (None), so `model` is used. The float16 →
+    float32 cast is exact.
+  - **Converter**: `tools/convert_ultralytics.py` = `load_checkpoint` + `ul_yaml` +
+    `ul_net.fold`, with no torch. Its npz is bit-identical to the T26.1 torch converter
+    and its json identical except the anchors. T26.1 wrote the stride units stored in the
+    checkpoint, so its "pixel" anchors were wrong (1.25, 1.625, ...); they are now pixels.
+    The `convert` extra is removed from `pyproject.toml`.
+  - **Tests**: `test_torch_pickle.py` builds pickles opcode by opcode (no torch needed).
+    It covers strides, offsets, dtypes, the module tree and non-persistent buffers. A
+    crafted `os.system` pickle is refused and the marker file is never created. The reader
+    is also run in a subprocess with `torch` blocked. `test_convert_ultralytics.py` no longer
+    needs torch.
 
-### [ ] T33.1 — Network description from the YAML
+### [x] T33.1 — Network description from the YAML
 - **Spec**: §3 · **Depends on**: T33.0 · **Size**: S
 - **Deliverables**: `python/yolo/models/ul_yaml.py`: model YAML (the dict read in T33.0, or
   `yolov5n.yaml` stored in `python/yolo/models/cfg/`) → the flat layer list of
@@ -120,8 +142,21 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
 - **Notes**: the YAML parser implements `make_divisible`, `round(n·gd)`, the `from` indices
   (−1, lists) and the modules `Conv`, `C3`, `SPPF`, `nn.Upsample`, `Concat`, `Detect`; the
   same parser serves YOLOv8 (T35.0) with `C2f` and the v8 `Detect`.
+- **Done**:
+  - **Parser**: `yolo.models.ul_yaml.parse(cfg)` handles YOLOv5 and YOLOv8 (C2f, DFL
+    `Detect`, `slice` layers). Each conv gets `bn` and `name` (state-dict prefix).
+  - **YAMLs**: `YOLOV5N` / `YOLOV8N` are Python dicts rather than `cfg/*.yaml`, as pyyaml
+    is not a dependency of `yolo/`. They equal the `model.yaml` of the official
+    checkpoints (test).
+  - **Layer list**: equal to the T26.1 one for both nets (85 and 106 layers) once `bn` /
+    `name` are dropped.
+  - **Graph support**: `specs.NETWORKS["yolov5n-coco"]`; `specs.layer_sources` accepts
+    `from` on any layer; `infer_shapes` handles `concat`, `add`, `slice` and the conv `p`.
+  - **Counts**: 1,867,405 parameters with BN folded (published 1.87 M); 1,872,157 unfolded
+    (+ one β per BN channel). 2.234 GMAC at 640 (4.47 GFLOPs, published 4.5) and 0.944
+    GMAC at 416 (`make count-macs`, new `--size` option).
 
-### [ ] T33.2 — Blocks in forward and backward passes
+### [x] T33.2 — Blocks in forward and backward passes
 - **Spec**: §4 · **Depends on**: T33.1 · **Size**: M
 - **Deliverables**: `python/yolo/layers/blocks.py`: `conv_bn_act` (conv + BN + SiLU or
   leaky, train / eval mode), `bottleneck`, `c3`, `sppf`, `concat`, `add`; each with
@@ -139,8 +174,22 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     first maximum, as in the forward (test with equal values, gradient mass conserved).
   - BN in training mode uses the batch statistics and updates the running averages with
     momentum 0.03 (PyTorch convention: $\hat\mu ← (1-m)\hat\mu + m\mu_B$); $\varepsilon = 10^{-3}$.
+- **Done**:
+  - **Blocks**: `yolo.layers.blocks` has `conv_bn_act` (SiLU or leaky, train / eval),
+    `bottleneck`, `c3`, `sppf`, `concat` and `add`. Parameters are flat dicts named like
+    the torch state dict (`m.0.cv2.W`); BN uses ε 10⁻³, keep factor 0.97, and the running
+    variance from the unbiased batch variance (PyTorch). The variance flag is
+    `bn_forward(unbiased=)`; Darknet networks are unchanged.
+  - **Gradchecks**: ≤ 1e-7 on x, W, γ, β of every block, with and without shortcut, C3
+    with n = 1 and 2, in train and eval modes.
+  - **Other checks**:
+    - the shortcut dx equals the residual-branch dx + dy;
+    - three chained 5×5 pools equal the 5 / 9 / 13 windows;
+    - the 6×6 / 2 p = 2 conv equals the naive conv (1e-12);
+    - on equal values, each window routes its gradient to its first maximum, as a
+      brute-force reference does, and the gradient mass is conserved.
 
-### [ ] T33.3 — Float network, forward and backward
+### [x] T33.3 — Float network, forward and backward
 - **Spec**: §4.5 · **Depends on**: T33.2 · **Size**: M
 - **Deliverables**: `python/yolo/models/ul_net.py`: trainable network built from the T33.1
   description (parameters, gradients, `train()` / `eval()`, `fold_bn()` → the `ul_graph`
@@ -150,6 +199,21 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
   to within 1e-5; gradcheck of the whole network on a 2-image 64×64 batch, sampled indices
 - **Notes**: the network keeps its weights unfused for training; inference, quantization and
   export work on the folded description (`quant/fuse_bn.py` formula, T4.1).
+- **Done**:
+  - **Network**: `yolo.models.ul_net` runs the `ul_yaml` description in the generic
+    `graph.Network`, which now reads `from` on any layer and handles `concat` / `add` /
+    `slice`, the conv `p`, `net["outputs"]` and `bn_unbiased`.
+  - **API**: `build(name_or_desc, state_dict, pretrained)`, `state_dict`, `load_state_dict`,
+    `fold` / `fold_bn` (`ul_graph` schema, float32) and `random_state_dict`.
+    `ul_net.build("yolov5n-coco", pretrained=True)` reads `weights/ultralytics/yolov5n.pt`.
+  - **Against torch**: eval forward vs the torch heads (float64) on 3 COCO val2017 images
+    letterboxed to 640 (139, 285, 632): max error 3.6·10⁻¹⁴.
+  - **Folding**: `fold_bn` is bit-identical to the T26.1 weights; `ul_graph.forward` of
+    the folded net is within 5.6·10⁻⁶ of the unfolded forward (float32 weights).
+  - **Gradchecks**: whole YOLOv5n, 2 images 64×64, training mode: sampled entries of x and
+    of 8 parameters (stem, C3 bottleneck, SPPF, P5 C3, heads) ≤ 1e-7. A small Conv + C3 (n = 2)
+    + SPPF + head network is checked on every parameter, and the graph's flat list equals
+    `blocks.c3` / `blocks.sppf` to 1e-12.
 
 ### [ ] T33.4 — Decoding, letterbox and COCO mAP
 - **Spec**: §8 · **Depends on**: T33.3 · **Size**: M

@@ -7,6 +7,9 @@
 - Une couche « conv » = convolution, puis BN et leaky si `bn`, sinon convolution linéaire avec
   biais (§3).
 - Les couches `yolo` / `region` sont l'identité : le décodage et la perte sont hors du graphe.
+- Ultralytics networks (T33.3, `yolo.models.ul_yaml`): every layer may read `from`; types
+  `concat`, `add` (residual shortcut), `slice` (channels [start, stop)); conv padding `p`;
+  head maps listed in `net["outputs"]`.
 """
 
 import numpy as np
@@ -19,7 +22,7 @@ from yolo.layers.conv import conv_backward, conv_forward
 from yolo.layers.pool import maxpool_backward, maxpool_forward
 from yolo.layers.route import route_backward, route_forward
 from yolo.layers.upsample import upsample_backward, upsample_forward
-from yolo.models.specs import infer_shapes
+from yolo.models.specs import infer_shapes, layer_sources
 
 OUTPUT_TYPES = ("yolo", "region")
 
@@ -27,16 +30,18 @@ OUTPUT_TYPES = ("yolo", "region")
 class Network:
     """Paramètres `params[i]`, état BN `state[i]` et exécution d'un réseau `net`."""
 
-    def __init__(self, net, dtype=np.float32, rng=None, bn_momentum=0.9, bn_eps=1e-5):
+    def __init__(self, net, dtype=np.float32, rng=None, bn_momentum=0.9, bn_eps=1e-5,
+                 bn_unbiased=False):
         self.net = net
         self.layers = net["layers"]
         self.dtype = np.dtype(dtype)
         self.bn_momentum = bn_momentum
         self.bn_eps = bn_eps
+        self.bn_unbiased = bn_unbiased
         self.shapes = infer_shapes(net)
         self.inputs = [self._sources(i, layer) for i, layer in enumerate(self.layers)]
         outputs = [i for i, layer in enumerate(self.layers) if layer["type"] in OUTPUT_TYPES]
-        self.outputs = outputs or [len(self.layers) - 1]
+        self.outputs = list(net.get("outputs", [])) or outputs or [len(self.layers) - 1]
         self.params = [{} for _ in self.layers]
         self.state = [{} for _ in self.layers]
         self.init_he(rng)
@@ -44,7 +49,7 @@ class Network:
 
     def _sources(self, i, layer):
         # -1 désigne l'entrée du réseau.
-        return list(layer["from"]) if layer["type"] == "route" else [i - 1]
+        return layer_sources(i, layer)
 
     def init_he(self, rng=None):
         """§7.1 : W ~ N(0, 2/(k²·C_in)), γ = 1, β = 0, biais de tête 0 ; μ_run = 0, σ²_run = 1."""
@@ -87,11 +92,12 @@ class Network:
     # ------------------------------------------------------------------ passe avant
     def _conv_forward(self, i, x, train):
         layer, p = self.layers[i], self.params[i]
-        y, c_conv = conv_forward(x, p["W"], p.get("b"), s=layer["s"])
+        y, c_conv = conv_forward(x, p["W"], p.get("b"), s=layer["s"], pad=layer.get("p"))
         caches = [c_conv]
         if layer["bn"]:
             y, c_bn = bn_forward(y, p["gamma"], p["beta"], self.state[i], train=train,
-                                 momentum=self.bn_momentum, eps=self.bn_eps)
+                                 momentum=self.bn_momentum, eps=self.bn_eps,
+                                 unbiased=self.bn_unbiased)
             caches.append(c_bn)
         if layer["act"] == "leaky":
             y, c_act = leaky_forward(y)
@@ -117,6 +123,12 @@ class Network:
                 y, cache = upsample_forward(src[0], s=layer["s"])
             elif t == "route":
                 y, cache = route_forward(src, layer.get("groups", 1), layer.get("group_id", 0))
+            elif t == "concat":
+                y, cache = route_forward(src)
+            elif t == "add":
+                y, cache = src[0] + src[1], None
+            elif t == "slice":
+                y, cache = src[0][:, layer["start"]:layer["stop"]], src[0].shape
             elif t in OUTPUT_TYPES:
                 y, cache = src[0], None
             else:
@@ -165,8 +177,14 @@ class Network:
                 dxs = [maxpool_backward(dy, cache)[0]]
             elif t == "upsample":
                 dxs = [upsample_backward(dy, cache)[0]]
-            elif t == "route":
+            elif t in ("route", "concat"):
                 dxs = route_backward(dy, cache)[0]
+            elif t == "add":
+                dxs = [dy, dy]
+            elif t == "slice":
+                dx = get_xp(dy).zeros(cache, dtype=dy.dtype)
+                dx[:, self.layers[i]["start"]:self.layers[i]["stop"]] = dy
+                dxs = [dx]
             else:
                 dxs = [dy]
             # §4.5 : une carte lue par plusieurs couches cumule ses gradients.

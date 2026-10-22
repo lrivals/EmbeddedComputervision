@@ -31,8 +31,9 @@ def describe(layer):
     t = layer["type"]
     if t == "conv":
         return "conv linéaire" if layer["act"] == "linear" else "conv"
-    if t == "route":
-        return "route " + ", ".join(str(j) for j in layer["from"])
+    if t in ("route", "concat", "add"):
+        f = layer["from"]
+        return f"{t} " + ", ".join(str(j) for j in (f if isinstance(f, list) else [f]))
     if t == "upsample":
         return f"upsample ×{layer['s']}"
     return t
@@ -70,6 +71,7 @@ def main():
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--net", choices=[*NETWORKS, "all"], default="all")
     src.add_argument("--manifest", type=Path)
+    ap.add_argument("--size", type=int, help="square input size instead of the network's (T33.1)")
     args = ap.parse_args()
     if args.manifest:
         nets = [net_from_manifest(args.manifest)]
@@ -78,6 +80,8 @@ def main():
     else:
         nets = [NETWORKS[args.net]]
     for net in nets:
+        if args.size:
+            net = {**net, "input": (net["input"][0], args.size, args.size)}
         print_table(net)
 
 

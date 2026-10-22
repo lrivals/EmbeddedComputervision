@@ -17,9 +17,6 @@ asl = ["mediapipe>=0.10.14", "pillow>=10"]  # hand pseudo-boxes, tools/prep_data
 autolabel = ["gradio>=4.44", "gradio_image_annotation>=0.5", "transformers>=4.44", "torch",
              "pillow>=10"]
 formal = ["z3-solver>=4.12"]  # tools/prove_kernels.py (T28.2), never imported by yolo/
-# tools/convert_ultralytics.py (T26.1), never imported by yolo/; official .pt files also need
-# `ultralytics` to unpickle (AGPL-3.0)
-convert = ["torch"]
 
 [build-system]
 requires = ["setuptools>=61"]

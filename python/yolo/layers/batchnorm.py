@@ -13,8 +13,12 @@ def bn_init_state(c, dtype=np.float64):
     return {"mean": np.zeros(c, dtype=dtype), "var": np.ones(c, dtype=dtype)}
 
 
-def bn_forward(x, gamma, beta, state, train=True, momentum=0.9, eps=1e-5):
-    """Renvoie (y, cache). En entraînement, statistiques du lot ; sinon moyennes glissantes."""
+def bn_forward(x, gamma, beta, state, train=True, momentum=0.9, eps=1e-5, unbiased=False):
+    """Renvoie (y, cache). En entraînement, statistiques du lot ; sinon moyennes glissantes.
+
+    `unbiased`: the running variance averages the unbiased batch variance (M/(M − 1)·σ²_c,
+    PyTorch convention, T33.3); the normalization always uses σ²_c.
+    """
     axes = (0, 2, 3)
     if train:
         # §4.2 : μ_c, σ²_c sur M = N·H·W valeurs
@@ -23,8 +27,9 @@ def bn_forward(x, gamma, beta, state, train=True, momentum=0.9, eps=1e-5):
         # §4.2 : μ_run ← m·μ_run + (1 − m)·μ_c (de même pour σ²)
         state["mean"] *= momentum
         state["mean"] += (1 - momentum) * mu
+        m = x.size // x.shape[1]
         state["var"] *= momentum
-        state["var"] += (1 - momentum) * var
+        state["var"] += (1 - momentum) * (var * m / max(m - 1, 1) if unbiased else var)
     else:
         mu, var = state["mean"], state["var"]
     inv_std = 1.0 / get_xp(var).sqrt(var + eps)

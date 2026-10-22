@@ -59,8 +59,12 @@ of SiLU layers comes with T26.3.
   - **Check**: NumPy == torch to within 2·10⁻⁷ (random weights, non-trivial BN, 3 images).
     The parameter counts are those published for the two "n" models (1.87 M, 3.15 M).
   - **Test**: `test_convert_ultralytics.py`, skipped without torch.
-  - **Remaining**: a run on the official weights, which needs a download and the licence
-    check.
+  - **Official weights** (2026-10-22, M33): run on `yolov5n.pt` / `yolov8n.pt` (local only,
+    AGPL). It showed that the v5 anchors written to the json were the stride units of
+    the checkpoint, not pixels.
+  - **Since T33.0**: the converter is torch-free (`yolo.io.torch_pickle` + `ul_yaml`), its
+    output is identical to this one except the anchors, now in pixels; the torch modules and
+    the `convert` extra are gone.
 
 ### [x] T26.2 — SiLU
 - **Spec**: §4.3, §9.4 · **Depends on**: — · **Size**: M

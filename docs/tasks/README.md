@@ -235,7 +235,7 @@ progress per milestone here.
 | M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 0 |
-| M33 | 9 | 0 |
+| M33 | 9 | 4 (T33.0-T33.3: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴; decoding, targets, loss, training and integer chain open) |
 | M34 | 6 | 0 |
 | M35 | 8 | 0 |
 | M36 | 12 | 0 |

@@ -4,6 +4,8 @@ Données pures : chaque couche est un dict avec au moins `type`. Les formes de s
 déduisent avec `infer_shapes`, les paramètres et les MACs avec `layer_cost`.
 """
 
+from yolo.models import ul_yaml
+
 VOC_CLASSES = 20
 
 
@@ -177,8 +179,27 @@ TINY_YOLOV7_COCO = {
     + _v7_head(86, 512, [6, 7, 8]),                                        # 95-98 : 13×13
 }
 
+# YOLOv5n COCO (Ultralytics v6.0+ YAML, T33.1): `ul_graph` schema, every layer reads `from`;
+# conv + BN + SiLU, C3 / SPPF blocks as `add` / `concat` / stride-1 `maxpool` layers, three
+# anchor heads (80, 40, 20 at 640).
+YOLOV5N_COCO = ul_yaml.parse(ul_yaml.YOLOV5N, name="yolov5n-coco")
+
 NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC, TINY_YOLOV4_COCO,
-                                         TINY_YOLOV7_COCO)}
+                                         TINY_YOLOV7_COCO, YOLOV5N_COCO)}
+
+
+def layer_sources(i, layer):
+    """Indices of the maps read by layer `i` (−1: network input).
+
+    Darknet layers read the previous one, a route its absolute `from` list; the Ultralytics
+    layers (T33.1) carry `from` on every type, an index or a list, −1 meaning the previous.
+    """
+    f = layer.get("from")
+    if f is None:
+        return [i - 1]
+    if layer["type"] == "route":
+        return list(f)
+    return [i - 1 if j == -1 else j for j in (f if isinstance(f, list) else [f])]
 
 
 def infer_shapes(net):
@@ -186,10 +207,14 @@ def infer_shapes(net):
     shapes = []  # (entrée, sortie)
     prev = tuple(net["input"])
     for i, layer in enumerate(net["layers"]):
-        c, h, w = prev
         t = layer["type"]
+        if "from" in layer and t != "route":
+            srcs = [tuple(net["input"]) if j < 0 else shapes[j][1]
+                    for j in layer_sources(i, layer)]
+            prev = srcs[0]
+        c, h, w = prev
         if t == "conv":
-            pad = layer["k"] // 2
+            pad = layer.get("p", layer["k"] // 2)
             s = layer["s"]
             out = (layer["cout"], (h + 2 * pad - layer["k"]) // s + 1,
                    (w + 2 * pad - layer["k"]) // s + 1)
@@ -209,6 +234,16 @@ def infer_shapes(net):
                     raise ValueError(f"couche {i} : route groupée invalide")
                 out = (out[0] // groups,) + out[1:]
             prev = out  # une route n'a pas d'entrée propre : elle lit ses sources
+        elif t == "concat":
+            if any(sh[1:] != srcs[0][1:] for sh in srcs):
+                raise ValueError(f"layer {i}: concat of maps of different sizes {srcs}")
+            out = (sum(sh[0] for sh in srcs),) + srcs[0][1:]
+        elif t == "add":
+            if any(sh != srcs[0] for sh in srcs):
+                raise ValueError(f"layer {i}: add of maps of different shapes {srcs}")
+            out = srcs[0]
+        elif t == "slice":
+            out = (layer["stop"] - layer["start"], h, w)
         elif t in ("yolo", "region"):  # sorties : identité, décodées hors du réseau (§8.1)
             out = (c, h, w)
         else:
