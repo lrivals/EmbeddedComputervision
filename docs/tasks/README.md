@@ -235,7 +235,7 @@ progress per milestone here.
 | M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 3 (T32.4, T32.5: Oxford-IIIT Pet downloaded, whole-body boxes from the trimaps; T32.8 datasheets; TrashNet labelling, loaders, notebooks and fine-tuning open) |
-| M33 | 9 | 4 (T33.0-T33.3: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴; decoding, targets, loss, training and integer chain open) |
-| M34 | 6 | 0 |
+| M33 | 9 | 6 (T33.0-T33.5: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴, v5 decoding and evaluation (COCO 28.1 AP at 640, published 28.0), targets; T33.6 loss and T33.7 recipe written, waiting for the torch loss fixture and the VOC run (≈ 6 CPU days); T33.8 integer chain open) |
+| M34 | 6 | 2 (T34.0 layer table and weights, T34.1 route / stride-1 pool backward; T34.2 COCO 34.3 AP at 416 against the published 35.2, gap open; T34.3 OTA loss and T34.4 training written, waiting for the torch fixture and the VOC run (≈ 10 CPU days); T34.5 open) |
 | M35 | 8 | 0 |
 | M36 | 12 | 0 |

@@ -100,8 +100,9 @@
     Tiny-YOLOv2 VOC & float, int, golden, C-sim: identical on 4,952 images & board \\
     Tiny-YOLOv3 COCO & identical up to C-sim (20 images) & full COCO C-sim pass \\
     YOLOv4-tiny COCO & identical up to C-sim (20 images, smoke run 10) & full C-sim, QAT \\
-    YOLOv7-tiny COCO & exported and calibrated & accuracy, C-sim pass \\
-    YOLOv5n, YOLOv8n & torch-free reader; v5n network $=$ torch to $\sim10^{-14}$ & mAP, training (M33--M35) \\
+    YOLOv7-tiny COCO & exported, calibrated; 34.3 AP at 416 (paper 35.2) & C-sim pass, VOC training \\
+    YOLOv5n COCO & torch-free, 28.1 AP at 640 (published 28.0); trainable & VOC training, integer \\
+    YOLOv8n COCO & torch-free reader & mAP, training (M35) \\
     \bottomrule
   \end{tabularx}
 
@@ -122,14 +123,17 @@
         post-processing properties (6 / 7, board row left)
       \item \textbf{M30}: static latency bound of the accelerator (T30.0)
       \item \textbf{M32}: Oxford-IIIT Pet boxed from the trimaps, datasheets
-      \item \textbf{M33} started: \texttt{.pt} read without torch, network from the
-        Ultralytics YAML, C3 / SPPF in forward and backward (T33.0--T33.3)
+      \item \textbf{M33}: \texttt{.pt} read without torch, network from the Ultralytics
+        YAML, C3 / SPPF in forward and backward; v5 decoding (28.1 AP), targets, CIoU loss,
+        training recipe (T33.0--T33.7)
+      \item \textbf{M34}: YOLOv7-tiny trainable without PyTorch: ELAN / SPP-CSP backward,
+        OTA loss, 34.3 AP at 416 (T34.0--T34.4 code)
     \end{itemize}
     \column{0.48\textwidth}
     \textbf{Planned}
     \begin{itemize}
-      \item \textbf{M33--M35}: YOLOv5n, YOLOv7-tiny, YOLOv8n trained and quantized without
-        PyTorch (CIoU, OTA, task-aligned assigner, DFL)
+      \item \textbf{M33--M35}: VOC fine-tuning of YOLOv5n and YOLOv7-tiny (6 and 10 CPU
+        days), YOLOv8n (task-aligned assigner, DFL), integer models
       \item \textbf{M36}: decision explanation at the three stages: gradient, perturbation
         and exact integer attributions, miss causes, on-chip CAM
       \item the run inventory \texttt{long-runs.md}: every open long run with its command,
@@ -148,8 +152,9 @@
     M24 YOLOv4-tiny & 5/7 & C-sim night, GPU & M30 latency bound & 1/4 & board \\
     M25 dependability & 5/9 & CPU nights & M31 assurance case & 0/6 & M27, M29 \\
     M26 recent models & 2/6 & C-sim, licence & M32 TrashNet, Pet & 3/14 & labelling, Drive \\
-    M27 safety metrics & 0/7 & CrowdHuman on PC & M33 YOLOv5n & 4/9 & code \\
-    M28 equivalence & 6/7 & board & M34--M36 & 0/26 & code \\
+    M27 safety metrics & 0/7 & CrowdHuman on PC & M33 YOLOv5n & 6/9 & CPU days, torch fixture \\
+    M28 equivalence & 6/7 & board & M34 YOLOv7-tiny & 2/6 & CPU days, AP gap \\
+     & & & M35--M36 & 0/20 & code \\
     \bottomrule
   \end{tabular}
 
@@ -157,7 +162,7 @@
   Most open tasks wait for \textbf{compute}, not for code: the runs are written, only the
   hours are missing. Everything that needs Vitis, Vivado or the KV260 is set aside in
   \texttt{docs/tasks/deferred/}, with the order to pick it up.
-  \src{docs/tasks/M*.md (ticked tasks, 2026-10-22)}
+  \src{docs/tasks/M*.md (ticked tasks, 2026-10-23)}
 \end{frame}
 
 % =====================================================================================
