@@ -134,15 +134,16 @@ def auto_jobs(jobs=None):
 
 def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric=None,
                  split=None, size=None, data_root=None, out=None, markdown=None, jobs=1,
-                 tiles=0, overlap=None):
+                 tiles=0, overlap=None, preset=None):
     """`tools/eval_voc.py` (fin du profil `<jeu>-train`) ; sorties du notebook à la fin.
     `jobs` None : `auto_jobs` ; plus de 1 : `--jobs` (inférence répartie sur des processus).
-    `tiles` > 0 : inférence par tuiles de `tiles` px (`overlap` : recouvrement, M15)."""
+    `tiles` > 0 : inférence par tuiles de `tiles` px (`overlap` : recouvrement, M15).
+    `preset` (with `resize` "v5"): `v5` by default, `v8` for YOLOv8n (NMS 0.7, T35.3)."""
     jobs = auto_jobs(jobs)
     cmd = ["python", "tools/eval_voc.py", "--net", str(net), "--weights", str(weights),
            "--dataset", dataset, "--resize", resize, "--subset", str(subset)]
     if resize == "v5":  # YOLOv5 / YOLOv7 settings: conf 0.001, NMS 0.65, max 300 (T33.4)
-        cmd += ["--preset", "v5"]
+        cmd += ["--preset", preset or "v5"]
     _opt(cmd, "--metric", metric)
     _opt(cmd, "--split", split)
     _opt(cmd, "--size", _size(size))

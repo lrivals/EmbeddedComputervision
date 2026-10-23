@@ -11,6 +11,11 @@ YOLOv5 (`mode="v5"`, T33.4) : the same formulas, b_xy = (2σ(t_xy) − 0.5 + c_x
 b_wh = (2σ(t_wh))²·A, score σ(t_o)·σ(t_c). The anchors of these networks are pixels of the
 actual input (`v5_levels`), not of a 416 reference: `decode` divides them by S·stride.
 
+YOLOv8 (`decode_v8`, T35.2), anchor-free: one point per cell and level at the cell centre
+a = (c_x + 0.5, c_y + 0.5) (grid units); per side k ∈ {l, t, r, b}, 16 logits z_k, distance
+d_k = Σ_i i·softmax(z_k)_i (DFL expectation); box (a_x − d_l, a_y − d_t, a_x + d_r, a_y + d_b)
+times the stride; scores σ(t_c), no objectness (`obj` is the best class score).
+
 Score de la classe c : σ(t_o)·σ(t_c) (YOLOv3) ou σ(t_o)·softmax(t)_c (YOLOv2, softmax
 stabilisé). Les boîtes sont rendues en `(cx, cy, w, h)` normalisés dans l'image letterbox ;
 `to_original` les ramène dans l'image d'origine.
@@ -19,7 +24,8 @@ stabilisé). Les boîtes sont rendues en `(cx, cy, w, h)` normalisés dans l'ima
 import numpy as np
 
 from yolo.data.letterbox import boxes_from_letterbox
-from yolo.data.targets import anchor_ref, anchors_frac, heads, is_v5, v5_levels
+from yolo.data.targets import (anchor_ref, anchors_frac, heads, is_v5, is_v8, v5_levels,
+                                v8_levels)
 from yolo.layers.activations import sigmoid
 
 
@@ -72,7 +78,9 @@ def decode_head(out, anchors, num_classes, mode="v3", alpha=1.0, new_coords=Fals
 
 def decode(outputs, net):
     """Toutes les têtes de `net` (format `specs`) concaténées ; mode v2 pour `region`,
-    `decode_v5` pour les réseaux YOLOv5 / YOLOv7 (`is_v5`)."""
+    `decode_v5` pour les réseaux YOLOv5 / YOLOv7 (`is_v5`), `decode_v8` pour YOLOv8."""
+    if is_v8(net):
+        return decode_v8(outputs, net)
     if is_v5(net):
         return decode_v5(outputs, net)
     anchors = anchors_frac(net["anchors"], anchor_ref(net))
@@ -94,6 +102,68 @@ def decode_v5(outputs, net):
         frac = anchors / np.array([sw * stride, sh * stride], dtype=np.float64)
         parts.append(decode_head(outputs[hid], frac, net["classes"], "v5"))
     return tuple(np.concatenate(x, axis=1) for x in zip(*parts))
+
+
+def anchor_points(grids, strides):
+    """Cell centres of the levels `grids` [(S_h, S_w)], row-major, concatenated: points
+    (A, 2) `(x, y)` in grid units and the stride (A,) of each one (8,400 points at 640)."""
+    pts, st = [], []
+    for (sh, sw), s in zip(grids, strides):
+        i, j = np.meshgrid(np.arange(sh), np.arange(sw), indexing="ij")
+        pts.append(np.stack([j.ravel() + 0.5, i.ravel() + 0.5], axis=1))
+        st.append(np.full(sh * sw, float(s)))
+    return np.concatenate(pts), np.concatenate(st)
+
+
+def dfl_expect(z):
+    """DFL expectation over the last axis (16 bins): (d = Σ_i i·p_i, p = softmax(z))."""
+    z = np.asarray(z, dtype=np.float64)
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    p = e / e.sum(axis=-1, keepdims=True)
+    return p @ np.arange(z.shape[-1], dtype=np.float64), p
+
+
+def dfl_expect_backward(dd, p):
+    """∂L/∂z from ∂L/∂d: ∂d/∂z_i = p_i (i − d)."""
+    i = np.arange(p.shape[-1], dtype=np.float64)
+    d = p @ i
+    return np.asarray(dd)[..., None] * p * (i - d[..., None])
+
+
+def dist2bbox(d, a):
+    """Distances (…, 4) `(l, t, r, b)` from the points a (…, 2) → boxes `(x1, y1, x2, y2)`."""
+    return np.concatenate([a - d[..., :2], a + d[..., 2:]], axis=-1)
+
+
+def split_v8(outputs, levels, reg_max):
+    """Head maps of `v8_levels` → (box logits (N, A, 4, reg_max), class logits (N, A, C),
+    grids)."""
+    flat, grids = [], []
+    for hid, _ in levels:
+        o = outputs[hid]
+        n, ch, sh, sw = o.shape
+        flat.append(np.asarray(o, dtype=np.float64).reshape(n, ch, sh * sw))
+        grids.append((sh, sw))
+    f = np.concatenate(flat, axis=2).transpose(0, 2, 1)  # (N, A, 4·reg_max + C)
+    n, a, _ = f.shape
+    return f[..., :4 * reg_max].reshape(n, a, 4, reg_max), f[..., 4 * reg_max:], grids
+
+
+def decode_v8(outputs, net):
+    """Heads of a YOLOv8 network (`v8_levels`), concatenated, small stride first: `boxes`
+    (N, A, 4) normalized `(cx, cy, w, h)`, `obj` (N, A) = best class score, `scores`
+    (N, A, C)."""
+    levels = v8_levels(net)
+    zb, zc, grids = split_v8(outputs, levels, net.get("reg_max", 16))
+    pts, st = anchor_points(grids, [s for _, s in levels])
+    d, _ = dfl_expect(zb)
+    xyxy = dist2bbox(d, pts) * st[:, None]
+    sh, sw = grids[0]
+    size = np.array([sw, sh], dtype=np.float64) * levels[0][1]
+    boxes = np.concatenate([(xyxy[..., :2] + xyxy[..., 2:]) / 2 / size,
+                            (xyxy[..., 2:] - xyxy[..., :2]) / size], axis=-1)
+    scores = sigmoid(zc)
+    return boxes, scores.max(axis=-1), scores
 
 
 def to_original(boxes, width, height, size, mode="letterbox"):

@@ -203,6 +203,71 @@ def test_matrice():
         assert (sweep.net, sweep.train_dir) == (train.net, train.train_dir)
 
 
+# M37 : (arch, NET, WEIGHTS, preset de tools/eval_voc.py) des notebooks des réseaux récents.
+_UL = "weights/ultralytics/"
+_FT = "build/notebooks/voc/"
+M37 = {"coco/yolov5n-coco_infer": ("v5", "yolov5n-coco", f"{_UL}yolov5n.pt", "v5"),
+       "coco/tiny-yolov7-coco_infer": ("tiny-yolov3", "tiny-yolov7-coco",
+                                       "weights/yolov7-tiny.weights", "v5"),
+       "coco/yolov8n-coco_infer": ("v5", "yolov8n-coco", f"{_UL}yolov8n.pt", "v8"),
+       "voc/yolov5n-coco_infer": ("v5", "yolov5n-coco", f"{_UL}yolov5n.pt", "v5"),
+       "voc/tiny-yolov7-coco_infer": ("tiny-yolov3", "tiny-yolov7-coco",
+                                      "weights/yolov7-tiny.weights", "v5"),
+       "voc/yolov8n-coco_infer": ("v5", "yolov8n-coco", f"{_UL}yolov8n.pt", "v8"),
+       "voc/yolov5n-voc_train": ("v5", "yolov5n-voc", None, "v5"),
+       "voc/tiny-yolov7-voc_train": ("v5", "tiny-yolov7-voc",
+                                     None, "v5"),
+       "voc/yolov8n-voc_train": ("v5", "yolov8n-voc", None, "v8"),
+       "voc/yolov5n-voc_infer": ("v5", "yolov5n-voc", None, "v5"),
+       "voc/tiny-yolov7-voc_infer": ("v5", f"{_FT}tiny-yolov7-voc/net.cfg", None, "v5"),
+       "voc/yolov8n-voc_infer": ("v5", "yolov8n-voc", None, "v8")}
+
+
+@pytest.mark.parametrize("key", list(M37))
+def test_matrice_m37(key):
+    """Arch, NET, WEIGHTS et preset de chaque case de la matrice M37 ; `--preset v8` dans
+    la commande d'évaluation de YOLOv8n seulement."""
+    arch, net, weights, preset = M37[key]
+    nb = NOTEBOOKS[key]
+    data = render(nb)
+    p = _params(data)
+    assert (nb.arch, p["NET"], p["WEIGHTS"], p["RESIZE"]) == (arch, net, weights, "v5")
+    assert p.get("PRESET", "v5") == preset
+    src = "\n".join(_code(data))
+    assert ("preset=PRESET" in src) == (preset == "v8")
+    assert nb.family == ("coco" if nb.model.endswith("-coco") else nb.dataset)
+    if weights is None and nb.role == "train":  # poids EMA du dossier OUT du run
+        assert "WEIGHTS or RUN /" in src
+    elif weights is None:  # affiné : run de _train choisi par RUN (T14.11)
+        assert nb.finetuned and p["RUNS_DIR"] == f"{_FT}{nb.model}" and "runs.pick" in src
+        assert "out of domain" in src
+    if nb.net.endswith(".cfg"):  # YOLOv7-tiny affiné : cfg du run de train_v5.py
+        assert 'NET = f"{CHOSEN.dir}/net.cfg"' in src
+    if nb.role == "train":
+        assert "optimizer.txt" in src and '"dfl"' in src
+
+
+def test_preset_v8_et_runs_npz(tmp_path, monkeypatch):
+    """`--preset v8` (T35.3) ; un run de train_v5.py compte par son `final.npz` et un run
+    Darknet de train_v5.py s'évalue avec son `net.cfg`."""
+    cmd = C.cmd_eval_voc("yolov8n-voc", "w.npz", resize="v5", preset="v8")
+    assert cmd[cmd.index("--preset") + 1] == "v8"
+    assert C.cmd_eval_voc("n", "w", resize="v5") == C.cmd_eval_voc("n", "w", resize="v5",
+                                                                   preset="v5")
+    monkeypatch.setattr(runs, "ROOT", tmp_path)
+    (tmp_path / "u").mkdir()
+    (tmp_path / "u" / "final.npz").write_bytes(b"")
+    assert [r.weights for r in runs.find_runs("u")] == ["u/final.npz"]
+    d = tmp_path / "d"
+    d.mkdir()
+    (d / "final.weights").write_bytes(b"")
+    (d / "net.cfg").write_text("")
+    seen = []
+    monkeypatch.setattr(C, "run", lambda cmd, **k: seen.append(cmd))
+    runs.evaluate(runs.find_runs("d")[0], "tiny-yolov7-voc", "voc", "v5", 4, preset="v5")
+    assert seen[0][seen[0].index("--net") + 1] == "d/net.cfg"
+
+
 def test_un_notebook_stats_par_jeu():
     """M16 (T16.3) : exactement un notebook `stats` par jeu, en tête des notebooks du jeu."""
     keys = list(NOTEBOOKS)

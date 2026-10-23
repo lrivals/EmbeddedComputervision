@@ -10,7 +10,7 @@ l'enregistre Jupyter : ouvrir puis enregistrer un notebook non exécuté ne chan
 import json
 import textwrap
 
-from tools.notebooks import ROOT
+from tools.notebooks import OUT, ROOT
 from tools.notebooks.colab import DRIVE_DIR
 from tools.notebooks.commandes import M11_TRAIN
 from tools.notebooks.matrice import (SPLIT_IMAGES, V4_ARCH, V4_INIT_NET, V5_ARCH, how_to_get,
@@ -241,6 +241,21 @@ def _v5(nb):
     return nb.arch == V5_ARCH or nb.net == "tiny-yolov7-coco"
 
 
+def _v8(nb):
+    """YOLOv8n (M35): anchor-free DFL head, `--preset v8` (NMS 0.7, T35.3), v8 loss."""
+    return nb.arch == V5_ARCH and nb.model.startswith("yolov8")
+
+
+def _preset(nb, cells):
+    """`preset=PRESET` in the `tools/eval_voc.py` calls of the YOLOv8n notebooks."""
+    if _v8(nb):
+        for c in cells:
+            if c["cell_type"] == "code":
+                c["source"] = _lines("".join(c["source"]).replace(
+                    "jobs=JOBS)", "jobs=JOBS, preset=PRESET)"))
+    return cells
+
+
 def _final(nb):
     """Weights written by `tools/train_v5.py` (Ultralytics state dict or Darknet)."""
     return "final.weights" if nb.model.startswith("tiny-") else "final.npz"
@@ -248,7 +263,8 @@ def _final(nb):
 
 def _weights_param(nb):
     if nb.role == "train" and nb.arch == V5_ARCH:
-        return ("WEIGHTS", f"{nb.out_dir}/{_final(nb)}", "EMA weights, evaluated at the end")
+        return ("WEIGHTS", None, f"None: EMA weights of OUT ({_final(nb)}), evaluated at "
+                "the end; or a path")
     if nb.role == "infer" and nb.finetuned:
         return ("WEIGHTS", None, "None : final.weights du run RUN ; ou un chemin")
     if nb.role == "infer":
@@ -270,6 +286,8 @@ def params(nb):
          ("RESIZE", "v5" if _v5(nb) else "stretch",
           "v5 (letterbox and thresholds of YOLOv5, T33.4)" if _v5(nb)
           else "stretch (référence M12) | letterbox"),
+         *([("PRESET", "v8", "eval_voc preset with RESIZE v5: NMS 0.7 of YOLOv8 (T35.3)")]
+           if _v8(nb) else []),
          ("METRIC", None, "None : celle du jeu (coco pour coco et flir)"),
          ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)")]
     if nb.role == "infer" and nb.finetuned:
@@ -372,6 +390,9 @@ def environment(nb):
             CHOSEN = runs.pick(RUNS_DIR, RUN, hint={needs[2]})
             WEIGHTS, OUT = CHOSEN.weights, f"{{OUT}}/{{CHOSEN.name}}"
             print(f"run choisi : {{CHOSEN.name}} ({{WEIGHTS}})")"""
+            if nb.arch == V5_ARCH and nb.net.endswith(".cfg"):  # Darknet cfg of train_v5.py
+                pre += """
+            NET = f"{CHOSEN.dir}/net.cfg\""""
     elif nb.role == "stats":  # ni poids ni cfg exigés : la cfg manquante est remplacée
         needs = ("()", "None", "''")
     elif nb.arch == V5_ARCH:  # COCO weights of the fine-tuning
@@ -465,7 +486,12 @@ def infer_body(nb):
                     "from yolo.io.darknet_weights import load_darknet_weights\n"
                     "from yolo.models.tiny_yolo import build\n",
                     "from tools.eval_voc import load_net\n").replace(
-                    "@NET@", "net = load_net(NET, WEIGHTS)"))
+                    "@NET@", "net = load_net(NET, WEIGHTS)").replace(
+                    # cache named with the resize mode (`runs.eval_paths`: `_v5`)
+                    'map_float = EVAL_DIR / f"map_float_s{SUBSET or \'all\'}.md"\n'
+                    '    dets = EVAL_DIR / f"dets_s{SUBSET or \'all\'}"',
+                    "map_float, dets = runs.eval_paths(EVAL_DIR, SUBSET, RESIZE)"))
+        _preset(nb, cells)
     else:
         for c in cells:
             if c["cell_type"] == "code":
@@ -599,7 +625,26 @@ def _infer_cells(nb):
                 print("COMPARE = False : comparaison sautée ; runs trouvés :")
                 print(runs.listing(RUNS))
             """))]
-    if nb.arch == V5_ARCH:  # float only (the integer YOLOv5n is T33.8)
+    if nb.arch == V5_ARCH and nb.finetuned:  # T37.4: against the COCO weights (T37.2)
+        ood = nb.model.removesuffix(f"-{nb.dataset}") + "-coco"
+        cells += [md(f"""
+            ## Fine-tuned against out-of-domain
+
+            The run against the COCO weights evaluated through `MAPPINGS` by
+            `notebooks/{nb.dataset}/{ood}_infer.ipynb` (T37.2, its last execution): the
+            baseline the fine-tuning must beat. Compare at the same `SUBSET` (images in the
+            evaluation column).
+            """), code(f"""
+            rows = ["| weights | mAP | evaluation |", "|---|---|---|"]
+            for label, table in (("fine-tuned", map_float),
+                                 ("COCO, out of domain", Path("{OUT}/{nb.dataset}/{ood}/map_float.md"))):
+                m = runs.read_map(table)
+                head = (Path(table).read_text().splitlines()[0].lstrip("# ") if m is not None
+                        else "— (run notebooks/{nb.dataset}/{ood}_infer.ipynb)")
+                rows.append(f"| {{label}} | {{'—' if m is None else f'{{m:.2f}}'}} | {{head}} |")
+            display(Markdown("\\n".join(rows)))
+            """)]
+    if nb.arch == V5_ARCH:  # float only (integer sections: T37.5)
         return cells + [md("## Résumé"), code("""
             print(map_float.read_text())
             print(f"sorties : {OUT}/ ; révision {TRACE['rev']}")
@@ -772,9 +817,15 @@ def _prep_preview_cells():
 
 
 def train_v5_body(nb):
-    """Fine-tuning with the YOLOv5 recipe (`tools/train_v5.py`, T33.7, T34.4)."""
+    """Fine-tuning with the YOLOv5 recipe (`tools/train_v5.py`, T33.7, T34.4) and its
+    YOLOv8 settings (T35.6)."""
     net_eval = ("RUN / 'net.cfg'" if nb.model.startswith("tiny-") else "NET")
-    return [md("""
+    v8 = ("""
+        YOLOv8n (T35.6): v8 loss (task-aligned assigner, BCE + CIoU + DFL), `optimizer=auto`
+        (AdamW or SGD by the rule of the reference, written to `optimizer.txt`), mosaic off
+        for the last 10 epochs.
+        """ if _v8(nb) else "")
+    return _preset(nb, [md("""
         ## Fine-tuning
 
         `tools/train_v5.py` in a subprocess: SGD Nesterov with three parameter groups,
@@ -783,7 +834,7 @@ def train_v5_body(nb):
         with the bias prior of the reference (YOLOv7-tiny: the OTA loss of
         `hyp.scratch.tiny.yaml`). A `checkpoint.npz` is written every 200 batches; running
         the cell again resumes (`--resume`).
-        """), code("""
+        """ + v8), code("""
         import csv
 
         from IPython.display import Markdown, display
@@ -796,11 +847,24 @@ def train_v5_body(nb):
         """), md("""
         ## Losses
 
-        Last rows of `loss.csv` (per batch: box, objectness and class terms per image).
+        `loss.csv`, per batch and per image: box, objectness and class terms (YOLOv5n,
+        YOLOv7-tiny), box, class and DFL terms (YOLOv8n). Last rows, then one curve per term.
         """), code("""
         rows = list(csv.DictReader((RUN / "loss.csv").open())) if (RUN / "loss.csv").exists() else []
+        parts = [k for k in ("box", "obj", "cls", "dfl") if rows and k in rows[0]]
         for r in rows[-10:]:
-            print(", ".join(f"{k} {r[k]}" for k in ("it", "lr", "loss", "box", "obj", "cls")))
+            print(", ".join(f"{k} {r[k]}" for k in ("it", "lr", "loss", *parts)))
+        if rows:
+            import matplotlib.pyplot as plt
+
+            it = [int(r["it"]) for r in rows]
+            fig, axes = plt.subplots(1, len(parts) + 1, figsize=(4 * (len(parts) + 1), 3))
+            for ax, k in zip(axes, ("loss", *parts)):
+                ax.plot(it, [float(r[k]) for r in rows], lw=0.8)
+                ax.set_title(k)
+                ax.set_xlabel("batch")
+            fig.tight_layout()
+            plt.show()
         """), md("""
         ## Evaluation
 
@@ -808,15 +872,17 @@ def train_v5_body(nb):
         """), code("""
         result = RUN / "map_float.md"
         result.unlink(missing_ok=True)
-        C.run(C.cmd_eval_voc(@NET_EVAL@, WEIGHTS, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
+        C.run(C.cmd_eval_voc(@NET_EVAL@, WEIGHTS or RUN / "@FINAL@", DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
                              DATA_ROOT, out=RUN / "dets", markdown=result, jobs=JOBS))
         display(Markdown(result.read_text()))
-        """.replace("@NET_EVAL@", net_eval)), md("## Résumé"), code("""
+        """.replace("@NET_EVAL@", net_eval).replace("@FINAL@", _final(nb))), md("## Résumé"), code("""
+        if (RUN / "optimizer.txt").exists():
+            print((RUN / "optimizer.txt").read_text().strip())
         print(f"outputs: {RUN}/ (checkpoint.npz, loss.csv, final weights) ; révision {TRACE['rev']}")
         print("commandes équivalentes :")
         for c in C.HISTORY:
             print("  " + c)
-        """)]
+        """)])
 
 
 def train_body(nb):

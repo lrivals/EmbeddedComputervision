@@ -19,6 +19,7 @@ CONF_THR = 0.25
 IOU_THR = 0.45
 V5_CONF_THR = 0.001
 V5_IOU_THR = 0.65
+V8_IOU_THR = 0.7  # YOLOv8 validation (T35.3); conf and max_det as v5
 V5_MAX_DET = 300
 
 

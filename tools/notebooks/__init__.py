@@ -71,4 +71,4 @@ class Notebook:
 
     @property
     def finetuned(self):
-        return self.weights.endswith("final.weights")
+        return self.weights.endswith(("final.weights", "final.npz"))  # npz : train_v5.py (M37)

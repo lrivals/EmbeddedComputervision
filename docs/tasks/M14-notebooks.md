@@ -141,6 +141,8 @@ out-of-domain inference notebooks without touching the generator.
 | flir | same, `tiny-yolov3-flir` | `tiny-yolov3-flir` | T11.7 |
 | exdark | `tiny-yolov2-voc`, `tiny-yolov3-coco` (out-of-domain), `tiny-yolov3-exdark` | `tiny-yolov3-exdark` | T11.2, T11.3, T15.14 |
 | crowdhuman | `tiny-yolov2-voc`, `tiny-yolov3-coco`, `tiny-yolov3-crowdhuman` | `tiny-yolov3-crowdhuman` | T11.6, T15.14 |
+| voc, recent networks ([M37](M37-notebooks-recent-models.md)) | `yolov5n-coco`, `tiny-yolov7-coco`, `yolov8n-coco` (through `MAPPINGS`); `yolov5n-voc`, `tiny-yolov7-voc`, `yolov8n-voc` (fine-tuned weights) | `yolov5n-voc`, `tiny-yolov7-voc`, `yolov8n-voc` (`tools/train_v5.py`, no `_sweep`) | T33.7, T34.4, T35.6 |
+| coco, recent networks (M37) | `yolov5n-coco`, `tiny-yolov7-coco`, `yolov8n-coco` (`--preset v5` / `v8`) | — | T33.4, T34.2, T35.3 |
 
 The `tiny-yolov3-<dataset>` models are the cfgs produced by `tools/make_cfg.py`
 (`build/m11/cfg/tiny-yolov3-<dataset>.cfg`). Each dataset of the Training column also has
@@ -159,7 +161,8 @@ runs/b8-s500/                         batch 8, first 500 images
 eval/<run>/                           evaluations of the inference notebooks
 ```
 
-A run counts as soon as it has a `final.weights`; `run.json` gives batch, subset,
+A run counts as soon as it has a `final.weights` (or a `final.npz`, the state dict that
+`tools/train_v5.py` writes for YOLOv5n and YOLOv8n, M37); `run.json` gives batch, subset,
 iterations, backend and revision. On Colab, `colab.sync_outputs` copies the whole folder,
 `runs/` included, into `<DRIVE_DIR>/runs/`.
 

@@ -1,14 +1,15 @@
-"""YOLOv5 training recipe (T33.7): optimizer groups, warmup, EMA, augmentation, trainer."""
+"""YOLOv5 training recipe (T33.7) and its YOLOv8 settings (T35.6): optimizer groups, warmup,
+EMA, augmentation, trainer."""
 
 import numpy as np
 import pytest
 
 from yolo.data.augment_v5 import box_candidates, mosaic4, random_perspective
 from yolo.data.loader import DataLoader, V5Dataset
-from yolo.data.targets import v5_levels
+from yolo.data.targets import v5_levels, v8_levels
 from yolo.models import ul_net, ul_yaml
 from yolo.train.ema import ModelEMA
-from yolo.train.optim import SGDGroups, param_group
+from yolo.train.optim import AdamWGroups, SGDGroups, auto_optimizer, param_group
 from yolo.train.schedule import V5Schedule
 from yolo.train.trainer_v5 import TrainerV5, head_conv, init_head_biases
 
@@ -21,10 +22,20 @@ MINI = {
 }
 
 
-def mini(size=32, rng=0):
-    return ul_net.build(ul_yaml.parse(MINI, name="mini", size=size),
+# The YOLOv8 head (T35.6): Conv, C2f, two levels of the decoupled DFL head.
+MINI_V8 = {
+    "nc": 2, "depth_multiple": 1.0, "width_multiple": 1.0,
+    "backbone": [[-1, 1, "Conv", [8, 3, 2]], [-1, 1, "C2f", [8, True]],
+                 [-1, 1, "Conv", [16, 3, 2]]],
+    "head": [[[1, 2], 1, "Detect", ["nc"]]],
+    "ch": 3,
+}
+
+
+def mini(size=32, rng=0, yaml=MINI):
+    return ul_net.build(ul_yaml.parse(yaml, name="mini", size=size),
                         state_dict=ul_net.random_state_dict(
-                            ul_yaml.parse(MINI, size=size), rng=rng))
+                            ul_yaml.parse(yaml, size=size), rng=rng))
 
 
 def test_param_groups():
@@ -94,6 +105,57 @@ def test_head_bias_init():
     assert np.allclose(d[:, :4], 0)
 
 
+def test_head_bias_init_v8():
+    """`Detect.bias_init` of YOLOv8: box convs 1.0, class convs log(5 / C / (S/s)²); with
+    `layers`, only those convs (the reinitialized class convs of a fine-tuning)."""
+    net = mini(yaml=MINI_V8)
+    init_head_biases(net, img_size=32)
+    levels = v8_levels(net.net)
+    assert [s for _, s in levels] == [2, 4]
+    for hid, stride in levels:
+        box, cls = net.layers[hid]["from"]
+        assert np.all(net.params[box]["b"] == 1.0)
+        assert np.allclose(net.params[cls]["b"], np.log(5 / 2 / (32 / stride) ** 2))
+    hid, stride = levels[0]
+    box, cls = net.layers[hid]["from"]
+    net.params[box]["b"][...] = 0.3
+    init_head_biases(net, layers=[cls], img_size=640)
+    assert np.all(net.params[box]["b"] == 0.3)
+    assert np.allclose(net.params[cls]["b"], np.log(5 / 2 / (640 / stride) ** 2))
+
+
+def test_auto_optimizer():
+    """YOLOv8 `optimizer=auto`: AdamW for ≤ 10,000 steps (lr 0.002·5/(4 + C)), else SGD."""
+    assert auto_optimizer(20, 16_551, 30, 16) == ("adamw", round(0.002 * 5 / 24, 6), 0.9)
+    assert auto_optimizer(20, 16_551, 100, 16) == ("sgd", 0.01, 0.9)    # 259 · 100 steps
+    assert auto_optimizer(80, 1, 1, 1)[1] == 0.000119
+
+
+def test_adamw_groups_matches_torch_formula():
+    """`torch.optim.AdamW` per group: decay p·(1 − lr·wd) on the weights group only."""
+    rng = np.random.default_rng(0)
+    p = [{"W": rng.standard_normal(3), "gamma": rng.standard_normal(3),
+          "b": rng.standard_normal(3)}]
+    ref = {k: v.copy() for k, v in p[0].items()}
+    m = {k: np.zeros(3) for k in ref}
+    v = {k: np.zeros(3) for k in ref}
+    opt = AdamWGroups(p, momentum=0.9, weight_decay=0.05)
+    lrs = {"weights": 0.01, "bn": 0.02, "bias": 0.03}
+    for t in range(1, 4):
+        g = {k: rng.standard_normal(3) for k in ref}
+        opt.step([g], lrs, momentum=0.5)                 # ignored, as the reference
+        for k in ref:
+            lr = lrs[param_group(k)]
+            if k == "W":
+                ref[k] *= 1 - lr * 0.05
+            m[k] = 0.9 * m[k] + 0.1 * g[k]
+            v[k] = 0.999 * v[k] + 0.001 * g[k] ** 2
+            mh, vh = m[k] / (1 - 0.9 ** t), v[k] / (1 - 0.999 ** t)
+            ref[k] -= lr * mh / (np.sqrt(vh) + 1e-8)
+    for k in ref:
+        assert np.allclose(p[0][k], ref[k], rtol=0, atol=1e-14)
+
+
 # --------------------------------------------------------------------- augmentation
 def _square_image(color, box, size=(120, 90)):
     img = np.full((size[1], size[0], 3), 30, dtype=np.uint8)
@@ -154,19 +216,24 @@ def test_v5_dataset(tmp_path):
 
 
 # --------------------------------------------------------------------- trainer
-def _trainer(net, tmp_path, name):
-    opt = SGDGroups(net.params)
+def _trainer(net, tmp_path, name, optimizer=SGDGroups):
+    opt = optimizer(net.params)
     sched = V5Schedule(0.01, epochs=3, iters_per_epoch=2)
     return TrainerV5(net, opt, sched, size=32, log_path=tmp_path / f"{name}.csv", batch=2)
 
 
-def test_trainer_resume_is_exact(tmp_path):
+@pytest.mark.parametrize("yaml, optimizer", [(MINI, SGDGroups), (MINI_V8, AdamWGroups)],
+                         ids=["v5-sgd", "v8-adamw"])
+def test_trainer_resume_is_exact(tmp_path, yaml, optimizer):
+    """Resume from `checkpoint.npz` = an uninterrupted run (T33.7; v8 loss and AdamW of
+    `optimizer=auto`, T35.6 / T37.3): parameters, EMA and `loss.csv`."""
     samples = _samples(tmp_path)
     loader = DataLoader(V5Dataset(samples), 2, seed=0)
-    a = _trainer(mini(), tmp_path, "a")
+    a = _trainer(mini(yaml=yaml), tmp_path, "a", optimizer)
     a.fit(loader, 3)
     a.save_checkpoint(tmp_path / "ck.npz")
-    b = _trainer(mini(rng=5), tmp_path, "b")
+    (tmp_path / "b.csv").write_text((tmp_path / "a.csv").read_text())
+    b = _trainer(mini(rng=5, yaml=yaml), tmp_path, "b", optimizer)
     b.load_checkpoint(tmp_path / "ck.npz")
     assert b.it == 3 and b.steps == a.steps and b._pending == a._pending
     a.fit(loader, 5)
@@ -178,6 +245,49 @@ def test_trainer_resume_is_exact(tmp_path):
         for k in ea:
             assert np.allclose(ea[k], eb[k])
     assert (tmp_path / "a.csv").read_text().splitlines()[0].startswith("it,lr,momentum")
+
+    def losses(name):  # the `seconds` column is a wall time
+        return [row.rsplit(",", 1)[0] for row in (tmp_path / name).read_text().splitlines()]
+    assert losses("a.csv") == losses("b.csv")
+
+
+def test_trainer_v8_step(tmp_path):
+    """A YOLOv8 network trains with the v8 loss and logs box / cls / dfl."""
+    samples = _samples(tmp_path)
+    loader = DataLoader(V5Dataset(samples), 2, seed=0)
+    net = mini(yaml=MINI_V8)
+    init_head_biases(net, img_size=32)
+    tr = TrainerV5(net, SGDGroups(net.params), V5Schedule(0.01, epochs=3, iters_per_epoch=2),
+                   size=32, log_path=tmp_path / "v8.csv", batch=2)
+    assert tr.parts == ("box", "cls", "dfl")
+    w0 = net.params[0]["W"].copy()
+    tr.fit(loader, 2)
+    head = (tmp_path / "v8.csv").read_text().splitlines()
+    assert head[0] == "it,lr,momentum,size,loss,box,cls,dfl,seconds" and len(head) == 3
+    assert not np.array_equal(net.params[0]["W"], w0)
+
+
+@pytest.mark.slow
+def test_overfit_one_image_v8(tmp_path):
+    """T2.8 criterion on the v8 recipe: one image, no augmentation, box and DFL losses go
+    down and the decoded box is back on the ground truth."""
+    from yolo.infer.boxes import iou
+    from yolo.infer.nms import postprocess
+
+    samples = _samples(tmp_path, 1, texture=True)
+    x, boxes, labels = V5Dataset(samples, train=False).load(0, 64)
+    net = mini(size=64, yaml=MINI_V8)
+    init_head_biases(net, img_size=64)
+    opt = AdamWGroups(net.params, weight_decay=0)
+    sched = V5Schedule(0.002, epochs=1500, iters_per_epoch=1, warmup_epochs=0)
+    tr = TrainerV5(net, opt, sched, size=64, ema=False, nbs=1, batch=1)
+    first = None
+    for _ in range(1500):
+        res, _ = tr.step(x[None], [boxes], [labels])
+        first = first or res.parts["box"]
+    assert res.parts["box"] < 0.01 * first
+    b, s, lab = postprocess(net.forward(x[None], train=False), net.net, 0.25, 0.45)[0]
+    assert lab[0] == 1 and iou(b[:1], boxes)[0, 0] > 0.95
 
 
 @pytest.mark.slow

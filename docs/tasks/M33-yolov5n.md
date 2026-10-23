@@ -24,17 +24,17 @@ Related backlog: [M1](M1-briques-numpy.md) (layers, gradcheck), [M2](M2-cibles-p
 (targets, loss, training loop), [M3](M3-inference-evaluation.md) (NMS, mAP), [M4](M4-quantification.md)
 (integer model), [T26.1](M26-recent-models.md) (converted description, `ul_graph.py`),
 [T26.2](M26-recent-models.md) (float and integer SiLU), [T26.3](M26-recent-models.md)
-(YOLOv5n on the hardware chain).
+(YOLOv5n on the hardware chain), [M37](M37-notebooks-recent-models.md) (COCO and VOC
+notebooks).
 
-**State** (2026-10-22):
+**State** (2026-10-23):
 - **Done**:
   - T33.0-T33.3: the official `yolov5n.pt` is read without torch, described from its
     YAML and run as a trainable NumPy network equal to torch to 4·10⁻¹⁴.
   - T33.4: v5 decoding and evaluation, COCO 28.1 AP at 640 (published 28.0).
   - T33.5: targets.
+  - T33.6: the loss, with gradchecks, equal to the torch `ComputeLoss` to 6·10⁻¹⁷.
 - **Code done, check open**:
-  - T33.6: the loss, with gradchecks; the comparison with a torch value waits for the
-    `yolov5n_loss.npz` fixture.
   - T33.7: the training recipe and its tests; the VOC fine-tuning (≈ 6 days on CPU)
     is in [long-runs.md](long-runs.md).
 - **Open**: T33.8. The official checkpoints (`weights/ultralytics/`) and the torch reference
@@ -228,7 +228,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
 - **Spec**: §8 · **Depends on**: T33.3 · **Size**: M
 - **Deliverables**: `mode="v5"` in `python/yolo/infer/decode.py`; letterbox 640 (gray 114,
   `auto=False`, stride 32) in `data/letterbox.py`; v5 NMS settings in `infer/nms.py`;
-  `notebooks/coco/yolov5n-coco_infer.ipynb` from the M14 generator; row in
+  `notebooks/coco/yolov5n-coco_infer.ipynb` from the M14 generator ([M37](M37-notebooks-recent-models.md)); row in
   `results/map_coco.md`
 - **Acceptance**: COCO val2017 mAP50-95 within 0.5 point of the published 28.0 at 640 (conf
   0.001, IoU 0.65, max 300 detections, as the published value); 416 value recorded
@@ -283,7 +283,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     - a centre on a cell corner gives 5 matches, 3 of them on the own cell (the
       reference keeps the duplicates).
 
-### [ ] T33.6 — Loss and its gradients
+### [x] T33.6 — Loss and its gradients
 - **Spec**: §6 · **Depends on**: T33.5 · **Size**: L
 - **Deliverables**: `python/yolo/train/loss_v5.py`: `ciou` (forward and analytic backward)
   in `infer/boxes.py` or `train/iou.py`, `yolo_v5_loss(outputs, targets) -> LossResult`;
@@ -316,16 +316,18 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     - gradcheck ≤ 1e-7 of the full loss (every matched cell plus random ones), with the
       backward constants held fixed by `targets_from`;
     - a batch without boxes; the gain scaling.
-  - **Not done**: equality with the torch `ComputeLoss` value. The test
-    (`weights/m33/yolov5n_loss.npz`: head outputs, targets, loss) is written and skipped
-    until the throwaway torch script makes that fixture.
+  - **Against torch** (2026-10-22): `ComputeLoss` of the yolov5 repo (`hyp.scratch-low`
+    gains scaled as `train.py`) on the YOLOv5n outputs of 2 COCO images at 320 and their
+    21 boxes: total 0.2321364636, equal to 6·10⁻¹⁷. The fixture
+    `weights/m33/yolov5n_loss.npz` (local only) was made by the throwaway script of M35
+    ([long-runs.md](long-runs.md)).
 
 ### [ ] T33.7 — Training recipe
 - **Spec**: §7 · **Depends on**: T33.6 · **Size**: L
 - **Deliverables**: in `python/yolo/train/`: SGD with Nesterov momentum and the three
   parameter groups in `optim.py`, warmup + linear (or cosine) schedule in `schedule.py`,
   weight EMA (`ema.py`); mosaic, random affine, HSV and flip in `data/augment.py`; head bias
-  initialisation; `yolov5n-voc_train` notebook (M14)
+  initialisation; `yolov5n-voc_train` notebook (M14, [M37](M37-notebooks-recent-models.md))
 - **Acceptance**: one image overfitted (box loss → 0, the boxes back at mAP 1.0, as T2.8);
   VOC fine-tuning from the COCO weights for N epochs improves the VOC mAP over the
   out-of-domain value; the training curves in the notebook

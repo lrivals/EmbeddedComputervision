@@ -46,6 +46,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M34](M34-yolov7-tiny.md) | YOLOv7-tiny without PyTorch (optional) | backward of the ELAN 4-source routes and stride-1 pools; v5 / OTA loss on the Darknet graph; COCO mAP, VOC fine-tuning, integer chain |
 | [M35](M35-yolov8n.md) | YOLOv8n without PyTorch (optional) | C2f, decoupled head and DFL in forward and backward; task-aligned assigner, BCE + CIoU + DFL loss; training and integer DFL |
 | [M36](M36-explanation.md) | Decision explanation (optional) | why a box is detected or a person missed: gradient, perturbation and exact integer attributions at the three stages, miss causes, concepts, training recorder and CKA, `make explain` viewer, on-chip CAM |
+| [M37](M37-notebooks-recent-models.md) | Notebooks of the recent models (optional) | COCO and VOC notebooks of YOLOv5n, YOLOv7-tiny and YOLOv8n: COCO inference, VOC out-of-domain inference, fine-tuning and fine-tuned inference, from the M14 generator |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -143,6 +144,10 @@ graph LR
   M27 -.-> M36
   M29 -.-> M36
   M36 -.-> M31
+  M14 --> M37[M37]
+  M33 --> M37
+  M34 --> M37
+  M35 --> M37
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
@@ -235,7 +240,8 @@ progress per milestone here.
 | M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 3 (T32.4, T32.5: Oxford-IIIT Pet downloaded, whole-body boxes from the trimaps; T32.8 datasheets; TrashNet labelling, loaders, notebooks and fine-tuning open) |
-| M33 | 9 | 6 (T33.0-T33.5: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴, v5 decoding and evaluation (COCO 28.1 AP at 640, published 28.0), targets; T33.6 loss and T33.7 recipe written, waiting for the torch loss fixture and the VOC run (≈ 6 CPU days); T33.8 integer chain open) |
-| M34 | 6 | 2 (T34.0 layer table and weights, T34.1 route / stride-1 pool backward; T34.2 COCO 34.3 AP at 416 against the published 35.2, gap open; T34.3 OTA loss and T34.4 training written, waiting for the torch fixture and the VOC run (≈ 10 CPU days); T34.5 open) |
-| M35 | 8 | 0 |
+| M33 | 9 | 7 (T33.0-T33.6: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴, v5 decoding and evaluation (COCO 28.1 AP at 640, published 28.0), targets, loss equal to the torch `ComputeLoss` to 6·10⁻¹⁷; T33.7 recipe written, waiting for the VOC run (≈ 6 CPU days); T33.8 integer chain open) |
+| M34 | 6 | 2 (T34.0 layer table and weights, T34.1 route / stride-1 pool backward; T34.2 COCO 34.3 AP at 416 against the published 35.2, gap open; T34.3 OTA loss and T34.4 training written, waiting for a torch OTA reference and the VOC run (≈ 10 CPU days); T34.5 open) |
+| M35 | 8 | 5 (T35.0-T35.2, T35.4, T35.5: `yolov8n.pt` described from its YAML (8.74 GFLOPs), C2f and DFL head with gradchecks, network == torch to 1.7·10⁻¹³, decoded boxes == torch, TAL and BCE + CIoU + DFL loss == Ultralytics (5·10⁻⁷); T35.3 COCO mAP and T35.6 VOC run waiting on CPU runs; T35.7 waits for T33.8) |
 | M36 | 12 | 2 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |
+| M37 | 7 | 1 |

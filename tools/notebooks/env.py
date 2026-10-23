@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from tools.notebooks import ROOT, colab
-from tools.notebooks.matrice import DATA_MARKERS, REGISTRATION
+from tools.notebooks.matrice import DATA_MARKERS, REGISTRATION, UL_WEIGHTS, UL_WEIGHTS_HINT
 
 
 class Prerequis(RuntimeError):
@@ -75,7 +75,8 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
     missing = []
     if in_colab:
         mount_drive(data_root)
-        if any(w.startswith("weights/") and not (ROOT / w).exists() for w in weights):
+        if any(w.startswith("weights/") and not w.startswith(UL_WEIGHTS)
+               and not (ROOT / w).exists() for w in weights):
             _sh("bash", "tools/get_weights.sh")
         if not data_root and not data_ok(dataset):
             mount_drive(drive_dir)  # archive sur Drive avant le téléchargement direct
@@ -95,8 +96,9 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
         missing.append(f"données {dataset} absentes ({where}) : {cmd}")
     for w in weights:
         if not (ROOT / w).exists():
-            missing.append(f"poids {w} absents : "
-                           + ("tools/get_weights.sh" if w.startswith("weights/") else hint))
+            how = (UL_WEIGHTS_HINT if w.startswith(UL_WEIGHTS)
+                   else "tools/get_weights.sh" if w.startswith("weights/") else hint)
+            missing.append(f"poids {w} absents : {how}")
     if cfg and str(cfg).endswith(".cfg") and not restore_cfg(cfg):
         missing.append(f"cfg {cfg} absente : {hint}")
     if missing:

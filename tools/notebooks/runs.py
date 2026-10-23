@@ -7,7 +7,8 @@ Disposition sous `build/notebooks/<jeu>/<modèle>/` (le `RUNS_DIR` des notebooks
     runs/b8-s500/run.json              lot, sous-ensemble, itérations, backend, révision
     eval/<run>/                        évaluations des notebooks d'inférence
 
-Un run compte dès qu'il a un `final.weights`. Sur Colab, `colab.sync_outputs(OUT)` copie
+Un run compte dès qu'il a un `final.weights` (ou un `final.npz`, state dict des réseaux
+Ultralytics de `tools/train_v5.py`, M37). Sur Colab, `colab.sync_outputs(OUT)` copie
 tout le dossier, `runs/` compris. Pas de dépendance hors bibliothèque standard.
 """
 
@@ -21,6 +22,7 @@ from pathlib import Path
 from tools.notebooks import ROOT
 
 TRAIN = "train"  # nom du run du notebook _train, à la racine de RUNS_DIR
+FINALS = ("final.weights", "final.npz")  # Darknet ; state dict de tools/train_v5.py (M37)
 
 
 @dataclass
@@ -61,14 +63,15 @@ def _meta(d):
 
 
 def find_runs(model_dir):
-    """Runs de `model_dir` qui ont un `final.weights` : `train` d'abord, puis `runs/*`."""
+    """Runs de `model_dir` qui ont un `final.weights` ou un `final.npz` : `train` d'abord,
+    puis `runs/*`."""
     root = ROOT / model_dir
     dirs = [(TRAIN, root)] + [(d.name, d) for d in sorted((root / "runs").glob("*"))
                               if d.is_dir()]
     out = []
     for name, d in dirs:
-        w = d / "final.weights"
-        if w.is_file():
+        w = next((d / f for f in FINALS if (d / f).is_file()), None)
+        if w:
             out.append(Run(name, _rel(d), _rel(w), _meta(d), w.stat().st_mtime))
     return out
 
@@ -145,14 +148,18 @@ def eval_paths(out_dir, subset, resize="stretch", tiles=0):
 
 
 def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=None,
-             data_root=None, out_dir=None, jobs=1, tiles=0, overlap=None):
+             data_root=None, out_dir=None, jobs=1, tiles=0, overlap=None, preset=None):
     """mAP flottante du run par `tools/eval_voc.py`, réutilisée si déjà calculée pour ce
     `subset` (et ce `resize`, ces `tiles`) ; rend la ligne de la table comparative.
     La cfg est celle du run (`net` de son `run.json`) quand elle existe : un run à une autre
-    entrée (608, M15) s'évalue avec la sienne ; `net` sinon."""
+    entrée (608, M15) s'évalue avec la sienne, un run Darknet de `tools/train_v5.py` avec
+    le `net.cfg` écrit à côté de ses poids (YOLOv7-tiny, M37) ; `net` sinon. `preset` :
+    celui de `--preset` quand `resize` vaut v5 (v8 pour YOLOv8n)."""
     from tools.notebooks import commandes as C
 
     own = run.meta.get("net")
+    if not own and run.weights.endswith(".weights") and (ROOT / run.dir / "net.cfg").exists():
+        own = f"{run.dir}/net.cfg"
     if own and str(own).endswith(".cfg") and (ROOT / own).exists():
         net = own
     md, dets = eval_paths(out_dir or run.dir, subset, resize, tiles)
@@ -164,7 +171,7 @@ def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=No
         (ROOT / md).unlink(missing_ok=True)
         C.run(C.cmd_eval_voc(net, run.weights, dataset, resize, subset, metric, split, size,
                              data_root, out=dets, markdown=md, jobs=jobs, tiles=tiles,
-                             overlap=overlap))
+                             overlap=overlap, preset=preset))
     return row(run, read_map(md), subset)
 
 

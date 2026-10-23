@@ -20,7 +20,7 @@ are reused, not copied.
 Related backlog: [T26.0](M26-recent-models.md) (cfg, weights, float and integer inference,
 export, C-sim), [M24](M24-yolov4-tiny.md) (stride-2 lowering, `scale_x_y`, COCO
 evaluation), [M1](M1-briques-numpy.md) (route, maxpool, leaky), [M2](M2-cibles-perte-entrainement.md)
-(trainer).
+(trainer), [M37](M37-notebooks-recent-models.md) (COCO and VOC notebooks).
 
 **State** (2026-10-22):
 - **Done**: T34.0 (layer table, weights) and T34.1 (backward of the routes and stride-1
@@ -110,7 +110,7 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
 - **Spec**: §8 · **Depends on**: T34.1 · **Size**: M
 - **Deliverables**: forward and backward of the whole graph in train mode (batch BN) and
   eval mode; COCO val2017 mAP at 416 and 640 (letterbox of T33.4); row in
-  `results/map_coco.md`; `tiny-yolov7-coco_infer` notebook (M14)
+  `results/map_coco.md`; `tiny-yolov7-coco_infer` notebook (M14, [M37](M37-notebooks-recent-models.md))
 - **Acceptance**: mAP at 640 within 0.5 point of the published value; gradcheck of the full
   network on a 2-image 64×64 batch (sampled indices)
 - **Done so far**:
@@ -177,15 +177,16 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
     - gradcheck ≤ 1e-7 of the OTA loss through the three heads of the real network,
       every matched cell plus others, with the assignment, IoU targets and CIoU α held
       fixed (`targets_from`).
-  - **Not done**: the comparison with a torch reference value. The v5 loss equals an
-    element-by-element reference loop to 1e-10, and the torch fixture test
-    (`weights/m33/yolov5n_loss.npz`) is skipped until that file is made by the throwaway
-    torch script.
+  - **Not done**: the comparison of the OTA loss with a torch reference value
+    (`ComputeLossOTA` of the yolov7 repo). The non-OTA path is checked: `yolo_v5_loss`
+    equals the YOLOv5 `ComputeLoss` to 6·10⁻¹⁷ on the `weights/m33/yolov5n_loss.npz` fixture
+    (T33.6, 2026-10-22).
 
 ### [ ] T34.4 — Training
 - **Spec**: §7 · **Depends on**: T34.3, T33.7 · **Size**: M
 - **Deliverables**: the M33 recipe (SGD Nesterov, warmup, three parameter groups, EMA,
-  mosaic / affine / HSV / flip) on the Darknet graph; `tiny-yolov7-voc_train` notebook (M14);
+  mosaic / affine / HSV / flip) on the Darknet graph; `tiny-yolov7-voc_train` notebook (M14,
+  [M37](M37-notebooks-recent-models.md));
   run in [long-runs.md](long-runs.md)
 - **Acceptance**: one image overfitted (T2.8 criterion); VOC fine-tuning from the COCO
   weights improves on the out-of-domain mAP; float VOC mAP recorded for M15

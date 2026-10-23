@@ -17,6 +17,8 @@ Ajouter un jeu à `DATASETS` (avec ses `MAPPINGS`) ajoute ses notebooks d'infér
 domaine sans toucher au générateur.
 """
 
+from pathlib import Path
+
 from tools.notebooks import OUT, Notebook
 from tools.notebooks.commandes import cfg_path
 from yolo.data.datasets import DATASETS, FAMILIES, MAPPINGS
@@ -77,14 +79,29 @@ V4_ARCH = "tiny-yolov4"
 V4_INIT_NET = "tiny-yolov4-coco"
 V4_TASKS = ("T24.6",)
 
-# YOLOv5n and YOLOv7-tiny with the YOLOv5 recipe (M33, M34): COCO inference of YOLOv5n
-# (the YOLOv7-tiny one is the Darknet `tiny-yolov7-coco_infer`) and VOC fine-tuning of both
-# from their COCO weights. The Ultralytics checkpoint is local only (AGPL, not on Drive).
+# YOLOv5n, YOLOv7-tiny and YOLOv8n with the YOLOv5 recipe (M33, M34, M35, M37): COCO
+# inference, VOC out-of-domain inference (`<arch>-coco` rows on voc, `MAPPINGS`), VOC
+# fine-tuning from the COCO weights and inference of the fine-tuned weights (`_final`).
+# The YOLOv7-tiny COCO and out-of-domain notebooks are the Darknet `tiny-yolov7-coco_infer`
+# of `PRETRAINED`. The Ultralytics checkpoints are local only (AGPL, not on Drive).
+# Rows: (dataset, model, role, weights, tasks[, net]); net defaults to the model name.
 V5_ARCH = "v5"
+UL_WEIGHTS = "weights/ultralytics/"
+UL_WEIGHTS_HINT = ("Ultralytics checkpoint, AGPL-3.0, local only (neither on Drive nor fetched "
+                   "by tools/get_weights.sh): copy it to weights/ultralytics/ (Colab: upload it)")
+_V5N, _V8N = f"{UL_WEIGHTS}yolov5n.pt", f"{UL_WEIGHTS}yolov8n.pt"
 V5_NOTEBOOKS = (
-    ("coco", "yolov5n-coco", "infer", "weights/ultralytics/yolov5n.pt", ("T33.4",)),
-    ("voc", "yolov5n-voc", "train", "weights/ultralytics/yolov5n.pt", ("T33.7",)),
+    ("coco", "yolov5n-coco", "infer", _V5N, ("T33.4",)),
+    ("coco", "yolov8n-coco", "infer", _V8N, ("T35.3",)),
+    ("voc", "yolov5n-coco", "infer", _V5N, ("T11.2", "T33.7")),
+    ("voc", "yolov8n-coco", "infer", _V8N, ("T11.2", "T35.6")),
+    ("voc", "yolov5n-voc", "train", _V5N, ("T33.7",)),
     ("voc", "tiny-yolov7-voc", "train", "weights/yolov7-tiny.weights", ("T34.4",)),
+    ("voc", "yolov8n-voc", "train", _V8N, ("T35.6",)),
+    ("voc", "yolov5n-voc", "infer", f"{OUT}/voc/yolov5n-voc/final.npz", ("T33.7", "T14.11")),
+    ("voc", "tiny-yolov7-voc", "infer", f"{OUT}/voc/tiny-yolov7-voc/final.weights",
+     ("T34.4", "T14.11"), f"{OUT}/voc/tiny-yolov7-voc/net.cfg"),
+    ("voc", "yolov8n-voc", "infer", f"{OUT}/voc/yolov8n-voc/final.npz", ("T35.6", "T14.11")),
 )
 
 # Tâche M11 de chaque jeu et tâche d'exécution M16 (en-tête des notebooks `stats`).
@@ -161,9 +178,10 @@ def build_registry():
             tasks = V4_TASKS + (TASKS[("sweep", "sweep")] if role == "sweep" else ())
             weights = f"{OUT}/{ds}/{model}/final.weights" if role == "infer" else init
             out.append(Notebook(ds, model, role, cfg, weights, ds, tasks, arch=v4, **inp))
-    for ds, model, role, weights, tasks in V5_NOTEBOOKS:
-        out.append(Notebook(ds, model, role, model, weights, ds if role == "train" else "coco",
-                            tasks, arch=V5_ARCH))
+    for ds, model, role, weights, tasks, *net in V5_NOTEBOOKS:
+        fam = "coco" if model.endswith("-coco") else ds
+        out.append(Notebook(ds, model, role, net[0] if net else model, weights, fam, tasks,
+                            arch=V5_ARCH))
     return {f"{nb.dataset}/{nb.name}": nb for nb in out}
 
 
@@ -203,7 +221,7 @@ def prerequis(nb):
     if nb.role == "stats":  # sans poids ; la cfg du jeu est remplacée si elle manque
         return req
     # Poids affinés : le run choisi (RUN) parmi ceux du notebook _train ou _sweep.
-    req["poids"] = (f"{nb.train_dir}/[runs/<run>/]final.weights" if nb.finetuned
+    req["poids"] = (f"{nb.train_dir}/[runs/<run>/]{Path(nb.weights).name}" if nb.finetuned
                     else nb.weights)
     if nb.net.endswith(".cfg"):
         req["cfg"] = nb.net
@@ -219,8 +237,10 @@ def how_to_get(kind, nb):
             return f"tools/get_datasets.sh {nb.dataset} (inscription : source affichée)"
         return f"tools/get_datasets.sh {nb.dataset}"
     if kind == "poids":
-        return (f"notebooks/{nb.dataset}/{nb.model}_train.ipynb ou _sweep.ipynb"
-                if nb.finetuned else "tools/get_weights.sh")
+        if nb.finetuned:  # the YOLOv5-recipe networks have no _sweep notebook
+            return (f"notebooks/{nb.dataset}/{nb.model}_train.ipynb"
+                    + ("" if nb.arch == V5_ARCH else " ou _sweep.ipynb"))
+        return UL_WEIGHTS_HINT if nb.weights.startswith(UL_WEIGHTS) else "tools/get_weights.sh"
     return f"notebooks/{nb.dataset}/{nb.model}_train.ipynb (préparation)"
 
 
