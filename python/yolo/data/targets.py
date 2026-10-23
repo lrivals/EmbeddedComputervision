@@ -71,6 +71,20 @@ def v5_levels(net):
     return sorted(levels, key=lambda lv: lv[1])
 
 
+def is_v8(net):
+    """True for the anchor-free DFL networks (YOLOv8, `head: "dfl"`, T35.2)."""
+    return net.get("head") == "dfl"
+
+
+def v8_levels(net):
+    """[(output id, stride)] of a YOLOv8 network, small stride first (T35.2)."""
+    from yolo.models.specs import infer_shapes
+
+    shapes = infer_shapes(net)
+    levels = [(hid, net["input"][1] // shapes[hid][1][1]) for hid in net["outputs"]]
+    return sorted(levels, key=lambda lv: lv[1])
+
+
 def responsible(boxes, anchors, owner, grid_sizes):
     """Cell and anchor of each box by the rule of §5.1 (used by `build_targets` and the miss
     target of T36.0). `boxes` (k, 4) normalised `(cx, cy, w, h)`; `anchors` (K, 2) fractions;
