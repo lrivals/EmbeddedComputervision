@@ -156,19 +156,24 @@ class Network:
         grads.update(g)
         return [dx], grads
 
-    def backward(self, douts):
+    def backward(self, douts, keep=None):
         """`douts` : {id: δy} pour les couches de sortie. Renvoie (δx, grads[i] par couche).
 
         Les couches qui ne reçoivent aucun gradient ont des gradients de paramètres nuls.
+        `keep` (T36.0): layer ids whose output δ is also returned, as a third value
+        {id: δy} (an id that receives no gradient is absent).
         """
         if self._caches is None:
             raise RuntimeError("backward() appelé sans forward()")
         dout = {i: get_xp(d).array(d, copy=True) for i, d in douts.items()}
         grads = [{k: get_xp(v).zeros_like(v) for k, v in p.items()} for p in self.params]
+        kept = {}
         for i in reversed(range(len(self.layers))):
             dy = dout.pop(i, None)
             if dy is None:
                 continue
+            if keep is not None and i in keep:
+                kept[i] = dy
             t, cache = self.layers[i]["type"], self._caches[i]
             if t == "conv":
                 dxs, g = self._conv_backward(i, dy, cache)
@@ -193,4 +198,6 @@ class Network:
                     dout[j] = dout[j] + dx
                 else:
                     dout[j] = dx
+        if keep is not None:
+            return dout.get(-1), grads, kept
         return dout.get(-1), grads

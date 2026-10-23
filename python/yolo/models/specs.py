@@ -184,8 +184,13 @@ TINY_YOLOV7_COCO = {
 # anchor heads (80, 40, 20 at 640).
 YOLOV5N_COCO = ul_yaml.parse(ul_yaml.YOLOV5N, name="yolov5n-coco")
 
+# YOLOv8n COCO (T35.0): C2f blocks (`slice` / `add` / `concat` layers), decoupled DFL head
+# per level (box 4·16 and class maps concatenated, 144 channels).
+YOLOV8N_COCO = ul_yaml.parse(ul_yaml.YOLOV8N, name="yolov8n-coco")
+
 NETWORKS = {net["name"]: net for net in (TINY_YOLOV2_VOC, TINY_YOLOV3_VOC, TINY_YOLOV4_COCO,
-                                         TINY_YOLOV7_COCO, YOLOV5N_COCO)}
+                                         TINY_YOLOV7_COCO, YOLOV5N_COCO,
+                                         YOLOV8N_COCO)}
 
 
 def layer_sources(i, layer):

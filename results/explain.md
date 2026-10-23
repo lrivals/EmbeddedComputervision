@@ -1,0 +1,148 @@
+# Decision explanation (M36)
+
+Why the detector outputs a box, and why it misses one, at the float, integer and golden
+stages. Tasks: [docs/tasks/M36-explanation.md](../docs/tasks/M36-explanation.md); tools and
+viewer: [docs/explain.md](../docs/explain.md). The tables between the
+`<!-- explain:… -->` markers are written by `python tools/explain.py report` from
+`build/explain/*.json`; the text around them is written by hand.
+
+**Conditions.**
+- Images: VOC2007 test in file order (the first `--n`), `stretch` preprocessing at 416.
+- Networks: Tiny-YOLOv2 VOC, and Tiny-YOLOv3 and YOLOv4-tiny COCO, whose VOC classes are
+  mapped to COCO.
+- Explained box: the float detection of best score at the operating point (conf 0.25,
+  NMS 0.45) that matches a ground truth of its class at IoU ≥ 0.5.
+- Float maps: computed on the BN-folded network in float32.
+- Integer stage: the `QuantModel` of `build/quant/<net>/calib.json`.
+- Golden stage: `golden_run` on `model/<net>/`.
+- These are **reduced runs**: 20 images per network (T36.1 to T36.3), 50 (T36.4) and 500
+  person images (T36.5). The full sizes are listed in
+  [long-runs.md](../docs/tasks/long-runs.md).
+
+**State** (2026-10-23): only T36.3 is run (below). The other sections are empty until
+their command has run (`tools/explain.py <command>`, then `report`); the commands and their
+durations are in [long-runs.md](../docs/tasks/long-runs.md).
+
+## T36.1: gradient maps, sanity checks
+
+**Completeness.** Integrated Gradients, 64 midpoint steps; the table gives the relative
+error |Σ attributions − (s(x) − s(x′))| / |s(x) − s(x′)|.
+
+**Sanity checks** (Adebayo 2018). The weights of the top convs are redrawn (He init), from
+the top conv down to every conv. ρ is the Spearman correlation between the absolute map of
+the original network and that of the randomized one. A method that keeps its map once the
+weights are random (ρ ≥ 0.3) fails.
+
+<!-- explain:sanity:begin -->
+<!-- explain:sanity:end -->
+
+## T36.2: perturbation maps at the three stages
+
+**Methods.**
+- D-RISE: 300 masks, grid 16, p = 0.5.
+- Occlusion: grey 64 px patch, stride 32.
+- Weight of a perturbed image: the best IoU · class score over the candidates before the
+  NMS.
+
+The integer and golden stages share the int8 heads (M28), so their maps must be equal
+**bit for bit**; this is checked on the first images with 100 masks.
+
+<!-- explain:stages:begin -->
+<!-- explain:stages:end -->
+
+## T36.3: exact integer attribution
+
+**Exact split.** On 16 random neurons per conv and image, the int64 sum of the products
+qW·qx is compared with the accumulator minus the bias.
+
+**Relevance.** LRP over the integer weights: ε rule with ε = 0.25 · std(z), and z⁺.
+Requantization and leaky pass the relevance through unchanged, so the relevance kept per
+layer measures what that approximation and the bias lose.
+
+<!-- explain:intattr:begin -->
+| net | images | Σ contributions ≠ acc − qb | relevance at input (ε) | (z⁺) | ρ int LRP / float LRP | ρ int LRP / Grad-CAM | ρ z⁺ / Grad-CAM | s / map |
+|---|---|---|---|---|---|---|---|---|
+| v2 | 17 | 0 / 2448 | 0.03 | 1.00 | 0.62 | 0.05 | 0.07 | 18.7 |
+| v3 | 14 | 0 / 2912 | 0.02 | 1.00 | 0.57 | 0.04 | 0.14 | 10.3 |
+| v4 | 20 | 0 / 6720 | 0.00 | 1.00 | 0.50 | 0.02 | 0.24 | 6.7 |
+
+Relevance kept per conv (Σ R_in / Σ R_out, mean over the images):
+
+| net | rule | per layer |
+|---|---|---|
+| v2 | eps | L0:0.21 L2:0.53 L4:0.41 L6:1.61 L8:0.53 L10:0.71 L12:0.88 L13:0.94 L14:0.80 |
+| v2 | zplus | L0:1.00 L2:1.00 L4:1.00 L6:1.00 L8:1.00 L10:1.00 L12:1.00 L13:1.00 L14:1.00 |
+| v3 | eps | L0:0.06 L2:0.68 L4:0.71 L6:0.47 L8:0.63 L10:1.04 L12:0.67 L13:0.76 L14:0.63 L15:0.88 |
+| v3 | zplus | L0:1.00 L2:1.00 L4:1.00 L6:1.00 L8:1.00 L10:1.00 L12:1.00 L13:1.00 L14:1.00 L15:1.00 |
+| v4 | eps | L0:1.83 L1:-0.13 L2:0.64 L4:8.23 L5:-0.43 L7:4.36 L10:6.82 L12:3.15 L13:-0.13 L15:0.58 L18:0.89 L20:0.40 L21:0.94 L23:0.85 L26:0.89 L27:1.07 L28:0.64 L29:1.12 L32:-0.08 L35:1.55 L36:1.06 |
+| v4 | zplus | L0:1.00 L1:1.00 L2:1.00 L4:1.00 L5:1.00 L7:1.00 L10:1.00 L12:1.00 L13:1.00 L15:1.00 L18:1.00 L20:1.00 L21:1.00 L23:1.00 L26:1.00 L27:1.00 L28:1.00 L29:1.00 L32:1.00 L35:1.00 L36:1.00 |
+<!-- explain:intattr:end -->
+
+**Reading.**
+- **Exact split.** The split of the accumulators is exact: no mismatch over 12,080
+  neurons.
+- **z⁺ rule.** It keeps all the relevance in every conv.
+- **ε rule.** It loses almost all of it on the way to the input: 0 to 3 % arrives.
+  - The bias takes its share at every layer.
+  - The ratio leaves [0, 1] on YOLOv4-tiny, where the route layers split the channels.
+  - For a map of the circuit, z⁺ is therefore the rule to use. The ε split stays exact
+    in its linear part only.
+- **Integer against float LRP.** Spearman 0.50 to 0.62: the two networks place the
+  relevance alike.
+- **LRP against Grad-CAM.** The input LRP maps agree little with Grad-CAM (ρ ≤ 0.24). They
+  are pixel-level maps, Grad-CAM is a 13 × 13 map upsampled.
+
+## T36.4: evaluation of the maps
+
+Measures, for each method and stage:
+- the pointing game (tolerance 15 px);
+- the share of the positive map inside the box;
+- deletion AUC (grey fill) and insertion AUC (into a blurred image), 16 steps, scored by
+  the D-RISE weight of the explained box at the same stage.
+
+Baselines: a random map and a centre Gaussian.
+
+<!-- explain:evaluate:begin -->
+<!-- explain:evaluate:end -->
+
+## T36.5: causes of the missed persons
+
+Persons of VOC2007 test (not difficult), at the operating point conf 0.25. Each miss gets
+one cause, by the fixed order of tests of `yolo.explain.misses`.
+
+**Waiting for T27.0.** The shares on CrowdHuman val, on the degraded sets of T27.3 and on
+ExDark wait for the person metrics of T27.0, and CrowdHuman is not in `data/`. One
+Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float: `results/explain/misses_<cause>.png`.
+
+<!-- explain:misses:begin -->
+<!-- explain:misses:end -->
+
+## T36.6: concepts and channels
+
+Network Dissection-lite and TCAV, on the layer read by the head.
+
+<!-- explain:concepts:begin -->
+<!-- explain:concepts:end -->
+
+## T36.7: training recorder
+
+**Run.** Tiny-YOLOv2 VOC fine-tuned from its Darknet weights on the first 200 images of
+VOC trainval:
+- batch 8, 250 iterations (10 epochs), lr 1e-4;
+- per-layer records every 10 iterations, weights every 50;
+- the same run with 5 % of the images relabelled at random (`--corrupt 0.05`).
+
+**Learned.** An image is learned in an epoch when its loss is under the median loss of the
+last epoch.
+
+<!-- explain:record:begin -->
+<!-- explain:record:end -->
+
+## T36.8: representation dynamics (CKA)
+
+Linear CKA on the outputs of every conv, pooled over 2 × 2 cells, over 64 VOC test images:
+- float against integer (dequantized), per layer;
+- each checkpoint of the T36.7 clean run against its last one.
+
+<!-- explain:cka:begin -->
+<!-- explain:cka:end -->

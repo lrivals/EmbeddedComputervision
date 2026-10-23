@@ -150,3 +150,47 @@ class SGDGroups:
 
     state_dict = SGD.state_dict
     load_state_dict = SGD.load_state_dict
+
+
+class AdamWGroups(AdamW):
+    """AdamW as `torch.optim.AdamW` with the three groups of `param_group` (YOLOv8
+    `optimizer=auto` on short runs, T35.6): one lr per group, weight decay on the weights
+    group only. β1 is the momentum given at creation; the warmup momentum of the schedule
+    does not reach it (the reference only ramps the `momentum` key of SGD groups)."""
+
+    def __init__(self, params, momentum=0.9, weight_decay=5e-4):
+        super().__init__(params, betas=(momentum, 0.999), eps=1e-8, weight_decay=weight_decay)
+
+    def step(self, grads, lrs, momentum=None):
+        b1, b2 = self.betas
+        self.t += 1
+        bc1, sqrt_bc2 = 1 - b1 ** self.t, (1 - b2 ** self.t) ** 0.5
+        for p, g, m, v in zip(self.params, grads, self.m, self.v):
+            for k in p:
+                xp = get_xp(p[k])
+                group = param_group(k)
+                lr = lrs[group]
+                m[k] *= b1
+                m[k] += (1 - b1) * g[k]
+                v[k] *= b2
+                v[k] += (1 - b2) * g[k] * g[k]
+                if self.weight_decay and group == "weights":
+                    p[k] *= 1 - lr * self.weight_decay
+                p[k] -= lr / bc1 * m[k] / (xp.sqrt(v[k]) / sqrt_bc2 + self.eps)
+
+
+AUTO_ITERATIONS = 10_000
+
+
+def auto_optimizer(num_classes, images, epochs, batch, nbs=64):
+    """`optimizer=auto` of YOLOv8 (releases 8.0-8.2): (name, lr0, momentum).
+
+    Optimizer steps ⌈images / max(batch, nbs)⌉·epochs > 10,000: SGD, lr0 0.01; else AdamW,
+    lr0 round(0.002·5 / (4 + C), 6); momentum 0.9 in both, and no bias warmup
+    (`warmup_bias_lr = 0`)."""
+    import math
+
+    steps = math.ceil(images / max(batch, nbs)) * epochs
+    if steps > AUTO_ITERATIONS:
+        return "sgd", 0.01, 0.9
+    return "adamw", round(0.002 * 5 / (4 + num_classes), 6), 0.9

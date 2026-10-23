@@ -348,6 +348,7 @@ class Result:
     latency: float
     model: str
     names: tuple
+    cam: object = None  # explanation map (h, w) in [0, 1], --gradcam (T36.9)
 
 
 class Rate:
@@ -378,6 +379,7 @@ class Demo:
         self.switch_to = None
         self.capture_rate, self.infer_rate = Rate(), Rate()
         self.latencies, self.done_at, self.n_infer, self.error = [], [], 0, None
+        self.gradcam, self.cam_fn, self.cam_ms = False, None, []
 
     # Capture thread: overwrites the frame slot, the queue never grows.
     def capture_loop(self):
@@ -425,13 +427,23 @@ class Demo:
                 model, t0 = self.model, time.perf_counter()
                 img = Image.fromarray(np.ascontiguousarray(frame[:, :, ::-1]))
                 boxes, scores, labels = model.infer(img, self.conf, self.iou)
+                cam = None
+                if self.gradcam:  # T36.9: map of the best detection, its own pass
+                    tc = time.perf_counter()
+                    if self.cam_fn is None or self.cam_fn[0] != model.name:
+                        from explain_live import cam_function
+
+                        self.cam_fn = (model.name, cam_function(model.name))
+                        tc = time.perf_counter()
+                    cam = self.cam_fn[1](img)
+                    self.cam_ms.append((time.perf_counter() - tc) * 1000)
                 t1 = time.perf_counter()
                 self.latencies.append(t1 - t0)
                 self.done_at.append(t1)
                 self.n_infer += 1
                 self.infer_rate.tick(t1)
                 res = Result(last, frame, np.asarray(boxes), np.asarray(scores),
-                             np.asarray(labels), t1 - t0, model.name, model.names)
+                             np.asarray(labels), t1 - t0, model.name, model.names, cam)
                 self.dets.put(res)
                 self.on_result(res)
         except Exception as exc:  # noqa: BLE001 — reported by the main thread
@@ -456,6 +468,9 @@ class Demo:
 
     def annotate(self, frame, res, boxes=True):
         img = frame.copy()
+        if res is not None and res.cam is not None and res.cam.shape == img.shape[:2]:
+            heat = cv2.applyColorMap((res.cam * 255).astype(np.uint8), cv2.COLORMAP_JET)
+            img = cv2.addWeighted(img, 0.6, heat, 0.4, 0)
         if boxes and res is not None:
             draw_cv(img, res.boxes, res.scores, res.labels, res.names)
         return img
@@ -480,6 +495,8 @@ class Demo:
                "latency_ms": float(lat.mean()) if lat.size else 0.0,
                "latency_p90_ms": float(np.percentile(lat, 90)) if lat.size else 0.0,
                "capture_fps": self.capture_rate.value}
+        if self.cam_ms:
+            out["cam_ms"] = float(np.mean(self.cam_ms))
         return out
 
 
@@ -492,12 +509,14 @@ def save_frame(img, save_dir, k, prefix="frame"):
 
 
 def run(source, model, specs=(), conf=CONF_THR, iou=IOU_THR, window=True, sync=False,
-        save=None, max_frames=None, seconds=None, cfg=None, dataset=None):
+        save=None, max_frames=None, seconds=None, cfg=None, dataset=None, gradcam=False):
     """Runs the demo until q, the end of the source, `max_frames` inferences or `seconds`.
-    Returns the `Demo` (its `summary()` and, headless, the saved paths in `demo.saved`)."""
+    Returns the `Demo` (its `summary()` and, headless, the saved paths in `demo.saved`).
+    `gradcam`: explanation map of the best detection over the frame (T36.9)."""
     need_cv2()
     demo = Demo(source, model, specs or [model.name], conf, iou, cfg, dataset, max_frames,
                 save, verbose=not window)
+    demo.gradcam = gradcam
     threads = [threading.Thread(target=demo.inference_loop, name="inference", daemon=True)]
     if source.live:
         threads.append(threading.Thread(target=demo.capture_loop, name="capture",
@@ -598,6 +617,9 @@ def main():
                     help="show the analysed frame with its boxes (inference rate)")
     ap.add_argument("--no-window", action="store_true", help="headless: no OpenCV window")
     ap.add_argument("--save", type=Path, default=None, help="annotated frames to this folder")
+    ap.add_argument("--gradcam", action="store_true",
+                    help="T36.9: Grad-CAM (float) or integer CAM of the best detection, "
+                         "over the frame")
     ap.add_argument("--max-frames", type=int, default=None, help="stop after N inferences")
     ap.add_argument("--seconds", type=float, default=None, help="stop after S seconds")
     ap.add_argument("--blas-threads", type=int, default=_default_blas_threads(),
@@ -637,12 +659,14 @@ def main():
     print(f"{source.describe()}; model {spec} ({model.size} px, {len(model.names)} classes); "
           f"BLAS threads {os.environ.get('OPENBLAS_NUM_THREADS', '?')}", flush=True)
     demo = run(source, model, specs, args.conf, args.iou, not args.no_window, args.sync,
-               args.save, args.max_frames, args.seconds, args.cfg, args.dataset)
+               args.save, args.max_frames, args.seconds, args.cfg, args.dataset, args.gradcam)
     s = demo.summary()
     disp = getattr(demo, "display_fps", None)
     print(f"{s['inferences']} inferences, {s['inference_fps']:.1f} inferences/s, latency "
           f"{s['latency_ms']:.0f} ms (p90 {s['latency_p90_ms']:.0f}), capture "
           f"{s['capture_fps']:.1f} FPS" + (f", display {disp:.1f} FPS" if disp else ""))
+    if "cam_ms" in s:
+        print(f"explanation map: {s['cam_ms']:.0f} ms per frame (in the latency)")
     if demo.saved:
         print(f"{len(demo.saved)} frames → {demo.saved[0].parent}")
     if demo.error:

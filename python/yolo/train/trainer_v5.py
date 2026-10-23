@@ -1,13 +1,16 @@
-"""YOLOv5 / YOLOv7 training loop (T33.7, T34.4): the recipe of the reference `train.py`.
+"""YOLOv5 / YOLOv7 / YOLOv8 training loop (T33.7, T34.4, T35.6): the recipe of the reference
+`train.py`.
 
     for each batch:  L, δ = yolo_v5_loss(forward(X));  grads += backward(δ)
+        (YOLOv8: yolo_v8_loss, BCE + CIoU + DFL with the task-aligned assigner)
         every `accumulate` batches (1 → 64/N in the warmup, then 64/N):
             SGD Nesterov step (3 groups, lr and momentum of `V5Schedule`), EMA update
 
 The loss is the total of the reference (already × N), its gradients are summed over the
 accumulated batches, and the weight decay is scaled by N·accumulate/64 (nominal batch 64),
 as the reference. The same loop trains the Ultralytics networks (`ul_net`) and the Darknet
-YOLOv7-tiny graph: both are `graph.Network`, seen through `v5_levels`.
+YOLOv7-tiny graph: both are `graph.Network`, seen through `v5_levels` (`v8_levels` for the
+anchor-free YOLOv8, whose loss parts are box / cls / dfl instead of box / obj / cls).
 
 Checkpoints: those of `Trainer` (parameters, BN state, optimizer, iteration) plus the EMA
 and the accumulation state; resuming reproduces the run on the same backend.
@@ -20,12 +23,14 @@ from pathlib import Path
 import numpy as np
 
 from yolo.backend import to_numpy
-from yolo.data.targets import v5_levels
+from yolo.data.targets import is_v8, v5_levels, v8_levels
 from yolo.train.ema import ModelEMA
 from yolo.train.loss_v5 import HYP_V5, yolo_v5_loss
+from yolo.train.loss_v8 import HYP_V8, yolo_v8_loss
 from yolo.train.trainer import Trainer
 
-LOG_FIELDS_V5 = ("it", "lr", "momentum", "size", "loss", "box", "obj", "cls", "seconds")
+PARTS_V5, PARTS_V8 = ("box", "obj", "cls"), ("box", "cls", "dfl")
+LOG_FIELDS_V5 = ("it", "lr", "momentum", "size", "loss", *PARTS_V5, "seconds")
 NBS = 64
 
 
@@ -37,8 +42,17 @@ def head_conv(net, hid):
 
 def init_head_biases(net, layers=None, img_size=640):
     """Prior of the reference `_initialize_biases`: objectness + log(8 / (S/s)²), classes
-    + log(0.6 / (C − 0.99)) on the head convs (all, or the ids of `layers`)."""
+    + log(0.6 / (C − 0.99)) on the head convs (all, or the ids of `layers`). YOLOv8
+    (`Detect.bias_init`): box convs set to 1.0, class convs to log(5 / C / (S/s)²)."""
     c = net.net["classes"]
+    if is_v8(net.net):
+        for hid, stride in v8_levels(net.net):
+            box, cls = net.layers[hid]["from"]
+            if layers is None or box in layers:
+                net.params[box]["b"][...] = 1.0
+            if layers is None or cls in layers:
+                net.params[cls]["b"][...] = np.log(5 / c / (img_size / stride) ** 2)
+        return
     for hid, stride, anchors in v5_levels(net.net):
         i = head_conv(net, hid)
         if layers is not None and i not in layers:
@@ -51,9 +65,10 @@ def init_head_biases(net, layers=None, img_size=640):
 class TrainerV5(Trainer):
     """Trains `net` (`graph.Network`, `is_v5`) with `optimizer` (`optim.SGDGroups`) and
     `schedule` (`schedule.V5Schedule`). `size`: square input; `hyp`: loss hyperparameters
-    (`HYP_V5`, `HYP_V7_TINY`); `ema`: keep a `ModelEMA`; `nbs`: nominal batch."""
+    (`HYP_V5`, `HYP_V7_TINY`, `HYP_V8`; default: the one of the head); `ema`: keep a
+    `ModelEMA`; `nbs`: nominal batch."""
 
-    def __init__(self, net, optimizer, schedule, size=640, seed=0, log_path=None, hyp=HYP_V5,
+    def __init__(self, net, optimizer, schedule, size=640, seed=0, log_path=None, hyp=None,
                  ema=True, nbs=NBS, batch=16):
         self.net = net
         self.optimizer = optimizer
@@ -61,8 +76,10 @@ class TrainerV5(Trainer):
         self.size = size
         self.seed = seed
         self.it = 0
-        self.hyp = hyp
-        self.levels = v5_levels(net.net)
+        self.v8 = is_v8(net.net)
+        self.hyp = hyp if hyp is not None else (HYP_V8 if self.v8 else HYP_V5)
+        self.levels = v8_levels(net.net) if self.v8 else v5_levels(net.net)
+        self.parts = PARTS_V8 if self.v8 else PARTS_V5
         self.log_path = None if log_path is None else Path(log_path)
         self.grad_hook = None
         self.nbs = nbs
@@ -81,8 +98,12 @@ class TrainerV5(Trainer):
         x = images.astype(self.net.dtype, copy=False)
         outputs = self.net.forward(x if xp is np else xp.asarray(x), train=True)
         outputs = {h: to_numpy(o) for h, o in outputs.items()}
-        res = yolo_v5_loss(outputs, boxes, labels, self.levels, self.net.net["classes"],
-                           self.hyp, img_size=self.size)
+        if self.v8:
+            res = yolo_v8_loss(outputs, boxes, labels, self.levels, self.net.net["classes"],
+                               self.hyp)
+        else:
+            res = yolo_v5_loss(outputs, boxes, labels, self.levels, self.net.net["classes"],
+                               self.hyp, img_size=self.size)
         douts = res.douts if xp is np else {h: xp.asarray(d) for h, d in res.douts.items()}
         _, grads = self.net.backward(douts)
         if self._grads is None:
@@ -112,10 +133,10 @@ class TrainerV5(Trainer):
         with open(self.log_path, "a", newline="") as f:
             w = csv.writer(f)
             if new:
-                w.writerow(LOG_FIELDS_V5)
+                w.writerow(("it", "lr", "momentum", "size", "loss", *self.parts, "seconds"))
             p = res.parts
             w.writerow([self.it, f"{lr:.6g}", f"{momentum:.4g}", self.size,
-                        f"{res.total / n:.6g}", *(f"{p[k] / n:.6g}" for k in ("box", "obj", "cls")),
+                        f"{res.total / n:.6g}", *(f"{p[k] / n:.6g}" for k in self.parts),
                         f"{seconds:.3f}"])
 
     def size_for(self, it):

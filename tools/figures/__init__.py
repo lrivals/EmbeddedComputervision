@@ -118,3 +118,4 @@ def _rel(p):
 
 from tools.figures import maths, materiel, modeles, projet, resultats, reseaux  # noqa: E402,F401  (enregistrement)
 from tools.figures import balayages  # noqa: E402,F401  (après resultats : ordre du registre)
+from tools.figures import explication  # noqa: E402,F401  (M36)

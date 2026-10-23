@@ -26,15 +26,14 @@ Related backlog: [M1](M1-briques-numpy.md) (layers, gradcheck), [M2](M2-cibles-p
 [T26.2](M26-recent-models.md) (float and integer SiLU), [T26.3](M26-recent-models.md)
 (YOLOv5n on the hardware chain).
 
-**State** (2026-10-22):
+**State** (2026-10-23):
 - **Done**:
   - T33.0-T33.3: the official `yolov5n.pt` is read without torch, described from its
     YAML and run as a trainable NumPy network equal to torch to 4·10⁻¹⁴.
   - T33.4: v5 decoding and evaluation, COCO 28.1 AP at 640 (published 28.0).
   - T33.5: targets.
+  - T33.6: the loss, with gradchecks, equal to the torch `ComputeLoss` to 6·10⁻¹⁷.
 - **Code done, check open**:
-  - T33.6: the loss, with gradchecks; the comparison with a torch value waits for the
-    `yolov5n_loss.npz` fixture.
   - T33.7: the training recipe and its tests; the VOC fine-tuning (≈ 6 days on CPU)
     is in [long-runs.md](long-runs.md).
 - **Open**: T33.8. The official checkpoints (`weights/ultralytics/`) and the torch reference
@@ -283,7 +282,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     - a centre on a cell corner gives 5 matches, 3 of them on the own cell (the
       reference keeps the duplicates).
 
-### [ ] T33.6 — Loss and its gradients
+### [x] T33.6 — Loss and its gradients
 - **Spec**: §6 · **Depends on**: T33.5 · **Size**: L
 - **Deliverables**: `python/yolo/train/loss_v5.py`: `ciou` (forward and analytic backward)
   in `infer/boxes.py` or `train/iou.py`, `yolo_v5_loss(outputs, targets) -> LossResult`;
@@ -316,9 +315,11 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
     - gradcheck ≤ 1e-7 of the full loss (every matched cell plus random ones), with the
       backward constants held fixed by `targets_from`;
     - a batch without boxes; the gain scaling.
-  - **Not done**: equality with the torch `ComputeLoss` value. The test
-    (`weights/m33/yolov5n_loss.npz`: head outputs, targets, loss) is written and skipped
-    until the throwaway torch script makes that fixture.
+  - **Against torch** (2026-10-22): `ComputeLoss` of the yolov5 repo (`hyp.scratch-low`
+    gains scaled as `train.py`) on the YOLOv5n outputs of 2 COCO images at 320 and their
+    21 boxes: total 0.2321364636, equal to 6·10⁻¹⁷. The fixture
+    `weights/m33/yolov5n_loss.npz` (local only) was made by the throwaway script of M35
+    ([long-runs.md](long-runs.md)).
 
 ### [ ] T33.7 — Training recipe
 - **Spec**: §7 · **Depends on**: T33.6 · **Size**: L

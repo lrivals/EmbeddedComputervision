@@ -92,6 +92,8 @@ The first useful step on a machine with Vitis is `make csim` (Vitis C-sim must e
 | [M30](M30-latency-bound.md) | T30.1 | Vitis | co-sim cycles | [ ] |
 | | T30.2 | Board | end-to-end latency, p99.9 | [ ] |
 | | T30.3 | Board | non-determinism on the PS | [ ] |
+| [M35](M35-yolov8n.md) | T35.7 | Vitis | YOLOv8n convs in synthesis | [ ] |
+| | T35.7 | Board | YOLOv8n post-processing on the A53 | [ ] |
 | [M36](M36-explanation.md) | T36.10 | Vitis | on-chip CAM cost | [ ] |
 | | T36.10 | Board | CAM read on the board | [ ] |
 

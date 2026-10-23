@@ -22,7 +22,8 @@ chemin série, dans le même ordre (machines à beaucoup de cœurs, runtime TPU 
 `--preset v5` (T33.4, YOLOv5 / YOLOv7) : Ultralytics letterbox, conf 0.001, NMS 0.65, at
 most 300 detections per image (the settings of the published COCO mAP); an option given
 explicitly wins over the preset. `--net yolov5n-coco` reads `weights/ultralytics/yolov5n.pt`
-(or `--weights` .pt / .npz state dict) without torch.
+(or `--weights` .pt / .npz state dict) without torch. `--preset v8` (T35.3, YOLOv8): the
+same with NMS 0.7 (`--net yolov8n-coco`, `weights/ultralytics/yolov8n.pt`).
 
 `--tiles N` (VisDrone, M15) : inférence par tuiles N × N px de l'image d'origine, recouvrement
 `--overlap`, plus l'image entière sauf `--no-full` ; NMS par classe sur le tout
@@ -46,13 +47,16 @@ from yolo.data.letterbox import input_size, parse_size, size_label  # noqa: E402
 from yolo.infer import coco_eval  # noqa: E402
 from yolo.infer.metrics import (evaluate, read_detections, to_voc_pixels,  # noqa: E402
                                 write_detections)
-from yolo.infer.nms import IOU_THR, V5_CONF_THR, V5_IOU_THR, V5_MAX_DET  # noqa: E402
+from yolo.infer.nms import (IOU_THR, V5_CONF_THR, V5_IOU_THR, V5_MAX_DET,  # noqa: E402
+                            V8_IOU_THR)
 from yolo.infer.pipeline import INTERPS, MODES, detect, preprocess  # noqa: E402
 from yolo.infer.tiles import merge, tile_grid, tile_to_image  # noqa: E402
 from yolo.io.darknet_weights import load_darknet_weights  # noqa: E402
 from yolo.models.tiny_yolo import CFG_FILES, build, load_cfg  # noqa: E402
 
 PRESETS = {"v5": {"resize": "v5", "conf": V5_CONF_THR, "iou": V5_IOU_THR,
+                  "max_det": V5_MAX_DET},
+           "v8": {"resize": "v5", "conf": V5_CONF_THR, "iou": V8_IOU_THR,
                   "max_det": V5_MAX_DET}}
 DEFAULTS = {"resize": "letterbox", "conf": 0.005, "iou": IOU_THR, "max_det": None}
 
@@ -70,7 +74,7 @@ def load_net(name, weights=None):
     """Darknet network + `.weights`, or Ultralytics network (`ul_net`) from a `.pt`, a `.npz`
     state dict, or its official checkpoint when `weights` is None."""
     desc = description(name)
-    if desc.get("head") == "anchor":
+    if desc.get("head") in ("anchor", "dfl"):
         from yolo.io.torch_pickle import load_checkpoint
         from yolo.models import ul_net
 
@@ -243,7 +247,8 @@ def main():
     ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--preset", choices=tuple(PRESETS), default=None,
-                    help="v5 : letterbox, seuils et max-det de YOLOv5 / YOLOv7 (T33.4)")
+                    help="v5 : letterbox, seuils et max-det de YOLOv5 / YOLOv7 (T33.4) ; v8 : idem, "
+                         "NMS 0.7 (YOLOv8, T35.3)")
     ap.add_argument("--resize", choices=MODES, default=None, help="défaut : letterbox")
     ap.add_argument("--interp", choices=INTERPS, default="pil")
     ap.add_argument("--tiles", type=int, default=0,
@@ -285,7 +290,7 @@ def main():
         dets = read_detections(view.names, args.dets)
         title = f"{args.dets.name} — {where}"
     else:
-        ul = description(args.net).get("head") == "anchor"
+        ul = description(args.net).get("head") in ("anchor", "dfl")
         if args.weights is None and not ul:
             ap.error("--weights ou --dets requis")
         net = load_net(args.net, args.weights)

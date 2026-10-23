@@ -41,14 +41,17 @@ goes in a new package `python/yolo/explain/` (NumPy only, never matplotlib or cv
 stays in `tools/`, as in M13 and M20), the CLI is `tools/explain.py`, and the results go to
 `results/explain.md`.
 
-**State** (2026-10-22): not started. Available: the backward pass of the three Darknet
-networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
+**State** (2026-10-23): T36.0 and T36.3 done. The code of T36.1 to T36.9 is written and
+tested; their reduced runs are open ([long-runs.md](long-runs.md)). The exact integer split
+holds on every neuron checked, and z⁺ LRP conserves the relevance through the integer chain
+([results/explain.md](../../results/explain.md)). It builds on the backward pass of the
+three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
 (`quant/fuse_bn.py`), the integer L13 features and the monitors of T29.0, the webcam app
 (M20). T36.5 waits for the person metrics of M27 (T27.0); T36.10 needs Vitis for its cost.
 
 ## A. Inference: why this box
 
-### [ ] T36.0 — Explanation target
+### [x] T36.0 — Explanation target
 - **Spec**: §8.1, §4.5 · **Depends on**: T1.7, T3.1 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `python/yolo/explain/targets.py`: the scalar to explain and its δ on
   the head outputs, for a **detection** (σ(t_o) · p_c of its cell and anchor, before NMS)
@@ -62,6 +65,18 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   model (it differentiates the batch statistics). Fold BN first (`fuse_bn`), then
   differentiate the folded network. With `softmax` heads (v2), p_c depends on all the
   classes: the δ goes through the softmax.
+- **Done**:
+  - **Target**: `yolo.explain.targets`: `Target` (head, anchor, cell, class); `target_score`
+    and `target_douts` (δ through the softmax for `region` heads);
+  - **Detections and misses**: `detections` (boxes kept by the NMS, with their cell),
+    `miss_target` (the assignment rule, shared with `build_targets` through the new
+    `data.targets.responsible`);
+  - **Explain**: `explain_net` (BN folded, float64) and `explain`.
+  - **Backward**: `Network.backward(douts, keep=)` returns the δ of the kept layers as a
+    third value; without `keep` it is unchanged.
+  - **Tests**: gradcheck of the target on the input, the head map and an intermediate layer
+    ≤ 10⁻⁶ for `yolo` and `region` heads (`test_explain_gradient.py`); `test_graph.py` and
+    `test_targets.py` green.
 
 ### [ ] T36.1 — Gradient attributions
 - **Spec**: — · **Depends on**: T36.0 · **Runs on**: PC (GPU via `yolo.backend` if
@@ -75,6 +90,15 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   Spearman rank correlation with the original map < 0.3 for Grad-CAM and IG (report the
   methods that fail); cost in forward + backward passes per map
 - **Notes**: saliency is known to fail the sanity checks; report it anyway, as a baseline.
+- **Progress** (code done, run open):
+  - **Methods**: `yolo.explain.gradient`: saliency, SmoothGrad, IG (black and blurred
+    baselines, 64 midpoint steps), Grad-CAM (default layer: the input of the head conv,
+    L13 / L14, L21 / L28, L35), and `randomize_from_top` for the Adebayo cascade.
+  - **Tests**: IG completeness ≤ 1 % on the tiny net at 128 steps. At 64 steps the tiny
+    net's few leaky and maxpool kinks give 1.1 %; the 64-step acceptance is measured on the
+    real networks.
+  - **To run**: `tools/explain.py sanity` (20 images × 3 networks, ≈ 40 min with 12
+    processes), not run yet.
 
 ### [ ] T36.2 — Perturbation attributions (black box)
 - **Spec**: §9, §10.2 · **Depends on**: T36.0 · **Runs on**: PC (C-sim gcc for the third
@@ -88,8 +112,17 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   maps must be equal bit for bit); deletion and insertion AUC per method
 - **Notes**: needs no gradient, so it applies to the circuit as is. It costs 10² to 10³
   inferences per map, which is fine on the PC and too much for the board.
+- **Progress** (code done, run open):
+  - **Code**: `yolo.explain.perturb`:
+    - stages `float_stage`, `int_stage`, `golden_stage` (`golden_run run`, int8 heads
+      decoded by the same `decode_int`);
+    - occlusion and D-RISE with seeded masks, so the masks are the same at every stage.
+  - **Tests**: the golden == integer check passes on Tiny-YOLOv2 at 416: same weights and
+    same map bit for bit on 3 masks (`test_golden_stage_equals_int`).
+  - **To run**: `tools/explain.py stages` (≈ 1 h with 12 processes), stopped before its
+    end.
 
-### [ ] T36.3 — Exact integer attribution
+### [x] T36.3 — Exact integer attribution
 - **Spec**: §9.3 · **Depends on**: T36.0, T25.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/int_attr.py`: an `IntNetwork` hook that keeps the
   int8 inputs; the int32 accumulator of the explained neuron split into per-channel and
@@ -102,6 +135,18 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
 - **Notes**: the exact part is the linear one. Requantization and leaky are approximated
   by the LRP rule, so the deviation is measured layer by layer. The split per channel is
   also what a side kernel can compute on the L13 buffer (T36.10).
+- **Done** ([results/explain.md](../../results/explain.md#t363-exact-integer-attribution)):
+  - **Code**: `yolo.explain.int_attr`:
+    - the `KeepInputs` hook and `contributions` (int64 qW·qx per channel and pixel);
+    - `check_exact`;
+    - `lrp_int` and `lrp_float` (one propagation, ε and z⁺ rules);
+    - `cam_l13`, the integer CAM of the 1 × 1 head (T36.10, Python part).
+  - **Results** (`tools/explain.py intattr`, the first 20 VOC test images, 17 / 14 / 20
+    with a matched detection for v2 / v3 / v4):
+    - Σ contributions == acc − qb on 12,080 / 12,080 neurons;
+    - z⁺ keeps all the relevance in every conv;
+    - ε lets 0 to 3 % reach the input, lost to the bias;
+    - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
@@ -115,6 +160,13 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   report the rates per box-size bin (same bins as T27.0).
 
 ## B. Safety link
+- **Progress** (code done, run open):
+  - **Code**: `yolo.explain.evaluate`: pointing game, energy in the box, deletion and
+    insertion scored by the D-RISE weight at the same stage, random and centre baselines,
+    the T27.0 size bins.
+  - **Command**: `tools/explain.py evaluate`, 14 method × stage pairs.
+  - **Report**: `tools/explain.py report` writes the table and the ranking.
+  - **To run**: 50 images × 3 networks, ≈ 2 h with 16 processes; not run yet.
 
 ### [ ] T36.5 — Miss causes
 - **Spec**: §8 · **Depends on**: T36.0, T27.0 · **Runs on**: PC · **Size**: M
@@ -131,6 +183,16 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
 - **Notes**: the cause says what to fix: anchors (k-means again), a threshold (T29.2), NMS
   (crowd), training data or quantization (QAT). It also feeds the hazard analysis of
   T31.1.
+- **Progress** (code done, waiting for T27.0 for the sets):
+  - **Code**: `yolo.explain.misses`: seven causes by a fixed order of tests. The task's six,
+    with quantization tested first at the integer stage, plus **mislocalized** (a box over
+    the threshold whose IoU stays < 0.5), needed for the partition.
+  - **Tests**: each cause is reached by a constructed case.
+  - **Command**: `tools/explain.py misses` (VOC test persons, float and integer). `report`
+    draws one Grad-CAM strip per cause (`results/explain/misses_<cause>.png`).
+  - **Not run**:
+    - VOC: ≈ 10 min.
+    - CrowdHuman, T27.3 and ExDark wait for T27.0, and CrowdHuman is not in `data/`.
 
 ### [ ] T36.6 — Concepts and channels
 - **Spec**: §4 · **Depends on**: T36.1 · **Runs on**: PC · **Size**: M
@@ -145,6 +207,14 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   a candidate for the ODD limits of T31.0.
 
 ## C. Training: how the choices form
+- **Progress** (code done, run open):
+  - **Code**: `yolo.explain.concepts`: dissection (quantile 0.995, ×4 upsampling, MIN_IOU
+    0.04); TCAV on the pooled activations (logistic CAV, Welch two-sided test with the
+    incomplete beta function, no SciPy); degradations `dark` and `fog`, until T27.3.
+  - **Command**: `tools/explain.py concepts` (v2 L13, 200 images, 20 random sets of 30,
+    concepts dark, fog, small, occluded). The VOC `truncated` flag stands for "occluded":
+    CrowdHuman is absent.
+  - **Not run yet.**
 
 ### [ ] T36.7 — Training recorder
 - **Spec**: §7 · **Depends on**: T2.7 · **Runs on**: PC, Colab · **Size**: M
@@ -158,6 +228,20 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   the labels corrupted on purpose, AUROC of "never learned" for the corrupted images
 - **Notes**: the corrupted labels show what the data map finds. On the M22 auto-labelled
   sets, the same list points to the labels to check by hand.
+- **Progress** (code done, run open):
+  - **Code**: `yolo.explain.recorder`: `Recorder.attach` chains the trainer's `grad_hook`;
+    `IndexedLoader` gives the image ids. It records:
+    - per layer, every N iterations: weight and gradient norms, update / weight ratio, dead
+      leaky share, percentiles and γ on the probe batch;
+    - every image's loss.
+  - **Analysis**: `summary` (never learned, forgetting events, data map), `corrupt_labels`.
+  - **Training options**: `tools/train.py --record --record-every --snap-every --corrupt`.
+  - **Analysis command**: `tools/explain.py record`.
+  - **Smoke run** (16 images, 2 epochs, one record every 2 iterations): AUROC of the
+    corrupted images 0.79 (never learned), 0.88 (mean loss); overhead 18 %, with snapshots
+    every 4 iterations.
+  - **Not run**: the 200-image runs (250 iterations, clean and 5 % corrupted, ≈ 1 h each
+    alone) were stopped at iteration 50.
 
 ### [ ] T36.8 — Representation dynamics
 - **Spec**: §7, §9 · **Depends on**: T36.1, T36.7 · **Runs on**: PC · **Size**: M
@@ -171,6 +255,13 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   regenerated by `make figures`
 
 ## D. Software and integration
+- **Progress** (code done, run open):
+  - **Code**: `yolo.explain.cka` (linear CKA, Gram form, pooled maps).
+  - **Command**: `tools/explain.py cka`: float / integer per conv, and with `--run`, the
+    CKA to the last snapshot and the Grad-CAM strip data.
+  - **Figures**: the `explain_cka_float_int`, `explain_cka_checkpoints` and
+    `explain_gradcam_strip` figures ([T13.60](M13-figures.md)).
+  - **Waits for**: the T36.7 run.
 
 ### [ ] T36.9 — Explanation viewer
 - **Spec**: — · **Depends on**: T36.1, T36.2, T36.3, T36.4 · **Runs on**: PC · **Size**: M
@@ -183,6 +274,19 @@ networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN folding
   command; the app opens on the PC (checked by hand, screenshot in `docs/explain.md`);
   webcam overlay cost in ms per frame for each of the 4 models of M20
 - **Notes**: same UI stack as `make autolabel` (M22) to avoid a new dependency.
+- **Progress** (code done, checks open):
+  - **Command line**: `tools/explain.py` (`map`, `sanity`, `stages`, `intattr`,
+    `evaluate`, `misses`, `concepts`, `cka`, `record`, `report`) and
+    `tools/explain_report.py`.
+  - **Viewer**: `make explain` (`tools/explain_app.py`, gradio on 127.0.0.1:7861).
+  - **Webcam**: `tools/webcam.py --gradcam` (`tools/explain_live.py`: Grad-CAM in float,
+    `cam_l13` in integer), cost in ms per frame in the summary.
+  - **Notebook**: `notebooks/explain.ipynb` (`gabarits.explain`).
+  - **Docs**: [docs/explain.md](../explain.md).
+  - **Open**:
+    - the app checked by hand and its screenshot;
+    - the webcam cost per model;
+    - the 10-image + 10-miss report, which needs CrowdHuman.
 
 ### [ ] T36.10 — On-chip explanation
 - **Spec**: §10.2 · **Depends on**: T36.3, T29.4 · **Size**: L

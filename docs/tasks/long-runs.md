@@ -57,6 +57,13 @@ GPU (T12.11-e).
 | [T11.2](M11-jeux-de-donnees.md), [T14.5](M14-notebooks.md) | `tools/m11.sh hors-domaine` | ExDark, KITTI val 1,496, VisDrone val 548; VOC and COCO weights; float and int | ≈ 1-1.5 h *(est.)* | ≈ 4,500 images × 4 passes × 0.2-0.3 s | `data/kitti` link or tree |
 | [T11.3](M11-jeux-de-donnees.md) | `tools/m11.sh exdark` (calibration, `act_hist`) | ExDark | ≈ 15 min *(est.)* | calibration + one eval | — |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman` (`int`, `int-hwpp`, capacities 256 and 1,024) | CrowdHuman val 4,370 | ≈ 35-45 min *(est.)* | 4 × 4,370 × 0.12-0.15 s | `data/crowdhuman` (missing on the PC, pull 11 GB) |
+| [T36.1](M36-explanation.md) | `tools/explain.py sanity --jobs 12` | VOC07 test, 20 images × 3 networks | ≈ 40 min *(est.)* | per image 5 methods × 4 networks (original + 3 randomizations); IG 2 × 130 passes, SmoothGrad 50, at ≈ 0.3 s/pass | — |
+| [T36.2](M36-explanation.md) | `tools/explain.py stages --jobs 12` | VOC07 test, 20 images × 3 networks; golden on 5 | ≈ 1 h *(est.)* | per image D-RISE 300 + occlusion 145 inferences, float 0.28 s and int 0.6 s each (measured 2026-10-22, one thread); golden 100 masks × 2.7 s on 5 images | `build/golden/golden_run`, `model/<net>/` |
+| [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | ≈ 2 h *(est.)*, full ≈ 20 h | 14 method × stage pairs ≈ 600 s per image | — |
+| [T36.5](M36-explanation.md) | `tools/explain.py misses --jobs 12` | VOC07 test, 500 person images × 3 networks | ≈ 10 min *(est.)* | one float + one int pass per image | CrowdHuman / ExDark / T27.3 sets: T27.0 |
+| [T36.6](M36-explanation.md) | `tools/explain.py concepts --jobs 12` | VOC07 test 200 + trainval ≈ 700 images, v2 L13 | ≈ 15 min *(est.)* | ≈ 900 forward passes, 50 forward + backward | — |
+| [T36.7](M36-explanation.md) | `tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --subset 200 --batch 8 --iters 250 --lr 1e-4 --burn-in 20 --record --record-every 10 --snap-every 50 [--corrupt 0.05] --out build/explain/record/{clean,corrupt5}`, then `tools/explain.py record --runs …` | VOC trainval, 200 images | ≈ 1 h per run alone *(est.)*; 2 runs side by side ≈ 2 h | 15-30 s/iteration measured with the other runs sharing the CPU | — |
+| [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
 | [T16.13](M16-presentation-jeux.md) | `notebooks/coco/coco_stats.ipynb`, then `stats-jeux.md` | COCO 5,000 images, 36,781 objects | unmeasured, R-M | — | — |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T18.8](M18-jeux-drone.md) | `tools/m11.sh <ds>-prep`, then the four `_stats` notebooks, `tools/data_stats.py --report` | auair, dronevehicle, hituav, uavdt (1.2 M objects) | unmeasured, M *(est.)* | prep ≈ 20 s each (DroneVehicle) | — |
@@ -141,7 +148,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 
 | Machine | Total | Largest items |
 |---|---|---|
-| PC CPU | ≈ 40 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
+| PC CPU | ≈ 45 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
 | PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
 | Colab | ≈ 110-120 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T15.9 ≈ 11 h |
 

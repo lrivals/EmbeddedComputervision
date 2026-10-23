@@ -128,6 +128,15 @@ def main():
                     help="facteur de ρ à chaque pas Z / U (plafond 1)")
     ap.add_argument("--device", choices=("cpu", "gpu"), default="cpu",
                     help="backend de l'entraînement : NumPy (défaut) ou CuPy (T12.11)")
+    ap.add_argument("--record", action="store_true",
+                    help="T36.7 : enregistreur (yolo.explain.recorder) → <out>/record.npz")
+    ap.add_argument("--record-every", type=int, default=10,
+                    help="itérations entre deux relevés par couche (--record)")
+    ap.add_argument("--snap-every", type=int, default=0,
+                    help="poids <out>/snap_<it>.npz toutes les N itérations (CKA, T36.8)")
+    ap.add_argument("--corrupt", type=float, default=0.0,
+                    help="part des images aux labels tirés au hasard (T36.7) ; "
+                         "indices dans <out>/corrupted.json")
     ap.add_argument("--no-figures", action="store_true",
                     help="pas de courbes dans <out>/figures/ (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
@@ -187,12 +196,33 @@ def main():
     samples = datasets.remap(samples, datasets.class_lut(args.dataset, net.net["classes"]))
     if args.subset:
         samples = samples[:args.subset]
+    if args.corrupt:
+        from yolo.explain.recorder import corrupt_labels
+
+        samples, bad = corrupt_labels(samples, args.corrupt, net.net["classes"], args.seed)
+        args.out.mkdir(parents=True, exist_ok=True)
+        (args.out / "corrupted.json").write_text(json.dumps([int(k) for k in bad]))
     loader = DataLoader(VOCDataset(samples, channels=net.net["input"][0], resize=args.resize,
                                    crop=args.crop), args.batch,
                         workers=args.workers, seed=args.seed)
     print(f"{len(samples)} images, {len(loader)} lots par époque")
+    recorder = None
+    fit_loader = loader
+    if args.record:
+        from yolo.explain.recorder import Recorder
+
+        # Lot sonde fixe : les 8 premières images, sans augmentation.
+        probe_ds = VOCDataset(samples[:8], train=False, channels=net.net["input"][0],
+                              resize=args.resize)
+        probe = np.stack([probe_ds.load(k, input_size(net.net, args.size))[0]
+                          for k in range(min(8, len(samples)))])
+        recorder = Recorder(net, probe, len(samples), every=args.record_every, out=args.out,
+                            snap_every=args.snap_every)
+        fit_loader, record_cb = recorder.attach(trainer, loader)
 
     def report(tr, res, lr):
+        if recorder:
+            record_cb(tr, res, lr)
         n = args.batch
         p = {k: v / n for k, v in res.parts.items()}
         print(f"it {tr.it:6d}  lr {lr:.2e}  perte {res.total / n:8.3f}  "
@@ -213,10 +243,12 @@ def main():
 
     args.out.mkdir(parents=True, exist_ok=True)
     try:
-        trainer.fit(loader, args.iters, checkpoint=ckpt, save_every=args.save_every,
+        trainer.fit(fit_loader, args.iters, checkpoint=ckpt, save_every=args.save_every,
                     callback=report)
     finally:
         loader.close()
+        if recorder:
+            print(f"enregistreur : {recorder.save()}")
         figures()
     if args.admm:
         admm.save(args.out / "admm.npz")

@@ -71,6 +71,37 @@ def v5_levels(net):
     return sorted(levels, key=lambda lv: lv[1])
 
 
+def responsible(boxes, anchors, owner, grid_sizes):
+    """Cell and anchor of each box by the rule of §5.1 (used by `build_targets` and the miss
+    target of T36.0). `boxes` (k, 4) normalised `(cx, cy, w, h)`; `anchors` (K, 2) fractions;
+    `owner` {global anchor: (head id, position in its mask)}. Returns [(k, hid, a, i, j)],
+    `None` for a box whose best anchor belongs to no head.
+    """
+    boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+    if len(boxes) == 0:
+        return []
+    # §5.1, 2 : ancre de meilleure IoU de forme parmi toutes les ancres de toutes les
+    # têtes ; l'échelle retenue est celle de l'ancre gagnante.
+    best = np.argmax(iou_wh(boxes[:, 2:4], anchors), axis=1)
+    out = []
+    for (gx, gy, _, _), k in zip(boxes, best):
+        if k not in owner:
+            out.append(None)
+            continue
+        hid, a = owner[k]
+        sh, sw = grid_hw(grid_sizes[hid])
+        # §5.1, 1 : cellule qui contient le centre (g = 1 bornée à la dernière cellule).
+        j = min(int(np.floor(gx * sw)), sw - 1)
+        i = min(int(np.floor(gy * sh)), sh - 1)
+        out.append((int(k), hid, a, i, j))
+    return out
+
+
+def anchor_owner(head_list):
+    """{global anchor: (head id, position in its mask)} of `heads(net)`."""
+    return {k: (hid, a) for hid, mask in head_list for a, k in enumerate(mask)}
+
+
 def build_targets(boxes_list, labels_list, anchors_px, head_list, grid_sizes, ref=ANCHOR_REF):
     """Cibles de chaque tête pour un lot.
 
@@ -100,19 +131,12 @@ def build_targets(boxes_list, labels_list, anchors_px, head_list, grid_sizes, re
             owner[k] = (hid, a)
     for n, (boxes, labels) in enumerate(zip(boxes_list, labels_list)):
         boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
-        if len(boxes) == 0:
-            continue
-        # §5.1, 2 : ancre de meilleure IoU de forme parmi toutes les ancres de toutes les
-        # têtes ; l'échelle retenue est celle de l'ancre gagnante.
-        best = np.argmax(iou_wh(boxes[:, 2:4], anchors), axis=1)
-        for (gx, gy, gw, gh), label, k in zip(boxes, labels, best):
-            if k not in owner:
+        for (gx, gy, gw, gh), label, r in zip(boxes, labels,
+                                              responsible(boxes, anchors, owner, grid_sizes)):
+            if r is None:
                 continue
-            hid, a = owner[k]
+            k, hid, a, i, j = r
             sh, sw = grid_hw(grid_sizes[hid])
-            # §5.1, 1 : cellule qui contient le centre (g = 1 bornée à la dernière cellule).
-            j = min(int(np.floor(gx * sw)), sw - 1)
-            i = min(int(np.floor(gy * sh)), sh - 1)
             pw, ph = anchors[k]
             t = targets[hid]
             t["obj"][n, a, i, j] = True

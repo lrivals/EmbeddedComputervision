@@ -238,4 +238,4 @@ progress per milestone here.
 | M33 | 9 | 6 (T33.0-T33.5: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴, v5 decoding and evaluation (COCO 28.1 AP at 640, published 28.0), targets; T33.6 loss and T33.7 recipe written, waiting for the torch loss fixture and the VOC run (≈ 6 CPU days); T33.8 integer chain open) |
 | M34 | 6 | 2 (T34.0 layer table and weights, T34.1 route / stride-1 pool backward; T34.2 COCO 34.3 AP at 416 against the published 35.2, gap open; T34.3 OTA loss and T34.4 training written, waiting for the torch fixture and the VOC run (≈ 10 CPU days); T34.5 open) |
 | M35 | 8 | 0 |
-| M36 | 12 | 0 |
+| M36 | 12 | 2 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |

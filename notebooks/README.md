@@ -10,6 +10,8 @@ Analyse : [analyse_balayages.ipynb](analyse_balayages.ipynb) compare les balayag
 
 Dataset analysis: [analyse_jeux.ipynb](analyse_jeux.ipynb) compares the dataset statistics of all datasets (reads the executed `_stats` notebooks, no data or GPU).
 
+Decision explanation: [explain.ipynb](explain.ipynb) runs `tools/explain.py` (maps, integer attribution, miss causes, M36).
+
 | Jeu | Modèle | Rôle | Palier | Prérequis | Colab |
 |---|---|---|---|---|---|
 | voc | [voc](voc/voc_stats.ipynb) | statistiques du jeu | R/M | données : `data/VOCdevkit/VOC2007/ImageSets/Main/test.txt` (tools/get_voc.sh) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main/notebooks/voc/voc_stats.ipynb) |
