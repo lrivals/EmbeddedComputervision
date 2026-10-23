@@ -177,10 +177,10 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
     - gradcheck ≤ 1e-7 of the OTA loss through the three heads of the real network,
       every matched cell plus others, with the assignment, IoU targets and CIoU α held
       fixed (`targets_from`).
-  - **Not done**: the comparison of the OTA loss with a torch reference value
-    (`ComputeLossOTA` of the yolov7 repo). The non-OTA path is checked: `yolo_v5_loss`
-    equals the YOLOv5 `ComputeLoss` to 6·10⁻¹⁷ on the `weights/m33/yolov5n_loss.npz` fixture
-    (T33.6, 2026-10-22).
+  - **Not done**: the comparison with a torch reference value. The v5 loss equals an
+    element-by-element reference loop to 1e-10, and the torch fixture test
+    (`weights/m33/yolov5n_loss.npz`) is skipped until that file is made by the throwaway
+    torch script.
 
 ### [ ] T34.4 — Training
 - **Spec**: §7 · **Depends on**: T34.3, T33.7 · **Size**: M

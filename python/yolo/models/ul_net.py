@@ -1,4 +1,4 @@
-"""Trainable Ultralytics networks (YOLOv5n T33.3, YOLOv8n T35.3), BN kept unfused, no torch.
+"""Trainable Ultralytics networks (YOLOv5n, T33.3), BN kept unfused, no torch.
 
 The description of `yolo.models.ul_yaml` runs in the generic `yolo.models.graph.Network`
 (forward, backward with gradient accumulation, train / eval BN). Ultralytics BN conventions:
@@ -22,7 +22,7 @@ from yolo.quant.fuse_bn import fuse_bn
 BN_EPS = 1e-3
 BN_MOMENTUM = 0.97  # keep factor: PyTorch momentum 0.03
 WEIGHTS = Path(__file__).resolve().parents[3] / "weights" / "ultralytics"
-PRETRAINED = {"yolov5n-coco": "yolov5n.pt", "yolov8n-coco": "yolov8n.pt"}
+PRETRAINED = {"yolov5n-coco": "yolov5n.pt"}
 UL_FIELDS = ("type", "from", "k", "s", "p", "cin", "cout", "act", "start", "stop")
 
 

@@ -1,4 +1,4 @@
-"""T33.1, T35.0: network description from the Ultralytics YAML."""
+"""T33.1: network description from the Ultralytics YAML."""
 
 import copy
 import json
@@ -58,51 +58,6 @@ def test_macs():
     assert macs(net, 640) == pytest.approx(2.25e9, rel=0.01)
     assert macs(net, 640) == 2_234_060_800
     assert macs(net, 416) == 943_890_688
-
-
-def test_yolov8n_architecture():
-    """Table of M35: C2f repeats 1-2-2-1 (shortcut) then 1 ×4 (none), decoupled heads of
-    64 + 80 channels, widths 64 / 80 of the box / class branches."""
-    net = NETWORKS["yolov8n-coco"]
-    layers = net["layers"]
-    assert net["head"] == "dfl" and net["reg_max"] == 16
-    assert sum(1 for layer in layers if layer["type"] == "add") == 1 + 2 + 2 + 1
-    assert sum(1 for layer in layers if layer["type"] == "slice") == 2 * 8
-    shapes = infer_shapes(net)
-    assert [shapes[j][1] for j in net["outputs"]] == [(144, 80, 80), (144, 40, 40),
-                                                      (144, 20, 20)]
-    by_name = {layer.get("name"): layer for layer in layers}
-    assert by_name["model.22.cv2.0.0"]["cout"] == 64 and by_name["model.22.cv3.0.0"]["cout"] == 80
-    assert by_name["model.22.cv2.2.2"] == {
-        "type": "conv", "from": by_name_index(layers, "model.22.cv2.2.1"), "k": 1, "s": 1,
-        "p": 0, "cin": 64, "cout": 64, "act": "linear", "bn": False, "name": "model.22.cv2.2.2"}
-    assert by_name["model.21.cv2"]["cin"] == 3 * 128 and by_name["model.21.cv2"]["cout"] == 256
-
-
-def by_name_index(layers, name):
-    return next(i for i, layer in enumerate(layers) if layer.get("name") == name)
-
-
-def test_yolov8n_macs():
-    """8.7 GFLOPs at 640 (published) = 4.35 GMAC ± 1 %; 416 value recorded."""
-    net = NETWORKS["yolov8n-coco"]
-    assert macs(net, 640) == pytest.approx(4.35e9, rel=0.01)
-    assert macs(net, 640) == 4_371_456_000
-    assert macs(net, 416) == 1_846_940_160
-
-
-def test_yolov8n_checkpoint_meta():
-    """Strides and the 80 COCO class names come from the checkpoint (T35.0)."""
-    pt = CHECKPOINTS / "yolov8n.pt"
-    if not pt.exists():
-        pytest.skip("official weights absent (M33 step 0)")
-    from yolo.io.torch_pickle import load_checkpoint
-
-    sd, meta = load_checkpoint(pt)
-    assert [float(s) for s in meta["stride"]] == [8.0, 16.0, 32.0]
-    names = meta["names"]
-    assert len(names) == 80 and names[0] == "person" and names[79] == "toothbrush"
-    assert "model.22.dfl.conv.weight" in sd
 
 
 def test_classes():

@@ -1,4 +1,4 @@
-# COCO val2017 AP (T11.1, T24.2, T24.5, T33.4, T34.2, T35.3)
+# COCO val2017 AP (T11.1, T24.2, T24.5, T33.4, T34.2)
 
 COCO val2017 (5,000 images, 36,781 objects), Darknet weights, 416×416 input, confidence
 threshold 0.005, per-class NMS 0.45, COCO metric (101-point interpolation, `iscrowd`
@@ -79,19 +79,6 @@ YOLOv7-tiny-SiLU, another network.
   conversion of the PyTorch `yolov7-tiny.pt` evaluated in the paper; and the paper's
   `test.py` uses rectangular batches (letterbox to the smallest multiple of 32, pad 0.5)
   where this evaluation uses a square letterbox.
-
-## YOLOv8n, YOLOv8 protocol (T35.3)
-
-The protocol above with NMS at IoU 0.7 (the Ultralytics validation of YOLOv8), on the
-official `yolov8n.pt` (v8.2.0) read without torch:
-
-```
-python tools/eval_voc.py --net yolov8n-coco --dataset coco --preset v8 --size 640
-```
-
-Not measured yet: the full split is a CPU run of about 45 min per size
-([long-runs.md](../docs/tasks/long-runs.md)). The published value is 37.3 AP at 640
-(Ultralytics README, val2017).
 
 ## YOLOv4-tiny: float, integer, FPGA C-sim (T24.5)
 

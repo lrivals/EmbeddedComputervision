@@ -1,5 +1,5 @@
-"""Training / fine-tuning of YOLOv5n, YOLOv7-tiny or YOLOv8n in NumPy with the YOLOv5 recipe
-(T33.7, T34.4) and its YOLOv8 settings (T35.6).
+"""Training / fine-tuning of YOLOv5n or YOLOv7-tiny in NumPy with the YOLOv5 recipe
+(T33.7, T34.4).
 
     # YOLOv5n on VOC from its COCO weights (heads reinitialized), 640, 30 epochs
     python tools/train_v5.py --net yolov5n-voc --init coco --epochs 30 \\
@@ -7,24 +7,14 @@
     # YOLOv7-tiny on VOC from its Darknet COCO weights, OTA loss (hyp.scratch.tiny.yaml)
     python tools/train_v5.py --net tiny-yolov7-voc --init coco --epochs 30 \\
         --out build/train/tiny-yolov7-voc
-    # YOLOv8n on VOC from its COCO weights: v8 loss (TAL, BCE + CIoU + DFL), optimizer=auto,
-    # mosaic off for the last 10 epochs
-    python tools/train_v5.py --net yolov8n-voc --init coco --epochs 30 \\
-        --out build/train/yolov8n-voc
     # resume
     python tools/train_v5.py --net tiny-yolov7-voc --out build/train/tiny-yolov7-voc --resume
 
-`--net`: an Ultralytics name `<arch>-<dataset>` (`yolov5n-voc`, `yolov8n-voc`,
-`ul_net.description`) or a
+`--net`: an Ultralytics name `<arch>-<dataset>` (`yolov5n-voc`, `ul_net.description`) or a
 YOLOv7-tiny one, `tiny-yolov7-<dataset>`, whose cfg is made from `yolov7-tiny.cfg` with the
 classes of the dataset (`tools/make_cfg.py`, written to `<out>/net.cfg`). `--init coco`
 copies the COCO weights except the layers of a different shape (the heads), whose biases
 get the prior of the reference (`init_head_biases`).
-
-YOLOv8 settings (`--net yolov8n-*`): `--optimizer auto` by default, the rule of the reference
-(`optim.auto_optimizer`: AdamW at lr0 0.002·5/(4 + C) for at most 10,000 optimizer steps,
-else SGD at 0.01; no bias warmup), printed and written to `<out>/optimizer.txt`; mosaic
-off for the last `--close-mosaic 10` epochs (a second loader from that iteration on).
 
 Outputs in `--out`: `checkpoint.npz` (exact resume), `loss.csv`, and the EMA weights:
 `final.npz` (torch-named state dict, read by `tools/eval_voc.py --net yolov5n-voc
@@ -48,7 +38,7 @@ from yolo.io.darknet_weights import load_darknet_weights, save_darknet_weights  
 from yolo.models import ul_net  # noqa: E402
 from yolo.models.tiny_yolo import CFG_DIR, CFG_FILES, PRETRAINED, build  # noqa: E402
 from yolo.train.loss_v5 import HYP_V5, HYP_V7_TINY  # noqa: E402
-from yolo.train.optim import AdamWGroups, SGDGroups, auto_optimizer  # noqa: E402
+from yolo.train.optim import SGDGroups  # noqa: E402
 from yolo.train.schedule import V5Schedule  # noqa: E402
 from yolo.train.trainer import copy_matching  # noqa: E402
 from yolo.train.trainer_v5 import TrainerV5, init_head_biases  # noqa: E402
@@ -99,13 +89,8 @@ def main():
     ap.add_argument("--lrf", type=float, default=0.01)
     ap.add_argument("--cos", action="store_true", help="one-cycle cosine instead of linear")
     ap.add_argument("--warmup-epochs", type=float, default=3.0)
-    ap.add_argument("--optimizer", choices=("sgd", "adamw", "auto"), default=None,
-                    help="default: auto for yolov8n (T35.6), sgd otherwise")
-    ap.add_argument("--close-mosaic", type=int, default=None,
-                    help="last epochs without mosaic; default: 10 for yolov8n, 0 otherwise")
     ap.add_argument("--hyp", choices=("v5", "v7-tiny"), default=None,
-                    help="loss hyperparameters; default: v7-tiny (OTA) for tiny-yolov7, "
-                         "the v8 loss for yolov8n")
+                    help="loss hyperparameters; default: v7-tiny (OTA) for tiny-yolov7")
     ap.add_argument("--no-ota", action="store_true", help="v7-tiny without OTA")
     ap.add_argument("--no-mosaic", action="store_true")
     ap.add_argument("--no-ema", action="store_true")
@@ -127,7 +112,6 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     net, cfg, coco = build_net(args.net, args.out, dtype, args.seed)
     v7 = cfg is not None
-    v8 = net.net.get("head") == "dfl"
     if not args.resume and args.init == "coco":
         skipped = copy_matching(coco(), net)
         init_head_biases(net, layers=skipped, img_size=args.size)
@@ -141,35 +125,16 @@ def main():
     samples = datasets.remap(samples, datasets.class_lut(dataset, net.net["classes"]))
     if args.subset:
         samples = samples[:args.subset]
-    def make_loader(mosaic):
-        return DataLoader(V5Dataset(samples, hyp=None if mosaic else {"mosaic": 0.0}),
-                          args.batch, workers=args.workers, seed=args.seed)
-
-    loader = make_loader(not args.no_mosaic)
+    loader = DataLoader(V5Dataset(samples, hyp={"mosaic": 0.0} if args.no_mosaic else None),
+                        args.batch, workers=args.workers, seed=args.seed)
     print(f"{len(samples)} images, {len(loader)} batches per epoch")
 
-    if v8 and args.hyp is None:
-        hyp = None  # HYP_V8, set by TrainerV5 from the head
-    else:
-        hyp = HYP_V7_TINY if (args.hyp or ("v7-tiny" if v7 else "v5")) == "v7-tiny" else HYP_V5
-        if args.no_ota:
-            hyp = {**hyp, "ota": False}
-    name = args.optimizer or ("auto" if v8 else "sgd")
-    lr0, momentum, warmup_bias_lr = args.lr0, 0.937, 0.1
-    if name == "auto":
-        name, lr0, momentum = auto_optimizer(net.net["classes"], len(samples), args.epochs,
-                                             args.batch)
-        warmup_bias_lr = 0.0
-    if name == "adamw":
-        momentum = 0.9  # β1 of the reference AdamW
-        optimizer = AdamWGroups(net.params, momentum=momentum, weight_decay=5e-4)
-    else:
-        optimizer = SGDGroups(net.params, momentum=momentum, weight_decay=5e-4)
-    used = f"optimizer {name}, lr0 {lr0:g}, momentum {momentum:g}, warmup_bias_lr {warmup_bias_lr:g}"
-    print(used)
-    (args.out / "optimizer.txt").write_text(used + "\n")
-    schedule = V5Schedule(lr0, args.epochs, len(loader), lrf=args.lrf, cos=args.cos,
-                          warmup_epochs=args.warmup_epochs, warmup_bias_lr=warmup_bias_lr)
+    hyp = HYP_V7_TINY if (args.hyp or ("v7-tiny" if v7 else "v5")) == "v7-tiny" else HYP_V5
+    if args.no_ota:
+        hyp = {**hyp, "ota": False}
+    optimizer = SGDGroups(net.params, momentum=0.937, weight_decay=5e-4)
+    schedule = V5Schedule(args.lr0, args.epochs, len(loader), lrf=args.lrf, cos=args.cos,
+                          warmup_epochs=args.warmup_epochs)
     trainer = TrainerV5(net, optimizer, schedule, size=args.size, seed=args.seed,
                         log_path=args.out / "loss.csv", hyp=hyp, ema=not args.no_ema,
                         batch=args.batch)
@@ -180,24 +145,13 @@ def main():
 
     def report(tr, res, lr):
         n = args.batch
-        parts = " ".join(f"{k} {res.parts[k] / n:.4f}" for k in tr.parts)
-        print(f"it {tr.it:6d}  lr {lr:.2e}  loss {res.total / n:8.4f}  {parts}", flush=True)
+        p = {k: v / n for k, v in res.parts.items()}
+        print(f"it {tr.it:6d}  lr {lr:.2e}  loss {res.total / n:8.4f}  box {p['box']:.4f} "
+              f"obj {p['obj']:.4f} cls {p['cls']:.4f}", flush=True)
 
     iters = args.iters or args.epochs * len(loader)
-    close = args.close_mosaic if args.close_mosaic is not None else (10 if v8 else 0)
-    phases = [(loader, iters)]
-    if close and not args.no_mosaic:
-        last = min(iters, max(args.epochs - close, 0) * len(loader))
-        phases = [(loader, last), (None, iters)]
     try:
-        for i, (ld, until) in enumerate(phases):
-            if ld is None:
-                loader.close()
-                loader = ld = make_loader(False)
-                print(f"mosaic off from iteration {trainer.it} (last {close} epochs)")
-            if trainer.it < until:
-                trainer.fit(ld, until, checkpoint=ckpt, save_every=args.save_every,
-                            callback=report)
+        trainer.fit(loader, iters, checkpoint=ckpt, save_every=args.save_every, callback=report)
     finally:
         loader.close()
     final = trainer.ema.swapped(net) if trainer.ema is not None else _same(net)

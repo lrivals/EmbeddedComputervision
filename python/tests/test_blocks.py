@@ -1,5 +1,4 @@
-"""T33.2, T35.1, T35.2: YOLOv5 / YOLOv8 blocks, gradcheck of every block and parameter
-(float64, small sizes)."""
+"""T33.2: YOLOv5 blocks, gradcheck of every block and parameter (float64, small sizes)."""
 
 import numpy as np
 import pytest
@@ -24,28 +23,6 @@ def c3_params(c1, c2, n, rng):
     for j in range(n):
         _conv_params(p, f"m.{j}.cv1.", ch, ch, 1, rng)
         _conv_params(p, f"m.{j}.cv2.", ch, ch, 3, rng)
-    return p
-
-
-def c2f_params(c1, c2, n, rng):
-    p, c = {}, c2 // 2
-    _conv_params(p, "cv1.", c1, 2 * c, 1, rng)
-    _conv_params(p, "cv2.", (2 + n) * c, c2, 1, rng)
-    for j in range(n):
-        _conv_params(p, f"m.{j}.cv1.", c, c, 3, rng)
-        _conv_params(p, f"m.{j}.cv2.", c, c, 3, rng)
-    return p
-
-
-def detect_v8_params(chs, nc, rng, reg_max=4):
-    p = {}
-    cb, cc = max(16, chs[0] // 4, reg_max * 4), max(chs[0], min(nc, 100))
-    for lv, c in enumerate(chs):
-        for br, cm, cout in (("cv2", cb, 4 * reg_max), ("cv3", cc, nc)):
-            _conv_params(p, f"{br}.{lv}.0.", c, cm, 3, rng)
-            _conv_params(p, f"{br}.{lv}.1.", cm, cm, 3, rng)
-            p[f"{br}.{lv}.2.W"] = rng.standard_normal((cout, cm, 1, 1)) / np.sqrt(cm)
-            p[f"{br}.{lv}.2.b"] = rng.standard_normal(cout) * 0.1
     return p
 
 
@@ -86,47 +63,6 @@ def test_c3(n, shortcut):
     x = rng.standard_normal((2, 6, 8, 8))
     _check(lambda x, p: blocks.c3_forward(x, p, state, n=n, shortcut=shortcut),
            blocks.c3_backward, x, p)
-
-
-@pytest.mark.parametrize("n", [1, 2])
-@pytest.mark.parametrize("shortcut", [True, False])
-@pytest.mark.parametrize("train", [True, False])
-def test_c2f(n, shortcut, train):
-    """T35.1: x and every W, γ, β; y_1 is read by the concat and the first bottleneck."""
-    rng = np.random.default_rng(10 + n)
-    p, state = c2f_params(6, 8, n, rng), {}
-    x = rng.standard_normal((2, 6, 6, 6))
-    if not train:
-        blocks.c2f_forward(x, p, state, n=n, shortcut=shortcut)  # running statistics
-    _check(lambda x, p: blocks.c2f_forward(x, p, state, n=n, shortcut=shortcut, train=train),
-           blocks.c2f_backward, x, p)
-
-
-@pytest.mark.parametrize("train", [True, False])
-def test_detect_v8(train):
-    """T35.2: two levels (the second at half resolution), box and class branches."""
-    rng = np.random.default_rng(13)
-    chs, nc = (4, 8), 3
-    p, state = detect_v8_params(chs, nc, rng), {}
-    x = rng.standard_normal((2, 4, 6, 6))
-    x2 = rng.standard_normal((2, 8, 3, 3))
-    if not train:
-        blocks.detect_v8_forward([x, x2], p, state)
-
-    def fwd(x, p):
-        outs, cache = blocks.detect_v8_forward([x, x2], p, state, train=train)
-        return np.concatenate([o.ravel() for o in outs]), ([o.shape for o in outs], cache)
-
-    def bwd(dy, cache):
-        shapes, c = cache
-        sizes = np.cumsum([np.prod(s) for s in shapes])[:-1]
-        douts = [d.reshape(s) for d, s in zip(np.split(dy, sizes), shapes)]
-        dxs, grads = blocks.detect_v8_backward(douts, c)
-        return dxs[0], grads
-
-    _check(fwd, bwd, x, p)
-    outs, _ = blocks.detect_v8_forward([x, x2], p, state, train=train)
-    assert [o.shape for o in outs] == [(2, 16 + nc, 6, 6), (2, 16 + nc, 3, 3)]
 
 
 def test_sppf():
