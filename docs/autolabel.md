@@ -135,6 +135,12 @@ by the size of the image **after** the EXIF transpose (the size a viewer shows).
 Labeller errors become training targets: review at least the "needs review" images, and
 keep a hand-checked val split to measure what a model trained on auto-labels is worth.
 
+**Industrial footage.** For factory CCTV (`person` only), the labeller and threshold come
+from T41.2 ([tasks/M41-safe-unsafe-behaviours.md](tasks/M41-safe-unsafe-behaviours.md)),
+measured on PREWID, whose boxes are hand-made; until then use the ground-level default
+(`grounding-dino-tiny`, 0.55). Video clips are cut into frames first, with the sampling
+rules of T41.1.
+
 ## 7. Troubleshooting
 
 | Symptom | Cause, fix |

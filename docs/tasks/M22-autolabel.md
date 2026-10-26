@@ -30,6 +30,9 @@ What remains:
 - Tiling for aerial images (T22.10), before any aerial set is labelled.
 - TrashNet and Oxford-IIIT Pet (T22.11 ranks 2 and 3) are planned in
   [M32](M32-trashnet-pets.md).
+- Industrial footage: [M41](M41-safe-unsafe-behaviours.md) labels factory CCTV frames
+  (`person`) after a check on PREWID (T41.2); [M42](M42-soda.md) and
+  [M43](M43-construction-ppe.md) use the labeller to find unboxed workers.
 - The editor's mouse interactions (draw, move, resize, delete a box) were only exercised
   through `gradio_client`; they are still to be tried by hand in a browser.
 

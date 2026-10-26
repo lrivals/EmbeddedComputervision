@@ -14,7 +14,9 @@ the time, and they are where false alarms are counted.
 
 M27 says the literature has "no industrial person dataset", and T27.6 waits for the ARCYS
 site images. PREWID is the public stand-in until those arrive; the ARCYS images later go
-through the same loader slot.
+through the same loader slot. Three complementary sets follow the same chain:
+[M41](M41-safe-unsafe-behaviours.md) (factory CCTV, auto-labelled), [M42](M42-soda.md)
+(construction sites) and [M43](M43-construction-ppe.md) (persons and PPE).
 
 | What it tests | Why |
 |---|---|
@@ -346,7 +348,7 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
 
 ## Out of scope
 
-- PPE classes (helmet, vest, gloves): PREWID has none. A PPE set would be a later milestone.
+- PPE classes (helmet, vest, gloves): PREWID has none; see [M43](M43-construction-ppe.md).
 - Tracking and re-identification of workers across frames or cameras.
 - Pose, segmentation, action recognition.
 - Training on the mp4 frames beyond the 3,000 already extracted.

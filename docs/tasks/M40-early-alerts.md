@@ -35,6 +35,9 @@ earlier. Outside the base of the spec.
     positive, final negative): no early negative removes a final detection;
   - person AP of the detector with and without the heads (cost of the extra loss).
 - **Notes**: the presence target can be per image or per zone of the grid; start per image.
+  Per behaviour class, the auto-labelled factory clips of
+  [M41](M41-safe-unsafe-behaviours.md) (T41.9) say which unsafe situations the heads flag
+  early; they are not used for the alarm rate.
 
 ### [ ] T40.1 — Time to first suspicion
 - **Spec**: §10.3 · **Depends on**: T40.0, T30.0 · **Runs on**: PC (perf_model) · **Size**: M
@@ -52,7 +55,7 @@ earlier. Outside the base of the spec.
   a fixed alarm rate on empty frames; empirical alarm rate on the test half within the
   finite-sample bound over 20 random splits; recall paid for it
 - **Notes**: PREWID empty frames ([M38](M38-prewid.md)) give the false-alarm side on
-  industrial footage.
+  industrial footage; the M41 clips are selected around behaviours and are not used here.
 
 ### [ ] T40.3 — Temporal bound with early heads
 - **Spec**: §10.3 · **Depends on**: T40.1, T30.0 · **Runs on**: PC · **Size**: S

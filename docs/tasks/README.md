@@ -50,6 +50,9 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M38](M38-prewid.md) | PREWID industrial workers (optional) | PREWID (CC BY 4.0) in the dataset chain with a time split and empty frames kept; out-of-domain and fine-tuned person AP; the M27 metrics (miss rate at fixed FPPI, per distance and camera, on sequences) on industrial footage |
 | [M39](M39-failure-prediction.md) | Learned failure prediction (optional) | failure labels; a head trained to predict the missed person, post-hoc then jointly with the detector, against the M29 monitors and KGFP; at the three stages and in the HLS kernel |
 | [M40](M40-early-alerts.md) | Conservative early alerts (optional) | intermediate presence heads whose positive raises the alert and whose negative cancels nothing; time to first suspicion and its static bound, conformal thresholds |
+| [M41](M41-safe-unsafe-behaviours.md) | Safe and Unsafe Behaviours (optional) | factory CCTV clips cut into image sequences (sampling without near-duplicates or missed events), `person` boxes from the M22 labeller checked on PREWID and by hand; missed workers per behaviour class |
+| [M42](M42-soda.md) | SODA construction sites (optional) | boxed workers and machines from many sites, licence checked first; annotation completeness by the M22 labeller; cross-domain transfer with PREWID |
+| [M43](M43-construction-ppe.md) | Construction-PPE (optional) | small YOLO set of persons and PPE (AGPL-3.0); person fine-tuning and transfer to PREWID; first PPE detector |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -164,12 +167,28 @@ graph LR
   M29 -.-> M40
   M39 -.-> M31
   M40 -.-> M31
+  M11 --> M41[M41]
+  M16 --> M41
+  M22 --> M41
+  M38 -.-> M41
+  M27 -.-> M41
+  M41 -.-> M40
+  M11 --> M42[M42]
+  M16 --> M42
+  M38 -.-> M42
+  M27 -.-> M42
+  M11 --> M43[M43]
+  M16 --> M43
+  M38 -.-> M43
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
   six gaps between YOLO on FPGA and ML safety. M25 gains T25.6-T25.8 for the same reason.
 - **M39-M40 (axis 1 of the thesis draft)**: learned failure prediction and conservative
   early alerts; T25.9, T25.10, T27.7 and T30.4 come from the same draft.
+- **M41-M43 (industrial person sets)**: complements to PREWID (M38) from a dataset search
+  (2026-10-26); M41 has no box and is labelled by M22, M42 and M43 have boxes and use M22
+  as a completeness check.
 
 ### Where the safety tasks run (M25, M27-M31, M39-M40)
 
@@ -268,3 +287,6 @@ progress per milestone here.
 | M38 | 12 | 7 (T38.0-T38.6: data chain with empty and worker frames cut apart, 7,003 frames, 0 CSV disagreement; loader with per-camera splits; notebooks, stats, Drive; out-of-domain person AP50 on test: v4-tiny 89.9, v7-tiny 89.7, v3-tiny 63.7, v2-tiny 25.5, CAM2 worst; T38.7 GPU and T38.8-T38.10 waiting for M27) |
 | M39 | 7 | 0 |
 | M40 | 4 | 0 |
+| M41 | 10 | 0 |
+| M42 | 8 | 0 |
+| M43 | 7 | 0 |
