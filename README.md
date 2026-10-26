@@ -25,7 +25,7 @@ Details: [docs/architecture.md](docs/architecture.md) · conventions:
 
 ## Work plan
 
-The work is split into milestones M0 to M36 in [docs/tasks/](docs/tasks/README.md). Each
+The work is split into milestones M0 to M40 in [docs/tasks/](docs/tasks/README.md). Each
 task gives the section of the spec, its dependencies, its deliverables and a measurable
 acceptance criterion. What needs Vitis/Vivado or the KV260, not available yet, is put aside
 in [docs/tasks/deferred/](docs/tasks/deferred/README.md), with the order in which to pick it
@@ -69,6 +69,16 @@ up once the tools and the board are there.
   person missed (gradient, perturbation and exact integer attributions at the three
   stages, miss causes, concepts), how the choices form during training (recorder, CKA), a
   `make explain` viewer and an on-chip CAM.
+- **[M37](docs/tasks/M37-notebooks-recent-models.md)**: COCO and VOC notebooks of YOLOv5n,
+  YOLOv7-tiny and YOLOv8n, from the M14 generator.
+- **[M38](docs/tasks/M38-prewid.md)**: PREWID, industrial workers (CC BY 4.0), in the
+  dataset chain; out-of-domain person AP and the M27 safety metrics on industrial footage.
+- **[M39](docs/tasks/M39-failure-prediction.md)**: learned failure prediction: a head
+  trained to predict the missed person, post-hoc then jointly with the detector, compared
+  with the M29 monitors and KGFP, at the three stages and in the HLS kernel.
+- **[M40](docs/tasks/M40-early-alerts.md)**: conservative early alerts: intermediate
+  presence heads whose positive raises the alert and whose negative cancels nothing, with
+  a static bound on the time to the first suspicion.
 
 ## Layout
 

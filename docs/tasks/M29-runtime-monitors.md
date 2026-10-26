@@ -52,6 +52,8 @@ to T29.3 wait for the person metrics of M27.
   the operating point"; share of the missed persons flagged at a fixed alarm rate (1 %,
   5 %); recall of the system "detector or monitor alarm" against the detector alone
 - **Notes**: an OOD score can be good at OOD and blind to in-domain misses: report both.
+  The learned monitor of [T39.1](M39-failure-prediction.md) uses the same protocol, to be
+  compared row by row.
 
 ### [ ] T29.2 — Conformal threshold for persons
 - **Spec**: §8.1 · **Depends on**: T27.2 · **Runs on**: PC · **Size**: M

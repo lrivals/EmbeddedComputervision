@@ -68,6 +68,21 @@ dominates (0.52 s). T30.1 co-sim, T30.2 and T30.3 need Vitis or the board.
 - **Spec**: §10.4 · **Depends on**: T30.2 · **Runs on**: board (KV260) · **Size**: M
 - **Deferred** (board): [deferred/M30](deferred/M30-latency-bound.md) — T30.3, deliverables and acceptance.
 
+### [ ] T30.4 — Reaction delay of the whole chain
+- **Spec**: §10.3, §10.4 · **Depends on**: T30.0, T40.3, T29.5 · **Size**: M
+  · **Runs on**: PC (model); board for the measurement
+- **Deliverables**: `tools/reaction_delay.py` (chain model); `results/latency_bound.md`
+  section
+- **Acceptance**: the chain acquisition → preprocessing → inference → monitor → decision →
+  alert modelled stage by stage, with the shared resources (DDR, ARM core) and each
+  assumption written; bound of the time to the first suspicion (early heads of
+  [M40](M40-early-alerts.md)) and of the maximum reaction time; which terms are proved
+  (T30.0), which are assumed (camera, transfers) and which wait for T30.2
+- **Notes**: Zhang 2025 (static WCET of CNN inference on an FPGA SoC with several DPUs, bus
+  arbitration and memory contention) is the reference for the inference part; add it to the
+  paper base (`bin/pdb`) before citing it.
+- **Deferred** (board): [deferred/M30](deferred/M30-latency-bound.md) — T30.4, reaction delay measured on the board.
+
 ## Dependencies
 
 ```mermaid
@@ -76,4 +91,8 @@ graph LR
   T912[T9.1.2] --> T300
   T81[T8.1] --> T302[T30.2] --> T303[T30.3]
   T300 --> T302
+  T300 --> T304[T30.4]
+  T403[T40.3] --> T304
+  T295[T29.5] --> T304
+  T302 -.-> T304
 ```

@@ -101,6 +101,22 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
   T27.1 and T27.3 end to end
 - **Notes**: waiting for site images from ARCYS; until then, PPE images from a public set
   (e.g. a hard-hat dataset) can stand in.
+  [M38](M38-prewid.md) brings PREWID (public, workers in legacy plants, person only) as
+  that stand-in; T38.8-T38.10 run T27.1, T27.3 and T27.4 on it.
+
+### [ ] T27.7 — Unflagged dangerous false negatives
+- **Spec**: §8.3 · **Depends on**: T27.2, T27.4, T29.1, T39.1 · **Runs on**: PC · **Size**: S
+- **Deliverables**: in `python/yolo/infer/metrics.py`: the unflagged-miss rate;
+  `results/person_safety.md` section
+- **Acceptance**:
+  - per person and per event (T27.4): number of persons missed by the detector **and** not
+    flagged by a monitor before the deadline, over the number of dangerous events;
+  - 95 % confidence interval (Clopper-Pearson) and the counts next to every rate;
+  - given for the detector alone, with each monitor of T29.1 and [T39.1](M39-failure-prediction.md),
+    and with the early alerts of [M40](M40-early-alerts.md) when available, at the same
+    alarm rate.
+- **Notes**: central metric of the thesis draft; the monitor coverage on the detector errors
+  and the false alarms per image are reported apart, never folded into it.
 
 ## Dependencies
 
@@ -111,4 +127,8 @@ graph LR
   T271 --> T273[T27.3]
   T270 --> T274[T27.4] --> T275
   T228[T22.8] --> T276[T27.6]
+  T272 --> T277[T27.7]
+  T274 --> T277
+  T291[T29.1] --> T277
+  T391[T39.1] --> T277
 ```

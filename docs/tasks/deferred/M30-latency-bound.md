@@ -25,3 +25,10 @@ run on the PC. Index: [README.md](README.md).
 - **Acceptance**: effect of Linux scheduling, DDR contention between the PS and the PL, and
   caches on the tail of T30.2, measured one by one; a variant (isolated core, `SCHED_FIFO`,
   locked memory, or bare metal) and its maximum; recommendation for the safety path.
+
+### [ ] T30.4 — Reaction delay measured on the board
+- **Condition**: Board · **Needs first**: T30.4 (PC model), T30.2, T40.1 (deferred)
+- **To do**: time from the frame capture to the alert output over 10⁵ frames, with and
+  without stress load; time to the first suspicion of the early heads.
+- **Acceptance**: every measured time ≤ the modelled bound of T30.4, or the assumption that
+  failed is named.

@@ -23,7 +23,7 @@ engineering, to be cited from the dependability literature when written up.
   - T25.3 ABFT lane in the HLS kernel and T25.7 faults in the HLS buffers, in C-sim
     ([results/faults.md](../../results/faults.md)).
 - **Tooling ready, campaign to run**: T25.1 (`tools/m25.sh`).
-- **Remaining**: T25.4, T25.6 and T25.8; the synthesis costs are deferred.
+- **Remaining**: T25.4, T25.6, T25.8, T25.9 and T25.10; the synthesis costs are deferred.
 
 ### [x] T25.0 — Fault model and injector
 - **Spec**: §9.3 · **Depends on**: T4.5 · **Runs on**: PC · **Size**: M
@@ -154,6 +154,30 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
   detected by the temporal vote of [T29.3](M29-runtime-monitors.md), by the ABFT of T25.2,
   and by both; false alarms of the temporal check without faults
 
+The two tasks below come from the thesis draft (ARCYS, 2026-10): a learned monitor
+([M39](M39-failure-prediction.md)) shares the chip with the detector, and the draft separates
+three families of dreaded events (perception error, execution anomaly, missed deadline).
+
+### [ ] T25.9 — Faults in the failure monitor
+- **Spec**: §9.3 · **Depends on**: T25.0, T39.1 · **Runs on**: PC · **Size**: S
+- **Deliverables**: fault sites on the failure head of [T39.1](M39-failure-prediction.md)
+  (weights, activations, accumulators) in `faults.py`; section in `results/faults.md`
+- **Acceptance**: per site and bit, the share of faults that **silence** the monitor (an
+  image flagged without fault is no longer flagged) and the share that raise a false alarm;
+  share of the silencing faults caught by the ABFT of T25.2 when the head is a conv
+- **Notes**: CoDANN II gives the monitor the same assurance level as the function it
+  watches; a monitor that fails silent is the case to measure.
+
+### [ ] T25.10 — Three families of dreaded events
+- **Spec**: §8.3 · **Depends on**: T25.2, T29.1, T29.5 · **Runs on**: PC · **Size**: M
+- **Deliverables**: section in `results/faults.md`, reused by [T31.1](M31-assurance-case.md)
+- **Acceptance**: one table, rows = mechanisms (max-score and learned monitors, ABFT,
+  temporal vote, watchdog), columns = event families (perception error without fault,
+  execution anomaly from the injections of T25.1 / T25.6, missed deadline from a delayed
+  frame in `sw-sim`); each cell = share of the events of the family detected, with counts
+- **Notes**: shows, with numbers, that an uncertainty monitor does not see a corrupted
+  computation and that the ABFT does not see a missed person.
+
 ## Dependencies
 
 ```mermaid
@@ -166,4 +190,9 @@ graph LR
   T270[T27.0] --> T256
   T250 --> T257[T25.7]
   T293[T29.3] --> T258
+  T250 --> T259[T25.9]
+  T391[T39.1] --> T259
+  T252 --> T2510[T25.10]
+  T291[T29.1] --> T2510
+  T295[T29.5] --> T2510
 ```

@@ -22,7 +22,7 @@ here: they stay in their milestone files.
 
 ```mermaid
 graph LR
-  T60["T6.0 install Vitis/Vivado"] --> SYN["syntheses: T6.1-T6.3, T9.1.2, T9.2.4,<br/>T9.3.5, T10.1-T10.4, T10.10, M23, T25.3-4, T29.4"]
+  T60["T6.0 install Vitis/Vivado"] --> SYN["syntheses: T6.1-T6.3, T9.1.2, T9.2.4,<br/>T9.3.5, T10.1-T10.4, T10.10, M23, T25.3-4, T29.4, T39.6"]
   T60 --> T65["T6.5 co-sim, IP export"]
   SYN --> T1324[T13.24 figure]
   T65 --> REG["make check-regmap"] --> T71["T7.1 bitstream"]
@@ -39,6 +39,7 @@ graph LR
   T81 --> FIG["T13.12, T13.13, T13.22, T13.23"]
   BRD --> T303[T30.3]
   BRD --> T295[T29.5]
+  BRD --> T401["T40.1, T30.4 board rows"]
 ```
 
 The first useful step on a machine with Vitis is `make csim` (Vitis C-sim must equal
@@ -92,10 +93,13 @@ The first useful step on a machine with Vitis is `make csim` (Vitis C-sim must e
 | [M30](M30-latency-bound.md) | T30.1 | Vitis | co-sim cycles | [ ] |
 | | T30.2 | Board | end-to-end latency, p99.9 | [ ] |
 | | T30.3 | Board | non-determinism on the PS | [ ] |
+| | T30.4 | Board | reaction delay of the chain | [ ] |
 | [M35](M35-yolov8n.md) | T35.7 | Vitis | YOLOv8n convs in synthesis | [ ] |
 | | T35.7 | Board | YOLOv8n post-processing on the A53 | [ ] |
 | [M36](M36-explanation.md) | T36.10 | Vitis | on-chip CAM cost | [ ] |
 | | T36.10 | Board | CAM read on the board | [ ] |
+| [M39](M39-failure-prediction.md) | T39.6 | Vitis | failure head cost | [ ] |
+| [M40](M40-early-alerts.md) | T40.1 | Board | time to first suspicion | [ ] |
 
 ## Keeping this folder up to date
 

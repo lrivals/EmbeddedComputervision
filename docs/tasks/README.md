@@ -48,6 +48,8 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M36](M36-explanation.md) | Decision explanation (optional) | why a box is detected or a person missed: gradient, perturbation and exact integer attributions at the three stages, miss causes, concepts, training recorder and CKA, `make explain` viewer, on-chip CAM |
 | [M37](M37-notebooks-recent-models.md) | Notebooks of the recent models (optional) | COCO and VOC notebooks of YOLOv5n, YOLOv7-tiny and YOLOv8n: COCO inference, VOC out-of-domain inference, fine-tuning and fine-tuned inference, from the M14 generator |
 | [M38](M38-prewid.md) | PREWID industrial workers (optional) | PREWID (CC BY 4.0) in the dataset chain with a time split and empty frames kept; out-of-domain and fine-tuned person AP; the M27 metrics (miss rate at fixed FPPI, per distance and camera, on sequences) on industrial footage |
+| [M39](M39-failure-prediction.md) | Learned failure prediction (optional) | failure labels; a head trained to predict the missed person, post-hoc then jointly with the detector, against the M29 monitors and KGFP; at the three stages and in the HLS kernel |
+| [M40](M40-early-alerts.md) | Conservative early alerts (optional) | intermediate presence heads whose positive raises the alert and whose negative cancels nothing; time to first suspicion and its static bound, conformal thresholds |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -153,12 +155,23 @@ graph LR
   M16 --> M38
   M15 -.-> M38
   M27 -.-> M38
+  M27 --> M39[M39]
+  M29 --> M39
+  M28 -.-> M39
+  M38 -.-> M39
+  M39 --> M40[M40]
+  M30 --> M40
+  M29 -.-> M40
+  M39 -.-> M31
+  M40 -.-> M31
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
   six gaps between YOLO on FPGA and ML safety. M25 gains T25.6-T25.8 for the same reason.
+- **M39-M40 (axis 1 of the thesis draft)**: learned failure prediction and conservative
+  early alerts; T25.9, T25.10, T27.7 and T30.4 come from the same draft.
 
-### Where the safety tasks run (M25, M27-M31)
+### Where the safety tasks run (M25, M27-M31, M39-M40)
 
 Each task of these milestones has a **Runs on** field. **PC** = Python, C++ golden model
 and HLS C-sim compiled with gcc (`make csim-gcc`), no Xilinx tool. **PC + Vitis** = HLS
@@ -166,12 +179,14 @@ synthesis or co-sim (resources, exact cycles). **Board** = KV260 with the bitstr
 
 | Milestone | PC only | PC, Vitis for the exact cost | Board |
 |---|---|---|---|
-| M25 | T25.0, T25.1, T25.2, T25.5, T25.6, T25.7, T25.8 | T25.3, T25.4 | — |
-| M27 | T27.0-T27.6 (T27.6 waits for the ARCYS images) | — | — |
+| M25 | T25.0, T25.1, T25.2, T25.5, T25.6, T25.7, T25.8, T25.9, T25.10 | T25.3, T25.4 | — |
+| M27 | T27.0-T27.7 (T27.6 waits for the ARCYS images) | — | — |
 | M28 | T28.1, T28.2, T28.3, T28.4, T28.6 | T28.0 (co-sim row) | T28.5 (and the board row of T28.0) |
 | M29 | T29.0, T29.1, T29.2, T29.3, T29.5 (`sw-sim`) | T29.4 | final check of T29.5 |
-| M30 | T30.0 | T30.1 (co-sim cycles) | T30.2, T30.3 |
+| M30 | T30.0, T30.4 (model) | T30.1 (co-sim cycles) | T30.2, T30.3, T30.4 (measurement) |
 | M31 | T31.0-T31.5 | — | — |
+| M39 | T39.0-T39.5 (T39.2, T39.3 on Colab GPU) | T39.6 | — |
+| M40 | T40.0, T40.2, T40.3, T40.1 (bound) | — | T40.1 (measurement) |
 
 "PC, Vitis for the exact cost": the function and its byte-for-byte check run on the PC; only
 the LUT / DSP / BRAM numbers or the co-sim cycles need Vitis (`perf_model` gives an
@@ -237,12 +252,12 @@ progress per milestone here.
 | M22 | 12 | 11 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC and per-domain measurement: usable at ground level and in low light, not on aerial images; datasets to label ranked; T22.9 closing the loop remains) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
-| M25 | 9 | 5 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign to run) |
-| M26 | 6 | 2 (T26.1 offline converter: YOLOv5n / v8n NumPy == torch to 2·10⁻⁷; T26.2 integer SiLU table, Python == golden == HLS; T26.0 YOLOv7-tiny in progress) |
-| M27 | 7 | 0 |
+| M25 | 11 | 5 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign to run) |
+| M26 | 6 | 2 (T26.1 offline converter: YOLOv5n / v8n NumPy == torch to 2·10⁻⁷; T26.2 integer SiLU table, Python == golden == HLS; T26.0 YOLOv7-tiny in progress: float mAP and INT8 calibration done; float COCO mAP of v5n / v8n measured by M33 / M35, their integer and hardware stages open) |
+| M27 | 8 | 0 |
 | M28 | 7 | 6 (T28.0 matrix: per layer, fake-quant → integer ≤ 1 LSB, integer == golden == C-sim byte for byte on 20 images × 3 nets, co-sim and board rows pending; T28.1 Python == golden == HLS on 105.6 M swept accumulators, int32 leaky overflow found and fixed; T28.2 95 SMT obligations proved with z3; T28.3 traceability in `make ci`; T28.4 tool-chain risks and tool qualification; T28.6 NMS == golden, capacity and overflow properties hold, the unsorted NMS depends on the order of the cells) |
 | M29 | 6 | 1 (T29.0 six monitors on integer features: max score best on ExDark, activation patterns on FLIR; T29.1-T29.3 wait for M27) |
-| M30 | 4 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
+| M30 | 5 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 0 |
 | M32 | 14 | 3 (T32.4, T32.5: Oxford-IIIT Pet downloaded, whole-body boxes from the trimaps; T32.8 datasheets; TrashNet labelling, loaders, notebooks and fine-tuning open) |
 | M33 | 9 | 7 (T33.0-T33.6: torch-free `.pt` reader bit-exact on the official v5n / v8n, YAML parser, C3 / SPPF blocks with gradchecks, trainable YOLOv5n == torch to 4·10⁻¹⁴, v5 decoding and evaluation (COCO 28.1 AP at 640, published 28.0), targets, loss equal to the torch `ComputeLoss` to 6·10⁻¹⁷; T33.7 recipe written, waiting for the VOC run (≈ 6 CPU days); T33.8 integer chain open) |
@@ -251,3 +266,5 @@ progress per milestone here.
 | M36 | 12 | 2 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |
 | M37 | 7 | 1 |
 | M38 | 12 | 7 (T38.0-T38.6: data chain with empty and worker frames cut apart, 7,003 frames, 0 CSV disagreement; loader with per-camera splits; notebooks, stats, Drive; out-of-domain person AP50 on test: v4-tiny 89.9, v7-tiny 89.7, v3-tiny 63.7, v2-tiny 25.5, CAM2 worst; T38.7 GPU and T38.8-T38.10 waiting for M27) |
+| M39 | 7 | 0 |
+| M40 | 4 | 0 |

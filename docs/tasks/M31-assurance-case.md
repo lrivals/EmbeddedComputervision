@@ -27,6 +27,8 @@ M25 and M27 to M30.
   camera height, person distance and minimum height in pixels, lighting range, dust and
   fog, occlusion, posture, PPE, frame rate — each linked to a dataset or a degradation of
   [T27.3](M27-safety-metrics.md), or marked "not covered"
+- **Notes**: the target standard (IEC 61496 or another) is an expected input from ARCYS; it
+  is written at the top of the file, or "to be given by ARCYS".
 
 ### [ ] T31.1 — Hazard and safety requirements
 - **Spec**: — · **Depends on**: T31.0 · **Runs on**: PC · **Size**: S
@@ -34,7 +36,8 @@ M25 and M27 to M30.
 - **Acceptance**: dreaded event ("person in the zone, not reported during N frames, at
   distance ≤ d"); requirements with numbers and a verification method each: recall at
   FPPI, reaction time bound, monitor coverage, fault detection, behaviour at start-up and on
-  a missing frame
+  a missing frame; each requirement tied to one of the three event families of
+  [T25.10](M25-dependability.md) (perception error, execution anomaly, missed deadline)
 
 ### [ ] T31.2 — Map of the objectives to the evidence
 - **Spec**: — · **Depends on**: T31.1 · **Runs on**: PC · **Size**: M
@@ -45,11 +48,11 @@ M25 and M27 to M30.
   IEC 61496 / TS 61496-4-3 and ISO/IEC TR 5469 marked "to read" until the texts are read
 
 ### [ ] T31.3 — Dangerous failure rate budget
-- **Spec**: — · **Depends on**: T27.5, T29.1, T29.3, T25.4 · **Runs on**: PC · **Size**: M
+- **Spec**: — · **Depends on**: T27.5, T27.7, T29.1, T29.3, T25.4 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/failure_budget.py`; `results/failure_budget.md`
 - **Acceptance**: per hour, the contributions of model misses (T27.5), hardware faults
   (fault rate assumption × undetected share from M25), monitor coverage (T29.1) and temporal
-  vote (T29.3), combined with the independence assumptions written; result in orders of
+  vote (T29.3), unflagged misses (T27.7), combined with the independence assumptions written; result in orders of
   magnitude against SIL 1 to 3 / PL c to e; sensitivity to each assumption
 
 ### [ ] T31.4 — Assurance argument
@@ -78,5 +81,6 @@ graph LR
   T291[T29.1] --> T313
   T293[T29.3] --> T313
   T254[T25.4] --> T313
+  T277[T27.7] --> T313
   T315[T31.5]
 ```

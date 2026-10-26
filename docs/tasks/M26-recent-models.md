@@ -19,9 +19,16 @@ The from-scratch, torch-free versions (weight reading, backward passes, loss, tr
 [M33](M33-yolov5n.md) (YOLOv5n), [M34](M34-yolov7-tiny.md) (YOLOv7-tiny) and
 [M35](M35-yolov8n.md) (YOLOv8n); T26.0, T26.3 and T26.4 stay the inference and hardware view.
 
-**State** (2026-10-20): T26.0 in progress (SPP 5×5 stride-1 pool, `new_coords` heads,
-calibration). T26.1 (converter) and T26.2 (SiLU) done; the export, driver and engine wiring
-of SiLU layers comes with T26.3.
+**State** (2026-10-23):
+- **Done**: T26.1 (converter, torch-free since T33.0) and T26.2 (SiLU).
+- **T26.0** in progress: cfg, weights, float COCO mAP (T34.2) and the INT8 calibration
+  ([calibration_tiny-yolov7-coco.md](../../results/calibration_tiny-yolov7-coco.md)) are
+  done. The integer mAP, export, golden and C-sim are open.
+- **T26.3 / T26.4**: the float COCO mAP is measured by M33 (YOLOv5n, T33.4) and M35
+  (YOLOv8n, T35.3), see [map_coco.md](../../results/map_coco.md). The integer models,
+  export, golden, C-sim, the stride-2 convs and the DFL post-processing on the ARM are open.
+  The export, driver and engine wiring of SiLU layers comes with T26.3.
+- **T26.5** waits for T26.0, T26.3 and T26.4.
 
 ### [ ] T26.0 — YOLOv7-tiny
 - **Spec**: §3, §4.4, §10.3 · **Depends on**: T24.5 · **Size**: L
