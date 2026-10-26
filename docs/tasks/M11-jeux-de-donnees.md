@@ -92,7 +92,8 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   `tiny-yolov3-coco` in [map_coco.md](../../results/map_coco.md) (AP 16.7, AP50 37.2 in
   stretch; 33.1 published, gap discussed there). Remaining: integer and FPGA stages of
   `tiny-yolov3-coco`, and the VOC against COCO calibration study.
-- **Remaining**: download COCO (`tools/get_datasets.sh coco`), run the profiles, write
+- **Remaining**: the integer and FPGA C-sim stages (`tools/m11.sh coco-int | coco-calib |
+  coco-fpga`), the image-by-image comparison and the calibration study in
   `results/map_coco.md`.
 
 ### [ ] T11.2 — Domain shift without retraining
@@ -129,7 +130,8 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   - profile `tools/m11.sh exdark`;
   - optional fine-tuning: profiles `exdark-prep` and `exdark-train` (`train` split of
     `imageclasslist.txt`), notebooks `tiny-yolov3-exdark_{train,sweep,infer}` (T15.14).
-- **Remaining**: manual download of ExDark, measurements.
+- **Remaining**: the measurements (`tools/m11.sh exdark`); ExDark is in `data/exdark`
+  (images, `ExDark_Annno/`, `imageclasslist.txt`).
 
 ### [ ] T11.4 — KITTI 2D (automotive, non-square input)
 - **Spec**: §5.2, §10.2 · **Depends on**: T11.0, T2.8 · **Size**: L
@@ -233,7 +235,9 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   `person`): profiles `crowdhuman-prep` and `crowdhuman-train` (`annotation_train.odgt`
   and train images in `Images/`), notebooks `tiny-yolov3-crowdhuman_{train,sweep,infer}`
   (T15.14).
-- **Remaining**: the measurements (CrowdHuman is in place, Kaggle version).
+- **Remaining**: bring CrowdHuman back to the PC (`tools/get_datasets.sh pull crowdhuman`,
+  11 GB: `data/crowdhuman` is missing, the archive is only on the Drive), then the
+  measurements.
 
 ### [ ] T11.7 — FLIR ADAS (thermal, single channel)
 - **Spec**: §10.2 · **Depends on**: T11.0, T2.8 · **Size**: L

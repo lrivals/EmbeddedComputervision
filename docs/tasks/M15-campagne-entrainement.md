@@ -103,6 +103,10 @@ VisDrone (T15.8, T15.10, T15.15, T15.16): tooling ready, runs to start.
   2. `voc/tiny-yolov3-voc_infer`, same settings, **after** the sweep of T15.2: a single
      pass evaluates the 6 runs of the grid and the 4 seed runs (≈ 3 h 40 on CPU, automatic
      resume; several sessions possible).
+- **Progress**: VisDrone done (6 runs on the 548 val images, Colab 2026-10-06, rev.
+  `17b4a47`): `b16-sall` first with 2.61, `b32-sall` drops to 1.37
+  ([resultats-balayages.md](resultats-balayages.md#full-split-t151-548-images-colab-on-2026-10-06-rev-17b4a47)).
+- **Remaining**: KITTI (step 1), then VOC after T15.2 (step 2).
 
 ### [ ] T15.2 — Noise of a run
 - **Spec**: §7 · **Depends on**: T15.1 · **Size**: S

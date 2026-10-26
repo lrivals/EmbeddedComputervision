@@ -151,7 +151,7 @@ becomes a `DATASETS` entry in a few lines (T22.9).
 - **Acceptance**: `--list` prints the labellers, the device (CPU / CUDA) and which
   weights are cached; it exits with a message, not a traceback, when an extra is missing.
 - **Notes**: `yolo/` must never import `torch`, `transformers` or `gradio` (same rule as
-  `cv2` in M20 and matplotlib in M13). Install the CPU wheel of torch on a PC without GPU
+  `cv2` in M20 and matplotlib in M13). Install the CPU wheel of torch on a PC without a usable GPU
   (`--index-url https://download.pytorch.org/whl/cpu`, ≈ 200 MB instead of ≈ 2 GB).
   Pin the versions found to work in the `Done` line.
 - **Done** (2026-10-12): extra `autolabel` in `python/pyproject.toml`; `--list` prints
@@ -272,7 +272,7 @@ becomes a `DATASETS` entry in a few lines (T22.9).
   the first **200** images of VOC 2007 test (not 500, to keep the CPU time near 40 min;
   `--n 500` reuses the cached predictions). 20 VOC names as prompts with the alias map,
   raw predictions ≥ 0.05, mAP@0.5 VOC07 11 points, difficult objects ignored. CPU only
-  (no CUDA on this PC); the first Grounding DINO minutes shared the CPU with test runs.
+  (no CUDA on this PC: the RTX 1000 Ada has no driver, M12 T12.11); the first Grounding DINO minutes shared the CPU with test runs.
 
 | labeller | mAP@0.5 | s / image | P / R @ 0.3 | P / R @ 0.4 | P / R @ 0.5 | P / R @ 0.55 | P / R @ 0.6 |
 |---|---|---|---|---|---|---|---|

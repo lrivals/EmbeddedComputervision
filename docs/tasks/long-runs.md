@@ -3,7 +3,7 @@
 Every computation of more than a few minutes that is still open in the milestone files
 (training, full-split mAP, C-sim passes, sweeps, labelling, campaigns, large transfers),
 with its command, its prerequisites and a duration, so the runs can be scheduled: nights on
-the PC, Colab sessions. State on 2026-10-20.
+the PC, Colab sessions. State on 2026-10-27.
 
 - Out of scope: what needs Vitis, Vivado or the KV260, listed in
   [deferred/](deferred/README.md).
@@ -18,7 +18,7 @@ the PC, Colab sessions. State on 2026-10-20.
 
 | Measurement | Value | Source |
 |---|---|---|
-| PC CPU training, Tiny-YOLOv2/v3, 416, batch 8 | ≈ 5.8 s/iteration, ≈ 0.7 s/image (QAT 600 it 3,494 s, ADMM 600 it 3,442 s); the docs still say 0.45 s/image | `build/train/{qat-w4a4,admm-mixed6}/loss.csv`, [M12](M12-profils-pc.md) |
+| PC CPU training, Tiny-YOLOv2/v3, 416, batch 8 | plain fine-tuning ≈ 3.6 s/iteration, ≈ 0.45 s/image (T2.7); QAT and ADMM ≈ 5.3 s/iteration, ≈ 0.66 s/image (600 it: QAT 3,189 s, ADMM 3,157 s in the `seconds` column) | `build/train/{qat-w4a4,admm-mixed6}/loss.csv`, [M12](M12-profils-pc.md) |
 | PC CPU training, pruned models, 300 it | r30 8.2, r50 7.8, r70 2.8 s/iteration | `build/m10/prune/*/train/loss.csv` |
 | Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59; 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
 | Colab T4, 6,000 iterations at batch 32 | ≈ 1 h 45; ×2.1 per iteration at 608, ×4 at 832 | [M15](M15-campagne-entrainement.md) T15.4, T15.9 |
@@ -115,7 +115,7 @@ These share the CPU with the table above: one at a time, at night.
 
 | Task | Run | Data | Estimate | Basis | Waits for |
 |---|---|---|---|---|---|
-| [T15.1](M15-campagne-entrainement.md) | `_infer` notebooks, `SUBSET=0`, `COMPARE=True`, `INT8=False` (regenerate with `python -m tools.notebooks <ds>/tiny-yolov3-<ds>_infer --force`) | VOC, KITTI (VisDrone maybe done) | VOC ≈ 2 h 15 (6 runs) or 3 h 40 (10 runs after T15.2), KITTI ≈ 40 min, VisDrone ≈ 15 min | stated | — |
+| [T15.1](M15-campagne-entrainement.md) | `_infer` notebooks, `SUBSET=0`, `COMPARE=True`, `INT8=False` (regenerate with `python -m tools.notebooks <ds>/tiny-yolov3-<ds>_infer --force`) | VOC, KITTI (VisDrone done 2026-10-06) | VOC ≈ 2 h 15 (6 runs) or 3 h 40 (10 runs after T15.2), KITTI ≈ 40 min | stated | — |
 | [T15.2](M15-campagne-entrainement.md) | `voc/tiny-yolov3-voc_sweep`, `BATCHES=[16,32]`, `TRAIN_SUBSETS=[0]`, `SEEDS=[1,2]` | VOC | ≈ 40 min GPU | stated | — |
 | [T15.4](M15-campagne-entrainement.md), [T2.9](M2-cibles-perte-entrainement.md) | VOC long run: batch 32, 6,000 it, `--burn-in 200 --steps 4800,5400 --scales 0.1,0.1`, `SAVE_EVERY=500` | VOC07+12 | ≈ 1 h 45 GPU + ≈ 22 min eval; + ≈ 4 h to extend to 20,000 *(est.)* | stated; 14,000 it × 1 s | T15.1, T15.2 |
 | [T15.5](M15-campagne-entrainement.md) | LR {5e-4, 1e-3, 2e-3} × burn-in {100, 500} | VOC | ≈ 1 h GPU | stated | code: `LRS` / `BURN_INS`, `run_name` |
@@ -186,17 +186,3 @@ graph LR
   T271 --> T272[T27.2] --> T39["T39.0, T39.1, T39.5"] --> T392["T39.2, T39.4 (Colab)"]
   T1514 --> T392
 ```
-
-## Inconsistencies found while listing
-
-To fix in the milestone files:
-
-- T11.1 still says "download COCO", but COCO is on the PC and the float stage is done.
-- T11.3 still says "manual download of ExDark", but `data/exdark` exists.
-- T11.6 says CrowdHuman is in place; `data/crowdhuman` is missing on the PC (Drive only).
-- The PC GPU: [M12](M12-profils-pc.md) T12.11 sees an RTX 1000 Ada, while
-  [colab-vscode.md](colab-vscode.md) and [M22](M22-autolabel.md) say there is no GPU / no
-  CUDA (no driver installed).
-- T15.1: the VisDrone full-split figures (b16-sall, b32-sall) already appear in the M15
-  header; the VisDrone part may be done.
-- CPU training speed: M12 still gives 0.45 s/image, the later logs give ≈ 0.7 s/image.

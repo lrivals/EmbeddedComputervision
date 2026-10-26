@@ -25,8 +25,8 @@ Measured landmarks (logs of `build/`):
 | full `eval_quant.py` `--variants int`, 8 jobs | ≈ 120 ms/image, ≈ 10 min |
 | full `eval_quant.py` `--variants float,int` | ≈ 150-300 ms/image, 12-25 min |
 | `make bench-sim`, 22 threads | ≈ 40 min |
-| QAT, batch 8, CPU | ≈ 0.45 s/image (≈ 36 min for 600 iterations) |
-| ADMM | ≈ 50 min for 600 iterations |
+| QAT, batch 8, CPU | ≈ 5.3 s/iteration, ≈ 0.66 s/image (≈ 53 min for 600 iterations) |
+| ADMM | ≈ 5.3 s/iteration, ≈ 53 min for 600 iterations |
 | QAT / ADMM on GPU (`--device gpu`, T12.11) | to measure (T12.11-e) |
 
 ### Profile datasheet
@@ -221,7 +221,7 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   - `python tools/train.py --net tiny-yolov2-voc --qat w4a4 … [--device gpu] --out build/m12/qat/<run>`;
   - then `python tools/quant_lowbit.py --scheme w4a4 --checkpoint build/m12/qat/<run>/checkpoint.npz --out build/m12/qat/<run>/model`;
   - then `eval_quant.py --model-dir … --variants int --subset 500`.
-- **Cost**: about 18 min for 300 iterations and about 36 min for 600 (batch 8). 2,000
+- **Cost**: about 27 min for 300 iterations and about 53 min for 600 (batch 8). 2,000
   iterations belong to tier N on CPU, and can move to tier M on GPU if T12.11 is
   validated.
 - **Measurement**: moving average over 50 iterations of `loss.csv` (start against end),
@@ -264,7 +264,7 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   current options. D needs an `--admm-growth` option.
 - **Command**: `python tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --admm build/m9/plan_mixed6.json --admm-rho <ρ₀> --admm-every <k> --lr 1e-4 --burn-in 50 --batch 8 --iters <n> [--device gpu] --out build/m12/admm/<run>`,
   then `quant_lowbit.py --weights pow2 --checkpoint …`, then `eval_quant.py … --subset 500`.
-- **Cost**: about 25 min for 300 iterations and about 50 min for 600. Runs C and D fit in
+- **Cost**: about 27 min for 300 iterations and about 53 min for 600. Runs C and D fit in
   tier M; they can run in parallel with the evaluations. On GPU (T12.11), the whole grid
   becomes feasible in one evening.
 - **Measurement**: the last row of `admm.csv` (`res_*` columns), and the slope of the
@@ -397,9 +397,12 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
 - **Acceptance**: the CPU / GPU equivalence profile below passes (a to f), and the speed
   gain is measured
 - **Context**: training (fine-tuning, QAT T9.3.3, ADMM T9.2.3) runs in NumPy on the CPU, at
-  about 0.45 s per image, i.e. 36 to 50 min for 600 iterations. This duration limits the
-  grids of T12.5 and T12.6. The PC has an NVIDIA RTX 1000 Ada Laptop GPU (6 GB, seen by
-  `lspci`).
+  about 0.45 s per image for a plain fine-tuning (T2.7) and ≈ 0.66 s per image for QAT and
+  ADMM (5.3 s per iteration at batch 8, `seconds` column of
+  `build/train/{qat-w4a4,admm-mixed6}/loss.csv`), i.e. ≈ 53 min for 600 iterations. This
+  duration limits the grids of T12.5 and T12.6. The PC has an NVIDIA RTX 1000 Ada Laptop
+  GPU (6 GB, seen by `lspci`), but no NVIDIA driver is installed: it is unusable until the
+  prerequisites below are met.
 - **Choice**: **CuPy**, which keeps the NumPy API and therefore the "hand-written layers"
   style (`forward` / `backward`) of the specification. PyTorch would bring its own
   autograd and a second computation path.
@@ -436,7 +439,7 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   | b) layers | GPU against CPU forward and backward passes, same inputs | float64 ≤ 1e-12; float32, relative error ≤ 1e-5 |
   | c) overfitting | T2.8 (`make test-slow`) on GPU | converges, as on CPU |
   | d) short training | 50 iterations with the same seed, QAT w4a4 then ADMM | mean GPU loss within 1 % of the CPU loss |
-  | e) speed | s/image and largest batch that fits in 6 GB, at 416×416 | gain quantified against 0.45 s/image |
+  | e) speed | s/image and largest batch that fits in 6 GB, at 416×416 | gain quantified against 0.66 s/image (QAT) |
   | f) CPU non-regression | 10 iterations with `--device cpu` (and without the option) | checkpoint identical to the byte to the previous one |
 
 - **Notes**:

@@ -17,8 +17,9 @@ are fetched on the PC through rclone ([donnees-drive.md](donnees-drive.md)).
 
 Claude (Claude Code) cannot run cells on a kernel attached to VS Code. The Colab extension
 only exposes UI commands (`colab.mountServer`, `colab.mountDrive`, `colab.openTerminal`…)
-and keeps its tokens in the VS Code secret storage. The PC has no GPU, so no local run
-either (tier N: hours on CPU). Claude prepares the parameters and follows the runs through
+and keeps its tokens in the VS Code secret storage. The PC's GPU (RTX 1000 Ada) has no
+NVIDIA driver installed ([M12](M12-profils-pc.md), T12.11), so no local GPU run either
+(tier N: hours on CPU). Claude prepares the parameters and follows the runs through
 rclone, and the user is the one who clicks "Run All".
 
 ## Setup (once per Colab session)

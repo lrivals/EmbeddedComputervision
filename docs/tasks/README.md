@@ -261,7 +261,7 @@ progress per milestone here.
 | M11 | 8 (+ pointer T11.8) | 1 (T11.0 generic adapter) |
 | M13 | 62 | 62 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
 | M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain, training, Colab GPU, smoke run) |
-| M15 | 16 | 1 (T15.3; T15.1 and T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
+| M15 | 16 | 1 (T15.3; T15.1: VisDrone done, KITTI and VOC ready for Colab; T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
 | M16 | 20 | 18 (T16.13 COCO: data on the PC since M24, notebook to run; T16.14 KITTI: data missing) |
 | M17 | 21 | 17 (T17.0-T17.16: tools, CI and first draft, in English; v2 follows M23-M26, v3 adds the safety evidence of M28 and M30; refs check, v0 procedure, board switch and frozen version remain) |
 | M18 | 11 | 9 (data ready, loaders, 24 notebooks generated, uploaded to the Drive; executed stats, fine-tunings remain) |
