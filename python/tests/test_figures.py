@@ -857,3 +857,18 @@ def test_faults_sources(tmp_path):
     p.write_text(json.dumps({**rep, "ber": [], "layer": [], "bit": []}))
     with pytest.raises(F.MissingSource):
         resultats.load_faults(p)
+
+
+def test_miss_fppi_plot(tmp_path):
+    d = {"dataset": "prewid", "split": "test", "net": "tiny-yolov4-coco", "stages": {
+        s: {"lamr": 0.1, "curve": {"thr": [9, 0.5, 0.1], "fppi": [0.0, 0.05, 0.5],
+                                   "mr": [1.0, 0.3, 0.1]},
+            "repo": {"0.5": {"recall": 0.7, "fppi": 0.05}},
+            "targets": {"0.95": {"thr": 0.1, "recall": 0.9, "fppi": 0.5}}}
+        for s in ("float", "int")}}
+    p = tmp_path / "oppoint.json"
+    p.write_text(json.dumps(d))
+    panels = resultats.load_miss_fppi([p])
+    assert panels[0]["title"].endswith("prewid test")
+    out = resultats.plot_miss_fppi(panels, tmp_path)
+    assert out[0].exists()

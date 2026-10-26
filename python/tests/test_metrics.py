@@ -1,12 +1,17 @@
 """T3.3 : mAP PASCAL VOC (§8.3), comparée au port Python du devkit officiel."""
 
+import math
+
 import numpy as np
 import pytest
 
+from tests import mr_ref
 from tests.voc_eval_ref import voc_eval
 from yolo.data.voc import VOC_CLASSES, load_split, xyxy_to_cxcywh
-from yolo.infer.metrics import (eval_class, evaluate, read_detections, to_voc_pixels, voc_ap,
-                                write_detections)
+from yolo.infer.metrics import (clopper_pearson, eval_class, evaluate, log_average_miss_rate,
+                                match_class, mr_fppi, person_metrics, point_at_threshold,
+                                read_detections, recall_at_fppi, threshold_for_recall,
+                                to_voc_pixels, unflagged_miss_rate, voc_ap, write_detections)
 
 CLASSES = ("cat", "dog", "person")
 
@@ -159,3 +164,134 @@ def test_evaluate_reads_ignore_regions():
     assert aps[0] == pytest.approx(1.0)
     aps, _ = evaluate(dets, [ann], 1, use_ignore=False)
     assert aps[0] < 0.99
+
+
+# ---------------------------------------------------------------------- T27.0 person metrics
+def _sample(i, boxes, difficult=None, visible=None, w=100, h=100):
+    b = np.array(boxes, dtype=float).reshape(-1, 4)
+    s = {"id": i, "width": w, "height": h, "xyxy": b, "labels": np.zeros(len(b), np.int64),
+         "difficult": np.zeros(len(b), bool) if difficult is None else np.array(difficult)}
+    if visible is not None:
+        s["visible"] = np.array(visible, float)
+    return s
+
+
+def _toy():
+    """3 images. A: g1 (height 100), g2 (height 20); B: g3 (height 50), g4 difficult; C: empty.
+    Detections by score: .9 g1 TP, .8 on C FP, .7 g3 TP, .6 g4 ignored, .5 g1 again FP,
+    .4 g2 TP."""
+    samples = [_sample("A", [[1, 1, 50, 100], [60, 1, 80, 20]], visible=[1.0, 0.5]),
+               _sample("B", [[1, 1, 40, 50], [50, 50, 90, 90]], [False, True], [0.2, 1.0]),
+               _sample("C", [])]
+    dets = (["A", "C", "B", "B", "A", "A"], np.array([0.9, 0.8, 0.7, 0.6, 0.5, 0.4]),
+            np.array([[1, 1, 50, 100], [10, 10, 30, 30], [1, 1, 40, 50], [50, 50, 90, 90],
+                      [2, 2, 50, 100], [60, 1, 80, 20]], float))
+    return samples, dets
+
+
+def test_toy_curve_by_hand():
+    samples, dets = _toy()
+    m = person_metrics(dets, samples)
+    c = m["curve"]
+    assert m["npos"] == 3 and m["n_images"] == 3
+    np.testing.assert_allclose(c["thr"], [np.inf, .9, .8, .7, .6, .5, .4])
+    np.testing.assert_allclose(c["fppi"], [0, 0, 1 / 3, 1 / 3, 1 / 3, 2 / 3, 2 / 3])
+    np.testing.assert_allclose(c["recall"], [0, 1 / 3, 1 / 3, 2 / 3, 2 / 3, 2 / 3, 1])
+    # operating point at 0.1 and 0.01 FPPI: threshold .9, recall 1/3
+    for f in (0.1, 0.01):
+        assert m["at"][f]["recall"] == pytest.approx(1 / 3) and m["at"][f]["thr"] == 0.9
+    assert recall_at_fppi(c, 0.5) == (pytest.approx(2 / 3), 0.6)
+    assert recall_at_fppi(c, 1.0) == (1.0, 0.4)
+    # LAMR: 7 references below 1/3 → miss 2/3, 0.562 → 1/3, 1.0 → 0 (floor 1e-10)
+    ref = math.exp((7 * math.log(2 / 3) + math.log(1 / 3) + math.log(1e-10)) / 9)
+    assert m["lamr"] == pytest.approx(ref, rel=1e-12)
+    # per height at .9: far (g2) 0/1, medium (g3) 0/1, near (g1) 1/1; g4 difficult left out
+    assert m["at"][0.1]["height"] == [(0, 1), (0, 1), (1, 1)]
+    # per occlusion (1 − visible): g1 0 → bin 0, g3 0.8 → bin 3, g2 0.5 → bin 2
+    assert m["at"][0.1]["occlusion"] == [(1, 1), (0, 0), (0, 1), (0, 1)]
+    assert point_at_threshold(c, 0.5) == (pytest.approx(2 / 3), pytest.approx(2 / 3))
+    assert point_at_threshold(c, 0.005) == (1.0, pytest.approx(2 / 3))
+    assert threshold_for_recall(c, 0.95) == 0.4 and threshold_for_recall(c, 0.5) == 0.7
+
+
+def test_toy_empty_only_and_ignore():
+    samples, dets = _toy()
+    # FPPI on the empty frames alone: only the FP on C counts, over 1 image.
+    m = person_metrics(dets, samples, empty_only=True)
+    assert m["n_images"] == 1
+    np.testing.assert_allclose(m["curve"]["fppi"], [0, 0, 1, 1, 1, 1, 1])
+    # an ignore region over C's detection removes that FP (as in the mAP, T15.10)
+    samples[2]["ignore_xyxy"] = np.array([[1.0, 1, 50, 50]])
+    m = person_metrics(dets, samples)
+    np.testing.assert_allclose(m["curve"]["fppi"], [0, 0, 0, 0, 0, 1 / 3, 1 / 3])
+    assert m["at"][0.1]["recall"] == pytest.approx(2 / 3)
+
+
+def test_match_class_gt_scores():
+    samples, dets = _toy()
+    gts = {s["id"]: (s["xyxy"], s["difficult"]) for s in samples}
+    order, tp, fp, gs = match_class(*dets, gts)
+    assert tp.tolist() == [1, 0, 1, 0, 0, 1] and fp.tolist() == [0, 1, 0, 0, 1, 0]
+    assert gs["A"].tolist() == [0.9, 0.4] and gs["B"][0] == 0.7 and np.isnan(gs["B"][1])
+
+
+def test_mr_fppi_ties():
+    # two detections with the same score form a single point
+    c = mr_fppi([0.5, 0.5, 0.2], np.array([1, 0, 1]), np.array([0, 1, 0]), 2, 1)
+    np.testing.assert_allclose(c["fppi"], [0, 1, 1])
+    np.testing.assert_allclose(c["recall"], [0, 0.5, 1])
+
+
+def test_lamr_matches_brute_force_reference():
+    """The incremental curve and the Caltech averaging against `mr_ref` (re-matching at every
+    threshold), on random scenes with duplicates, difficult boxes and false alarms."""
+    rng = np.random.default_rng(1)
+    for _ in range(5):
+        samples, ids, scores, boxes, gts = [], [], [], [], {}
+        for i in range(30):
+            objs = []
+            for _ in range(int(rng.integers(0, 4))):
+                x, y = rng.integers(1, 150, 2)
+                b = [float(x), float(y), float(x + rng.integers(10, 60)),
+                     float(y + rng.integers(20, 90))]
+                objs.append((b, bool(rng.random() < 0.1)))
+                if rng.random() < 0.8:
+                    for _ in range(1 + int(rng.random() < 0.3)):  # sometimes a duplicate
+                        ids.append(str(i))
+                        scores.append(round(float(rng.random()), 2))  # ties
+                        boxes.append(np.array(b) + rng.normal(0, 4, 4))
+            for _ in range(int(rng.integers(0, 3))):
+                x, y = rng.integers(1, 150, 2)
+                ids.append(str(i))
+                scores.append(round(float(rng.random()) * 0.6, 2))
+                boxes.append(np.array([x, y, x + 30.0, y + 50.0]))
+            samples.append(_sample(str(i), [o[0] for o in objs], [o[1] for o in objs],
+                                   w=250, h=250))
+            gts[str(i)] = objs
+        dets = (ids, np.array(scores), np.array(boxes).reshape(-1, 4))
+        m = person_metrics(dets, samples)
+        ref = mr_ref.lamr(list(zip(ids, scores, [list(b) for b in boxes])), gts, len(samples))
+        assert m["lamr"] == pytest.approx(ref, rel=1e-12)
+        assert 0.05 < ref < 1.0
+
+
+def test_lamr_perfect_and_empty():
+    c = {"fppi": np.array([0.0, 0.0]), "mr": np.array([1.0, 0.0])}
+    assert log_average_miss_rate(c) == pytest.approx(1e-10)
+    c = {"fppi": np.array([0.0]), "mr": np.array([1.0])}
+    assert log_average_miss_rate(c) == 1.0
+
+
+def test_clopper_pearson():
+    assert clopper_pearson(0, 10)[0] == 0.0
+    assert clopper_pearson(0, 10)[1] == pytest.approx(1 - 0.025 ** (1 / 10), rel=1e-9)
+    assert clopper_pearson(10, 10) == (pytest.approx(0.025 ** (1 / 10), rel=1e-9), 1.0)
+    lo, hi = clopper_pearson(5, 100)
+    assert lo == pytest.approx(0.01643, abs=1e-5) and hi == pytest.approx(0.11283, abs=1e-5)
+    assert clopper_pearson(0, 0) == (0.0, 1.0)
+
+
+def test_unflagged_miss_rate():
+    r = unflagged_miss_rate([True, True, False, False], [True, False, True, False])
+    assert (r["k"], r["n"], r["rate"]) == (1, 4, 0.25)
+    assert r["ci"] == clopper_pearson(1, 4)

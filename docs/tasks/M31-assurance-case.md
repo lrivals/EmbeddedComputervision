@@ -29,6 +29,10 @@ M25 and M27 to M30.
   [T27.3](M27-safety-metrics.md), or marked "not covered"
 - **Notes**: the target standard (IEC 61496 or another) is an expected input from ARCYS; it
   is written at the top of the file, or "to be given by ARCYS".
+- **Input from M27** (2026-10-26): the six degradations of `tools/degrade.py` (T27.3) are
+  the proposed ODD axes, each at 3 severities: low light, fog / dust, motion blur, sensor
+  noise, JPEG, partial occlusion; their recall cost on PREWID is in
+  [results/person_safety.md](../../results/person_safety.md).
 
 ### [ ] T31.1 — Hazard and safety requirements
 - **Spec**: — · **Depends on**: T31.0 · **Runs on**: PC · **Size**: S

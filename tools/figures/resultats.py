@@ -1864,3 +1864,72 @@ def faults(out_dir):
     if not path.exists():
         path = ROOT / "build" / "m25" / "smoke" / "report.json"
     return plot_faults(load_faults(need(path)), out_dir)
+
+
+# --- T13.61: miss rate against FPPI (M27, T27.2) -------------------------------------------
+
+def load_miss_fppi(paths):
+    """`oppoint.json` files of `tools/person_safety.py oppoint` → [{title, stages: {stage:
+    {fppi, mr, lamr, targets, repo}}}], one panel each."""
+    out = []
+    for p in paths:
+        d = json.loads(Path(p).read_text())
+        out.append({"title": f"{st.NET_LABELS.get(d['net'], d['net'])} — {d['dataset']} "
+                             f"{d['split']}", "stages": d["stages"]})
+    return out
+
+
+def plot_miss_fppi(panels, out_dir, name="miss_fppi"):
+    plt = st.plt()
+    fig, axes = plt.subplots(1, len(panels), figsize=(st.COL * len(panels) * 0.85, 4.4),
+                             squeeze=False)
+    colors = {"float": st.STAGE_COLORS["flottant"], "int": st.STAGE_COLORS["entier"],
+              "csim": st.STAGE_COLORS["csim"]}
+    names = {"float": "float", "int": "integer", "csim": "C-sim"}
+    for ax, pnl in zip(axes[0], panels):
+        for key, s in pnl["stages"].items():
+            f, mr = np.array(s["curve"]["fppi"]), np.array(s["curve"]["mr"])
+            keep = f > 0
+            ax.plot(f[keep], mr[keep], color=colors.get(key, st.INK2),
+                    ls="-" if key == "float" else "--",
+                    label=f"{names.get(key, key)}: LAMR {100 * s['lamr']:.1f} %")
+            for thr, r in s.get("repo", {}).items():
+                x = max(r["fppi"], 1e-3)  # FPPI 0: pinned to the left edge
+                ax.plot(x, 1 - r["recall"], "o", ms=5, mfc="white",
+                        mec=colors.get(key, st.INK2), clip_on=False)
+                if key == "float":
+                    ax.annotate(f"thr {thr}" + (" (FPPI 0)" if r["fppi"] == 0 else ""),
+                                (x, 1 - r["recall"]), fontsize=7, color=st.INK2,
+                                xytext=(4, 4), textcoords="offset points")
+            for t, r in s.get("targets", {}).items():
+                if r["fppi"] > 0:
+                    ax.plot(r["fppi"], 1 - r["recall"], "s", ms=5,
+                            color=colors.get(key, st.INK2))
+                    if key == "float":
+                        ax.annotate(f"recall {float(t):g}", (r["fppi"], 1 - r["recall"]),
+                                    fontsize=7, color=st.INK2, xytext=(4, -10),
+                                    textcoords="offset points")
+        ax.axvspan(1e-2, 1.0, color=st.GRID, alpha=0.35, lw=0)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlim(1e-3, 10)
+        ax.set_ylim(5e-3, 1.05)
+        ax.set_xlabel("false positives per image (FPPI)")
+        ax.set_ylabel("miss rate")
+        ax.set_title(pnl["title"])
+        ax.legend(loc="lower left")
+        st.note(ax, "shaded: LAMR range; ○ repo thresholds,\n■ target recall (check half)",
+                loc="lower right")
+    fig.tight_layout()
+    return st.save(fig, out_dir, name)
+
+
+@figure("miss_fppi", "resultats", "T13.61",
+        "Miss rate against false positives per image (log-log), float and integer, with the "
+        "repo thresholds (0.005, 0.5) and the thresholds chosen for recall 0.95 / 0.99.",
+        "build/m27/<dataset>-<split>/<net>/oppoint.json (tools/person_safety.py oppoint)")
+def miss_fppi(out_dir):
+    paths = sorted((ROOT / "build" / "m27").glob("*/*/oppoint.json"))
+    if not paths:
+        raise MissingSource("build/m27/*/*/oppoint.json absent")
+    return plot_miss_fppi(load_miss_fppi(paths), out_dir)

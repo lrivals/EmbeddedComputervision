@@ -32,8 +32,10 @@ through the same loader slot. Three complementary sets follow the same chain:
 **State**: 7 of 12 tasks done (2026-10-26): T38.0-T38.6. Data chain, loader, datasheet,
 notebooks, stats run, archive on the Drive, and the out-of-domain baseline (best: YOLOv4-tiny
 and YOLOv7-tiny COCO at about 90 person AP50 on `test` with no training). Open: T38.7
-(fine-tuning, GPU), T38.8-T38.10 (wait for T27.0, T27.1, T27.3, T27.4: `person_safety.py`,
-`degrade.py` and `dreaded_event.py` do not exist yet), T38.11 (waits for a T38.7
+(fine-tuning, GPU), T38.8-T38.10 (the M27 tools exist since 2026-10-26 and already ran
+on `test` and `lab` with the pre-trained networks, see
+[results/person_safety.md](../../results/person_safety.md); the fine-tuned network of T38.7
+remains), T38.11 (waits for a T38.7
 checkpoint). The archive is in `data/PREWID PRE-industry Worker Image Dataset for Indus/`
 (downloaded by hand). All tasks run on the PC.
 
@@ -317,6 +319,10 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
   placed on PREWID with the FPPI it costs.
 - **Notes**: this is the industrial row M27 is missing; it answers T27.6 with public
   data until the ARCYS images arrive.
+- **Progress** (2026-10-26): done with the pre-trained networks through M27
+  (`person_safety.py report --per-camera`, FPPI on empty frames, C-sim on 100 CAM1 frames,
+  `oppoint`): YOLOv4-tiny R@0.1 90.7 / 90.1 % float / integer, Tiny-YOLOv3 59.8 / 56.6 %.
+  Remaining: the fine-tuned network of T38.7.
 
 ### [ ] T38.9 — Degraded conditions and grayscale input
 - **Spec**: §8.3 · **Depends on**: T38.8, T27.3 · **Runs on**: PC · **Size**: S
@@ -326,6 +332,8 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
 - **Acceptance**: section in `results/person_safety.md`; the grayscale cost is given (the
   readme describes the target as grayscale cameras, so a plant camera may not deliver
   colour).
+- **Progress** (2026-10-26): the degradations already ran on `test` with YOLOv4-tiny
+  (T27.3); remaining: the grayscale variant and the fine-tuned network.
 
 ### [ ] T38.10 — Missed workers on sequences
 - **Spec**: §8.3 · **Depends on**: T38.8, T27.4 · **Runs on**: PC · **Size**: S
@@ -336,6 +344,8 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
   with no gap) and the frame-rate assumption written next to every per-hour number.
 - **Notes**: T27.4 asks for a ground-level person video set; PREWID gives industrial
   footage. A gap in the frame numbers ends a run.
+- **Progress** (2026-10-26): `dreaded_event.py` already ran on `test` and `lab` with
+  YOLOv4-tiny (T27.4, 10 frames/s assumed); remaining: the fine-tuned network.
 
 ### [ ] T38.11 — Replay in the webcam demo
 - **Spec**: — · **Depends on**: T38.7, M20 · **Runs on**: PC · **Size**: S

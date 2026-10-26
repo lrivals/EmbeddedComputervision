@@ -59,6 +59,7 @@ Distribution des activations par couche et seuil de saturation retenu par la cal
 ![calibration_tiny-yolov2-voc](figures/resultats/calibration_tiny-yolov2-voc.png)
 ![calibration_tiny-yolov3-coco](figures/resultats/calibration_tiny-yolov3-coco.png)
 ![calibration_tiny-yolov4-coco](figures/resultats/calibration_tiny-yolov4-coco.png)
+![calibration_tiny-yolov7-coco](figures/resultats/calibration_tiny-yolov7-coco.png)
 
 ### T13.18 — `erreur_couches`
 
@@ -189,6 +190,15 @@ mAP of the integer Tiny-YOLOv2 under bit flips: against the bit error rate per f
 - Source : `build/m25/faults/report.json (else build/m25/smoke/report.json)`
 - Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
 
+### T13.61 — `miss_fppi`
+
+Miss rate against false positives per image (log-log), float and integer, with the repo thresholds (0.005, 0.5) and the thresholds chosen for recall 0.95 / 0.99.
+
+- Commande : `python -m tools.figures miss_fppi`
+- Source : `build/m27/<dataset>-<split>/<net>/oppoint.json (tools/person_safety.py oppoint)`
+
+![miss_fppi](figures/resultats/miss_fppi.png)
+
 ### T13.53 — `balayages`
 
 Analyse transversale des balayages lot × sous-ensemble : grilles, classements, effets du lot et du sous-ensemble, époques, perte, courbes, composantes, AP par classe, poids publiés et coût. 50 images, palier R.
@@ -196,6 +206,30 @@ Analyse transversale des balayages lot × sous-ensemble : grilles, classements, 
 - Commande : `python -m tools.figures balayages`
 - Source : `sorties des notebooks notebooks/*/*_sweep.ipynb et *_infer.ipynb`
 - Sous-ensemble d'images : sortie dans `docs/tasks/figures/resultats/`, non publiée dans `results/` (règle M12).
+
+### T13.60 — `explain_cka_float_int`
+
+Linear CKA between the float and the integer outputs of every conv (64 VOC test images, maps pooled 2 × 2), per network.
+
+- Commande : `python -m tools.figures explain_cka_float_int`
+- Source : `build/explain/cka.json`
+- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
+
+### T13.60 — `explain_cka_checkpoints`
+
+Linear CKA of each conv at each checkpoint to the same conv at the last checkpoint of the T36.7 recorder run: the layers that settle first are the ones that reach 1 first.
+
+- Commande : `python -m tools.figures explain_cka_checkpoints`
+- Source : `build/explain/cka.json`
+- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
+
+### T13.60 — `explain_gradcam_strip`
+
+Grad-CAM of the first ground-truth box of 4 probe images (fixed cell and anchor) across the checkpoints of the T36.7 recorder run.
+
+- Commande : `python -m tools.figures explain_gradcam_strip`
+- Source : `build/explain/cka_gradcam.npz`
+- Sous-ensemble d'images : sortie dans `build/figures/resultats/`, non publiée dans `results/` (règle M12).
 
 ## Modèles (B)
 

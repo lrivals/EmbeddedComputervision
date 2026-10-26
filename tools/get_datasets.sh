@@ -5,6 +5,7 @@
 #                                    | auair | dronevehicle | hituav | uavdt (M18) | asl (M21)
 #                                    | trashnet | pets (M32: download + tools/prep_datasets.py)
 #                                    | prewid (M38: hand-copied folder + tools/prep_datasets.py)
+#                                    | mot17 (M27, T27.4: MOT17 train videos, 5.5 GB)
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
 #                                    et les dossiers bruts de M18, puis lance leurs prétraitements
@@ -79,6 +80,7 @@ declare -A MARKER=(
   [trashnet]=trashnet/annotations_val.json
   [pets]=pets/annotations_val.json
   [prewid]=prewid/annotations_val.json
+  [mot17]=mot17/train/MOT17-02-FRCNN/gt/gt.txt
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
@@ -299,6 +301,15 @@ pets() {
   [[ -e "$DATA_DIR/${MARKER[pets]}" ]] || python "$ROOT/tools/prep_datasets.py" pets
 }
 
+# MOT17 (M27, T27.4): ground-level pedestrian videos, read by `load_mot17` from
+# data/mot17/train/<SEQ>-FRCNN/. The archive holds a top folder MOT17/: moved up one level.
+mot17() {
+  fetch mot17 https://motchallenge.net/data/MOT17.zip train/MOT17-02-FRCNN/gt/gt.txt
+  if [[ -d "$DATA_DIR/mot17/MOT17/train" && ! -e "$DATA_DIR/${MARKER[mot17]}" ]]; then
+    mv "$DATA_DIR/mot17/MOT17/"* "$DATA_DIR/mot17/" && rmdir "$DATA_DIR/mot17/MOT17"
+  fi
+}
+
 # PREWID (M38): no automatic download; frame counts of the hand-copied folder, then the prep.
 prewid() {
   local d="$DATA_DIR/$PREWID_RAW" cam
@@ -366,7 +377,7 @@ for ds in "$@"; do
     ;&
   check)
     for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl \
-      trashnet pets prewid; do
+      trashnet pets prewid mot17; do
       check "$d" || true
     done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \
@@ -383,7 +394,7 @@ for ds in "$@"; do
     fetch kitti $base/data_object_label_2.zip training/label_2
     fetch kitti $base/data_object_image_2.zip training/image_2
     ;;
-  trashnet|pets)
+  trashnet|pets|mot17)
     "$ds"
     check "$ds" || status=1
     ;;

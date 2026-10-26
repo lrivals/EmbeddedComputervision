@@ -83,7 +83,9 @@ PETS_CATS = tuple(c for c in PETS_CLASSES if c[0].isupper())
 PREWID_CLASSES = ("person",)
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
-PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd")
+# `visible` (visible fraction of the full box, CrowdHuman, MOT17) and `track` (identity,
+# MOT17) are optional per-object fields of M27.
+PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd", "visible", "track")
 
 
 def _image_size(path):
@@ -207,6 +209,24 @@ def parse_crowdhuman(line, box="fbox"):
     return d["ID"], boxes, difficult
 
 
+def crowdhuman_visible(line):
+    """Visible fraction |vbox ∩ fbox| / |fbox| of each box kept by `parse_crowdhuman` (NaN
+    without `vbox`): the occlusion level of T27.0."""
+    out = []
+    for g in json.loads(line).get("gtboxes", []):
+        if g.get("tag") not in ("person", "mask"):
+            continue
+        if "vbox" not in g:
+            out.append(np.nan)
+            continue
+        fx, fy, fw, fh = g["fbox"]
+        vx, vy, vw, vh = g["vbox"]
+        iw = max(0.0, min(fx + fw, vx + vw) - max(fx, vx))
+        ih = max(0.0, min(fy + fh, vy + vh) - max(fy, vy))
+        out.append(iw * ih / (fw * fh) if fw * fh > 0 else np.nan)
+    return out
+
+
 def parse_bbgt(text):
     """ExDark, format bbGt v3 (`classe l t w h …`, en-tête `% bbGt`) → (coins, labels)."""
     boxes, labels = [], []
@@ -323,7 +343,7 @@ def load_crowdhuman(root, split):
         if not image.exists():
             image = root / "Images_val" / f"{i}.jpg"
         out.append(make_sample(i, image, *_image_size(image), boxes, [0] * len(boxes),
-                               difficult))
+                               difficult, visible=crowdhuman_visible(line)))
     return out
 
 
@@ -423,16 +443,18 @@ def load_uavdt(root, split):
 ASL_VAL_FROM = 2551  # frames n° 2551-3000 of each class: val split (M21, no random split)
 
 
-def _load_json_split(root, split, classes, keep=None):
+def _load_json_split(root, split, classes, keep=None, meta=()):
     """`root/annotations_<split>.json` written by tools/prep_datasets.py (continuous corners,
-    class names, image paths relative to `root`) → samples; `keep(entry)` filters them."""
+    class names, image paths relative to `root`) → samples; `keep(entry)` filters them;
+    the entry keys `meta` are copied to the sample (PREWID `camera`, `frame`)."""
     out = []
     for a in json.loads((root / f"annotations_{split}.json").read_text()):
         if keep and not keep(a):
             continue
         labels = [classes.index(c) for c in a["labels"]]
-        out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
-                               a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
+        s = make_sample(Path(a["image"]).stem, root / a["image"], a["width"], a["height"],
+                        a["boxes"], labels, np.zeros(len(labels), bool))
+        out.append(s | {k: a[k] for k in meta if k in a})
     return out
 
 
@@ -458,10 +480,97 @@ def load_pets(root, split):
 def load_prewid(root, split):
     """Output of `tools/prep_datasets.py prewid`: `train` / `val` / `test` = contiguous time
     blocks of each plant camera, `lab` = the lab sequence, `loco_<camera>_<split>` = leave
-    one camera out. `<split>:<camera>` keeps the frames of one camera (`test:CAM2`)."""
+    one camera out. `<split>:<camera>` keeps the frames of one camera (`test:CAM2`). The
+    samples carry `camera` and `frame` (sequences of T27.4)."""
     name, _, camera = split.partition(":")
     return _load_json_split(root, name, PREWID_CLASSES,
-                            (lambda a: a["camera"] == camera) if camera else None)
+                            (lambda a: a["camera"] == camera) if camera else None,
+                            meta=("camera", "frame"))
+
+
+# MOT17 (T27.4): ground-level pedestrian videos. gt.txt classes: 1 pedestrian (kept), 2
+# person on vehicle, 7 static person, 8 distractor, 12 reflection (kept as `difficult`);
+# vehicles and occluders are dropped. Every sequence comes three times (DPM, FRCNN, SDP
+# public detections) with the same images and ground truth: the FRCNN copy is read.
+MOT_CLASSES = ("person",)
+MOT_DIFFICULT = (2, 7, 8, 12)
+
+
+def mot_seqinfo(seq_dir):
+    """`seqinfo.ini` → {name, frameRate, seqLength, imWidth, imHeight, imDir, imExt}."""
+    info = {}
+    for line in (Path(seq_dir) / "seqinfo.ini").read_text().splitlines():
+        k, eq, v = line.partition("=")
+        if eq:
+            info[k.strip()] = int(v) if v.strip().isdigit() else v.strip()
+    return info
+
+
+def load_mot17(root, split):
+    """`root/<train|test>/<SEQ>-FRCNN/{img1,gt/gt.txt,seqinfo.ini}`; `train:MOT17-02` keeps
+    one sequence. Every frame is a sample (empty frames kept) with `sequence`, `frame` and
+    `fps`; objects carry `track` and `visible`. A box with the `consider` flag 0 is
+    `difficult`."""
+    name, _, seq = split.partition(":")
+    dirs = sorted((root / name).glob("MOT17-*-FRCNN"))
+    if seq:
+        dirs = [d for d in dirs if d.name.startswith(seq + "-")]
+    if not dirs:
+        raise FileNotFoundError(f"no MOT17-*-FRCNN sequence under {root / name}"
+                                + (f" for {seq}" if seq else ""))
+    out = []
+    for d in dirs:
+        info = mot_seqinfo(d)
+        per = {}
+        for line in (d / "gt" / "gt.txt").read_text().splitlines():
+            f = line.split(",")
+            if len(f) < 9:
+                continue
+            frame, track, x, y, w, h = int(f[0]), int(f[1]), *map(float, f[2:6])
+            cls, consider, vis = int(f[7]), int(f[6]), float(f[8])
+            if cls != 1 and cls not in MOT_DIFFICULT:
+                continue
+            per.setdefault(frame, []).append(
+                ([x - 1, y - 1, x - 1 + w, y - 1 + h], cls != 1 or consider == 0, track, vis))
+        seq_name = d.name.rsplit("-", 1)[0]
+        for frame in range(1, info["seqLength"] + 1):
+            objs = per.get(frame, [])
+            image = d / info.get("imDir", "img1") / f"{frame:06d}{info.get('imExt', '.jpg')}"
+            s = make_sample(f"{seq_name}_{frame:06d}", image, info["imWidth"],
+                            info["imHeight"], [o[0] for o in objs], [0] * len(objs),
+                            [o[1] for o in objs], track=[o[2] for o in objs],
+                            visible=[o[3] for o in objs])
+            out.append(s | {"sequence": seq_name, "frame": frame, "fps": info["frameRate"]})
+    return out
+
+
+# T27.6: industrial-site images (ARCYS), until then any folder of images + YOLO txt.
+INDUSTRIAL_CLASSES = ("person",)
+INDUSTRIAL_HELP = (
+    "expected layout: <root>/<split>/images/*.jpg|png and <root>/<split>/labels/<stem>.txt "
+    "(YOLO `0 cx cy w h` normalised, an empty txt = a frame without person); procedure in "
+    "docs/tasks/M27-safety-metrics.md (T27.6): autolabel (M22), then manual correction")
+
+
+def load_industrial(root, split):
+    """`root/<split>/{images,labels}`: images and YOLO txt, class 0 = person; an image without
+    txt is an error (an empty frame has an empty txt). A missing or empty folder raises a
+    `FileNotFoundError` that names the expected layout."""
+    images = root / split / "images"
+    found = sorted(p for p in images.glob("*") if p.suffix.lower() in (".jpg", ".jpeg", ".png")) \
+        if images.is_dir() else []
+    if not found:
+        raise FileNotFoundError(f"industrial: no image in {images}; {INDUSTRIAL_HELP}")
+    out = []
+    for img in found:
+        txt = root / split / "labels" / f"{img.stem}.txt"
+        if not txt.exists():
+            raise FileNotFoundError(f"industrial: no label {txt} for {img.name}; "
+                                    f"{INDUSTRIAL_HELP}")
+        w, h = _image_size(img)
+        boxes, labels = parse_yolo_txt(txt.read_text(), w, h, len(INDUSTRIAL_CLASSES))
+        out.append(make_sample(img.stem, img, w, h, boxes, labels, np.zeros(len(labels), bool)))
+    return out
 
 
 @dataclass(frozen=True)
@@ -507,6 +616,20 @@ DATASETS = {
     "prewid": Dataset(PREWID_CLASSES, _splits(load_prewid), "prewid", "test", "train",
                       "train"),
 }
+
+# M27: sets read by the safety tools only (no datasheet, notebooks or stats run): video
+# sequences (T27.4) and the industrial slot (T27.6). `load`, `eval_view` and `split_of`
+# read both registries.
+EVAL_ONLY = {
+    "mot17": Dataset(MOT_CLASSES, _splits(load_mot17), "mot17", "train", "train", "train"),
+    "industrial": Dataset(INDUSTRIAL_CLASSES, _splits(load_industrial), "industrial", "test",
+                          "calib", "train"),
+}
+
+
+def info(name):
+    """`Dataset` entry of `name`, in `DATASETS` or `EVAL_ONLY`."""
+    return DATASETS[name] if name in DATASETS else EVAL_ONLY[name]
 
 
 # ---------------------------------------------------------------- correspondances
@@ -563,6 +686,10 @@ MAPPINGS = {
     ("pets", "coco"): {c: "cat" if c in PETS_CATS else "dog" for c in PETS_CLASSES},
     ("prewid", "voc"): {"person": "person"},
     ("prewid", "coco"): {"person": "person"},
+    ("mot17", "voc"): {"person": "person"},
+    ("mot17", "coco"): {"person": "person"},
+    ("industrial", "voc"): {"person": "person"},
+    ("industrial", "coco"): {"person": "person"},
 }
 
 FAMILIES = {"voc": VOC_CLASSES, "coco": COCO_CLASSES}
@@ -572,8 +699,8 @@ def model_family(dataset, n_model_classes):
     """Classes de sortie du modèle : celles du jeu si le compte concorde (poids affinés sur
     ce jeu), sinon VOC (20) ou COCO (80). Rend (nom de famille, noms des classes).
     """
-    if n_model_classes == len(DATASETS[dataset].classes):
-        return dataset, DATASETS[dataset].classes
+    if n_model_classes == len(info(dataset).classes):
+        return dataset, info(dataset).classes
     for fam, names in FAMILIES.items():
         if n_model_classes == len(names):
             return fam, names
@@ -583,7 +710,7 @@ def model_family(dataset, n_model_classes):
 def class_lut(dataset, n_model_classes):
     """Indice de classe du jeu → indice de classe du modèle (−1 : sans équivalent)."""
     fam, names = model_family(dataset, n_model_classes)
-    src = DATASETS[dataset].classes
+    src = info(dataset).classes
     if fam == dataset:
         return np.arange(len(src), dtype=np.int64)
     if (dataset, fam) not in MAPPINGS:
@@ -636,7 +763,7 @@ def remap_detections(per_class, det_lut):
 
 def load(name, root=None, split=None, role="test"):
     """Échantillons du jeu `name` ; `split` par défaut selon `role` (test, calib, train)."""
-    ds = DATASETS[name]
+    ds = info(name)
     return ds.load(Path(root) if root else DATA_DIR / ds.root, split or getattr(ds, role))
 
 
@@ -649,7 +776,7 @@ def add_args(ap, split_help="split(s), séparés par des virgules ; défaut selo
 
 
 def split_of(args, role="test"):
-    return args.split or getattr(DATASETS[args.dataset], role)
+    return args.split or getattr(info(args.dataset), role)
 
 
 def load_args(args, role="test"):

@@ -142,6 +142,20 @@ def test_crowdhuman(tmp_path):
     np.testing.assert_allclose(s["xyxy"][1], [91, 1, 100, 50])  # fbox bornée à l'image
 
 
+def test_crowdhuman_visible(tmp_path):
+    # T27.0: visible fraction |vbox ∩ fbox| / |fbox|, NaN without vbox.
+    _image(tmp_path / "Images" / "1,ab.jpg", 100, 50)
+    line = {"ID": "1,ab", "gtboxes": [
+        {"tag": "person", "fbox": [10, 5, 20, 20], "vbox": [10, 5, 20, 10]},
+        {"tag": "person", "fbox": [40, 5, 10, 10], "vbox": [35, 0, 30, 30]},
+        {"tag": "person", "fbox": [60, 5, 10, 10]},
+        {"tag": "person", "fbox": [200, 5, 10, 10], "vbox": [200, 5, 5, 5]},  # off the image
+        {"tag": "other", "fbox": [0, 0, 5, 5]}]}
+    (tmp_path / "annotation_val.odgt").write_text(json.dumps(line) + "\n")
+    (s,) = D.load("crowdhuman", tmp_path, "val")
+    np.testing.assert_allclose(s["visible"], [0.5, 1.0, np.nan])  # clipped box dropped too
+
+
 def test_crowdhuman_images_val(tmp_path):
     # Version Kaggle : images de val dans Images_val/.
     _image(tmp_path / "Images_val" / "1,ab.jpg", 100, 50)
@@ -291,6 +305,7 @@ def test_prewid(tmp_path):
     assert full["labels"].tolist() == [0] and len(empty["labels"]) == 0
     (s,) = D.load("prewid", tmp_path, "test:CAM3")
     assert s["id"] == "210900_CAM3"
+    assert (s["camera"], s["frame"]) == ("CAM3", 210900)  # sequences of T27.4
     for n in (20, 80):
         view = D.eval_view("prewid", n)
         assert view.names == ("person",) and view.gt_lut.tolist() == [0]
@@ -348,20 +363,20 @@ def test_kitti_on_voc():
     assert v.det_lut[VOC_CLASSES.index("dog")] == -1
 
 
-@pytest.mark.parametrize("name", sorted(D.DATASETS))
+@pytest.mark.parametrize("name", sorted(D.DATASETS) + sorted(D.EVAL_ONLY))
 @pytest.mark.parametrize("n", [20, 80])
 def test_mappings_valid(name, n):
     """Toute correspondance vise des classes existantes et ses sources sont des classes du jeu."""
     fam = "voc" if n == 20 else "coco"
-    if name != fam and n != len(D.DATASETS[name].classes) and (name, fam) not in D.MAPPINGS:
+    if name != fam and n != len(D.info(name).classes) and (name, fam) not in D.MAPPINGS:
         with pytest.raises(ValueError):  # ASL, TrashNet: no class in VOC or COCO
             D.eval_view(name, n)
         return
     v = D.eval_view(name, n)
-    assert len(v.names) >= 1 and len(v.gt_lut) == len(D.DATASETS[name].classes)
+    assert len(v.names) >= 1 and len(v.gt_lut) == len(D.info(name).classes)
     m = D.MAPPINGS.get((name, "voc" if n == 20 else "coco"))
     if m:
-        assert set(m) <= set(D.DATASETS[name].classes)
+        assert set(m) <= set(D.info(name).classes)
 
 
 def test_model_family_error():
@@ -386,3 +401,57 @@ def test_remap_detections():
 def test_tag():
     assert D.tag("voc", "2007:test") == ""
     assert D.tag("coco", "val2017") == "coco-val2017"
+
+
+def _mot_seq(root, name, frames, gt):
+    d = root / "train" / f"{name}-FRCNN"
+    for f in range(1, frames + 1):
+        _image(d / "img1" / f"{f:06d}.jpg", 100, 50)
+    (d / "gt").mkdir(parents=True, exist_ok=True)
+    (d / "gt" / "gt.txt").write_text("".join(",".join(map(str, r)) + "\n" for r in gt))
+    (d / "seqinfo.ini").write_text(
+        f"[Sequence]\nname={name}\nimDir=img1\nframeRate=30\nseqLength={frames}\n"
+        "imWidth=100\nimHeight=50\nimExt=.jpg\n")
+
+
+def test_mot17(tmp_path):
+    # frame, id, left, top, w, h, consider, class, visibility (1-based pixels)
+    _mot_seq(tmp_path, "MOT17-02", 3, [
+        (1, 7, 11, 6, 20, 20, 1, 1, 0.8),
+        (1, 8, 41, 6, 10, 10, 1, 7, 1.0),   # static person: difficult
+        (1, 9, 61, 6, 10, 10, 1, 3, 1.0),   # car: dropped
+        (2, 7, 12, 6, 20, 20, 0, 1, 0.2),   # consider 0: difficult
+    ])
+    _mot_seq(tmp_path, "MOT17-04", 1, [(1, 1, 1, 1, 10, 10, 1, 1, 1.0)])
+    s = D.load("mot17", tmp_path)
+    assert [x["id"] for x in s] == ["MOT17-02_000001", "MOT17-02_000002", "MOT17-02_000003",
+                                    "MOT17-04_000001"]
+    for x in s:
+        _check(x)
+    a = s[0]
+    np.testing.assert_allclose(a["xyxy"][0], [11, 6, 30, 25])
+    assert a["difficult"].tolist() == [False, True] and a["track"].tolist() == [7, 8]
+    np.testing.assert_allclose(a["visible"], [0.8, 1.0])
+    assert s[1]["difficult"].tolist() == [True] and len(s[2]["labels"]) == 0
+    assert (a["sequence"], a["frame"], a["fps"]) == ("MOT17-02", 1, 30)
+    assert len(D.load("mot17", tmp_path, "train:MOT17-04")) == 1
+    with pytest.raises(FileNotFoundError):
+        D.load("mot17", tmp_path, "train:MOT17-09")
+    assert D.eval_view("mot17", 80).names == ("person",)
+
+
+def test_industrial(tmp_path):
+    # T27.6: an empty folder gives a clear message.
+    with pytest.raises(FileNotFoundError, match="expected layout"):
+        D.load("industrial", tmp_path)
+    _image(tmp_path / "test" / "images" / "a.jpg", 100, 50)
+    _image(tmp_path / "test" / "images" / "b.png", 100, 50)
+    (tmp_path / "test" / "labels").mkdir()
+    (tmp_path / "test" / "labels" / "a.txt").write_text("0 0.2 0.3 0.2 0.4\n")
+    with pytest.raises(FileNotFoundError, match="no label"):
+        D.load("industrial", tmp_path)
+    (tmp_path / "test" / "labels" / "b.txt").write_text("")
+    a, b = D.load("industrial", tmp_path)
+    _check(a)
+    np.testing.assert_allclose(a["xyxy"][0], [11, 6, 30, 25])
+    assert len(b["labels"]) == 0
