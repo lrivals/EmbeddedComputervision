@@ -4,6 +4,7 @@
 #   tools/get_datasets.sh <jeu>…     coco | kitti | visdrone | crowdhuman | exdark | flir
 #                                    | auair | dronevehicle | hituav | uavdt (M18) | asl (M21)
 #                                    | trashnet | pets (M32: download + tools/prep_datasets.py)
+#                                    | prewid (M38: hand-copied folder + tools/prep_datasets.py)
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
 #                                    et les dossiers bruts de M18, puis lance leurs prétraitements
@@ -29,6 +30,8 @@
 # TrashNet and Oxford-IIIT Pet (M32, docs/tasks/M32-trashnet-pets.md): downloaded here, then
 # boxed by tools/prep_datasets.py (TrashNet: M22 labeller, `pip install -e
 # "python[autolabel]"`, ≈ 1 h on CPU; Pet: trimaps, seconds).
+# PREWID (M38, docs/tasks/M38-prewid.md): downloaded by hand from Mendeley Data (the folder
+# keeps the truncated archive name), then split by tools/prep_datasets.py (seconds).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -59,6 +62,7 @@ fetch() {  # dossier url témoin : télécharge et décompresse si le témoin ma
 }
 
 # Témoin de chaque jeu (relatif à data/), source et arborescence attendue.
+PREWID_RAW="PREWID PRE-industry Worker Image Dataset for Indus/PREWID"  # name of the archive
 declare -A MARKER=(
   [voc]=VOCdevkit/VOC2007/ImageSets/Main/test.txt
   [coco]=coco/annotations/instances_val2017.json
@@ -74,6 +78,7 @@ declare -A MARKER=(
   [asl]=asl/annotations_val.json
   [trashnet]=trashnet/annotations_val.json
   [pets]=pets/annotations_val.json
+  [prewid]=prewid/annotations_val.json
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
@@ -114,6 +119,10 @@ declare -A HOWTO=(
   [pets]="https://www.robots.ox.ac.uk/~vgg/data/pets/ (images.tar.gz, annotations.tar.gz): $0 pets
     in data/Oxford-IIIT Pet/{images,annotations}/, boxes: tools/prep_datasets.py pets
     data/pets/annotations_{train,val,test}.json, data/pets/images/{train,val,test}/"
+  [prewid]="https://data.mendeley.com/datasets/xgt8kyxyrz/1 (Download All, doi:10.17632/xgt8kyxyrz.1,
+    CC BY 4.0: cite Silvestre-Blanes, Albero-Albero, Zafrilla-Muñoz, Perez Llorens (2026), PREWID,
+    Mendeley Data V1), unzipped as data/$PREWID_RAW/{01_Images,02_GroundTruth}/, then: $0 prewid
+    data/prewid/annotations_{train,val,test,lab}.json, data/prewid/images/{train,val,test,lab}/"
 )
 
 # Dossier de chaque jeu dans data/ (Dataset.root de python/yolo/data/datasets.py) : contenu
@@ -290,6 +299,16 @@ pets() {
   [[ -e "$DATA_DIR/${MARKER[pets]}" ]] || python "$ROOT/tools/prep_datasets.py" pets
 }
 
+# PREWID (M38): no automatic download; frame counts of the hand-copied folder, then the prep.
+prewid() {
+  local d="$DATA_DIR/$PREWID_RAW" cam
+  [[ -d "$d/01_Images" ]] || { echo "prewid : $d absent"; return 1; }
+  for cam in CAM0 CAM1 CAM2 CAM3 CAMLAB01; do
+    echo "prewid $cam : $(find "$d/01_Images/$cam" -name '*.jpg' | wc -l) frames"
+  done
+  [[ -e "$DATA_DIR/${MARKER[prewid]}" ]] || python "$ROOT/tools/prep_datasets.py" prewid
+}
+
 check() {
   local ds=$1
   if [[ -e "$DATA_DIR/${MARKER[$ds]}" ]]; then
@@ -300,7 +319,7 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,31p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,34p' "$0"; exit 1; }
 case "$1" in
 ready)
   shift
@@ -347,7 +366,7 @@ for ds in "$@"; do
     ;&
   check)
     for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl \
-      trashnet pets; do
+      trashnet pets prewid; do
       check "$d" || true
     done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \
@@ -367,6 +386,10 @@ for ds in "$@"; do
   trashnet|pets)
     "$ds"
     check "$ds" || status=1
+    ;;
+  prewid)
+    prewid || echo "  téléchargement manuel : ${HOWTO[prewid]}"
+    check prewid || status=1
     ;;
   visdrone|crowdhuman|exdark|flir|auair|dronevehicle|hituav|uavdt|asl)
     if ! check "$ds"; then

@@ -278,6 +278,24 @@ def test_pets(tmp_path):
         assert view.gt_lut[D.PETS_CLASSES.index("pug")] == 1 - cat
 
 
+def test_prewid(tmp_path):
+    rec = [{"image": "images/test/210500_CAM1.jpg", "width": 640, "height": 480,
+            "camera": "CAM1", "frame": 210500, "boxes": [[10, 20, 60, 200]],
+            "labels": ["person"]},
+           {"image": "images/test/210900_CAM3.jpg", "width": 640, "height": 480,
+            "camera": "CAM3", "frame": 210900, "boxes": [], "labels": []}]
+    (tmp_path / "annotations_test.json").write_text(json.dumps(rec))
+    full, empty = D.load("prewid", tmp_path)
+    _check(full)
+    _check(empty)
+    assert full["labels"].tolist() == [0] and len(empty["labels"]) == 0
+    (s,) = D.load("prewid", tmp_path, "test:CAM3")
+    assert s["id"] == "210900_CAM3"
+    for n in (20, 80):
+        view = D.eval_view("prewid", n)
+        assert view.names == ("person",) and view.gt_lut.tolist() == [0]
+
+
 @pytest.mark.parametrize("ds", ["auair", "dronevehicle", "hituav", "uavdt"])
 def test_m18_mappings(ds):
     for n in (20, 80):

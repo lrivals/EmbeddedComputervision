@@ -301,6 +301,28 @@ FICHES = {
                   "(`data/pets/rejected.json`)",
                   "breeds map to VOC / COCO `cat` and `dog` (out-of-domain baseline)"],
     },
+    # M38 (docs/tasks/M38-prewid.md): industrial person set, hand-copied from Mendeley Data.
+    "prewid": {
+        "name": "PREWID (Pre-Industry Worker Image Dataset for Industrial Environments)",
+        "source": "https://data.mendeley.com/datasets/xgt8kyxyrz/1 (doi:10.17632/xgt8kyxyrz.1)",
+        "version": "V1 (2026-06-03); split by tools/prep_datasets.py prewid",
+        "license": "CC BY 4.0. Attribution: J. Silvestre-Blanes, T. Albero-Albero, "
+                   "J. Zafrilla-Muñoz, R. Perez Llorens (2026), PREWID, Mendeley Data V1, "
+                   "Universitat Politècnica de València",
+        "sensor": "fixed industrial IP cameras in a legacy plant (CAM0-CAM3), elevated view; "
+                  "one laboratory sequence (CAMLAB01)",
+        "resolution": "640×480 (plant), 1920×1080 (lab)",
+        "classes": D.PREWID_CLASSES,
+        "official": {"train": (None, None), "val": (None, None), "test": (None, None)},
+        "objects": "workers boxed by hand on every frame (YOLO txt), partly visible and far "
+                   "workers included; empty frames kept as images with no box",
+        "notes": ["no official split: per plant camera, empty frames and worker frames each "
+                  "cut by frame number into contiguous blocks 70 / 15 / 15 (worker cuts at a "
+                  "gap in the numbers); the lab sequence is its own `lab` split",
+                  "the readme says PNG grayscale; the files are colour JPEG",
+                  "frame names are counters, not times; frame rate not published",
+                  "leave-one-camera-out splits: `loco_<camera>_{train,val,test}`"],
+    },
 }
 
 

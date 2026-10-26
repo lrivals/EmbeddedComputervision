@@ -1303,6 +1303,30 @@ QUESTIONS = {
               "leash, a few with two animals (one box over both)")
         display(Markdown(DS.md_par_classe(STATS)))
         """),
+    # PREWID (M38, docs/tasks/M38-prewid.md#stats-question).
+    "prewid": ("How far are the workers from each camera (box height per camera), and what "
+               "share of the frames is empty?", "T38.3", """
+        import json
+        from pathlib import Path
+        import numpy as np
+        from yolo.data.datasets import DATA_DIR
+        root = Path(DATA_ROOT or DATA_DIR / "prewid")
+        es = {s: json.loads((root / f"annotations_{s}.json").read_text())
+              for s in ("train", "val", "test", "lab")}
+        rows = ["| Camera | Image height | Frames | Empty (train / val / test / lab) | Boxes "
+                "| Box height px: q10 / median / q90 | Under 32 px |", "|---|---|---|---|---|---|---|"]
+        for cam in sorted({e["camera"] for v in es.values() for e in v}):
+            fr = {s: [e for e in v if e["camera"] == cam] for s, v in es.items()}
+            allf = [e for v in fr.values() for e in v]
+            h = np.array([b[3] - b[1] for e in allf for b in e["boxes"]])
+            empty = " / ".join(f"{100 * sum(not e['boxes'] for e in v) / len(v):.0f} %"
+                               if v else "-" for v in fr.values())
+            q = np.quantile(h, [0.1, 0.5, 0.9])
+            rows.append(f"| {cam} | {allf[0]['height']} | {len(allf)} | {empty} | {len(h)} "
+                        f"| {q[0]:.0f} / {q[1]:.0f} / {q[2]:.0f} | {int((h < 32).sum())} |")
+        display(Markdown("\\n".join(rows)))
+        display(Markdown(DS.md_par_classe(STATS)))
+        """),
 }
 
 

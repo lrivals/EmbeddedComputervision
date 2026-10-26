@@ -1,5 +1,5 @@
-"""M18, M21, M32 : prétraitements sur disque de tools/prep_datasets.py (DroneVehicle, UAVDT,
-ASL, Oxford-IIIT Pet, TrashNet)."""
+"""M18, M21, M32, M38 : prétraitements sur disque de tools/prep_datasets.py (DroneVehicle,
+UAVDT, ASL, Oxford-IIIT Pet, TrashNet, PREWID)."""
 
 import json
 import sys
@@ -282,3 +282,63 @@ def test_prep_trashnet(tmp_path):
     np.testing.assert_allclose(ious, [0.5])
     (ref,) = json.loads((out / "handcheck_val.json").read_text())
     assert ref["labels"] == ["metal"]
+
+
+# ---------------------------------------------------------------- M38: PREWID
+
+def test_prewid_frame_and_split():
+    assert P.prewid_frame("210430_CAM0") == 210430 and P.prewid_frame("CAMLAB01_0126") == 126
+    frames = list(range(100))
+    s = P.time_split(frames)
+    assert [sum(v == n for v in s.values()) for n in ("train", "val", "test")] == [70, 15, 15]
+    assert max(f for f in frames if s[f] == "train") < min(f for f in frames if s[f] == "val")
+    # snap: a cut never splits a run of consecutive numbers
+    s = P.time_split(list(range(6)) + [10, 11, 12] + [20, 21], snap=True)  # cut at 8 → 9
+    assert {s[f] for f in (10, 11, 12)} == {"train"} and {s[20], s[21]} == {"test"}
+    np.testing.assert_allclose(P.yolo_corners((0, 0.5, 0.5, 0.25, 0.5), 640, 480),
+                               [240, 120, 400, 360])
+    assert P.yolo_corners((0, 0.05, 0.5, 0.2, 0.2), 100, 100)[0] == 0  # clipped
+
+
+def test_prep_prewid(tmp_path):
+    from PIL import Image
+
+    src = tmp_path / "PREWID"
+    img, gt = src / "01_Images", src / "02_GroundTruth"
+    csv = ["filename;class_id;x_center;y_center;width;height"]
+    for cam, n, size in (("CAM0", 20, (64, 48)), ("CAM2", 20, (64, 48)),
+                         ("CAMLAB01", 4, (96, 54))):
+        (img / cam).mkdir(parents=True)
+        (gt / f"GT_{cam}").mkdir(parents=True)
+        # plant: 10 consecutive empty frames, then 10 workers apart (gaps in the numbers)
+        frames = range(n) if cam == "CAMLAB01" else list(range(10)) + list(range(20, 40, 2))
+        for k, i in enumerate(frames):
+            stem = f"CAMLAB01_{i:04d}" if cam == "CAMLAB01" else f"2100{i:02d}_{cam}"
+            Image.new("RGB", size).save(img / cam / f"{stem}.jpg")
+            rows = [] if k < n // 2 else ["0 0.5 0.5 0.25 0.5"]  # empty frames first
+            (gt / f"GT_{cam}" / f"{stem}.txt").write_text("".join(r + "\n" for r in rows))
+            csv += [f"{stem}.txt;" + r.replace(" ", ";") for r in rows]
+    csv[-1] = csv[-1].replace("0.25", "0.3")  # a lab row that disagrees with its txt
+    (gt / "groundtruth.csv").write_text("\n".join(csv) + "\n")
+    out = tmp_path / "prewid"
+    records, issues = P.prep_prewid(src, out)
+    assert issues["csv"] == ["CAMLAB01_0003"] and issues["small"] == []
+    assert sum(len(r) for r in records.values()) == 44 and len(records["lab"]) == 4
+    for sp in ("train", "val", "test"):  # empty frames and workers in every split
+        es = json.loads((out / f"annotations_{sp}.json").read_text())
+        assert {e["camera"] for e in es} == {"CAM0", "CAM2"}
+        assert any(not e["boxes"] for e in es) and any(e["boxes"] for e in es)
+    e = next(e for e in records["train"] if e["boxes"])
+    assert e["boxes"] == [[24, 12, 40, 36]] and e["labels"] == ["person"]
+    assert (out / e["image"]).stat().st_nlink == 2  # hard link to the raw frame
+    loco = json.loads((out / "annotations_loco_CAM2_test.json").read_text())
+    assert len(loco) == 20 and {e["camera"] for e in loco} == {"CAM2"}
+    assert {e["camera"] for e in json.loads(
+        (out / "annotations_loco_CAM2_train.json").read_text())} == {"CAM0"}
+    from yolo.data import datasets as D
+
+    assert len(D.load("prewid", out, "test:CAM0")) == len(
+        [e for e in records["test"] if e["camera"] == "CAM0"])
+    assert len(D.load("prewid", out, "lab")) == 4
+    P.prewid_preview(out, tmp_path / "preview.png")
+    assert (tmp_path / "preview.png").exists()

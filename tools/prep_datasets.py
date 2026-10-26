@@ -5,6 +5,7 @@
     python tools/prep_datasets.py asl [--preview build/asl.png]  # → data/asl/ (M21)
     python tools/prep_datasets.py pets [--preview build/pets_preview.png]          # M32
     python tools/prep_datasets.py trashnet [--preview build/trashnet_preview.png]  # M32
+    python tools/prep_datasets.py prewid [--preview build/prewid_preview.png]      # M38
 
 - **dronevehicle** (version Roboflow YOLO-OBB, `data/DroneVehicle Dataset/`) : le cadre
   blanc de 100 px autour de l'image 640×512 est recadré ; chaque boîte orientée (4 coins)
@@ -44,6 +45,14 @@
   predictions are cached in `data/trashnet/autolabel.json` (format of
   tools/autolabel_io.py); the annotations are rebuilt from it at each run. Split 70 / 15 /
   15 stratified by class. See docs/tasks/M32-trashnet-pets.md.
+- **prewid** (PREWID, hand-copied in `data/PREWID PRE-industry Worker Image Dataset for
+  Indus/PREWID/`, M38): boxes from the per-frame YOLO txt of `02_GroundTruth/GT_<camera>/`,
+  checked against the CSVs (`data/prewid/checks.json`); empty frames kept as images with no
+  box. Each plant camera is cut by frame number into contiguous blocks 70 / 15 / 15 (train /
+  val / test); the lab sequence is the `lab` split; `annotations_loco_<camera>_<split>.json`
+  hold one plant camera out (train / val: the other three, test: all its frames). Output
+  `data/prewid/annotations_{train,val,test,lab}.json` and `data/prewid/images/<split>/`
+  (hard links). See docs/tasks/M38-prewid.md.
 
 Idempotent : un fichier de sortie présent n'est pas refait. AU-AIR et HIT-UAV n'ont pas de
 prétraitement sur disque (liens de `tools/get_datasets.sh local`).
@@ -63,8 +72,8 @@ sys.path.insert(0, str(ROOT / "python"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from yolo.data.datasets import (  # noqa: E402
-    ASL_CLASSES, ASL_VAL_FROM, DRONEVEHICLE_CLASSES, PETS_CATS, PETS_CLASSES, TRASHNET_CLASSES,
-    UAVDT_CLASSES)
+    ASL_CLASSES, ASL_VAL_FROM, DRONEVEHICLE_CLASSES, PETS_CATS, PETS_CLASSES, PREWID_CLASSES,
+    TRASHNET_CLASSES, UAVDT_CLASSES)
 
 DATA = ROOT / "data"
 BORDER = 100  # px de cadre blanc de DroneVehicle de chaque côté (840×712 → 640×512)
@@ -927,15 +936,172 @@ def trashnet_handcheck_iou(out, result):
               f"q10 {np.quantile(ious, 0.1):.3f}, < 0.5 : {int((ious < 0.5).sum())}")
     return ious
 
+# -------------------------------------------------------------------------------- PREWID
+
+PREWID_RAW = "PREWID PRE-industry Worker Image Dataset for Indus/PREWID"
+PREWID_CAMERAS = ("CAM0", "CAM1", "CAM2", "CAM3")  # plant cameras, 640×480
+PREWID_LAB = "CAMLAB01"           # lab sequence, 1920×1080: its own `lab` split
+PREWID_SPLIT = (0.7, 0.15, 0.15)  # train, val, test: contiguous time blocks per camera
+PREWID_MIN_SIDE = 4               # px: a smaller box side is reported (kept)
+PREWID_CSV_TOL = 1e-5             # txt and CSV values must agree to this
+
+
+def prewid_frame(stem):
+    """Frame number of a PREWID name: `210430_CAM0` → 210430, `CAMLAB01_0126` → 126."""
+    return int(next(p for p in stem.split("_") if p.isdigit()))
+
+
+def prewid_rows(lines):
+    """YOLO lines `class cx cy w h` → [(class, cx, cy, w, h)]."""
+    rows = []
+    for ln in lines:
+        f = ln.replace(";", " ").split()
+        if f:
+            rows.append((int(f[0]), *(float(v) for v in f[1:5])))
+    return rows
+
+
+def prewid_csv(path):
+    """`groundtruth*.csv` (`;`-separated, one row per box) → {txt name: rows}."""
+    out = {}
+    for ln in path.read_text().splitlines()[1:]:
+        name, _, rest = ln.partition(";")
+        if name:
+            out.setdefault(name.strip(), []).extend(prewid_rows([rest]))
+    return out
+
+
+def yolo_corners(row, width, height):
+    """(class, cx, cy, w, h) normalised → [x0, y0, x1, y1] in pixels, clipped to the image."""
+    _, cx, cy, w, h = row
+    return [round(min(max(v, 0.0), lim), 2)
+            for v, lim in (((cx - w / 2) * width, width), ((cy - h / 2) * height, height),
+                           ((cx + w / 2) * width, width), ((cy + h / 2) * height, height))]
+
+
+def time_split(frames, shares=PREWID_SPLIT, names=("train", "val", "test"), snap=False):
+    """Frame numbers → {frame: split}: sorted, cut into contiguous blocks of `shares`. With
+    `snap`, each cut moves forward to the next gap in the numbers, so a run of consecutive
+    frames (one worker, near duplicates) stays on one side."""
+    frames = sorted(frames)
+    out, start, cum = {}, 0, 0.0
+    for name, share in zip(names, shares):
+        cum += share
+        end = len(frames) if name == names[-1] else max(round(cum * len(frames)), start)
+        while snap and 0 < end < len(frames) and frames[end] - frames[end - 1] == 1:
+            end += 1
+        out.update((f, name) for f in frames[start:end])
+        start = end
+    return out
+
+
+def prep_prewid(src, out):
+    """Per-frame YOLO txt → corners; empty frames kept; time-block split of each plant
+    camera, `lab` split, leave-one-camera-out files. Returns the report counters."""
+    from PIL import Image
+
+    img_dir, gt = src / "01_Images", src / "02_GroundTruth"
+    csv = {}
+    for f in sorted(gt.glob("groundtruth*.csv")):
+        csv.update(prewid_csv(f))
+    records = {s: [] for s in ("train", "val", "test", "lab")}
+    issues = {"csv": [], "small": []}
+    seen = set()
+    cams = [c for c in PREWID_CAMERAS + (PREWID_LAB,) if (img_dir / c).is_dir()]
+    for cam in cams:
+        stems = sorted((p.stem for p in (img_dir / cam).glob("*.jpg")), key=prewid_frame)
+        txts = {p.stem for p in (gt / f"GT_{cam}").glob("*.txt")}
+        if set(stems) != txts:
+            raise ValueError(f"PREWID {cam}: images without txt "
+                             f"{sorted(set(stems) - txts)[:5]}, txt without image "
+                             f"{sorted(txts - set(stems))[:5]}")
+        rows_of = {s: prewid_rows((gt / f"GT_{cam}" / f"{s}.txt").read_text().splitlines())
+                   for s in stems}
+        if cam == PREWID_LAB:
+            split = dict.fromkeys(map(prewid_frame, stems), "lab")
+        else:  # empty frames come in long blocks: cut them apart from the worker frames
+            split = time_split(prewid_frame(s) for s in stems if not rows_of[s])
+            split.update(time_split((prewid_frame(s) for s in stems if rows_of[s]), snap=True))
+        for stem in stems:
+            frame = prewid_frame(stem)
+            sp = split[frame]
+            with Image.open(img_dir / cam / f"{stem}.jpg") as img:
+                width, height = img.size
+            rows = rows_of[stem]
+            if any(r[0] != 0 for r in rows):
+                raise ValueError(f"PREWID {stem}: class other than 0")
+            ref = csv.get(f"{stem}.txt", [])
+            seen.add(f"{stem}.txt")
+            if len(ref) != len(rows) or any(abs(a - b) > PREWID_CSV_TOL
+                                            for r, c in zip(rows, ref) for a, b in zip(r, c)):
+                issues["csv"].append(stem)
+            boxes = [yolo_corners(r, width, height) for r in rows]
+            issues["small"] += [stem for b in boxes
+                                if min(b[2] - b[0], b[3] - b[1]) < PREWID_MIN_SIDE]
+            (out / "images" / sp).mkdir(parents=True, exist_ok=True)
+            _link(img_dir / cam / f"{stem}.jpg", out / "images" / sp / f"{stem}.jpg")
+            records[sp].append({"image": f"images/{sp}/{stem}.jpg", "width": width,
+                                "height": height, "camera": cam, "frame": frame,
+                                "boxes": boxes, "labels": ["person"] * len(boxes)})
+    issues["csv"] += sorted(set(csv) - seen)  # CSV rows of a frame that does not exist
+    plant = records["train"] + records["val"] + records["test"]
+    for held in (c for c in cams if c != PREWID_LAB):  # leave one camera out (T38.7)
+        loco = {"train": [e for e in records["train"] if e["camera"] != held],
+                "val": [e for e in records["val"] if e["camera"] != held],
+                "test": [e for e in plant if e["camera"] == held]}
+        for sp, es in loco.items():
+            (out / f"annotations_loco_{held}_{sp}.json").write_text(
+                json.dumps(es, separators=(",", ":")))
+    (out / "annotations_lab.json").write_text(json.dumps(records["lab"], separators=(",", ":")))
+    write_split_files(out, records, [], PREWID_CLASSES)  # val last: the marker
+    (out / "checks.json").write_text(json.dumps(issues, indent=0))
+    prewid_report(records, issues)
+    return records, issues
+
+
+def prewid_report(records, issues):
+    print(f"{'prewid':8} {'split':6} {'frames':>7} {'empty':>6} {'boxes':>6}")
+    for cam in PREWID_CAMERAS + (PREWID_LAB,):
+        for sp, es in records.items():
+            es = [e for e in es if e["camera"] == cam]
+            if es:
+                print(f"{cam:8} {sp:6} {len(es):7} {sum(not e['boxes'] for e in es):6} "
+                      f"{sum(len(e['boxes']) for e in es):6}")
+    for sp, es in records.items():
+        print(f"prewid {sp} : {len(es)} frames, {sum(not e['boxes'] for e in es)} empty, "
+              f"{sum(len(e['boxes']) for e in es)} boxes")
+    n = sum(len(es) for es in records.values())
+    print(f"prewid : {n} frames, {len(issues['csv'])} disagreements with the CSVs"
+          + (f" ({', '.join(issues['csv'][:5])})" if issues["csv"] else "")
+          + f", {len(issues['small'])} boxes under {PREWID_MIN_SIDE} px")
+
+
+def prewid_preview(out, dest):
+    """Per camera, an empty frame and the frame with the most workers (T38.1)."""
+    entries = [e for s in ("train", "val", "test", "lab")
+               for e in json.loads((out / f"annotations_{s}.json").read_text())]
+    picks = []
+    for cam in PREWID_CAMERAS + (PREWID_LAB,):
+        es = [e for e in entries if e["camera"] == cam]
+        if not es:
+            continue
+        empty = [e for e in es if not e["boxes"]]
+        if empty:
+            picks.append(empty[len(empty) // 2])
+        picks.append(max(es, key=lambda e: len(e["boxes"])))
+    grid_preview(out, dest, picks, lambda e: f"{e['camera']} {e['frame']} ({len(e['boxes'])})",
+                 cols=len(picks) // 2 or 1)
+    print(f"prewid preview : {len(picks)} frames → {dest}")
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("datasets", nargs="+",
-                    choices=("dronevehicle", "uavdt", "asl", "trashnet", "pets"))
+                    choices=("dronevehicle", "uavdt", "asl", "trashnet", "pets", "prewid"))
     ap.add_argument("--src", type=Path, default=None,
                     help="dossier brut (défaut : data/DroneVehicle Dataset/"
                          "DroneVehiclesDatasetYOLO, data/UAVDT Dataset, data/ASL Alphabet, "
-                         "data/TrashNet, data/Oxford-IIIT Pet)")
+                         "data/TrashNet, data/Oxford-IIIT Pet, data/PREWID…/PREWID)")
     ap.add_argument("--out", type=Path, default=None,
                     help="sortie (défaut : data/<dataset>)")
     ap.add_argument("--keep-border", action="store_true",
@@ -944,7 +1110,7 @@ def main():
                     help="processes (TrashNet: labeller processes of "
                          f"{TRASHNET_THREADS} threads, default 3)")
     ap.add_argument("--preview", type=Path, default=None,
-                    help="ASL, TrashNet, Pet: also write a grid of boxes (val images)")
+                    help="ASL, TrashNet, Pet, PREWID: also write a grid of boxes")
     ap.add_argument("--handcheck", type=Path, default=None,
                     help="TrashNet: copy 100 val images there for a hand check in the M22 "
                          "editor (T32.3)")
@@ -970,6 +1136,11 @@ def main():
             prep_pets(args.src or DATA / PETS_RAW, out, jobs=args.jobs)
             if args.preview:
                 pets_preview(out, args.preview)
+        elif ds == "prewid":
+            out = args.out or DATA / "prewid"
+            prep_prewid(args.src or DATA / PREWID_RAW, out)
+            if args.preview:
+                prewid_preview(out, args.preview)
         else:
             out = args.out or DATA / "trashnet"
             prep_trashnet(args.src or DATA / TRASHNET_RAW, out, jobs=args.jobs)

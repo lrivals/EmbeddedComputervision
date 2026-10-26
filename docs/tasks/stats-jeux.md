@@ -24,6 +24,7 @@ anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0
 | exdark | 12 | 5 563 | 17 498 | 2 | 18,1 % | 1,0 % | 0,74 % | 0 | 33 | 0,615 |
 | flir | 15 | 11 886 | 191 728 | 15 | 85,6 % | 50,7 % | 17,70 % | 0 | 133 | 0,564 |
 | pets | 37 | 6 964 | 6 964 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 114 | 0,824 |
+| prewid | 1 | 3 413 | 1 924 | 1 | 38,5 % | 0,4 % | 0,16 % | 0 | 138 | 0,777 |
 <!-- /data_stats:comparatif -->
 
 ## VOC
@@ -195,3 +196,41 @@ The mask splits into several parts over 1 % of the image on **131 of 7 332** ima
 (1.8 %). On the 48 that were checked by eye, almost all show one animal cut apart by a coat,
 a hand, a collar or a leash. Only about three show two animals, which then get one box over
 both. So the body box is the union of the mask, not one box per part (T32.5).
+
+## PREWID
+
+<!-- data_stats:prewid -->
+Révision `fba540c`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-prewid.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset prewid --split train,test --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 2 821 | 1 581 | 0 | 1 348 | 1 / 3 | 37,5 % | 13x13 5,1 % · 26x26 0,3 % | 0,00 % | 0 / 0 |
+| test | 592 | 343 | 0 | 289 | 1 / 2 | 42,9 % | 13x13 1,7 % · 26x26 0,6 % | 0,87 % | 0 / 0 |
+| ensemble | 3 413 | 1 924 | 0 | 1 637 | 1 / 3 | 38,5 % | 13x13 4,5 % · 26x26 0,4 % | 0,16 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 2 821 | 1 581 | — / — | ok |
+| test | 592 | 343 | — / — | ok |
+<!-- /data_stats:prewid -->
+
+**Question (T38.3): how far are the workers from each camera (box height per camera), and
+what share of the frames is empty?** Box height in pixels of the native frame (480 rows for
+the plant cameras, 1080 for the lab), with the share of empty frames per split:
+
+| Camera | Frames | Empty (train / val / test / lab) | Boxes | Box height px: q10 / median / q90 | Under 32 px |
+|---|---|---|---|---|---|
+| CAM0 | 1 001 | 62 % / 63 % / 64 % / – | 391 | 60 / 89 / 179 | 0 |
+| CAM1 | 1 000 | 30 % / 32 % / 31 % / – | 753 | 60 / 111 / 195 | 3 |
+| CAM2 | 1 000 | 40 % / 41 % / 41 % / – | 657 | 48 / 71 / 107 | 37 |
+| CAM3 | 1 002 | 59 % / 59 % / 60 % / – | 447 | 87 / 152 / 240 | 0 |
+| CAMLAB01 | 3 000 | – / – / – / 48 % | 1 574 | 115 / 392 / 719 | 7 |
+
+CAM2 sees the workers farthest away (median 71 px, 37 boxes under 32 px, at the back of the
+aisle), CAM3 the closest (median 152 px). At the 416 input a plant frame shrinks by 0.65, so
+a CAM2 worker is a median 46 px high and about 15 px wide: 38.5 % of the boxes are "small"
+at the input although almost none is smaller than a fine cell (the boxes are tall and
+narrow; k-means anchors 15×37 to 82×88, `results/anchors_prewid.md`). **Empty frames are
+45 % of the plant frames and 48 % of the lab ones**; the split keeps the same share in train,
+val and test for each camera (empty frames and worker frames are cut separately, T38.1), so
+`test` has 289 empty frames to measure false alarms on.

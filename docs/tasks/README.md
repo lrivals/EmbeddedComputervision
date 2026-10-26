@@ -47,6 +47,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M35](M35-yolov8n.md) | YOLOv8n without PyTorch (optional) | C2f, decoupled head and DFL in forward and backward; task-aligned assigner, BCE + CIoU + DFL loss; training and integer DFL |
 | [M36](M36-explanation.md) | Decision explanation (optional) | why a box is detected or a person missed: gradient, perturbation and exact integer attributions at the three stages, miss causes, concepts, training recorder and CKA, `make explain` viewer, on-chip CAM |
 | [M37](M37-notebooks-recent-models.md) | Notebooks of the recent models (optional) | COCO and VOC notebooks of YOLOv5n, YOLOv7-tiny and YOLOv8n: COCO inference, VOC out-of-domain inference, fine-tuning and fine-tuned inference, from the M14 generator |
+| [M38](M38-prewid.md) | PREWID industrial workers (optional) | PREWID (CC BY 4.0) in the dataset chain with a time split and empty frames kept; out-of-domain and fine-tuned person AP; the M27 metrics (miss rate at fixed FPPI, per distance and camera, on sequences) on industrial footage |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -148,6 +149,10 @@ graph LR
   M33 --> M37
   M34 --> M37
   M35 --> M37
+  M11 --> M38[M38]
+  M16 --> M38
+  M15 -.-> M38
+  M27 -.-> M38
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
@@ -245,3 +250,4 @@ progress per milestone here.
 | M35 | 8 | 5 (T35.0-T35.2, T35.4, T35.5: `yolov8n.pt` described from its YAML (8.74 GFLOPs), C2f and DFL head with gradchecks, network == torch to 1.7·10⁻¹³, decoded boxes == torch, TAL and BCE + CIoU + DFL loss == Ultralytics (5·10⁻⁷); T35.3 COCO mAP and T35.6 VOC run waiting on CPU runs; T35.7 waits for T33.8) |
 | M36 | 12 | 2 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |
 | M37 | 7 | 1 |
+| M38 | 12 | 7 (T38.0-T38.6: data chain with empty and worker frames cut apart, 7,003 frames, 0 CSV disagreement; loader with per-camera splits; notebooks, stats, Drive; out-of-domain person AP50 on test: v4-tiny 89.9, v7-tiny 89.7, v3-tiny 63.7, v2-tiny 25.5, CAM2 worst; T38.7 GPU and T38.8-T38.10 waiting for M27) |

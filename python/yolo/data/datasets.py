@@ -78,6 +78,9 @@ PETS_CLASSES = (
     "staffordshire_bull_terrier", "wheaten_terrier", "yorkshire_terrier",
 )
 PETS_CATS = tuple(c for c in PETS_CLASSES if c[0].isupper())
+# PREWID (M38, docs/tasks/M38-prewid.md): workers seen by fixed cameras in legacy plants;
+# empty frames are kept (no box), they are where false alarms are counted.
+PREWID_CLASSES = ("person",)
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
 PER_OBJECT = ("boxes", "xyxy", "labels", "difficult", "area", "crowd")
@@ -420,11 +423,13 @@ def load_uavdt(root, split):
 ASL_VAL_FROM = 2551  # frames n° 2551-3000 of each class: val split (M21, no random split)
 
 
-def _load_json_split(root, split, classes):
+def _load_json_split(root, split, classes, keep=None):
     """`root/annotations_<split>.json` written by tools/prep_datasets.py (continuous corners,
-    class names, image paths relative to `root`) → samples."""
+    class names, image paths relative to `root`) → samples; `keep(entry)` filters them."""
     out = []
     for a in json.loads((root / f"annotations_{split}.json").read_text()):
+        if keep and not keep(a):
+            continue
         labels = [classes.index(c) for c in a["labels"]]
         out.append(make_sample(Path(a["image"]).stem, root / a["image"], a["width"],
                                a["height"], a["boxes"], labels, np.zeros(len(labels), bool)))
@@ -448,6 +453,15 @@ def load_pets(root, split):
     """Output of `tools/prep_datasets.py pets`: whole-body boxes from the trimaps (one per
     mask component), `test` = official test.txt, `train` / `val` from trainval.txt."""
     return _load_json_split(root, split, PETS_CLASSES)
+
+
+def load_prewid(root, split):
+    """Output of `tools/prep_datasets.py prewid`: `train` / `val` / `test` = contiguous time
+    blocks of each plant camera, `lab` = the lab sequence, `loco_<camera>_<split>` = leave
+    one camera out. `<split>:<camera>` keeps the frames of one camera (`test:CAM2`)."""
+    name, _, camera = split.partition(":")
+    return _load_json_split(root, name, PREWID_CLASSES,
+                            (lambda a: a["camera"] == camera) if camera else None)
 
 
 @dataclass(frozen=True)
@@ -489,6 +503,9 @@ DATASETS = {
     "trashnet": Dataset(TRASHNET_CLASSES, _splits(load_trashnet), "trashnet", "test", "train",
                         "train"),
     "pets": Dataset(PETS_CLASSES, _splits(load_pets), "pets", "test", "train", "train"),
+    # M38: person only, so every pre-trained network gets a score (MAPPINGS).
+    "prewid": Dataset(PREWID_CLASSES, _splits(load_prewid), "prewid", "test", "train",
+                      "train"),
 }
 
 
@@ -544,6 +561,8 @@ MAPPINGS = {
     # M32: each breed to its species.
     ("pets", "voc"): {c: "cat" if c in PETS_CATS else "dog" for c in PETS_CLASSES},
     ("pets", "coco"): {c: "cat" if c in PETS_CATS else "dog" for c in PETS_CLASSES},
+    ("prewid", "voc"): {"person": "person"},
+    ("prewid", "coco"): {"person": "person"},
 }
 
 FAMILIES = {"voc": VOC_CLASSES, "coco": COCO_CLASSES}
