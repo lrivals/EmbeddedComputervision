@@ -72,6 +72,10 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   target_link_libraries(tb_fault PRIVATE accel driver)
   target_compile_definitions(tb_fault PRIVATE ACC_MODEL_DIR="${ACC_MODEL_DIR}")
   add_test(NAME tb_fault COMMAND tb_fault)
+  # T39.5: integer failure head (C-sim), checked against Python by test_failure.py.
+  add_executable(tb_failure tb/tb_failure.cpp)
+  target_include_directories(tb_failure PRIVATE kernels)
+  target_compile_options(tb_failure PRIVATE -Wall -Wextra)
 
   # T9.4.2 : architecture streaming (Tiny-YOLOv2).
   add_executable(tb_stream tb/tb_stream.cpp)

@@ -24,9 +24,14 @@ The claim of the draft is not the idea of failure prediction but its **joint tra
 the detector, its integer form and its cost on the chip. Outside the base of the spec: the
 method comes from the failure-prediction literature above.
 
-**State**: not started (2026-10-26). T39.0 waits for the operating point of
-[T27.2](M27-safety-metrics.md); everything but the exact cost of T39.6 runs on the PC or
-Colab.
+**State** (2026-10-26): the code of T39.0 to T39.5 is written and tested
+(`python/tests/test_failure.py`); reduced runs with `tiny-yolov3-coco` on COCO persons and
+PREWID test are in [results/failure_prediction.md](../../results/failure_prediction.md), at a
+**provisional** threshold of 0.25. Every task stays open until T27.2 gives the operating
+point and CrowdHuman (data and `tiny-yolov3-crowdhuman`) is on the PC; the full runs are in
+[long-runs.md](long-runs.md). T39.6 waits for T29.4. First findings: the learned head beats
+every T29.0 monitor on COCO (AUROC 0.82 against 0.77 for the max score), but on PREWID frames
+with persons the max score is better (0.94 against 0.87); integer == C-sim on the head.
 
 ### [ ] T39.0 — Failure labels
 - **Spec**: §8.3 · **Depends on**: T27.2, T38.2 · **Runs on**: PC · **Size**: M
@@ -43,6 +48,18 @@ Colab.
 - **Notes**: reuse `matched` and `classify_miss` of `python/yolo/explain/misses.py`, so a
   miss means the same thing in M36 and here. The labels depend on the operating point: a
   new threshold means new labels.
+- **Progress** (code done, full run waiting for T27.2):
+  - **Code**: `tools/failure_labels.py label` (per person: missed, cause, TCP; per image:
+    failure, top score, pooled features float and integer, split 60 / 20 / 20; person
+    detections down to 0.005 for T39.4) and `report`; `failure.person_tcp`,
+    `image_targets`, `split_of`, `feature_layers` (inputs of the last conv of each head).
+  - **Fix found on the way**: in Tiny-YOLOv3, anchor 0 belongs to no head, and
+    `misses.responsible_index` crashed on a box whose best anchor is anchor 0. Such a box now
+    counts as `no_anchor`; it is 34 % of the COCO misses at 0.25.
+  - **Reduced run**: 500 COCO persons (55 s) and 592 PREWID test frames (70 s), threshold
+    0.25. 61 % of the COCO persons missed (70 % of the images), 56 % of the PREWID persons
+    (30 % of the frames). Imbalance: 0.4 and 2.3 failure-free images per failing one.
+  - **Not run**: CrowdHuman val (data and weights not on the PC), the T27.2 threshold.
 
 ### [ ] T39.1 — Post-hoc learned monitor
 - **Spec**: §8.3 · **Depends on**: T39.0, T29.0 · **Runs on**: PC · **Size**: M
@@ -58,6 +75,17 @@ Colab.
 - **Notes**: the head stays integer-friendly (ReLU, no softmax over many classes) so T39.5
   and T39.6 need no redesign. Class imbalance: weighted loss or balanced batches, chosen on
   the validation split only.
+- **Progress** (code done, full run waiting for T39.0 at T27.2):
+  - **Code**: `yolo.infer.failure.FailureHead` (d → 32 ReLU → 1, `miss` and `tcp` targets,
+    positive weight or balanced batches), the metrics of the T29.1 protocol, the KGFP metric;
+    `tools/failure_prediction.py fit` / `eval`; `tools/ood_monitor.py compare --labels …
+    --failure …`, which also gives T29.1 its code.
+  - **Tests**: gradcheck of both losses, a rare-failure toy learned (AUROC > 0.95), the
+    metrics on hand-computed cases.
+  - **Reduced run** (test split, 100 and 119 images): COCO head AUROC 0.82 / 0.81 (float /
+    int) against 0.77 for the max score and ≤ 0.54 for the other T29.0 monitors. PREWID:
+    head 0.94 overall but 0.87 on the frames with persons, where the max score gets 0.94.
+    The head is 49 k parameters and 49 k MACs.
 
 ### [ ] T39.2 — Joint training of the detector and the failure head
 - **Spec**: §6, §7 · **Depends on**: T39.1 · **Runs on**: PC / Colab · **Size**: L
@@ -73,6 +101,19 @@ Colab.
   - gradient check of the new loss term (as for the losses of M2).
 - **Notes**: the failure labels move while the detector trains: recompute them per epoch,
   or freeze the detector for the last epochs; state which.
+- **Progress** (code done, run open on Colab):
+  - **Code**: `yolo.train.failure.FailureTerm` (asymmetric BCE, SelectiveNet coverage
+    penalty, gradient through the pooled features scaled by `weight`). The labels are
+    **recomputed at every batch** from the current detector outputs;
+    `--failure-freeze-after K` freezes the detector for the last iterations. Wired into
+    `Trainer` (log columns `fail`, `coverage`, `positives`; head in the checkpoint) and
+    `tools/train.py --failure …`.
+  - **Evaluation**: `failure_labels.py label --checkpoint` relabels with the joint
+    detector; `failure_prediction.py eval --joint` adds the jointly trained head.
+  - **Tests**: gradcheck of the term (features and head, coverage on and off), exact resume
+    from a checkpoint, detector frozen by `freeze_after`. CPU smoke run of `tools/train.py
+    --failure` passes.
+  - **Not run**: the training from `tiny-yolov3-crowdhuman` ([long-runs.md](long-runs.md)).
 
 ### [ ] T39.3 — KGFP baseline
 - **Spec**: — · **Depends on**: T39.1 · **Runs on**: PC (GPU) / Colab · **Size**: M
@@ -85,6 +126,17 @@ Colab.
   - parameters and MACs of KGFP (DINO) against the failure head.
 - **Notes**: if the code, weights or protocol are not available, the limit of the comparison
   is written instead (rule of the draft).
+- **Progress**:
+  - **Availability**: code, models and features on the Fraunhofer GitLab
+    (`iosb_public/KGFP`, arXiv 2603.25499). It needs a GPU and is built on YOLOv8 features.
+  - **Wrapper**: `tools/kgfp_baseline.py` does not import it. `metric --scores` scores a CSV
+    exported by the KGFP run on the same image ids; `cost` computes DINO ViT-B/16 from its
+    architecture: 85.8 M parameters and 17.6 GMACs, 1,743× and 357,000× the head.
+  - **Reduced run, COCO test**: person recall among the accepted images at 5 % false alarms
+    is 54 % for the max score and 50 % for the heads, against 43 % for the detector alone.
+    The paper's 84.5 % is for YOLOv8, a different detector; the limit is written in the
+    results.
+  - **Not run**: KGFP itself.
 
 ### [ ] T39.4 — Calibration against failure prediction
 - **Spec**: §8 · **Depends on**: T39.1 · **Runs on**: PC · **Size**: S
@@ -94,6 +146,13 @@ Colab.
   and after
 - **Notes**: Zhu 2024 shows the degradation on classifiers; the question is whether it holds
   on a detector.
+- **Progress**:
+  - **Code**: `yolo.infer.confidence` (ECE, AURC, temperature by NLL);
+    `yolo_loss(label_smoothing=ε)` (gradcheck in `test_loss.py`) and
+    `tools/train.py --label-smoothing`; `tools/failure_prediction.py calib [--smoothed]`.
+  - **Reduced run**: temperature 1.1-1.2 changes the ECE by less than 0.006. The failure AUROC
+    and AURC cannot move, since temperature scaling is monotone.
+  - **Not run**: the label-smoothing fine-tune, which is the actual test of Zhu 2024.
 
 ### [ ] T39.5 — Failure monitor at the three stages
 - **Spec**: §9, §10.2 · **Depends on**: T39.1, T28.0 · **Runs on**: PC (float, integer,
@@ -104,6 +163,16 @@ Colab.
   score
 - **Notes**: links to [M28](M28-equivalence.md): the equivalence matrix gets a row for the
   head.
+- **Progress** (code done, full run waiting for T39.0 at T27.2):
+  - **Code**: `yolo.quant.int_failure.IntFailureHead`: integer zero point and
+    standardization folded into the first layer, int8 per-row weights, int32 accumulators,
+    hidden layer requantized by M0/n as a conv. `IntNetwork.failure_score`.
+    `hls/kernels/failure_head.hpp` and `hls/tb/tb_failure.cpp` (C-sim, g++).
+    `tools/failure_prediction.py stages --check`. A "failure head" note under the
+    equivalence matrix (a row would break the article's per-network table).
+  - **Reduced run**: 51 KB against 197 KB in float32. AUROC float → integer 0.817 → 0.821
+    (COCO) and 0.938 → 0.901 (PREWID); the flag changes on 1 and 3 test images.
+    Integer == C-sim on all 1,092 images (also a test).
 
 ### [ ] T39.6 — Failure head in the HLS kernel
 - **Spec**: §10.2 · **Depends on**: T39.5, T29.4 · **Size**: M

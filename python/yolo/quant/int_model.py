@@ -120,6 +120,10 @@ class IntNetwork:
         self.hooks = []
         # Faulty model (T25.0): the int32 accumulator wraps instead of raising OverflowError.
         self.wrap_acc = False
+        # Failure head (T39.5): `yolo.quant.int_failure.IntFailureHead` on the integer pooled
+        # features of `failure_layers`; read by `failure_score`, the detector path ignores it.
+        self.failure_head = None
+        self.failure_layers = []
 
     def forward(self, qx, all_outputs=False):
         """`qx` : (N, 3, H, W) int8. Rend {id: tête int8} ou la liste des sorties int8."""
@@ -157,6 +161,12 @@ class IntNetwork:
         if all_outputs:
             return outs
         return {i: outs[i] for i in self.qm.outputs}
+
+    def failure_score(self, outs):
+        """(N,) int failure score of the head (T39.5) from the `all_outputs` list."""
+        from yolo.infer.failure import features_int
+
+        return self.failure_head.score(features_int(outs, self.failure_layers))
 
 
 def fake_quant_forward(fused, qm, x, layers=None, all_outputs=False):

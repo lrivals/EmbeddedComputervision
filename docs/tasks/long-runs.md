@@ -77,6 +77,9 @@ GPU (T12.11-e).
 | [T27.3](M27-safety-metrics.md) | `tools/degrade.py`, 6 degradations × 3 severities, float and int | CrowdHuman val | ≈ 1.5-7 h *(est.)* | 36 evals × 4,370 images at 66 ms (16 jobs) to 170 ms | T27.1 |
 | [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 train, float and int inference | ≈ 5,300 frames (MOT17 train) | ≈ 30 min *(est.)* | 2 × 5,300 × 0.17 s | MOT download |
 | [T38.8-T38.10](M38-prewid.md) float, int | `tools/person_safety.py`, `degrade.py` (+ grayscale), `dreaded_event.py` with `--dataset prewid`, fine-tuned and best pre-trained net | PREWID test 592, lab 3,000 | ≈ 1-3 h *(est.)* | float 46 ms/image measured (T38.6, 8 jobs): 2 nets × (3,592 + 18 degradations × 592) ≈ 25 min; the integer stage is slower (0.17-0.3 s/image in the rows above) | T27.0, T27.1, T27.3, T27.4, T38.7 |
+| [T39.0, T39.1](M39-failure-prediction.md) | `tools/failure_labels.py label --net <crowdhuman cfg> --weights … --calib … --set crowdhuman:val --conf <T27.2>`; same for `prewid:test` and `coco:val2017` (all persons, no `--n`) at the T27.2 point; then `tools/failure_labels.py report`, `tools/failure_prediction.py fit` and `eval --write`, `tools/ood_monitor.py compare --labels … --failure … --write` | CrowdHuman val 4,370, PREWID test 592, COCO val2017 ≈ 2,700 person images | ≈ 15-20 min *(est.)* | labels measured 2026-10-26: 0.11 s/image (500 COCO in 55 s, 592 PREWID in 70 s, 12 jobs); head fit ≈ 10 s | T27.2, CrowdHuman data and weights (T15.14) |
+| [T39.4](M39-failure-prediction.md) | `tools/failure_prediction.py calib --labels … --smoothed <labels of the smoothed detector> --write` | same sets | ≈ 5 min *(est.)* | one labelling pass of the smoothed detector | T39.0 at T27.2, label-smoothing fine-tune (Colab row) |
+| [T39.5](M39-failure-prediction.md) | `tools/failure_prediction.py stages --labels … --check --write` | same sets | ≈ 1 min | g++ build + scoring, measured | T39.0 at T27.2 |
 | [T29.1, T29.2](M29-runtime-monitors.md) | monitors on CrowdHuman val, T27.3 sets, ExDark; conformal threshold over 20 splits | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
 | [T32.1](M32-trashnet-pets.md) | `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png --handcheck build/trashnet_handcheck` (resumes from `data/trashnet/autolabel.json`) | TrashNet, 2,427 of 2,527 images left | ≈ 1.5-2 h with 3 processes, ≈ 3.5 h with one | stated; measured 8 s/image per process × 2,427 / 3 ≈ 1.8 h | — |
 | [T32.6](M32-trashnet-pets.md) | `python tools/eval_voc.py --dataset pets`, VOC and COCO weights → `build/m32/pets_ood.md` | Pet test 3,662 | ≈ 20 min *(est.)* | 2 × 3,662 × 0.17 s | — |
@@ -138,6 +141,8 @@ These share the CPU with the table above: one at a time, at night.
 | [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | T32.10, T32.11 |
 | [T38.7](M38-prewid.md) | `notebooks/prewid/tiny-yolov3-prewid_{sweep,train}.ipynb` (`prewid-prep` done): from COCO and from CrowdHuman, then leave-one-camera-out × 4 and `lab` added to training | PREWID 2,821 train | ≈ 12 h *(est.)* | sweep 1 h + 3 long runs × 1 h 45 + 4 LOCO × 1 h 20 + evals (test 592, lab 3,000 at 46 ms/image, 8 jobs) | CrowdHuman recipe: T15.14 |
 | [T41.8](M41-safe-unsafe-behaviours.md), [T42.6](M42-soda.md), [T43.5](M43-construction-ppe.md) | `tools/m11.sh <dataset>-prep`, `_train` notebook per dataset, then the cross-domain evaluations on PREWID test | Safe and Unsafe (T41.3 count), SODA ≈ 14,000 train *(est.)*, Construction-PPE ≈ 1,000 train | ≈ 8-10 h GPU *(est.)* | 3 × (long run 1 h 45 + evals); SODA longer at full split | T41.6, T42.4, T43.3 |
+| [T39.2](M39-failure-prediction.md) | `tools/train.py --net <crowdhuman cfg> --dataset crowdhuman --init <crowdhuman final.weights> --failure --failure-conf <T27.2> [--failure-freeze-after K] --out build/m39/joint`, then `tools/failure_labels.py label --checkpoint build/m39/joint/checkpoint.npz …` and `tools/failure_prediction.py eval --joint build/m39/joint/checkpoint.npz --write`, `kgfp_baseline.py metric --joint …` | CrowdHuman train 15,000 | ≈ 3-4 h GPU *(est.)* | fine-tune length of T15.14; labels recomputed per batch: one decode + NMS per image; CPU smoke run with the term 4 s/it at batch 4 (2026-10-26) | T39.1 at T27.2, CrowdHuman weights |
+| [T39.4](M39-failure-prediction.md) | `tools/train.py … --label-smoothing 0.1` fine-tune of the same detector | CrowdHuman train | ≈ 2 h GPU *(est.)* | short fine-tune from the CrowdHuman weights | CrowdHuman weights |
 | [T19.5](M19-english.md) | re-execute the notebooks after the template translation: stats, `analyse_balayages`, sweeps | every dataset | ≈ 1 h GPU per sweep *(est.)*, stats on the PC | sweep 6 runs × 10 min | do not run `python -m tools.notebooks all` before M26 is settled (M32) |
 
 ## Transfers
@@ -159,7 +164,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 |---|---|---|
 | PC CPU | ≈ 45 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
 | PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
-| Colab | ≈ 120-130 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h |
+| Colab | ≈ 125-135 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h, T39.2 + T39.4 fine-tunes ≈ 5-6 h |
 
 Suggested order, unblockers first:
 
@@ -178,6 +183,8 @@ graph LR
   T217[T21.7] --> T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
   T271 --> T388
+  T271 --> T272[T27.2] --> T39["T39.0, T39.1, T39.5"] --> T392["T39.2, T39.4 (Colab)"]
+  T1514 --> T392
 ```
 
 ## Inconsistencies found while listing

@@ -54,6 +54,18 @@ to T29.3 wait for the person metrics of M27.
 - **Notes**: an OOD score can be good at OOD and blind to in-domain misses: report both.
   The learned monitor of [T39.1](M39-failure-prediction.md) uses the same protocol, to be
   compared row by row.
+- **Progress** (code done in M39, 2026-10-26; full run waiting for T27.2 and T27.3):
+  - **Code**: `tools/ood_monitor.py compare --labels <labels of tools/failure_labels.py>`
+    fits norm, Mahalanobis, max score, abstraction boxes and activation patterns on the fit
+    split of a labels file and reports, on its test split: AUROC (all images, and images
+    with persons), missed persons flagged at 1 % and 5 %, system recall. Raw score or
+    typicality, chosen on val. The autoencoder is left out (full maps needed, dominated in
+    T29.0). `--failure` adds the T39.1 heads as rows.
+  - **Reduced run** (Tiny-YOLOv3 COCO, threshold 0.25 provisional, in
+    [results/failure_prediction.md](../../results/failure_prediction.md)): on COCO persons
+    every OOD score stays at AUROC 0.38-0.54 while the max score reaches 0.66-0.77, so they
+    are blind to in-domain misses, as the note expected.
+  - **Not run**: CrowdHuman val, the T27.3 sets, ExDark, at the T27.2 point.
 
 ### [ ] T29.2 — Conformal threshold for persons
 - **Spec**: §8.1 · **Depends on**: T27.2 · **Runs on**: PC · **Size**: M

@@ -4,6 +4,8 @@
     python tools/ood_monitor.py fit                 # Mahalanobis baseline + autoencoder
     python tools/ood_monitor.py eval                # AUROC, score / mAP per group, cost
     python tools/ood_monitor.py compare             # T29.0: six monitors, integer features
+    python tools/ood_monitor.py compare --labels build/m39/labels/<model>_<set>.npz \
+        [--failure build/m39/heads/<labels>_int_miss.npz]   # T29.1 protocol, T39.1 head
 
 Features: output of L13 (last backbone conv, 1024 × 13 × 13) of the integer model
 (`IntNetwork`, int8 map dequantized by its scale), `stretch` preprocessing as
@@ -382,6 +384,72 @@ def cmd_compare(args):
     print(compare_markdown(res))
 
 
+def cmd_compare_misses(args):
+    """T29.1 protocol on a labels file of T39.0 (`tools/failure_labels.py`): the monitors are
+    fitted on the fit split (pooled multi-scale features of the labelled network, integer
+    for the boxes and patterns as in T29.0), scored on the test split, against the event
+    "this image has a missed person". Raw score or typicality (median of the val split):
+    the one of best val AUROC. The autoencoder is left out (it needs the full maps; T29.0
+    found it dominated). `--failure`: learned heads of T39.1, as more rows."""
+    from failure_labels import Labels
+    from failure_prediction import load_head, metrics
+
+    L = Labels(args.labels)
+    stage = args.stage
+    fit, val = L.split == 0, L.split == 1
+    fails = getattr(L, f"miss_{stage}")
+    x = L.features(stage)
+    pi = L.feat_int.astype(np.int64)
+    d = x.shape[1]
+    maha = ood.Mahalanobis().fit(x[fit])
+    boxes = ood.AbstractionBoxes(k=args.clusters, seed=args.seed).fit(pi[fit])
+    patterns = ood.ActivationPatterns(bits=args.bits).fit(pi[fit])
+    raw = {"norm": (ood.norm(x), 0, d), "mahalanobis": (maha.score(x), d * (d + 1) * 4, d * d + d),
+           "max_score": (1.0 - getattr(L, f"top_{stage}"), 0, 1),
+           "boxes": (boxes.score(pi), boxes.memory_bytes, boxes.ops(d)),
+           "patterns": (patterns.score(pi), patterns.memory_bytes, patterns.ops(d))}
+    rows = []
+    for k, (sc, mem, ops) in raw.items():
+        best = None
+        for kind, v in (("raw", sc), ("typ", ood.typicality(sc, float(np.median(sc[val]))))):
+            auc = ood.auroc(v[val & ~fails], v[val & fails])
+            if best is None or auc > best[0]:
+                best = (auc, kind, v)
+        rows.append({"monitor": k, "variant": best[1], "memory": int(mem), "macs": int(ops),
+                     **metrics(L, stage, np.asarray(best[2], np.float64))})
+    for path in args.failure or ():
+        h, meta = load_head(path)
+        rows.append({"monitor": f"failure ({h.target}, {meta['stage']})", "variant": "learned",
+                     "memory": h.memory_bytes, "macs": h.macs,
+                     **metrics(L, stage, h.score(L.features(meta["stage"])))})
+    res = {"labels": L.name, "stage": stage, "rows": rows}
+    (args.out / f"misses_{L.name}_{stage}.json").write_text(json.dumps(res, indent=1) + "\n")
+    lines = ["| Monitor | Score | AUROC | AUROC, images with persons | Missed flagged @1 % | @5 % "
+             "| System recall @5 % | Detector recall | Memory | Ops per image |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        lines.append(f"| {r['monitor']} | {r['variant']} | {r['auroc']:.3f} | "
+                     f"{r['auroc_persons']:.3f} | "
+                     f"{r['flagged_1'] * 100:.1f} % | {r['flagged_5'] * 100:.1f} % | "
+                     f"{r['system_5'] * 100:.1f} % | {r['detector_recall'] * 100:.1f} % | "
+                     f"{r['memory']:,} B | {r['macs']:,} |")
+    print(f"{L.name}, {stage} stage, test split:")
+    print("\n".join(lines))
+    if args.write:
+        from failure_labels import write_section
+
+        write_section(f"monitors-{L.name}-{stage}", f"T29.0 monitors and learned heads against "
+                      f"missed persons: {L.name}, {stage} stage (T39.1)",
+                      MISSES_NOTE + "\n\n" + "\n".join(lines))
+
+
+MISSES_NOTE = """`tools/ood_monitor.py compare --labels … --failure …`, test split. The T29.0
+monitors are fitted on the fit split (pooled features of the labelled network, integer for
+the boxes and patterns); raw score or typicality, whichever has the better val AUROC. The
+autoencoder is left out (it needs the full maps; T29.0 found it dominated). Alarm rates are
+over all test images."""
+
+
 def compare_markdown(res):
     lines = ["| Monitor | AUROC ExDark raw / typ. | AUROC FLIR raw / typ. | FPR@95 ExDark (best) "
              "| FPR@95 FLIR (best) | Memory | Ops per image |",
@@ -413,11 +481,20 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     sub.add_parser("eval")
     p = sub.add_parser("compare")
-    p.add_argument("--monitors", default="all", help="all, or a list among " + ",".join(ALL_MONITORS))
+    p.add_argument("--monitors", default="all",
+                   help="all, or a list among " + ",".join(ALL_MONITORS))
     p.add_argument("--clusters", type=int, default=4)
     p.add_argument("--bits", type=int, default=64)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--labels", type=Path, default=None,
+                   help="T39.0 labels: T29.1 protocol (missed persons) instead of T29.0")
+    p.add_argument("--stage", choices=("float", "int"), default="int")
+    p.add_argument("--failure", type=Path, nargs="*", default=None,
+                   help="T39.1 heads (build/m39/heads/*.npz) added as rows")
+    p.add_argument("--write", action="store_true", help="section of results/failure_prediction.md")
     args = ap.parse_args()
+    if args.cmd == "compare" and args.labels:
+        return cmd_compare_misses(args)
     {"extract": cmd_extract, "fit": cmd_fit, "eval": cmd_eval,
      "compare": cmd_compare}[args.cmd](args)
 

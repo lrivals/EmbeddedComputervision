@@ -7,7 +7,9 @@ the causes form a partition:
 1. **quantization** (integer stage only): the float model, run on the same image, detects
    it. Tested first: the other causes describe the integer model's own outputs, this one says
    the float model had none of them;
-2. **no_anchor**: no anchor shape has IoU ≥ `anchor_iou` with the box (§5.1 shape IoU);
+2. **no_anchor**: no anchor shape has IoU ≥ `anchor_iou` with the box (§5.1 shape IoU), or
+   its best anchor belongs to no head (anchor 0 of Tiny-YOLOv3, masks 3,4,5 and 1,2,3): the
+   box has no responsible cell, training never gave it a target;
 3. **low_objectness**: σ(t_o) < the threshold at every candidate of the box, i.e. at the
    responsible cell and anchor (§5.1) and at every pre-NMS box with IoU ≥ `match_iou`;
 4. **class_confusion**: among them, the one of best objectness ≥ threshold has another
@@ -87,12 +89,14 @@ def matched(dets, box, cls, match_iou=MATCH_IOU):
 
 def responsible_index(net, box, grids):
     """Index, in the order of `decode`, of the cell and anchor responsible for `box` (§5.1);
-    `grids` {head id: (S_h, S_w)}."""
+    `grids` {head id: (S_h, S_w)}. `None` when its best anchor belongs to no head."""
     from yolo.data.targets import anchor_owner, responsible
 
     anchors = anchors_frac(net["anchors"], anchor_ref(net))
     r = responsible(np.asarray(box, dtype=np.float64)[None], anchors,
                     anchor_owner(heads(net)), grids)[0]
+    if r is None:
+        return None
     _, hid, a, i, j = r
     off = 0
     for h, mask in heads(net):
@@ -112,11 +116,13 @@ def classify_miss(net, box, cls, out, grids, conf_thr=CONF_THR, float_out=None,
     if float_out is not None and matched(float_out.dets, box, cls, match_iou):
         return "quantization"
     anchors = anchors_frac(net["anchors"], anchor_ref(net))
-    if iou_wh(np.asarray(box[2:4], dtype=np.float64)[None], anchors).max() < anchor_iou:
+    resp = responsible_index(net, box, grids)
+    if (iou_wh(np.asarray(box[2:4], dtype=np.float64)[None], anchors).max() < anchor_iou
+            or resp is None):
         return "no_anchor"
     ov = iou(np.asarray(box, dtype=np.float64)[None], out.boxes)[0]
     near = np.nonzero(ov >= match_iou)[0]
-    cand = np.union1d(near, [responsible_index(net, box, grids)]).astype(int)
+    cand = np.union1d(near, [resp]).astype(int)
     if out.obj[cand].max() < conf_thr:
         return "low_objectness"
     best = cand[np.argmax(out.obj[cand])]

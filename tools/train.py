@@ -17,6 +17,12 @@
     # même entraînement sur le GPU (CuPy, T12.11) ; le CPU reste le défaut et la référence
     python tools/train.py … --device gpu
 
+    # T39.2: detector and failure head trained together (labels recomputed per batch)
+    python tools/train.py --net build/m11/cfg/tiny-yolov3-crowdhuman.cfg --dataset crowdhuman \
+        --init <crowdhuman final.weights> --failure --failure-conf 0.25 --out build/m39/joint
+    # T39.4: class label smoothing ε = 0.1
+    python tools/train.py … --label-smoothing 0.1
+
     # affinage sur un autre jeu (T11.4, T11.5, T11.7) : cfg à N classes de tools/make_cfg.py,
     # poids COCO hors têtes
     python tools/train.py --net build/m11/cfg/tiny-yolov3-kitti.cfg --dataset kitti \
@@ -59,6 +65,19 @@ from yolo.train.trainer import Trainer, copy_matching  # noqa: E402
 # Source de `--init coco` : toute cfg Tiny-YOLOv3 (VOC, ou à N classes de tools/make_cfg.py) ;
 # les couches de forme différente (les têtes) restent à l'initialisation de He.
 COCO_WEIGHTS = ("tiny-yolov3-coco", ROOT / "weights" / "yolov3-tiny.weights")
+
+
+def failure_term(args, spec):
+    """T39.2: `FailureTerm` of the options, or None."""
+    if not args.failure:
+        return None
+    from yolo.train.failure import FailureTerm
+
+    return FailureTerm(spec, hidden=args.failure_hidden, pos_weight=args.failure_pos_weight,
+                       coverage=args.failure_coverage, lam=args.failure_lambda,
+                       weight=args.failure_weight, cls=args.failure_class,
+                       conf=args.failure_conf, lr=args.failure_lr,
+                       freeze_after=args.failure_freeze_after, seed=args.seed)
 
 
 def init_weights(net, name, init, dtype, init_net=None):
@@ -137,6 +156,24 @@ def main():
     ap.add_argument("--corrupt", type=float, default=0.0,
                     help="part des images aux labels tirés au hasard (T36.7) ; "
                          "indices dans <out>/corrupted.json")
+    ap.add_argument("--label-smoothing", type=float, default=0.0,
+                    help="T39.4: class targets 1 − ε/2, ε/2")
+    ap.add_argument("--failure", action="store_true",
+                    help="T39.2: failure head trained with the detector")
+    ap.add_argument("--failure-weight", type=float, default=1.0,
+                    help="scale of the head gradient reaching the detector (0: none)")
+    ap.add_argument("--failure-pos-weight", type=float, default=4.0,
+                    help="weight of the images with a missed person")
+    ap.add_argument("--failure-coverage", type=float, default=0.9,
+                    help="SelectiveNet target coverage (share of images without alarm)")
+    ap.add_argument("--failure-lambda", type=float, default=1.0)
+    ap.add_argument("--failure-conf", type=float, default=0.25,
+                    help="operating point of the labels (T27.2; provisional 0.25)")
+    ap.add_argument("--failure-class", type=int, default=0, help="person class of the network")
+    ap.add_argument("--failure-hidden", type=int, default=32)
+    ap.add_argument("--failure-lr", type=float, default=1e-3)
+    ap.add_argument("--failure-freeze-after", type=int, default=None,
+                    help="iteration from which only the head trains (labels then fixed)")
     ap.add_argument("--no-figures", action="store_true",
                     help="pas de courbes dans <out>/figures/ (M13 ; aussi YOLO_FIGURES=0)")
     args = ap.parse_args()
@@ -183,7 +220,8 @@ def main():
                       size=None if args.multiscale else input_size(net.net, args.size),
                       seed=args.seed,
                       log_path=args.out / "loss.csv", grad_hook=grad_hook,
-                      ignore_thresh=args.ignore_thresh)
+                      failure=failure_term(args, net.net),
+                      ignore_thresh=args.ignore_thresh, label_smoothing=args.label_smoothing)
     ckpt = args.out / "checkpoint.npz"
     if args.resume:
         trainer.load_checkpoint(ckpt)
@@ -227,7 +265,9 @@ def main():
         p = {k: v / n for k, v in res.parts.items()}
         print(f"it {tr.it:6d}  lr {lr:.2e}  perte {res.total / n:8.3f}  "
               f"coord {p['coord']:.3f} obj {p['obj']:.3f} noobj {p['noobj']:.3f} "
-              f"cls {p['cls']:.3f}", flush=True)
+              f"cls {p['cls']:.3f}"
+              + (" fail {loss:.3f} cov {coverage:.2f} pos {positives:.2f}".format(
+                  **tr.failure.last) if tr.failure else ""), flush=True)
         if args.save_every and tr.it % args.save_every == 0:
             if args.admm:
                 admm.save(args.out / "admm.npz")

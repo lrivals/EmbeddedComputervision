@@ -78,7 +78,7 @@ def ignore_mask(p, anchors, obj, gt_boxes, thresh, alpha=1.0):
 
 def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
               class_mode="sigmoid", lambda_coord=1.0, ignore_thresh=0.5,
-              anchor_ref=ANCHOR_REF, scale_x_y=None):
+              anchor_ref=ANCHOR_REF, scale_x_y=None, label_smoothing=0.0):
     """Perte et gradients par rapport aux sorties brutes des têtes (§6.2).
 
     `outputs` : {id: (N, A·(5+C), S_h, S_w)} (sortie de `Network.forward`) ;
@@ -86,6 +86,8 @@ def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
     `head_list` : `yolo.data.targets.heads(net)` ; `anchor_ref` :
     `yolo.data.targets.anchor_ref(net)` ; `scale_x_y` : {id: α} des têtes YOLOv4-tiny (1 par
     défaut), position prédite σ(t)·α − (α − 1)/2 et gradient ×α.
+    `label_smoothing` ε (T39.4): class targets 1 − ε/2 and ε/2 (sigmoid, as `smooth_BCE` of
+    Ultralytics), or (1 − ε)·onehot + ε/C (softmax).
     """
     scale_x_y = scale_x_y or {}
     if class_mode not in ("sigmoid", "softmax"):
@@ -136,6 +138,10 @@ def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
         tc = p[:, :, 5:]
         onehot = (t["cls"][:, :, None] == np.arange(num_classes)[None, None, :, None, None])
         onehot = onehot.astype(np.float64)
+        if label_smoothing:
+            eps = label_smoothing
+            onehot = (onehot * (1 - eps) + eps / 2 if class_mode == "sigmoid"
+                      else onehot * (1 - eps) + eps / num_classes)
         if class_mode == "sigmoid":
             # §2.3, §6.2 : BCE multi-label ; ∂/∂t_c = σ(t_c) − 1[c=c*]
             term[:, :, 5:] = objf[:, :, None] * bce_logits(tc, onehot)
@@ -144,6 +150,7 @@ def yolo_loss(outputs, gt_boxes, gt_labels, anchors_px, head_list, num_classes,
             # §2.2, §8.1 : softmax stabilisé (max soustrait) ; −ln softmax_{c*}, ∂ = softmax − 1
             z = tc - tc.max(axis=2, keepdims=True)
             lse = np.log(np.exp(z).sum(axis=2, keepdims=True))
+            # Soft targets (Σ_k y_k = 1): −Σ y_k ln softmax_k, same ∂ = softmax − y.
             term[:, :, 5:] = objf[:, :, None] * onehot * (lse - z)
             grad[:, :, 5:] = objf[:, :, None] * (np.exp(z - lse) - onehot)
 

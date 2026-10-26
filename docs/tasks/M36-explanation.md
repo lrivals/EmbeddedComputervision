@@ -187,6 +187,8 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **Code**: `yolo.explain.misses`: seven causes by a fixed order of tests. The task's six,
     with quantization tested first at the integer stage, plus **mislocalized** (a box over
     the threshold whose IoU stays < 0.5), needed for the partition.
+  - **Fix (2026-10-26, M39)**: `no_anchor` also covers a box whose best anchor belongs to
+    no head (anchor 0 of Tiny-YOLOv3); `responsible_index` crashed on it.
   - **Tests**: each cause is reached by a constructed case.
   - **Command**: `tools/explain.py misses` (VOC test persons, float and integer). `report`
     draws one Grad-CAM strip per cause (`results/explain/misses_<cause>.png`).

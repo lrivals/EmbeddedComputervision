@@ -170,3 +170,25 @@ def test_perfect_prediction_has_low_loss():
     res = yolo_loss({0: p.reshape(2, -1, s, s)}, GT_BOXES, GT_LABELS, ANCHORS, hl, C,
                     ignore_thresh=0.99)
     assert res.total < 1e-9
+
+
+@pytest.mark.parametrize("out_type,class_mode", [("yolo", "sigmoid"), ("region", "softmax")])
+def test_label_smoothing_gradcheck(out_type, class_mode):
+    # T39.4: smoothed class targets keep ∂/∂t_c = activation − target.
+    rng = np.random.default_rng(7)
+    desc = mini_net(out_type)
+    net = Network(desc, dtype=np.float64, rng=rng)
+    x = rng.standard_normal((2, 3, 16, 16))
+    hl = heads(desc)
+
+    def run(eps):
+        return yolo_loss(net.forward(x), GT_BOXES, GT_LABELS, ANCHORS, hl, C,
+                         class_mode=class_mode, ignore_thresh=IGNORE, label_smoothing=eps)
+
+    def loss():
+        return np.concatenate([t.ravel() for t in run(0.1).terms.values()])
+
+    res = run(0.1)
+    assert res.parts["cls"] != pytest.approx(run(0.0).parts["cls"])
+    _, grads = net.backward(res.douts)
+    assert check_grad(loss, net.params[5]["W"], grads[5]["W"]) <= 1e-7

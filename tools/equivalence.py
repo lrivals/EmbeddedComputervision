@@ -302,7 +302,12 @@ def render(data):
             "(Tiny-YOLOv2, C-sim detections == integer on 4,952 / 4,952 VOC images) and "
             "the C-sim smoke run of `results/map_coco.md` (YOLOv4-tiny, 10 / 10).",
             "- **pending**: co-sim needs Vitis, the board row is T28.5 "
-            "(docs/tasks/deferred/M28-equivalence.md).", ""]
+            "(docs/tasks/deferred/M28-equivalence.md).",
+            "- **Failure head (T39.5)**, a side output on the integer features (no golden "
+            "C++ model): float → integer is *statistical* (AUROC of the failure prediction, "
+            "results/failure_prediction.md); integer → C-sim is *pointwise*, the score equal "
+            "on every image (`hls/tb/tb_failure.cpp`, `tools/failure_prediction.py stages "
+            "--check`, `python/tests/test_failure.py`); co-sim and board pending (T39.6).", ""]
     for net, r in nets.items():
         out += [f"### {net}", "",
                 f"{len(r['images'])} images ({r['dataset']}, first of the split); golden on "

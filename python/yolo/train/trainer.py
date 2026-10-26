@@ -53,11 +53,15 @@ class Trainer:
     `size` : taille d'entrée fixe (S ou (H, W)), ou `None` pour le multi-échelle
     (`multiscale_size`, ramenée au rapport d'aspect du réseau par `scaled_input`).
     `grad_hook(trainer, grads)` : appelé avant le pas SGD (terme de pénalité de l'ADMM, T9.2).
+    `failure` (T39.2): a `yolo.train.failure.FailureTerm`, the failure head trained with the
+    detector; its gradient enters at the feature layers, its labels are recomputed per batch.
     Les autres options sont passées à `yolo_loss` (`ignore_thresh`, `lambda_coord`).
     """
 
+    failure = None  # subclasses that do not call __init__ (TrainerV5) train no failure head
+
     def __init__(self, net, optimizer, schedule, size=416, seed=0, log_path=None,
-                 grad_hook=None, **loss_kwargs):
+                 grad_hook=None, failure=None, **loss_kwargs):
         self.net = net
         self.optimizer = optimizer
         self.schedule = schedule
@@ -73,6 +77,7 @@ class Trainer:
                             "anchor_ref": anchor_ref(net.net), **loss_kwargs}
         self.log_path = Path(log_path) if log_path else None
         self.grad_hook = grad_hook
+        self.failure = failure
 
     def array_module(self):
         """numpy ou cupy, d'après les paramètres du réseau."""
@@ -89,21 +94,38 @@ class Trainer:
         n = images.shape[0]
         xnp = self.array_module()
         x = images.astype(self.net.dtype, copy=False)
-        outputs = self.net.forward(x if xnp is np else xnp.asarray(x), train=True)
-        outputs = {h: to_numpy(o) for h, o in outputs.items()}
+        fail = self.failure
+        outputs = self.net.forward(x if xnp is np else xnp.asarray(x), train=True,
+                                   all_outputs=fail is not None)
+        if fail is not None:
+            outs = outputs
+            outputs = {h: to_numpy(outs[h]) for h, _ in self.head_list}
+        else:
+            outputs = {h: to_numpy(o) for h, o in outputs.items()}
         layers = self.net.layers
         res = yolo_loss(outputs, boxes, labels, self.net.net["anchors"], self.head_list,
                         self.net.net["classes"],
                         scale_x_y={h: layers[h].get("scale_x_y", 1.0) for h, _ in self.head_list},
                         **self.loss_kwargs)
         douts = {h: d / n for h, d in res.douts.items()}
+        if fail is not None:
+            from yolo.train.failure import miss_labels
+
+            y = miss_labels(outputs, self.net.net, boxes, labels, fail.cls, fail.conf,
+                            fail.iou_thr)
+            _, fdouts, fgrads = fail({i: to_numpy(outs[i]) for i in fail.layers}, y)
+            for i, d in fdouts.items():  # the head loss is already a batch mean
+                d = d.astype(outs[i].dtype)
+                douts[i] = douts[i] + d if i in douts else d
+            fail.step(fgrads)
         if xnp is not np:
             douts = {h: xnp.asarray(d) for h, d in douts.items()}
         _, grads = self.net.backward(douts)
         lr = self.schedule(self.it)
         if self.grad_hook:
             self.grad_hook(self, grads)
-        self.optimizer.step(grads, lr)
+        if fail is None or not fail.frozen(self.it):
+            self.optimizer.step(grads, lr)
         h, w = images.shape[-2:]
         self._log(lr, w if h == w else f"{h}x{w}", n, res, time.perf_counter() - t0)
         self.it += 1
@@ -132,12 +154,15 @@ class Trainer:
         new = not self.log_path.exists()
         with open(self.log_path, "a", newline="") as f:
             w = csv.writer(f)
+            fail = self.failure.last if self.failure is not None else None
             if new:
-                w.writerow(LOG_FIELDS)
+                w.writerow(LOG_FIELDS + (("fail", "coverage", "positives") if fail else ()))
             p = res.parts
             w.writerow([self.it, f"{lr:.6g}", size, f"{res.total / n:.6g}",
                         *(f"{p[k] / n:.6g}" for k in ("coord", "obj", "noobj", "cls")),
-                        f"{seconds:.3f}"])
+                        f"{seconds:.3f}",
+                        *((f"{fail[k]:.6g}" for k in ("loss", "coverage", "positives"))
+                          if fail else ())])
 
     # ---------------------------------------------------------------- checkpoints
     def checkpoint_arrays(self):
@@ -148,6 +173,8 @@ class Trainer:
             arrays.update({f"state/{i}/{k}": to_numpy(v) for k, v in s.items()})
         arrays.update({f"velocity/{k}": to_numpy(v)
                        for k, v in self.optimizer.state_dict().items()})
+        if self.failure is not None:
+            arrays.update(self.failure.arrays())
         return arrays
 
     def save_checkpoint(self, path):
@@ -175,6 +202,9 @@ class Trainer:
                 elif kind == "velocity":
                     velocity[rest] = data[key]
             self.optimizer.load_state_dict(velocity)
+            if self.failure is not None:
+                self.failure.load_arrays({k: data[k] for k in data.files
+                                          if k.startswith("failure/")})
 
 
 def _rgb_to_gray(ws, wd):
