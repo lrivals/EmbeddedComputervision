@@ -76,6 +76,7 @@ GPU (T12.11-e).
 | [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py`: tiny-yolov3-crowdhuman, person of v3-coco and v4-coco | CrowdHuman val 4,370 | ≈ 1 h *(est.)* | 3 nets × 4,370 × 0.3 s (float + int) | T27.0, T15.14 |
 | [T27.3](M27-safety-metrics.md) | `tools/degrade.py`, 6 degradations × 3 severities, float and int | CrowdHuman val | ≈ 1.5-7 h *(est.)* | 36 evals × 4,370 images at 66 ms (16 jobs) to 170 ms | T27.1 |
 | [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 train, float and int inference | ≈ 5,300 frames (MOT17 train) | ≈ 30 min *(est.)* | 2 × 5,300 × 0.17 s | MOT download |
+| [T38.8-T38.10](M38-prewid.md) float, int | `tools/person_safety.py`, `degrade.py` (+ grayscale), `dreaded_event.py` with `--dataset prewid`, fine-tuned and best pre-trained net | PREWID test 592, lab 3,000 | ≈ 1-3 h *(est.)* | float 46 ms/image measured (T38.6, 8 jobs): 2 nets × (3,592 + 18 degradations × 592) ≈ 25 min; the integer stage is slower (0.17-0.3 s/image in the rows above) | T27.0, T27.1, T27.3, T27.4, T38.7 |
 | [T29.1, T29.2](M29-runtime-monitors.md) | monitors on CrowdHuman val, T27.3 sets, ExDark; conformal threshold over 20 splits | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
 | [T32.1](M32-trashnet-pets.md) | `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png --handcheck build/trashnet_handcheck` (resumes from `data/trashnet/autolabel.json`) | TrashNet, 2,427 of 2,527 images left | ≈ 1.5-2 h with 3 processes, ≈ 3.5 h with one | stated; measured 8 s/image per process × 2,427 / 3 ≈ 1.8 h | — |
 | [T32.6](M32-trashnet-pets.md) | `python tools/eval_voc.py --dataset pets`, VOC and COCO weights → `build/m32/pets_ood.md` | Pet test 3,662 | ≈ 20 min *(est.)* | 2 × 3,662 × 0.17 s | — |
@@ -131,6 +132,7 @@ These share the CPU with the table above: one at a time, at night.
 | [T24.6](M24-yolov4-tiny.md) | `notebooks/<ds>/tiny-yolov4-<ds>_{sweep,train,infer}.ipynb` with `INT8` and `HW` stages | the 11 `TRAINABLE` datasets | ≈ 30-35 h *(est.)* | per dataset ≈ 3 h (sweep, long run, evals); C-sim stage on the PC | — |
 | [M24](M24-yolov4-tiny.md) QAT | QAT of v4-tiny (integer model loses 1.3 AP50) | COCO | unmeasured | — | — |
 | [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | T32.10, T32.11 |
+| [T38.7](M38-prewid.md) | `notebooks/prewid/tiny-yolov3-prewid_{sweep,train}.ipynb` (`prewid-prep` done): from COCO and from CrowdHuman, then leave-one-camera-out × 4 and `lab` added to training | PREWID 2,821 train | ≈ 12 h *(est.)* | sweep 1 h + 3 long runs × 1 h 45 + 4 LOCO × 1 h 20 + evals (test 592, lab 3,000 at 46 ms/image, 8 jobs) | CrowdHuman recipe: T15.14 |
 | [T19.5](M19-english.md) | re-execute the notebooks after the template translation: stats, `analyse_balayages`, sweeps | every dataset | ≈ 1 h GPU per sweep *(est.)*, stats on the PC | sweep 6 runs × 10 min | do not run `python -m tools.notebooks all` before M26 is settled (M32) |
 
 ## Transfers
@@ -152,7 +154,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 |---|---|---|
 | PC CPU | ≈ 45 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
 | PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
-| Colab | ≈ 110-120 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T15.9 ≈ 11 h |
+| Colab | ≈ 120-130 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h |
 
 Suggested order, unblockers first:
 
@@ -169,6 +171,8 @@ graph LR
   T158[T15.8] --> T159["T15.9, T15.10, T15.15, T15.16"]
   T188[T18.8] --> T1810[T18.10]
   T217[T21.7] --> T219[T21.9] --> T2111[T21.11]
+  T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
+  T271 --> T388
 ```
 
 ## Inconsistencies found while listing

@@ -180,7 +180,7 @@ synthesis or co-sim (resources, exact cycles). **Board** = KV260 with the bitstr
 | Milestone | PC only | PC, Vitis for the exact cost | Board |
 |---|---|---|---|
 | M25 | T25.0, T25.1, T25.2, T25.5, T25.6, T25.7, T25.8, T25.9, T25.10 | T25.3, T25.4 | — |
-| M27 | T27.0-T27.7 (T27.6 waits for the ARCYS images) | — | — |
+| M27 | T27.0-T27.7 (T27.6 waits for the ARCYS images; PREWID stands in, M38) | — | — |
 | M28 | T28.1, T28.2, T28.3, T28.4, T28.6 | T28.0 (co-sim row) | T28.5 (and the board row of T28.0) |
 | M29 | T29.0, T29.1, T29.2, T29.3, T29.5 (`sw-sim`) | T29.4 | final check of T29.5 |
 | M30 | T30.0, T30.4 (model) | T30.1 (co-sim cycles) | T30.2, T30.3, T30.4 (measurement) |

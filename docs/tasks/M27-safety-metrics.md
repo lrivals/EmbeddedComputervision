@@ -14,14 +14,18 @@ What the literature lacks (thesis state of the art, ARCYS, 2026-10):
 - the asymmetric loss (missed pedestrian catastrophic, false detection "major") and the
   conversion of a per-image error rate into a per-hour rate are posed by DEEL (Delseny 2021,
   §4.2.4.2 and §4.2.4.4), without a detection metric to plug in;
-- no industrial person dataset (PPE, machines, dust, degraded lighting).
+- no industrial person dataset (PPE, machines, dust, degraded lighting). PREWID (Mendeley
+  Data, 2026: workers in a legacy plant, person only, no PPE) appeared since and is in the
+  chain through [M38](M38-prewid.md).
 
 The chain of the repo gives the three stages (float, integer, C-sim) on CrowdHuman already
 ([T11.6](M11-jeux-de-donnees.md), [T15.14](M15-campagne-entrainement.md)): this milestone
 adds the metrics and the test conditions. Outside the base of the spec: the method comes
 from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 
-**State**: not started (2026-10-20). Everything but T27.6 runs on the PC.
+**State**: not started (2026-10-20). Everything but T27.6 runs on the PC. Since 2026-10-26
+an industrial test set is ready for T27.0-T27.4: PREWID (`load("prewid")`, M38), 592 test
+frames of which 289 empty, per camera with `test:<camera>`.
 
 ### [ ] T27.0 — Person metrics
 - **Spec**: §8.3 · **Depends on**: T11.6 · **Runs on**: PC · **Size**: M
@@ -102,7 +106,10 @@ from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 - **Notes**: waiting for site images from ARCYS; until then, PPE images from a public set
   (e.g. a hard-hat dataset) can stand in.
   [M38](M38-prewid.md) brings PREWID (public, workers in legacy plants, person only) as
-  that stand-in; T38.8-T38.10 run T27.1, T27.3 and T27.4 on it.
+  that stand-in; T38.8-T38.10 run T27.1, T27.3 and T27.4 on it. Ready since 2026-10-26
+  (T38.0-T38.6): `data/prewid/`, splits `train` / `val` / `test` / `lab`, best
+  out-of-domain person AP50 89.9 on `test` (YOLOv4-tiny COCO, T38.6). The `industrial`
+  slot can reuse the PREWID loader (one JSON per split, empty frames kept).
 
 ### [ ] T27.7 — Unflagged dangerous false negatives
 - **Spec**: §8.3 · **Depends on**: T27.2, T27.4, T29.1, T39.1 · **Runs on**: PC · **Size**: S
