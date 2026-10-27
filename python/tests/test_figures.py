@@ -50,7 +50,7 @@ def test_all_skips_cleanly_without_data(tmp_path, monkeypatch):
     figs = [f for f in F.select(["all"]) if f.family != "maths"]
     status = F.run(figs, tmp_path / "res", tmp_path / "build", verbose=False)
     assert set(status) == {f.name for f in figs}
-    assert all(s == "sautée" for s, _ in status.values()), status
+    assert all(s == "skipped" for s, _ in status.values()), status
     assert not (tmp_path / "res").exists()
 
 
@@ -59,12 +59,12 @@ def test_gallery_links_existing_images_only(tmp_path):
     fig = F.FIGURES["cascade_m10"]
     (res / fig.family).mkdir(parents=True)
     (res / fig.family / "cascade_m10.png").write_bytes(b"png")
-    path = gallery({"etat_art": ("sautée", "results/benchmarks.csv absent")}, res,
+    path = gallery({"etat_art": ("skipped", "results/benchmarks.csv absent")}, res,
                    tmp_path / "build")
     text = path.read_text()
     assert path == tmp_path / "results" / "figures.md"
     assert "](figures/resultats/cascade_m10.png)" in text
-    assert "Non générée : results/benchmarks.csv absent" in text
+    assert "Not generated: results/benchmarks.csv absent" in text
     for f in F.FIGURES.values():
         assert f"`{f.name}`" in text
 
@@ -112,7 +112,7 @@ def test_map_formats_reads_full_runs_only(tmp_path):
     write("build/m9/map_{net}-pow2-ptq.json", {"int": {"map": 0.5}}, images=500)
     rows = resultats.load_map_formats("n", tmp_path)
     assert [(r[0], r[1], r[2]) for r in rows] == [
-        ("flottant", 0.56, 32), ("INT8 PTQ", 0.55, 8), ("w4a4 QAT", 0.36, 4)]
+        ("float", 0.56, 32), ("INT8 PTQ", 0.55, 8), ("w4a4 QAT", 0.36, 4)]
     _pngs(resultats.plot_map_formats(rows, tmp_path))
 
 
@@ -240,9 +240,9 @@ def test_resources_synth_replaces_estimate(tmp_path, monkeypatch):
     t = resultats._tools("perf_model").TILES
     b, rows, budget = resultats.load_resources()
     by = {r["name"]: r for r in rows}
-    assert by["moteur unique pow2"]["lut"] == (rl.lut_pow2(t["tm"], t["tn"]), resultats.EST)
-    assert by["moteur unique pow2"]["dsp"] == (rl.REQUANT_DSP * t["tm"], resultats.EST)
-    assert by["moteur unique INT8"]["dsp"] == (rl.dsp(t["tm"], t["tn"]), resultats.EST)
+    assert by["single engine pow2"]["lut"] == (rl.lut_pow2(t["tm"], t["tn"]), resultats.EST)
+    assert by["single engine pow2"]["dsp"] == (rl.REQUANT_DSP * t["tm"], resultats.EST)
+    assert by["single engine INT8"]["dsp"] == (rl.dsp(t["tm"], t["tn"]), resultats.EST)
     assert budget == {"dsp": b["dsp"], "mem": budget["mem"], "lut": b["lut"]}
 
     rep = tmp_path / "hls" / "proj_kv260_synth_pow2" / "sol" / "syn" / "report"
@@ -264,10 +264,10 @@ def test_resources_packed_rows():
     pm = resultats._tools("perf_model")
     t = pm.TILES
     by = {r["name"]: r for r in resultats.load_resources()[1]}
-    assert by["moteur unique 2 MAC/DSP"]["dsp"] == (pm.kernel_dsp(t["tm"], t["tn"], pack=2),
+    assert by["single engine 2 MAC/DSP"]["dsp"] == (pm.kernel_dsp(t["tm"], t["tn"], pack=2),
                                                     resultats.EST)
-    assert by["moteur unique 2 MAC/DSP, Tm 64"]["dsp"][0] == 800  # benchmarks.csv, T23.3
-    assert resultats.SYNTH_DIRS["moteur unique 2 MAC/DSP"] == "synth_pack"
+    assert by["single engine 2 MAC/DSP, Tm 64"]["dsp"][0] == 800  # benchmarks.csv, T23.3
+    assert resultats.SYNTH_DIRS["single engine 2 MAC/DSP"] == "synth_pack"
 
 
 def test_benchmarks_projection_rows_grouped():
@@ -626,7 +626,7 @@ def test_after_run_without_matplotlib(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("YOLO_FIGURES", raising=False)
     monkeypatch.setitem(sys.modules, "matplotlib", None)  # import → ImportError
     assert auto.after_run("train", _run_dir(tmp_path)) == []
-    assert "matplotlib absent" in capsys.readouterr().out
+    assert "matplotlib missing" in capsys.readouterr().out
 
 
 def test_after_run_scan(tmp_path, monkeypatch):
@@ -824,8 +824,8 @@ def test_map_covers_every_module():
 
 def test_gradcheck_errors_below_threshold():
     errs = maths.gradcheck_errors()
-    assert all(v <= 1e-7 for k, v in errs.items() if "faux" not in k), errs
-    assert errs["témoin faux (x³ ↦ 2x²)"] > 1e-5
+    assert all(v <= 1e-7 for k, v in errs.items() if "false control" not in k), errs
+    assert errs["false control (x³ ↦ 2x²)"] > 1e-5
 
 
 def test_conv_timings_same_output():

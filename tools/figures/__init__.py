@@ -89,13 +89,13 @@ def select(targets):
         elif t in FIGURES:
             out.append(FIGURES[t])
         else:
-            raise SystemExit(f"figure ou famille inconnue : {t} (voir --list)")
+            raise SystemExit(f"unknown figure or family: {t} (see --list)")
     seen = set()
     return [f for f in out if not (f.name in seen or seen.add(f.name))]
 
 
 def run(figs, results=RESULTS, build=BUILD, verbose=True):
-    """Génère `figs` ; rend {nom: (état, chemins ou message)} avec état ok | sautée | erreur."""
+    """Génère `figs` ; rend {nom: (état, chemins ou message)} avec état ok | skipped."""
     status = {}
     for fig in figs:
         out = out_dir_of(fig, results, build)
@@ -105,9 +105,9 @@ def run(figs, results=RESULTS, build=BUILD, verbose=True):
             if verbose:
                 print(f"  ok      {fig.name:18s} → {', '.join(_rel(p) for p in paths if p.suffix == '.png')}")
         except MissingSource as e:
-            status[fig.name] = ("sautée", str(e))
+            status[fig.name] = ("skipped", str(e))
             if verbose:
-                print(f"  sautée  {fig.name:24s} ({e})")
+                print(f"  skipped {fig.name:24s} ({e})")
     return status
 
 

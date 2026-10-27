@@ -31,7 +31,7 @@ def require_names(path, names):
     text = need(ROOT / path).read_text()
     missing = [n for n in names if not re.search(rf"\b{re.escape(n)}\b", text)]
     if missing:
-        raise AssertionError(f"{path} : noms absents du code {missing}")
+        raise AssertionError(f"{path}: names missing from the code {missing}")
     return text
 
 
@@ -55,14 +55,14 @@ def plot_soc(soc, out_dir, name="soc"):
     # PS
     st.block(ax, 0.2, 0.4, 6.2, 10.2, "", c_ps, fill=0.05)
     ax.text(0.4, 10.3, "PS : ARM Cortex-A53 (Linux)", fontsize=9, weight="bold", va="top")
-    st.block(ax, 0.6, 8.0, 5.4, 1.4, "yolo_app / yolo_bench\nprétraitement, post-traitement",
+    st.block(ax, 0.6, 8.0, 5.4, 1.4, "yolo_app / yolo_bench\npreprocessing, post-processing",
              c_ps)
-    st.block(ax, 0.6, 5.6, 5.4, 1.8, "driver sw/driver/\nprogram.cpp : arène, descripteurs\n"
-             "accel_driver.cpp : une couche = un appel", c_ps)
-    st.block(ax, 0.6, 3.3, 2.6, 1.7, "Device « uio »\n/dev/uioN\n/dev/udmabufN", c_ps)
-    st.block(ax, 3.4, 3.3, 2.6, 1.7, "Device « sim »\nregistres émulés\n→ noyau C-sim", c_ps,
+    st.block(ax, 0.6, 5.6, 5.4, 1.8, "driver sw/driver/\nprogram.cpp: arena, descriptors\n"
+             "accel_driver.cpp: one layer = one call", c_ps)
+    st.block(ax, 0.6, 3.3, 2.6, 1.7, "\"uio\" device\n/dev/uioN\n/dev/udmabufN", c_ps)
+    st.block(ax, 3.4, 3.3, 2.6, 1.7, "\"sim\" device\nemulated registers\n→ C-sim kernel", c_ps,
              ls="--")
-    ax.text(3.3, 2.8, "device.hpp : deux réalisations", fontsize=7, ha="center", color=st.MUTED)
+    ax.text(3.3, 2.8, "device.hpp: two implementations", fontsize=7, ha="center", color=st.MUTED)
     st.arrow(ax, (3.3, 8.0), (3.3, 7.4))
     st.arrow(ax, (1.9, 5.6), (1.9, 5.0))
     st.arrow(ax, (4.7, 5.6), (4.7, 5.0))
@@ -70,15 +70,15 @@ def plot_soc(soc, out_dir, name="soc"):
     regs = "\n".join(f"0x{o:02x}  {n}" for n, o in soc["regs"]
                      if not n.startswith("AP_") and n not in ("END", "SPAN"))
     st.block(ax, 7.0, 3.0, 3.6, 7.6, "", st.PALETTE[3], fill=0.08)
-    ax.text(8.8, 10.3, "AXI-Lite « control »", fontsize=8.5, weight="bold", ha="center",
+    ax.text(8.8, 10.3, "AXI-Lite \"control\"", fontsize=8.5, weight="bold", ha="center",
             va="top")
     ax.text(7.25, 9.7, regs, fontsize=7, family="monospace", va="top", linespacing=1.35)
     ax.text(8.8, 3.3, "regmap.hpp", fontsize=7, ha="center", color=st.MUTED)
     st.arrow(ax, (6.0, 4.2), (7.0, 6.5), "write32 / read32", fontsize=6.5)
     # PL
     st.block(ax, 11.2, 3.0, 4.0, 7.6, "", c_pl, fill=0.05)
-    ax.text(13.2, 10.3, "PL : noyau yolo_conv", fontsize=9, weight="bold", ha="center", va="top")
-    st.block(ax, 11.6, 7.6, 3.2, 1.8, "moteur de conv\n(voir moteur.png)", c_pl)
+    ax.text(13.2, 10.3, "PL: yolo_conv kernel", fontsize=9, weight="bold", ha="center", va="top")
+    st.block(ax, 11.6, 7.6, 3.2, 1.8, "conv engine\n(see moteur.png)", c_pl)
     for k, (port, bundle) in enumerate(soc["ports"]):
         y = 6.6 - 0.75 * k
         st.block(ax, 11.6, y, 3.2, 0.55, f"m_axi {port} → {bundle}", c_pl, fill=0.22,
@@ -86,7 +86,7 @@ def plot_soc(soc, out_dir, name="soc"):
     st.arrow(ax, (10.6, 8.5), (11.6, 8.5), "ap_start", fontsize=6.5)
     # DDR
     st.block(ax, 15.8, 0.4, 4.0, 10.2, "", c_ddr, fill=0.05)
-    ax.text(17.8, 10.3, "DDR (zone contiguë)", fontsize=9, weight="bold", ha="center", va="top")
+    ax.text(17.8, 10.3, "DDR (contiguous area)", fontsize=9, weight="bold", ha="center", va="top")
     items = [(f"activations {k}", v) for k, v in soc["buffers"].items()]
     items += [(k.removesuffix(".bin"), v) for k, v in soc["blobs"].items()]
     total = sum(v for _, v in items)
@@ -100,16 +100,16 @@ def plot_soc(soc, out_dir, name="soc"):
         st.block(ax, 16.1, y, 3.4, h, f"{lab} : {v / 1e6:.2f} Mo" if v > 1e5 else
                  f"{lab} : {v / 1e3:.1f} Ko", c_ddr, fill=0.2, fontsize=7)
     st.arrow(ax, (14.8, 5.0), (16.1, 5.0), "AXI HP", fontsize=6.5, both=True)
-    st.arrow(ax, (6.0, 1.2), (15.8, 1.2), "l'ARM écrit l'entrée et lit les têtes (virt) ; le "
-             "noyau lit et écrit en adresses physiques (phys)", fontsize=7, both=True)
-    ax.set_title(f"SoC KV260 : PS, registres, noyau et arène DDR ({NET}, manifest)")
+    st.arrow(ax, (6.0, 1.2), (15.8, 1.2), "the ARM writes the input and reads the heads (virt); the "
+             "kernel reads and writes physical addresses (phys)", fontsize=7, both=True)
+    ax.set_title(f"KV260 SoC: PS, registers, kernel and DDR arena ({NET}, manifest)")
     return st.save(fig, out_dir, name)
 
 
 @figure("soc", "materiel", "T13.8",
-        "Schéma du SoC : application et driver sur l'ARM, registres AXI-Lite, ports m_axi du "
-        "noyau et découpage de l'arène DDR.",
-        "sw/driver/regmap.hpp, pragmas de hls/kernels/conv_pe.cpp, model/<net>/manifest.json")
+        "SoC diagram: application and driver on the ARM, AXI-Lite registers, m_axi ports of the "
+        "kernel and layout of the DDR arena.",
+        "sw/driver/regmap.hpp, pragmas of hls/kernels/conv_pe.cpp, model/<net>/manifest.json")
 def soc(out_dir):
     return plot_soc(load_soc(), out_dir)
 
@@ -149,26 +149,26 @@ def plot_engine(e, out_dir, name="moteur"):
     st.block(ax, 3.3, 4.6, 3.6, 1.6, "load_input\nin_buf[Tn][IR][IC]\nping-pong in_a / in_b",
              c_ld)
     st.block(ax, 3.3, 1.8, 3.6, 1.6, "load_weights\nw_buf[Tm][Tn][3][3]\nping-pong w_a / w_b", c_ld)
-    st.arrow(ax, (2.4, 5.0), (3.3, 5.4), f"mots {w} bits", fontsize=6.5)
-    st.arrow(ax, (2.4, 3.0), (3.3, 2.6), f"mots {w} bits", fontsize=6.5)
+    st.arrow(ax, (2.4, 5.0), (3.3, 5.4), f"{w}-bit words", fontsize=6.5)
+    st.arrow(ax, (2.4, 3.0), (3.3, 2.6), f"{w}-bit words", fontsize=6.5)
     # réseau de MACs
     st.block(ax, 8.0, 1.4, 4.6, 5.2, "", c_mac, fill=0.06)
     tm, tn = k["tm"], k["tn"]
     xs, ys = np.meshgrid(np.linspace(8.3, 12.3, tn), np.linspace(1.9, 5.7, tm))
     ax.plot(xs.ravel(), ys.ravel(), "s", ms=1.6, color=c_mac)
-    ax.text(10.3, 6.25, f"compute : Tm × Tn = {tm} × {tn} = {tm * tn} MAC int8 / cycle",
+    ax.text(10.3, 6.25, f"compute: Tm × Tn = {tm} × {tn} = {tm * tn} int8 MAC / cycle",
             ha="center", fontsize=7.5, weight="bold")
-    st.arrow(ax, (6.9, 5.4), (8.0, 4.6), f"Tn = {tn} voies")
-    st.arrow(ax, (6.9, 2.6), (8.0, 3.2), "poids")
-    st.block(ax, 13.4, 3.0, 1.9, 2.0, "accumulateur\nint32\nout_a / out_b", c_mac)
+    st.arrow(ax, (6.9, 5.4), (8.0, 4.6), f"Tn = {tn} lanes")
+    st.arrow(ax, (6.9, 2.6), (8.0, 3.2), "weights")
+    st.block(ax, 13.4, 3.0, 1.9, 2.0, "accumulator\nint32\nout_a / out_b", c_mac)
     st.arrow(ax, (12.6, 4.0), (13.4, 4.0))
-    st.block(ax, 16.0, 2.3, 3.8, 3.4, f"store_tile\n(output_stage.hpp)\nrequantification "
-             f"×{k['requant']}\nleaky entière, clip\nmaxpool fusionné\nwrite_row → act_out", c_out)
+    st.block(ax, 16.0, 2.3, 3.8, 3.4, f"store_tile\n(output_stage.hpp)\nrequantization "
+             f"×{k['requant']}\ninteger leaky, clip\nfused maxpool\nwrite_row → act_out", c_out)
     st.arrow(ax, (15.3, 4.0), (16.0, 4.0), f"Tm = {tm}")
-    ax.text(10, 0.6, f"Tuile Tr × Tc = {k['tr']} × {k['tc']} (maxpool : {k['tile_pool']} × "
-            f"{k['tile_pool']}) ; trim = {k['trim']}, pliage L00 = {k['fold']} — "
-            "constantes de hls/kernels/accel_config.hpp", ha="center", fontsize=7.5, color=st.INK2)
-    ax.set_title("Moteur unique : chargeurs ping-pong, réseau de MACs, étage de sortie")
+    ax.text(10, 0.6, f"Tile Tr × Tc = {k['tr']} × {k['tc']} (maxpool: {k['tile_pool']} × "
+            f"{k['tile_pool']}); trim = {k['trim']}, L00 folding = {k['fold']} — "
+            "constants of hls/kernels/accel_config.hpp", ha="center", fontsize=7.5, color=st.INK2)
+    ax.set_title("Single engine: ping-pong loaders, MAC array, output stage")
     # chronogramme
     ax2 = fig.add_axes([0.08, 0.06, 0.88, 0.22])
     p = e["per_tile"]
@@ -191,18 +191,18 @@ def plot_engine(e, out_dir, name="moteur"):
             ax2.text(x + w_ / 2, rows[r], f"t{i}", ha="center", va="center", fontsize=7,
                      color="white")
     ax2.set_yticks(list(rows.values()), list(rows))
-    ax2.set_xlabel("cycles (moyenne par tuile, perf_model.layer_cycles)")
+    ax2.set_xlabel("cycles (mean per tile, perf_model.layer_cycles)")
     d = e["d"]
-    ax2.set_title(f"Recouvrement sur 3 tuiles, L{d['layer']:02d} ({d['cin']} → {d['cout']}, "
-                  f"{d['h']}×{d['w']}) : chargement {ld:.0f}, calcul {comp:.0f}, stockage "
+    ax2.set_title(f"Overlap over 3 tiles, L{d['layer']:02d} ({d['cin']} → {d['cout']}, "
+                  f"{d['h']}×{d['w']}): load {ld:.0f}, compute {comp:.0f}, store "
                   f"{store:.0f} cycles", fontsize=8.5)
     ax2.grid(axis="y", visible=False)
     return st.save(fig, out_dir, name)
 
 
 @figure("moteur", "materiel", "T13.9",
-        "Moteur unique : chargeurs ping-pong, réseau Tm × Tn de MACs, accumulateur, étage de "
-        "sortie, et chronogramme du recouvrement sur 3 tuiles.",
+        "Single engine: ping-pong loaders, Tm × Tn MAC array, accumulator, output stage, "
+        "and timing diagram of the overlap over 3 tiles.",
         "hls/kernels/accel_config.hpp, conv_pe.cpp, output_stage.hpp, tools/perf_model.py")
 def moteur(out_dir):
     return plot_engine(load_engine(), out_dir)
@@ -246,14 +246,14 @@ def plot_tiling(rows, tn, tm, out_dir, name="tuilage"):
         ax.set_ylim(R * 1.02, -0.02 * R)
         ax.set_aspect("equal")
         ax.grid(False)
-        pool = f", maxpool {g['pk']}/{g['ps']} fusionné" if d["pool_k"] else ""
-        ax.set_title(f"L{d['layer']:02d} : sortie {R}×{C}{pool}\n{g['n_r']} × {g['n_c']} tuiles "
-                     f"spatiales ({g['tr']}×{g['tc']} en entrée du pooling)", fontsize=8.5)
-        ax.set_xlabel("colonnes")
-        ax.set_ylabel("lignes")
+        pool = f", maxpool {g['pk']}/{g['ps']} fused" if d["pool_k"] else ""
+        ax.set_title(f"L{d['layer']:02d}: output {R}×{C}{pool}\n{g['n_r']} × {g['n_c']} spatial "
+                     f"tiles ({g['tr']}×{g['tc']} at the pooling input)", fontsize=8.5)
+        ax.set_xlabel("columns")
+        ax.set_ylabel("rows")
         # voies
         ax = axes[r, 1]
-        cases = [("sans pliage ni trim", g0, False), ("noyau actuel", g, True)]
+        cases = [("no folding, no trim", g0, False), ("current kernel", g, True)]
         for y, (lab, gg, trim) in enumerate(cases):
             lanes = gg["lanes"]
             for t in range(gg["nti"]):
@@ -266,24 +266,24 @@ def plot_tiling(rows, tn, tm, out_dir, name="tuilage"):
                             ls="-" if not trim else ":", lw=0.8)
             busy = lanes / (gg["nti"] * tn)
             note = "; pliage : cin·k voies" if gg["folded"] else ""
-            ax.text(gg["nti"] * tn + 1, y, f"{lab} : {lanes} voies utiles / {gg['nti']} × Tn "
+            ax.text(gg["nti"] * tn + 1, y, f"{lab}: {lanes} useful lanes / {gg['nti']} × Tn "
                     f"= {100 * busy:.0f} %{note}", va="center", fontsize=7.5)
         ax.set_yticks([])
         ax.set_xlim(0, max(gg["nti"] for _, gg, _ in cases) * tn * 2.4 + 10)
-        ax.set_xlabel(f"voies d'entrée (Tn = {tn}) ; hachuré : voies inutiles (sans trim)")
-        ax.set_title(f"cin = {d['cin']}, cout = {d['cout']} → {g['n_m']} groupe(s) de Tm = {tm}"
-                     f" ; {g['n_r'] * g['n_c'] * g['n_m'] * g['nti']} tuiles au total", fontsize=8.5)
+        ax.set_xlabel(f"input lanes (Tn = {tn}); hatched: useless lanes (without trim)")
+        ax.set_title(f"cin = {d['cin']}, cout = {d['cout']} → {g['n_m']} group(s) of Tm = {tm}"
+                     f"; {g['n_r'] * g['n_c'] * g['n_m'] * g['nti']} tiles in total", fontsize=8.5)
         ax.grid(False)
         for s in ("left", "top", "right"):
             ax.spines[s].set_visible(False)
-    fig.suptitle("Tuilage du moteur unique (tools/perf_model.py:tile_grid)", fontsize=9.5)
+    fig.suptitle("Tiling of the single engine (tools/perf_model.py:tile_grid)", fontsize=9.5)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("tuilage", "materiel", "T13.10",
-        "Tuilage de deux couches : tuiles spatiales et voies d'entrée, avec le pliage de L00 "
-        "(cin = 3) et la couche 13×13 couverte par une seule tuile.",
+        "Tiling of two layers: spatial tiles and input lanes, with the folding of L00 "
+        "(cin = 3) and the 13×13 layer covered by a single tile.",
         "model/<net>/manifest.json, tools/perf_model.py:tile_grid, accel_config.hpp")
 def tuilage(out_dir):
     pm = _tools("perf_model")
@@ -316,25 +316,25 @@ def plot_streaming(p, engine, out_dir, name="streaming"):
     buf = np.array([r["buffer_bytes"] for r in rows]) / 1024
     wts = np.array([r["weight_bytes"] if r["weights"] == "puce" else 0 for r in rows]) / 1024
     ax.bar(x, buf, 0.6, color=st.PALETTE[0], hatch="///", ec="white",
-           label="line buffer ou carte (Ko)")
+           label="line buffer or map (KB)")
     ax.bar(x, wts, 0.6, bottom=buf, color=st.PALETTE[3], hatch="///", ec="white",
-           label="poids sur la puce (Ko)")
+           label="weights on chip (KB)")
     for i, r in enumerate(rows):
         if r["weights"] == "ddr":
-            ax.text(i, buf[i] * 1.15 + 1, "poids\nDDR", ha="center", fontsize=6.5, color=st.INK2)
+            ax.text(i, buf[i] * 1.15 + 1, "weights\nDDR", ha="center", fontsize=6.5, color=st.INK2)
     ax.set_yscale("log")
-    ax.set_ylabel("mémoire par étage (Ko)")
+    ax.set_ylabel("memory per stage (KB)")
     ax.set_xticks(x, labels)
     ax.legend(loc="upper left")
-    ax.set_title(f"Streaming {p['board']} : un étage par conv (PE × SIMD), estimation "
-                 f"stream_model — {p['dsp']} DSP / {p['dsp_budget']}, "
-                 f"{p['onchip_bytes'] / 2**20:.2f} Mo sur puce")
+    ax.set_title(f"Streaming {p['board']}: one stage per conv (PE × SIMD), stream_model "
+                 f"estimate — {p['dsp']} DSP / {p['dsp_budget']}, "
+                 f"{p['onchip_bytes'] / 2**20:.2f} MB on chip")
     ax.grid(axis="x", visible=False)
     ax = axes[1]
     ax.bar(x - 0.2, np.array([r["cycles"] for r in rows]) / 1e6, 0.4, color=st.PALETTE[1],
-           hatch="///", ec="white", label="streaming : cycles de l'étage par image")
+           hatch="///", ec="white", label="streaming: cycles of the stage per image")
     ax.bar(x + 0.2, np.array(engine) / 1e6, 0.4, color=st.PALETTE[0], hatch="///", ec="white",
-           label="moteur unique : cycles de la couche")
+           label="single engine: cycles of the layer")
     ax.axhline(p["ii_cycles"] / 1e6, color=st.PALETTE[7], lw=1.2, ls="--")
     ax.text(len(rows) - 0.5, p["ii_cycles"] / 1e6 * 1.05, f"II = {p['ii_cycles'] / 1e6:.2f} M",
             ha="right", fontsize=7.5, color=st.PALETTE[7])
@@ -361,20 +361,20 @@ def plot_streaming(p, engine, out_dir, name="streaming"):
                            (0.1 + 1.3 * i / len(rows), 1.2 / len(rows)),
                            fc=st.PALETTE[1 + img % 2 * 2], alpha=0.75, hatch="///")
         start += p["ii_cycles"]
-    ax.set_yticks([0.75, 1.95], ["streaming\n(étages en parallèle)", "moteur unique\n"
-                                 "(couche après couche)"])
+    ax.set_yticks([0.75, 1.95], ["streaming\n(stages in parallel)", "single engine\n"
+                                 "(layer after layer)"])
     ax.set_xlim(0, 2 * tot / f * 1e3)
-    ax.set_xlabel(f"temps (ms à {f / 1e6:.0f} MHz)")
-    ax.set_title(f"Deux images : moteur unique {f / tot:.1f} img/s, streaming {p['fps']:.1f} "
-                 f"img/s (latence ≈ {p['latency_ms']:.1f} ms) — estimations, hachuré", fontsize=8.5)
+    ax.set_xlabel(f"time (ms at {f / 1e6:.0f} MHz)")
+    ax.set_title(f"Two images: single engine {f / tot:.1f} img/s, streaming {p['fps']:.1f} "
+                 f"img/s (latency ≈ {p['latency_ms']:.1f} ms) — estimates, hatched", fontsize=8.5)
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("streaming", "materiel", "T13.11",
-        "Architecture streaming face au moteur unique : mémoire et parallélisme par étage, "
-        "cycles par couche, chronogramme sur deux images (estimations).",
+        "Streaming architecture against the single engine: memory and parallelism per stage, "
+        "cycles per layer, timing diagram over two images (estimates).",
         "tools/stream_model.py:plan, tools/perf_model.py, hw/boards/kv260.yaml")
 def streaming(out_dir):
     return plot_streaming(*load_streaming(), out_dir)
@@ -383,14 +383,15 @@ def streaming(out_dir):
 # --- T13.12 : chaîne de vérification ------------------------------------------------------
 
 CHAIN = [  # (stade, jalon qui vérifie le passage vers ce stade, critère)
-    ("NumPy flottant\n(BN fusionnée)", None, ""),
-    ("entier Python\n(IntNetwork)", "M4", "mAP {flottant} → {entier}"),
-    ("golden C++", "M5", "0 écart à l'octet, {dumps} dumps"),
-    ("C-sim du noyau", "M6", "0 écart par couche (tb_net)"),
+    ("float NumPy\n(BN folded)", None, ""),
+    ("Python integer\n(IntNetwork)", "M4", "mAP {flottant} → {entier}"),
+    ("golden C++", "M5", "0 byte gap, {dumps} dumps"),
+    ("C-sim of the kernel", "M6", "0 gap per layer (tb_net)"),
     ("driver ARM\nbackend sim", "M7", "{csim_eq}"),
-    ("carte KV260\n(backend uio)", "M8", "mAP {carte}"),
+    ("KV260 board\n(uio backend)", "M8", "mAP {carte}"),
 ]
 STATE_COLORS = {"vérifié": st.PALETTE[5], "vérifié sur PC": st.PALETTE[2], "à faire": st.GREY}
+STATE_LABELS = {"vérifié": "checked", "vérifié sur PC": "checked on PC", "à faire": "to do"}
 
 
 def chain_states(tracking):
@@ -417,11 +418,11 @@ def chain_facts(net=NET):
 
     def fmt(k):
         m = st_.get(k, {}).get("map")
-        return f"{100 * m:.2f}" if m is not None else "à mesurer"
+        return f"{100 * m:.2f}" if m is not None else "to measure"
 
     dumps = len([d for d in (ROOT / "model" / net / "dumps").glob("*") if d.is_dir()])
     return {"flottant": fmt("flottant"), "entier": fmt("entier"), "carte": fmt("carte"),
-            "dumps": dumps, "csim_eq": st_.get("csim", {}).get("eq", "détections identiques")}
+            "dumps": dumps, "csim_eq": st_.get("csim", {}).get("eq", "identical detections")}
 
 
 def plot_chain(states, facts, out_dir, name="chaine_verif"):
@@ -441,17 +442,17 @@ def plot_chain(states, facts, out_dir, name="chaine_verif"):
                      ls="--" if state == "à faire" else "-")
             ax.text(4 * i - 0.5, 0.95, crit, ha="center", va="top", fontsize=6.6, color=st.INK2,
                     wrap=True)
-            ax.text(4 * i - 0.5, 2.75, f"{state}\n({CHAIN[i][1]})", ha="center", fontsize=6.8,
+            ax.text(4 * i - 0.5, 2.75, f"{STATE_LABELS[state]}\n({CHAIN[i][1]})", ha="center", fontsize=6.8,
                     color=STATE_COLORS[state], weight="bold")
-    ax.set_title("Chaîne de vérification bit-exact : chaque stade est comparé au précédent "
-                 "(états lus dans le suivi de docs/tasks/README.md)", fontsize=9)
+    ax.set_title("Bit-exact verification chain: each stage is compared with the previous one "
+                 "(states read from the progress table of docs/tasks/README.md)", fontsize=9)
     return st.save(fig, out_dir, name)
 
 
 @figure("chaine_verif", "materiel", "T13.12",
-        "Chaîne de vérification bit-exact, du flottant NumPy à la carte : critère et état de "
-        "chaque passage.",
-        "tableau de suivi de docs/tasks/README.md, build/m8/<net>/map_stades.json, dumps")
+        "Bit-exact verification chain, from float NumPy to the board: criterion and state of "
+        "each hand-over.",
+        "progress table of docs/tasks/README.md, build/m8/<net>/map_stades.json, dumps")
 def chaine_verif(out_dir):
     from tools.figures.projet import load_tracking
 

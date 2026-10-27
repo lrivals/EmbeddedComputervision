@@ -23,8 +23,8 @@ def fiche(fig, code, evite, test):
     """Cartouche en bas de la planche : code tracé, bibliothèque évitée, test."""
     missing = [t for t in test.split(", ") if not (TESTS / t.split("::")[0]).exists()]
     if missing:
-        raise AssertionError(f"tests cités absents : {missing}")
-    fig.text(0.01, 0.005, f"Code : {code}    Évite : {evite}    Test : {test}", fontsize=7,
+        raise AssertionError(f"tests cited but missing: {missing}")
+    fig.text(0.01, 0.005, f"Code: {code}    Avoids: {evite}    Test: {test}", fontsize=7,
              color=st.INK2, ha="left", va="bottom",
              bbox=dict(fc=st.GRID, ec="none", pad=3, alpha=0.6))
 
@@ -44,19 +44,19 @@ def finish(fig, out_dir, name, title):
 # --- T13.31 : carte de la réimplémentation -------------------------------------------------
 
 MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
-    "backend": ("NumPy / CuPy au choix", "torch.device", "test_backend.py", ""),
-    "data/anchors": ("k-means des ancres", "sklearn.cluster.KMeans", "test_anchors.py", "T13.40"),
+    "backend": ("NumPy or CuPy", "torch.device", "test_backend.py", ""),
+    "data/anchors": ("anchor k-means", "sklearn.cluster.KMeans", "test_anchors.py", "T13.40"),
     "fmt": ("number format", "babel.numbers", "test_fmt.py", "T19.6"),
     "data/augment": ("augmentations", "albumentations, cv2", "test_data_pipeline.py", "T13.42"),
-    "data/augment_v5": ("mosaïque, perspective (v5)", "cv2, ultralytics", "test_recipe_v5.py",
+    "data/augment_v5": ("mosaic, perspective (v5)", "cv2, ultralytics", "test_recipe_v5.py",
                         "T33.7"),
-    "data/datasets": ("jeux de données", "torchvision.datasets", "test_datasets.py", ""),
+    "data/datasets": ("datasets", "torchvision.datasets", "test_datasets.py", ""),
     "data/letterbox": ("letterbox", "cv2.resize", "test_data_pipeline.py", "T13.42"),
     "data/tal": ("task-aligned assigner", "ultralytics TaskAlignedAssigner", "test_tal.py",
                  "T35.4"),
-    "data/loader": ("chargement par lots", "torch.utils.data", "test_data_pipeline.py", ""),
-    "data/targets": ("cibles YOLO", "ultralytics", "test_targets.py", "T13.38"),
-    "data/voc": ("annotations VOC", "devkit VOC", "test_voc.py", ""),
+    "data/loader": ("batch loading", "torch.utils.data", "test_data_pipeline.py", ""),
+    "data/targets": ("YOLO targets", "ultralytics", "test_targets.py", "T13.38"),
+    "data/voc": ("VOC annotations", "devkit VOC", "test_voc.py", ""),
     "explain/cka": ("linear CKA", "torch_cka", "test_explain_train.py", "T36.8"),
     "explain/concepts": ("Network Dissection, TCAV", "captum.concept", "test_explain_train.py",
                          "T36.6"),
@@ -71,19 +71,19 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
                         "T36.2"),
     "explain/recorder": ("training recorder", "TensorBoard", "test_explain_train.py", "T36.7"),
     "explain/targets": ("explanation target", "—", "test_explain_gradient.py", "T36.0"),
-    "infer/boxes": ("boîtes et IoU", "torchvision.ops.box_iou", "test_boxes.py", "T13.37"),
+    "infer/boxes": ("boxes and IoU", "torchvision.ops.box_iou", "test_boxes.py", "T13.37"),
     "infer/confidence": ("score calibration (ECE)", "netcal", "test_failure.py", "T39.4"),
     "infer/coco_eval": ("mAP COCO", "pycocotools", "test_coco_eval.py", ""),
-    "infer/decode": ("décodage des têtes", "ultralytics", "test_decode.py", "T13.37"),
+    "infer/decode": ("head decoding", "ultralytics", "test_decode.py", "T13.37"),
     "infer/failure": ("failure prediction head", "—", "test_failure.py", "T39.1"),
-    "infer/hw_postproc": ("post-traitement matériel", "—", "test_hw_postproc.py", ""),
+    "infer/hw_postproc": ("hardware post-processing", "—", "test_hw_postproc.py", ""),
     "infer/metrics": ("mAP VOC", "devkit VOC MATLAB", "test_metrics.py", "T13.41"),
     "infer/nms": ("NMS", "torchvision.ops.nms", "test_nms.py", "T13.41"),
     "infer/ood": ("OOD monitor", "scikit-learn, PyOD", "test_ood.py", "T25.5"),
-    "infer/pipeline": ("prétraitement", "cv2", "test_pipeline.py", "T13.42"),
-    "infer/tiles": ("inférence par tuiles", "SAHI", "test_tiles.py", ""),
-    "io/darknet_weights": ("format .weights", "darknet", "test_darknet_weights.py", "T13.47"),
-    "io/export": ("export de l'arène", "onnx, Vitis AI", "test_export.py", "T13.47"),
+    "infer/pipeline": ("preprocessing", "cv2", "test_pipeline.py", "T13.42"),
+    "infer/tiles": ("tiled inference", "SAHI", "test_tiles.py", ""),
+    "io/darknet_weights": (".weights format", "darknet", "test_darknet_weights.py", "T13.47"),
+    "io/export": ("arena export", "onnx, Vitis AI", "test_export.py", "T13.47"),
     "io/torch_pickle": (".pt reader", "torch.load", "test_torch_pickle.py", "T33.0"),
     "layers/activations": ("activations", "torch.nn.LeakyReLU", "test_activations.py", "T13.34"),
     "layers/blocks": ("C3, SPPF, residual blocks", "ultralytics", "test_blocks.py", "T33.2"),
@@ -93,14 +93,14 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "layers/route": ("route", "torch.cat", "test_upsample_route.py", "T13.36"),
     "layers/upsample": ("upsample", "torch.nn.Upsample", "test_upsample_route.py", "T13.36"),
     "models/cfg": ("parser .cfg", "darknet", "test_cfg.py", "T13.47"),
-    "models/graph": ("graphe et rétropropagation", "torch.autograd", "test_graph.py", "T13.33"),
-    "models/specs": ("formes et coûts", "torchinfo", "test_tiny_yolo.py", ""),
+    "models/graph": ("graph and backpropagation", "torch.autograd", "test_graph.py", "T13.33"),
+    "models/specs": ("shapes and costs", "torchinfo", "test_tiny_yolo.py", ""),
     "models/tiny_yolo": ("construction", "torch.nn.Module", "test_tiny_yolo.py", ""),
     "models/ul_graph": ("converted YOLOv5n / v8n", "ultralytics", "test_convert_ultralytics.py",
                         "T26.1"),
     "models/ul_net": ("trainable YOLOv5n", "torch.nn.Module", "test_ul_net.py", "T33.3"),
     "models/ul_yaml": ("model YAML parser", "ultralytics", "test_ul_yaml.py", "T33.1"),
-    "prune": ("élagage", "torch.nn.utils.prune", "test_prune.py", ""),
+    "prune": ("pruning", "torch.nn.utils.prune", "test_prune.py", ""),
     "quant/abft": ("ABFT checksum", "—", "test_abft.py", "T25.2"),
     "quant/int_failure": ("integer failure head", "—", "test_failure.py", "T39.5"),
     "quant/bounds": ("accumulator bounds", "—", "test_exhaustive_ops.py", "T28.1"),
@@ -108,28 +108,28 @@ MODULES = {  # module → (brique, bibliothèque évitée, test, planche)
     "quant/fake_quant": ("fake-quant, QAT", "torch.ao.quantization", "test_fake_quant.py",
                          "T13.46"),
     "quant/faults": ("fault injection", "PyTorchFI", "test_faults.py", "T25.0"),
-    "quant/fuse_bn": ("fusion BN", "torch.ao fuse_modules", "test_fuse_bn.py", "T13.35"),
-    "quant/int_layers": ("arithmétique entière", "Vitis AI", "test_int_layers.py", "T13.44"),
-    "quant/int_model": ("réseau entier", "Vitis AI", "test_int_model.py", "T13.44"),
+    "quant/fuse_bn": ("BN folding", "torch.ao fuse_modules", "test_fuse_bn.py", "T13.35"),
+    "quant/int_layers": ("integer arithmetic", "Vitis AI", "test_int_layers.py", "T13.44"),
+    "quant/int_model": ("integer network", "Vitis AI", "test_int_model.py", "T13.44"),
     "quant/lowbit": ("4 bits", "Brevitas", "test_fake_quant.py", "T13.46"),
-    "quant/lut": ("tables σ et exp", "—", "test_lut.py", "T13.45"),
-    "quant/pack": ("2 MAC int8 par DSP", "Xilinx WP486", "test_pack.py", "T23.0"),
-    "quant/pow2": ("puissances de 2", "Brevitas", "test_pow2.py", "T13.46"),
-    "quant/quantize": ("quantification", "torch.quantization", "test_quantize.py", "T13.43"),
+    "quant/lut": ("σ and exp tables", "—", "test_lut.py", "T13.45"),
+    "quant/pack": ("2 int8 MACs per DSP", "Xilinx WP486", "test_pack.py", "T23.0"),
+    "quant/pow2": ("powers of two", "Brevitas", "test_pow2.py", "T13.46"),
+    "quant/quantize": ("quantization", "torch.quantization", "test_quantize.py", "T13.43"),
     "testing/gradcheck": ("gradcheck", "torch.autograd.gradcheck", "test_gradcheck.py", "T13.33"),
     "train/admm": ("ADMM", "—", "test_admm.py", "T13.46"),
-    "train/ema": ("EMA des poids", "ultralytics ModelEMA", "test_recipe_v5.py", "T33.7"),
+    "train/ema": ("weight EMA", "ultralytics ModelEMA", "test_recipe_v5.py", "T33.7"),
     "train/failure": ("detector + failure head training", "—", "test_failure.py", "T39.2"),
-    "train/loss": ("perte YOLO", "torch.nn.BCEWithLogitsLoss", "test_loss.py", "T13.38"),
-    "train/loss_v5": ("perte YOLOv5, CIoU, OTA", "ultralytics ComputeLoss", "test_loss_v5.py",
+    "train/loss": ("YOLO loss", "torch.nn.BCEWithLogitsLoss", "test_loss.py", "T13.38"),
+    "train/loss_v5": ("YOLOv5 loss, CIoU, OTA", "ultralytics ComputeLoss", "test_loss_v5.py",
                       "T33.6"),
     "train/optim": ("SGD", "torch.optim.SGD", "test_train.py", "T13.39"),
     "train/loss_v8": ("YOLOv8 loss, DFL", "ultralytics v8DetectionLoss", "test_loss_v8.py",
                       "T35.5"),
-    "train/schedule": ("taux d'apprentissage", "torch.optim.lr_scheduler", "test_train.py",
+    "train/schedule": ("learning rate", "torch.optim.lr_scheduler", "test_train.py",
                        "T13.39"),
-    "train/trainer": ("boucle d'entraînement", "pytorch-lightning", "test_train.py", "T13.39"),
-    "train/trainer_v5": ("recette YOLOv5", "ultralytics train.py", "test_recipe_v5.py",
+    "train/trainer": ("training loop", "pytorch-lightning", "test_train.py", "T13.39"),
+    "train/trainer_v5": ("YOLOv5 recipe", "ultralytics train.py", "test_recipe_v5.py",
                          "T33.7"),
 }
 
@@ -156,9 +156,9 @@ def load_map():
 
 
 @figure("carte", "maths", "T13.31",
-        "Carte de la réimplémentation : chaque module de python/yolo/, la brique qu'il "
-        "réécrit, la bibliothèque évitée, son test et la planche qui l'explique.",
-        "python/yolo/ (parcours du paquet), python/tests/")
+        "Map of the reimplementation: each module of python/yolo/, the building block it "
+        "rewrites, the library avoided, its test and the plate that explains it.",
+        "python/yolo/ (walk of the package), python/tests/")
 def carte(out_dir):
     rows = load_map()
     plt = st.plt()
@@ -167,8 +167,8 @@ def carte(out_dir):
     ax.set_ylim(len(rows) + 0.5, -1)
     ax.axis("off")
     xs = [0, 2.3, 4.6, 6.8, 9.1]
-    for x, h in zip(xs, ["module python/yolo/", "brique", "bibliothèque évitée", "test",
-                         "planche"]):
+    for x, h in zip(xs, ["python/yolo/ module", "building block", "library avoided", "test",
+                         "plate"]):
         ax.text(x, -0.4, h, fontsize=8, weight="bold")
     family = {m.split("/")[0] for m, *_ in rows}
     fam_color = {f: st.PALETTE[k % 8] for k, f in enumerate(sorted(family))}
@@ -179,11 +179,11 @@ def carte(out_dir):
                 color=fam_color[mod.split("/")[0]])
         ax.text(xs[1], y, brick, fontsize=7, va="center")
         ax.text(xs[2], y, avoid, fontsize=7, va="center", color=st.INK2)
-        ax.text(xs[3], y, test if ok else f"{test} (absent)", fontsize=7, va="center",
+        ax.text(xs[3], y, test if ok else f"{test} (missing)", fontsize=7, va="center",
                 color=st.INK if ok else st.PALETTE[7])
         ax.text(xs[4], y, task, fontsize=7, va="center", weight="bold", color=st.PALETTE[0])
-    ax.set_title(f"Réimplémentation en NumPy pur : {len(rows)} modules, aucune dépendance "
-                 "d'apprentissage ni de vision (ADR 0001)")
+    ax.set_title(f"Reimplementation in pure NumPy: {len(rows)} modules, no learning or vision "
+                 "dependency (ADR 0001)")
     fig.tight_layout()
     return st.save(fig, out_dir, "carte")
 
@@ -211,8 +211,8 @@ def conv_timings(sizes=(8, 16, 26, 52), c=4, f=8, reps=2):
 
 
 @figure("convolution", "maths", "T13.32",
-        "Convolution : la formule sur un patch, le dépliage im2col en produit de matrices, "
-        "et le temps des boucles face à im2col.",
+        "Convolution: the formula on a patch, the im2col unfolding into a matrix product, "
+        "and the time of the loops against im2col.",
         "yolo.layers.conv (conv_forward_naive, conv_forward, conv_backward)")
 def convolution(out_dir):
     from matplotlib.patches import Rectangle
@@ -234,7 +234,7 @@ def convolution(out_dir):
     ax.add_patch(Rectangle((1, 2), 3, 3, fill=False, ec=st.PALETTE[1], lw=2))
     ax.set_xlim(0, 6)
     ax.set_ylim(6, 0)
-    st.image_axes(ax, f"patch (2, 1) → y = {y[0, 0, 2, 1]:.0f} (Sobel, pas s = 1, p = 0)")
+    st.image_axes(ax, f"patch (2, 1) → y = {y[0, 0, 2, 1]:.0f} (Sobel, stride s = 1, p = 0)")
     eq(ax, r"$y_{f,i,j}=b_f+\sum_c\sum_u\sum_v W_{f,c,u,v}\,x_{c,\,si+u-p,\,sj+v-p}$",
        y=-0.04, size=7.5)
     # 2. im2col : formes de L00
@@ -245,11 +245,11 @@ def convolution(out_dir):
     st.block(ax, 3.6, 3.8, 2.0, 4.0, "X_col\n(C·k², Ho·Wo)\n(27, 173 056)", st.PALETTE[2])
     ax.text(6.0, 5.9, "=", fontsize=16, ha="center", va="center")
     st.block(ax, 6.4, 4.6, 3.4, 2.6, "Y\n(F, Ho·Wo)\n(16, 416·416)", st.PALETTE[1])
-    ax.text(5, 2.8, "sliding_window_view : chaque patch k×k×C\ndevient une colonne, sans copie\n"
-            "(L00 de Tiny-YOLOv2 : C = 3, k = 3, F = 16)", ha="center", fontsize=7.5)
+    ax.text(5, 2.8, "sliding_window_view: each k×k×C patch\nbecomes a column, without a copy\n"
+            "(L00 of Tiny-YOLOv2: C = 3, k = 3, F = 16)", ha="center", fontsize=7.5)
     ax.text(5, 0.6, r"$dW=\delta Y\cdot X_{col}^T,\quad dX=\mathrm{col2im}(W^T\cdot\delta Y)$",
             ha="center", fontsize=8.5)
-    ax.set_title("im2col : la convolution devient un produit de matrices", fontsize=9)
+    ax.set_title("im2col: the convolution becomes a matrix product", fontsize=9)
     # passe arrière : vérifie la forme de dW (appel du code, pas de réécriture)
     _, cache = conv_forward(x, W, pad=0)
     _, g = conv_backward(np.ones_like(y), cache)
@@ -261,13 +261,13 @@ def convolution(out_dir):
     ax.plot(n, [r[1] * 1e3 for r in rows], "o-", color=st.PALETTE[7], label="conv_forward_naive")
     ax.plot(n, [r[2] * 1e3 for r in rows], "s-", color=st.PALETTE[0], label="conv_forward (im2col)")
     ax.set_yscale("log")
-    ax.set_xlabel("taille de la carte n × n (C = 4, F = 8)")
-    ax.set_ylabel("temps (ms, cette machine)")
+    ax.set_xlabel("map size n × n (C = 4, F = 8)")
+    ax.set_ylabel("time (ms, this machine)")
     ax.legend(loc="upper left")
-    ax.set_title(f"même sortie : écart max {max(r[3] for r in rows):.1e} (float64)", fontsize=9)
+    ax.set_title(f"same output: max gap {max(r[3] for r in rows):.1e} (float64)", fontsize=9)
     fiche(fig, "yolo.layers.conv:conv_forward, conv_forward_naive, conv_backward",
           "torch.nn.Conv2d", "test_conv.py")
-    return finish(fig, out_dir, "convolution", "Convolution : boucles et im2col (§4.1)")
+    return finish(fig, out_dir, "convolution", "Convolution: loops and im2col (§4.1)")
 
 
 # --- T13.33 : rétropropagation ------------------------------------------------------------
@@ -300,13 +300,13 @@ def gradcheck_errors():
     out["maxpool 2/1"] = max(check_layer(lambda x, p: maxpool_forward(x, 2, 1), maxpool_backward, xp, {}).values())
     out["upsample"] = max(check_layer(lambda x, p: upsample_forward(x), upsample_backward, x, {}).values())
     w = np.random.default_rng(3).standard_normal(10)
-    out["témoin faux (x³ ↦ 2x²)"] = check_grad(lambda: w**3, w, 2 * w**2)
+    out["false control (x³ ↦ 2x²)"] = check_grad(lambda: w**3, w, 2 * w**2)
     return out
 
 
 @figure("retropropagation", "maths", "T13.33",
-        "Rétropropagation écrite à la main : formule du gradient renvoyé par chaque couche, "
-        "puis l'erreur du gradcheck par couche face au seuil 1e-7.",
+        "Backpropagation written by hand: formula of the gradient each layer returns, "
+        "then the gradcheck error per layer against the 1e-7 threshold.",
         "yolo.layers.*, yolo.models.graph, yolo.testing.gradcheck")
 def retropropagation(out_dir):
     plt = st.plt()
@@ -318,44 +318,44 @@ def retropropagation(out_dir):
               ("BN", r"$\delta\hat x=\gamma\,\delta y$" + "\n" +
                r"$\delta x=\frac{1}{\sigma}(\delta\hat x-\overline{\delta\hat x}-\hat x\,"
                r"\overline{\delta\hat x\,\hat x})$"),
-              ("leaky", r"$\delta x=\delta y\cdot(1\ \mathrm{si}\ x>0,\ 0{,}1\ \mathrm{sinon})$"),
-              ("maxpool", r"$\delta x=\delta y$ à l'argmax, 0 ailleurs")]
+              ("leaky", r"$\delta x=\delta y\cdot(1\ \mathrm{if}\ x>0,\ 0.1\ \mathrm{otherwise})$"),
+              ("maxpool", r"$\delta x=\delta y$ at the argmax, 0 elsewhere")]
     for k, (name, formula) in enumerate(layers):
         y = 7.6 - 1.75 * k
         st.block(ax, 0.2, y - 0.5, 2.0, 1.0, name, st.PALETTE[k], fontsize=9, weight="bold")
         ax.text(2.6, y, formula, fontsize=8, va="center")
         if k:
             st.arrow(ax, (1.2, y + 1.25), (1.2, y + 0.5))
-    st.block(ax, 0.2, 0.1, 5.4, 1.0, "route : la carte lue deux fois reçoit\nδ = δ₁ + δ₂ "
-             "(Network.backward additionne)", st.PALETTE[3], fontsize=7.5)
-    st.block(ax, 6.2, 0.1, 5.6, 1.0, "upsample ×2 : δx = somme des 4 δy\nde chaque bloc 2×2",
+    st.block(ax, 0.2, 0.1, 5.4, 1.0, "route: the map read twice receives\nδ = δ₁ + δ₂ "
+             "(Network.backward adds them)", st.PALETTE[3], fontsize=7.5)
+    st.block(ax, 6.2, 0.1, 5.6, 1.0, "upsample ×2: δx = sum of the 4 δy\nof each 2×2 block",
              st.PALETTE[4], fontsize=7.5)
-    ax.set_title("passe avant ↓, gradient renvoyé (formule) →", fontsize=9)
+    ax.set_title("forward pass ↓, gradient returned (formula) →", fontsize=9)
     errs = gradcheck_errors()
-    bad = {n: v for n, v in errs.items() if "faux" not in n and v > 1e-7}
-    assert not bad and errs["témoin faux (x³ ↦ 2x²)"] > 1e-5, errs
+    bad = {n: v for n, v in errs.items() if "false control" not in n and v > 1e-7}
+    assert not bad and errs["false control (x³ ↦ 2x²)"] > 1e-5, errs
     names = list(errs)
     vals = np.array([max(errs[n], 1e-16) for n in names])
-    colors = [st.PALETTE[7] if "faux" in n else st.PALETTE[5] for n in names]
+    colors = [st.PALETTE[7] if "false control" in n else st.PALETTE[5] for n in names]
     ax2.barh(range(len(names)), vals, color=colors)
     ax2.axvline(1e-7, color=st.INK2, ls="--", lw=1)
-    ax2.text(1.3e-7, len(names) - 0.4, "seuil 1e-7", fontsize=7, color=st.INK2)
+    ax2.text(1.3e-7, len(names) - 0.4, "threshold 1e-7", fontsize=7, color=st.INK2)
     ax2.set_xscale("log")
     ax2.set_yticks(range(len(names)), names)
     ax2.invert_yaxis()
     ax2.set_xlabel(r"$\|g_a-g_n\|_\infty/\max(\|g_a\|,\|g_n\|)$, $g_n=\frac{f(x+h)-f(x-h)}{2h}$")
-    ax2.set_title("gradcheck en float64 (check_layer)", fontsize=9)
+    ax2.set_title("gradcheck in float64 (check_layer)", fontsize=9)
     fiche(fig, "yolo.models.graph:Network.backward, yolo.testing.gradcheck:check_layer",
           "torch.autograd", "test_gradcheck.py, test_graph.py")
     return finish(fig, out_dir, "retropropagation",
-                  "Rétropropagation écrite à la main (§4, §11)")
+                  "Backpropagation written by hand (§4, §11)")
 
 
 # --- T13.34 : activations -----------------------------------------------------------------
 
 @figure("activations", "maths", "T13.34",
-        "Leaky ReLU et sa dérivée, sigmoïde stable face à la forme naïve, BCE sur logits et "
-        "son gradient, softmax stable.",
+        "Leaky ReLU and its derivative, stable sigmoid against the naive form, BCE on logits and "
+        "its gradient, stable softmax.",
         "yolo.layers.activations, yolo.train.loss (softplus, bce_logits)")
 def activations(out_dir):
     from yolo.layers.activations import leaky_backward, leaky_forward, sigmoid
@@ -368,7 +368,7 @@ def activations(out_dir):
     ax = axes[0]
     ax.plot(t, y, color=st.PALETTE[0], label="f(x)")
     ax.plot(t, leaky_backward(np.ones_like(t), cache)[0], color=st.PALETTE[1], ls="--", label="f'(x)")
-    eq(ax, r"$f(x)=\max(x,\,0{,}1x)$")
+    eq(ax, r"$f(x)=\max(x,\,0.1x)$")
     ax.legend(loc="lower right")
     ax.set_title("leaky ReLU", fontsize=9)
     ax = axes[1]
@@ -380,12 +380,12 @@ def activations(out_dir):
     assert np.isfinite(stable).all()
     ax.plot(tt, np.log(np.maximum(stable, 1e-300)), color=st.PALETTE[0], label="ln σ, sigmoid (2 branches)")
     ax.plot(tt, np.where(np.isfinite(naive_log), naive_log, np.nan), color=st.PALETTE[7], ls=":",
-            lw=2.2, label="ln σ naïve (float32)")
+            lw=2.2, label="ln σ naive (float32)")
     ax.set_xlabel("t")
-    eq(ax, r"$\sigma(t)=\frac{1}{1+e^{-t}}$ si $t\geq0$, $\frac{e^t}{1+e^t}$ sinon", size=7.5)
+    eq(ax, r"$\sigma(t)=\frac{1}{1+e^{-t}}$ if $t\geq0$, $\frac{e^t}{1+e^t}$ otherwise", size=7.5)
     ax.legend(loc="lower right", fontsize=6.5)
-    st.note(ax, "aucune inf/nan sur [−100, 100]", "lower left")
-    ax.set_title("sigmoïde stable", fontsize=9)
+    st.note(ax, "no inf/nan on [−100, 100]", "lower left")
+    ax.set_title("stable sigmoid", fontsize=9)
     ax = axes[2]
     for yv, c in ((1, st.PALETTE[0]), (0, st.PALETTE[1])):
         ax.plot(t, bce_logits(t, yv), color=c, label=f"BCE(t, y={yv})")
@@ -393,7 +393,7 @@ def activations(out_dir):
     ax.plot(t, softplus(t), color=st.MUTED, lw=0.8, ls=":")
     eq(ax, r"$\mathrm{BCE}(t,y)=\mathrm{softplus}(t)-yt$", size=7.5)
     ax.legend(loc="center right", fontsize=6.3)
-    ax.set_title("BCE sur logits", fontsize=9)
+    ax.set_title("BCE on logits", fontsize=9)
     ax = axes[3]
     rng = np.random.default_rng(SEED)
     z = rng.standard_normal(20) * 3 + 500  # logits énormes : exp déborderait sans le max
@@ -405,20 +405,20 @@ def activations(out_dir):
     p = scores[0, 0] / 0.5  # σ(0) = 0,5 d'objectness
     ax.bar(range(20), p, color=st.PALETTE[6])
     eq(ax, r"$\mathrm{softmax}(t)_c=\frac{e^{t_c-\max t}}{\sum_k e^{t_k-\max t}}$", size=7.5)
-    ax.set_xlabel("classe (logits ≈ 500 : e^t déborde sans le max)")
-    ax.set_title(f"softmax stable (Σ = {p.sum():.6f})", fontsize=9)
+    ax.set_xlabel("class (logits ≈ 500: e^t overflows without the max)")
+    ax.set_title(f"stable softmax (Σ = {p.sum():.6f})", fontsize=9)
     fiche(fig, "yolo.layers.activations:leaky_forward, sigmoid ; yolo.train.loss:softplus, "
           "bce_logits ; yolo.infer.decode:decode_head (v2)", "torch.sigmoid, torch.nn.BCEWithLogitsLoss",
           "test_activations.py, test_loss.py")
-    return finish(fig, out_dir, "activations", "Activations, sigmoïde stable, BCE et softmax "
+    return finish(fig, out_dir, "activations", "Activations, stable sigmoid, BCE and softmax "
                   "(§4.3, §4.5, §6.2)")
 
 
 # --- T13.35 : batch normalization ---------------------------------------------------------
 
 @figure("batchnorm", "maths", "T13.35",
-        "Batch normalization : normalisation par canal, moyennes glissantes, puis fusion dans "
-        "la convolution (sortie identique).",
+        "Batch normalization: per-channel normalization, running means, then folding into "
+        "the convolution (identical output).",
         "yolo.layers.batchnorm.bn_forward, yolo.quant.fuse_bn.fuse_bn")
 def batchnorm(out_dir):
     from yolo.layers.batchnorm import bn_forward, bn_init_state
@@ -440,7 +440,7 @@ def batchnorm(out_dir):
         ax.hist(y[:, c].ravel(), bins=40, histtype="stepfilled", color=st.PALETTE[c], alpha=0.25)
     eq(ax, r"$\hat x=\frac{x-\mu_B}{\sqrt{\sigma_B^2+\epsilon}},\ y=\gamma\hat x+\beta$", size=7.5)
     ax.legend(loc="upper right", fontsize=6.5)
-    ax.set_title("par canal sur (N, H, W) : avant (trait), après (plein)", fontsize=8.5)
+    ax.set_title("per channel over (N, H, W): before (line), after (filled)", fontsize=8.5)
     ax = axes[1]
     state = bn_init_state(3)
     means = []
@@ -450,12 +450,12 @@ def batchnorm(out_dir):
         means.append(state["mean"].copy())
     means = np.array(means)
     for c in range(3):
-        ax.plot(means[:, c], color=st.PALETTE[c], label=f"μ_run canal {c}")
+        ax.plot(means[:, c], color=st.PALETTE[c], label=f"μ_run channel {c}")
         ax.axhline([4, -2, 0.5][c], color=st.PALETTE[c], ls=":", lw=0.9)
-    eq(ax, r"$\mu\leftarrow0{,}9\,\mu+0{,}1\,\mu_B$", y=0.6)
-    ax.set_xlabel("itération")
+    eq(ax, r"$\mu\leftarrow0.9\,\mu+0.1\,\mu_B$", y=0.6)
+    ax.set_xlabel("iteration")
     ax.legend(loc="lower right", fontsize=6.5)
-    ax.set_title("moyennes glissantes (pointillé : vraie moyenne)", fontsize=8.5)
+    ax.set_title("running means (dotted: true mean)", fontsize=8.5)
     ax = axes[2]
     W = rng.standard_normal((4, 3, 3, 3))
     g, b = rng.uniform(0.5, 2, 4), rng.standard_normal(4)
@@ -470,12 +470,12 @@ def batchnorm(out_dir):
     ax.plot([-lim, lim], [-lim, lim], color=st.MUTED, lw=0.8)
     eq(ax, r"$s_f=\gamma_f/\sqrt{\sigma_f^2+\epsilon},\ W'_f=s_fW_f,\ b'_f=\beta_f+s_f(b_f-\mu_f)$",
        size=7)
-    ax.set_xlabel("conv puis BN")
-    ax.set_ylabel("conv fusionnée")
-    ax.set_title(f"fusion : écart max {np.abs(ref - fused).max():.1e}", fontsize=8.5)
+    ax.set_xlabel("conv then BN")
+    ax.set_ylabel("folded conv")
+    ax.set_title(f"folding: max gap {np.abs(ref - fused).max():.1e}", fontsize=8.5)
     fiche(fig, "yolo.layers.batchnorm:bn_forward ; yolo.quant.fuse_bn:fuse_bn",
           "torch.nn.BatchNorm2d, torch.ao fuse_modules", "test_batchnorm.py, test_fuse_bn.py")
-    return finish(fig, out_dir, "batchnorm", "Batch normalization et sa fusion (§4.2, §9.1)")
+    return finish(fig, out_dir, "batchnorm", "Batch normalization and its folding (§4.2, §9.1)")
 
 
 # --- T13.36 : maxpool, upsample, route ----------------------------------------------------
@@ -490,8 +490,8 @@ def _grid(ax, a, title, hl=None, fmt="{:.0f}", cmap="Blues"):
 
 
 @figure("pool_upsample_route", "maths", "T13.36",
-        "Maxpool 2×2/2 et 2×2/1 (avec la réplication du bord), upsample ×2 et route, avec "
-        "les gradients qui remontent.",
+        "Maxpool 2×2/2 and 2×2/1 (with border replication), upsample ×2 and route, with "
+        "the gradients flowing back.",
         "yolo.layers.pool, upsample, route")
 def pool_upsample_route(out_dir):
     from yolo.layers.pool import maxpool_backward, maxpool_forward
@@ -505,35 +505,35 @@ def pool_upsample_route(out_dir):
     y, c = maxpool_forward(x)
     dx, _ = maxpool_backward(np.ones_like(y), c)
     _grid(axes[0, 0], x[0, 0], "x 4×4", hl=dx[0, 0] > 0)
-    _grid(axes[0, 1], y[0, 0], "maxpool 2×2/2 : max par fenêtre")
-    _grid(axes[1, 0], dx[0, 0], "δx : δy remonte vers l'argmax", cmap="Oranges")
+    _grid(axes[0, 1], y[0, 0], "maxpool 2×2/2: max per window")
+    _grid(axes[1, 0], dx[0, 0], "δx: δy flows back to the argmax", cmap="Oranges")
     y1, c1 = maxpool_forward(x, 2, 1)
-    _grid(axes[1, 1], y1[0, 0], f"maxpool 2×2/1 : {x.shape[-1]}×{x.shape[-1]} → "
-          f"{y1.shape[-1]}×{y1.shape[-1]}\n(bord répliqué, couche 11)")
+    _grid(axes[1, 1], y1[0, 0], f"maxpool 2×2/1: {x.shape[-1]}×{x.shape[-1]} → "
+          f"{y1.shape[-1]}×{y1.shape[-1]}\n(border replicated, layer 11)")
     u = np.arange(4, dtype=np.float64).reshape(1, 1, 2, 2) + 1
     yu, cu = upsample_forward(u)
-    _grid(axes[0, 2], yu[0, 0], "upsample ×2 : plus proche voisin")
+    _grid(axes[0, 2], yu[0, 0], "upsample ×2: nearest neighbour")
     du, _ = upsample_backward(np.arange(16, dtype=np.float64).reshape(1, 1, 4, 4), cu)
-    _grid(axes[1, 2], du[0, 0], "δx : somme des 4 δy du bloc", cmap="Oranges")
+    _grid(axes[1, 2], du[0, 0], "δx: sum of the 4 δy of the block", cmap="Oranges")
     a = np.ones((1, 2, 2, 2))
     b = 2 * np.ones((1, 1, 2, 2))
     r, cr = route_forward([a, b])
     (da, db), _ = route_backward(np.arange(r.size, dtype=np.float64).reshape(r.shape), cr)
-    _grid(axes[0, 3], r[0].reshape(-1, 2), f"route : concat. des canaux\n{a.shape[1]} + "
-          f"{b.shape[1]} → {r.shape[1]} canaux (empilés)")
+    _grid(axes[0, 3], r[0].reshape(-1, 2), f"route: channel concat.\n{a.shape[1]} + "
+          f"{b.shape[1]} → {r.shape[1]} channels (stacked)")
     _grid(axes[1, 3], np.concatenate([da[0], db[0]]).reshape(-1, 2),
-          "δ découpé : canaux 0-1 → a, 2 → b", cmap="Oranges")
+          "δ split: channels 0-1 → a, 2 → b", cmap="Oranges")
     fiche(fig, "yolo.layers.pool:maxpool_forward/backward ; upsample ; route",
           "torch.nn.MaxPool2d, torch.nn.Upsample, torch.cat",
           "test_pool.py, test_upsample_route.py")
-    return finish(fig, out_dir, "pool_upsample_route", "Maxpool, upsample et route (§4.4, §4.5)")
+    return finish(fig, out_dir, "pool_upsample_route", "Maxpool, upsample and route (§4.4, §4.5)")
 
 
 # --- T13.37 : boîtes, IoU, décodage -------------------------------------------------------
 
 @figure("boites_decodage", "maths", "T13.37",
-        "IoU de deux boîtes et IoU de forme des ancres, décodage du centre dans sa cellule, "
-        "taille selon t_w pour les 5 ancres de Tiny-YOLOv2, scale_x_y de YOLOv4-tiny.",
+        "IoU of two boxes and shape IoU of the anchors, decoding of the centre in its cell, "
+        "size against t_w for the 5 anchors of Tiny-YOLOv2, scale_x_y of YOLOv4-tiny.",
         "yolo.infer.boxes (iou, iou_wh, cxcywh_to_xyxy), yolo.infer.decode.decode_head")
 def boites_decodage(out_dir):
     from matplotlib.patches import Rectangle
@@ -576,7 +576,7 @@ def boites_decodage(out_dir):
     ax.set_aspect("equal")
     ax.set_xticks(range(5, 9))
     ax.set_yticks(range(5, 9))
-    ax.set_title("centre décodé pour t ∈ [−8, 8] : reste dans la cellule (6, 6)", fontsize=8.5)
+    ax.set_title("centre decoded for t ∈ [−8, 8]: stays in cell (6, 6)", fontsize=8.5)
     eq(ax, r"$b_x=\frac{\sigma(t_x)+j}{S},\ b_y=\frac{\sigma(t_y)+i}{S}$", y=0.12)
     ax = axes[2]
     anchors = anchors_frac(load_cfg("tiny-yolov2-voc")["anchors"])
@@ -590,10 +590,10 @@ def boites_decodage(out_dir):
         ax.plot(tw, np.array(res) * 416, color=st.PALETTE[k], label=f"ancre {k} : p_w = {pw * 416:.0f} px")
     ax.set_yscale("log")
     ax.set_xlabel("t_w")
-    ax.set_ylabel("b_w (px à 416)")
+    ax.set_ylabel("b_w (px at 416)")
     ax.legend(loc="upper left", fontsize=6.5)
     eq(ax, r"$b_w=p_w\,e^{t_w}$", x=0.6, y=0.15)
-    ax.set_title("taille de la boîte selon t_w", fontsize=8.5)
+    ax.set_title("box size against t_w", fontsize=8.5)
     # scale_x_y (T24.2) : α des têtes de YOLOv4-tiny lu dans le .cfg ; 2.0 est celui de YOLOv4.
     ax = axes[3]
     v4 = sorted({layer.get("scale_x_y", 1.0) for layer in load_cfg("tiny-yolov4-coco")["layers"]
@@ -612,14 +612,14 @@ def boites_decodage(out_dir):
     ax.axhspan(0, 1, color=st.GRID, alpha=0.6, lw=0)
     ax.set_ylim(-0.6, 1.6)
     ax.set_xlabel("t_x")
-    ax.set_ylabel("décalage dans la cellule (b_x·S − j)")
+    ax.set_ylabel("offset in the cell (b_x·S − j)")
     ax.legend(loc="upper left", fontsize=6.5)
     eq(ax, r"$\alpha\,\sigma(t_x)-\frac{\alpha-1}{2}$", x=0.62, y=0.15)
-    ax.set_title("scale_x_y : le centre atteint les bords", fontsize=8.5)
+    ax.set_title("scale_x_y: the centre reaches the borders", fontsize=8.5)
     fiche(fig, "yolo.infer.boxes:iou, iou_wh, cxcywh_to_xyxy ; yolo.infer.decode:decode_head "
           "(alpha = scale_x_y)",
           "torchvision.ops.box_iou", "test_boxes.py, test_decode.py")
-    return finish(fig, out_dir, "boites_decodage", "Boîtes, IoU et décodage (§5.2, §8.1)")
+    return finish(fig, out_dir, "boites_decodage", "Boxes, IoU and decoding (§5.2, §8.1)")
 
 
 # --- T13.38 : cibles et perte -------------------------------------------------------------
@@ -643,8 +643,8 @@ def toy_loss():
 
 
 @figure("perte", "maths", "T13.38",
-        "Cibles et perte YOLO : encodage d'une vérité, la perte terme par terme, le poids "
-        "ω = 2 − g_w g_h, le masque ignore et la part de chaque terme sur un lot.",
+        "YOLO targets and loss: encoding of a ground truth, the loss term by term, the weight "
+        "ω = 2 − g_w g_h, the ignore mask and the share of each term on a batch.",
         "yolo.data.targets.build_targets, yolo.train.loss (yolo_loss, ignore_mask)")
 def perte(out_dir):
     from matplotlib.patches import Rectangle
@@ -684,8 +684,8 @@ def perte(out_dir):
     ax.text(0.04, 0.6, r"$+\sum_{obj}\mathrm{BCE}(\sigma(t_o),1)+\sum_{noobj}\mathrm{BCE}"
             r"(\sigma(t_o),0)+\sum_{obj}L_{cls}$", fontsize=10)
     ax.text(0.0, 0.35, "v3 : L_cls = Σ_c BCE(σ(t_c), 1[c = c*]) ;  v2 : L_cls = −ln softmax(t)_{c*}\n"
-            "ignore : ancre non responsable dont la boîte prédite dépasse ignore_thresh d'IoU\n"
-            "avec une vérité → exclue de tous les termes (yolo.train.loss, docstring)", fontsize=8,
+            "ignore: a non-responsible anchor whose predicted box exceeds ignore_thresh of IoU\n"
+            "with a ground truth → left out of every term (yolo.train.loss, docstring)", fontsize=8,
             color=st.INK2)
     # 3. ω
     ax = fig.add_subplot(gs[1, 0])
@@ -713,7 +713,7 @@ def perte(out_dir):
     ax.plot(xs, ys, "s", mfc="none", mec=st.PALETTE[7], ms=6, label=f"ignore ({ig.sum()})")
     ys, xs = np.nonzero(ob)
     ax.plot(xs, ys, "o", color=st.PALETTE[3], ms=5, label=f"obj ({ob.sum()})")
-    st.image_axes(ax, "IoU prédite (gris), masques")
+    st.image_axes(ax, "predicted IoU (grey), masks")
     ax.title.set_fontsize(8.5)
     ax.legend(loc="lower right", fontsize=6.5)
     # 5. parts
@@ -723,10 +723,10 @@ def perte(out_dir):
     total = sum(parts.values())
     ax.set_title(f"Σ termes = LossResult.total = {res.total:.2f}", fontsize=8.5)
     assert np.isclose(total, res.total)
-    ax.set_ylabel("perte (somme sur le lot de 2)")
+    ax.set_ylabel("loss (sum over the batch of 2)")
     fiche(fig, "yolo.data.targets:build_targets ; yolo.train.loss:yolo_loss, ignore_mask",
           "torch.nn.BCEWithLogitsLoss, ultralytics", "test_targets.py, test_loss.py")
-    return finish(fig, out_dir, "perte", "Cibles et perte YOLO (§5.1, §6.2)")
+    return finish(fig, out_dir, "perte", "YOLO targets and loss (§5.1, §6.2)")
 
 
 # --- T13.39 : optimiseur et taux d'apprentissage ------------------------------------------
@@ -746,8 +746,8 @@ def sgd_path(momentum, steps=80, lr=0.03):
 
 
 @figure("optimisation", "maths", "T13.39",
-        "SGD avec et sans momentum sur une quadratique mal conditionnée, taux d'apprentissage "
-        "(montée puis paliers) et tailles multi-échelles.",
+        "SGD with and without momentum on an ill-conditioned quadratic, learning rate "
+        "(ramp then steps) and multi-scale sizes.",
         "yolo.train.optim.SGD, yolo.train.schedule.lr_at, yolo.train.trainer.multiscale_size")
 def optimisation(out_dir):
     from yolo.train.schedule import lr_at
@@ -765,28 +765,28 @@ def optimisation(out_dir):
     ax.plot(0, 0, "*", color=st.INK, ms=9)
     ax.legend(loc="lower right")
     eq(ax, r"$v\leftarrow\mu v-\mathrm{lr}(g+\mathrm{wd}\cdot p),\ p\leftarrow p+v$", size=7.5)
-    ax.set_title("SGD sur ½(x² + 25 y²)", fontsize=9)
+    ax.set_title("SGD on ½(x² + 25 y²)", fontsize=9)
     ax = axes[1]
     its = np.arange(0, 40200, 50)
     lr = [lr_at(i, 1e-3, burn_in=1000, steps=(32000, 36000), scales=(0.1, 0.1)) for i in its]
     ax.plot(its, lr, color=st.PALETTE[0])
     ax.set_yscale("log")
-    ax.set_xlabel("itération")
+    ax.set_xlabel("iteration")
     ax.set_ylabel("lr")
     ax.set_ylim(1e-9, 3e-3)
-    eq(ax, r"$\mathrm{lr}\cdot(it/\mathrm{burn\_in})^4$ puis ×0,1 aux paliers", size=7.5, y=0.2)
+    eq(ax, r"$\mathrm{lr}\cdot(it/\mathrm{burn\_in})^4$ then ×0.1 at the steps", size=7.5, y=0.2)
     ax.set_title("lr_at (cfg yolov2-tiny-voc)", fontsize=9)
     ax = axes[2]
     it = np.arange(0, 300)
     sizes = [multiscale_size(i) for i in it]
     ax.step(it, sizes, where="post", color=st.PALETTE[2])
     ax.set_yticks(range(320, 609, 64))
-    ax.set_xlabel("itération")
-    ax.set_ylabel("taille d'entrée")
-    ax.set_title("multi-échelle : 320 à 608, tirage tous les 10 lots", fontsize=9)
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("input size")
+    ax.set_title("multi-scale: 320 to 608, drawn every 10 batches", fontsize=9)
     fiche(fig, "yolo.train.optim:SGD ; yolo.train.schedule:lr_at ; yolo.train.trainer:multiscale_size",
           "torch.optim.SGD, torch.optim.lr_scheduler", "test_train.py")
-    return finish(fig, out_dir, "optimisation", "Optimiseur et taux d'apprentissage (§7.1)")
+    return finish(fig, out_dir, "optimisation", "Optimizer and learning rate (§7.1)")
 
 
 # --- T13.40 : k-means des ancres ----------------------------------------------------------
@@ -811,8 +811,8 @@ def kmeans_euclid(wh, k, iters=100, seed=SEED):
 
 
 @figure("kmeans", "maths", "T13.40",
-        "k-means des ancres avec la distance 1 − IoU face à la distance euclidienne, et "
-        "l'initialisation k-means++ sur des boîtes jouets.",
+        "Anchor k-means with the 1 − IoU distance against the Euclidean distance, and "
+        "the k-means++ initialization on toy boxes.",
         "yolo.data.anchors (kmeans_anchors, _init_plusplus, mean_best_iou)")
 def kmeans(out_dir):
     from yolo.data.anchors import _init_plusplus, kmeans_anchors, mean_best_iou
@@ -825,7 +825,7 @@ def kmeans(out_dir):
     plt = st.plt()
     fig, axes = plt.subplots(1, 2, figsize=(st.FULL, 4.0))
     for ax, (cent, name, c) in zip(axes, ((ours, "1 − IoU (kmeans_anchors)", st.PALETTE[0]),
-                                          (eu, "euclidienne (témoin)", st.PALETTE[7]))):
+                                          (eu, "Euclidean (control)", st.PALETTE[7]))):
         assign = np.argmax(iou_wh(wh, cent), axis=1)
         ax.scatter(wh[:, 0], wh[:, 1], c=[st.PALETTE[a % 8] for a in assign], s=4, alpha=0.35)
         ax.plot(cent[:, 0], cent[:, 1], "X", ms=11, color=c, mec="white")
@@ -833,15 +833,15 @@ def kmeans(out_dir):
         ax.set_yscale("log")
         ax.set_xlabel("w (px)")
         ax.set_ylabel("h (px)")
-        ax.set_title(f"{name} : IoU moyenne {mean_best_iou(wh, cent):.4f}", fontsize=9)
+        ax.set_title(f"{name}: mean IoU {mean_best_iou(wh, cent):.4f}", fontsize=9)
     init = _init_plusplus(wh, k, np.random.default_rng(SEED))
     axes[0].plot(init[:, 0], init[:, 1], "o", mfc="none", mec=st.INK, ms=8, label="k-means++ (∝ d²)")
     axes[0].legend(loc="upper left")
-    eq(axes[0], r"$d=1-\mathrm{IoU}(\mathrm{boîte},\mathrm{centre})$", y=0.12)
-    st.note(axes[1], "attirée par les grandes boîtes", "lower right")
+    eq(axes[0], r"$d=1-\mathrm{IoU}(\mathrm{box},\mathrm{centre})$", y=0.12)
+    st.note(axes[1], "pulled by the large boxes", "lower right")
     fiche(fig, "yolo.data.anchors:kmeans_anchors, _init_plusplus, mean_best_iou",
           "sklearn.cluster.KMeans", "test_anchors.py")
-    return finish(fig, out_dir, "kmeans", "k-means des ancres avec la distance 1 − IoU (§5.2)")
+    return finish(fig, out_dir, "kmeans", "Anchor k-means with the 1 − IoU distance (§5.2)")
 
 
 # --- T13.41 : NMS et mAP ------------------------------------------------------------------
@@ -856,8 +856,8 @@ def _voc_ref():
 
 
 @figure("nms_map", "maths", "T13.41",
-        "NMS pas à pas, appariement détections / vérités et courbe précision-rappel, AP VOC07 "
-        "sur 11 points face à l'aire sous l'enveloppe, égale à la référence du devkit.",
+        "NMS step by step, detection / ground-truth matching and precision-recall curve, VOC07 "
+        "11-point AP against the area under the envelope, equal to the devkit reference.",
         "yolo.infer.nms (nms), yolo.infer.metrics (eval_class, voc_ap), tests/voc_eval_ref.py")
 def nms_map(out_dir):
     from yolo.infer.boxes import cxcywh_to_xyxy
@@ -882,7 +882,7 @@ def nms_map(out_dir):
     ax.set_xlim(0, 1)
     ax.set_ylim(1, 0)
     ax.set_aspect("equal")
-    st.image_axes(ax, f"NMS (IoU > 0,45) : {len(boxes)} → {len(keep)} boîtes")
+    st.image_axes(ax, f"NMS (IoU > 0.45): {len(boxes)} → {len(keep)} boxes")
     ax = axes[1]
     # appariement sur des images jouets : vérités et détections bruitées
     gts, ids, sc, bx = {}, [], [], []
@@ -901,18 +901,18 @@ def nms_map(out_dir):
             x0 = rng.uniform(0, 300, 2)
             bx.append(np.r_[x0, x0 + rng.uniform(30, 90, 2)])
     rec, prec, ap = eval_class(ids, np.array(sc), np.array(bx), gts)
-    ax.plot(rec, prec, color=st.PALETTE[0], lw=1.2, label="précision(rappel)")
+    ax.plot(rec, prec, color=st.PALETTE[0], lw=1.2, label="precision(recall)")
     env = np.maximum.accumulate(prec[::-1])[::-1]
     ax.plot(rec, env, color=st.PALETTE[1], ls="--", lw=1, label="enveloppe max_{r̃ ≥ r}")
     for t in np.arange(0, 1.1, 0.1):
         p = prec[rec >= t]
         ax.plot([t], [p.max() if p.size else 0], "o", color=st.PALETTE[1], ms=4)
     ax.set_xlabel("rappel")
-    ax.set_ylabel("précision")
+    ax.set_ylabel("precision")
     ax.set_xlim(0, 1.02)
     ax.set_ylim(0, 1.05)
     ax.legend(loc="lower left", fontsize=7)
-    ax.set_title("IoU ≥ 0,5, une vérité une fois, difficult ignorés", fontsize=8.5)
+    ax.set_title("IoU ≥ 0.5, a ground truth once, difficult ignored", fontsize=8.5)
     ax = axes[2]
     ref = _voc_ref()
     vals = {"VOC07, 11 points": (voc_ap(rec, prec, True), ref.voc_ap(rec, prec, True)),
@@ -927,12 +927,12 @@ def nms_map(out_dir):
     ax.set_xticks(x, list(vals))
     ax.set_ylim(0, 1.1)
     ax.legend(loc="lower center", fontsize=7)
-    eq(ax, r"$AP=\frac{1}{11}\sum_{r\in\{0,0{,}1,\ldots,1\}}\max_{\tilde r\geq r}p(\tilde r)$",
+    eq(ax, r"$AP=\frac{1}{11}\sum_{r\in\{0,0.1,\ldots,1\}}\max_{\tilde r\geq r}p(\tilde r)$",
        size=7.5)
-    ax.set_title("égal à la référence du devkit", fontsize=8.5)
+    ax.set_title("equal to the devkit reference", fontsize=8.5)
     fiche(fig, "yolo.infer.nms:nms ; yolo.infer.metrics:eval_class, voc_ap",
           "torchvision.ops.nms, devkit VOC MATLAB", "test_nms.py, test_metrics.py")
-    return finish(fig, out_dir, "nms_map", "NMS et mAP VOC (§8.2, §8.3)")
+    return finish(fig, out_dir, "nms_map", "NMS and VOC mAP (§8.2, §8.3)")
 
 
 # --- T13.42 : prétraitement et augmentations ----------------------------------------------
@@ -947,8 +947,8 @@ def _toy_image(w=200, h=120):
 
 
 @figure("pretraitement", "maths", "T13.42",
-        "Letterbox face à stretch, interpolation bilinéaire de Darknet, aller-retour RGB → HSV "
-        "→ RGB et transformation affine des boîtes.",
+        "Letterbox against stretch, Darknet bilinear interpolation, RGB → HSV → RGB round trip "
+        "and affine transform of the boxes.",
         "yolo.data.letterbox, yolo.infer.pipeline (resize_darknet, preprocess), yolo.data.augment")
 def pretraitement(out_dir):
     from yolo.data.augment import affine, hsv_to_rgb, rgb_to_hsv, transform_boxes, warp_image
@@ -976,7 +976,7 @@ def pretraitement(out_dir):
     ax.imshow(up[..., 0], cmap="viridis")
     for (i, j), v in np.ndenumerate(up[..., 0] * 15):
         ax.text(j, i, f"{v:.1f}", ha="center", va="center", fontsize=6, color="white")
-    st.image_axes(ax, "resize_darknet 4×4 → 7×7\n(coins alignés, linéaire x puis y)")
+    st.image_axes(ax, "resize_darknet 4×4 → 7×7\n(aligned corners, linear in x then y)")
     ax.title.set_fontsize(8)
     ax = axes[2]
     rgb = np.asarray(img, dtype=np.float32) / 255
@@ -986,7 +986,7 @@ def pretraitement(out_dir):
     hsv[..., 1] = np.clip(hsv[..., 1] * 1.5, 0, 1)
     hsv[..., 2] = np.clip(hsv[..., 2] * 0.7, 0, 1)
     ax.imshow(np.concatenate([rgb, np.ones((rgb.shape[0], 4, 3)), hsv_to_rgb(hsv)], 1))
-    st.image_axes(ax, f"RGB → HSV → RGB : écart {err:.1e}\nsaturation ×1,5, exposition ×0,7")
+    st.image_axes(ax, f"RGB → HSV → RGB: gap {err:.1e}\nsaturation ×1.5, exposure ×0.7")
     ax.title.set_fontsize(8)
     ax = axes[3]
     params = {"scale": 0.8, "shift": np.array([0.3, -0.1]), "flip": True, "sat": 1.0,
@@ -995,21 +995,21 @@ def pretraitement(out_dir):
     boxes2 = np.r_[box, [[0.97, 0.5, 0.04, 0.2]]]  # boîte au bord : sort du carré
     tb, keep = transform_boxes(boxes2, *img.size, S, m)
     ax.imshow(warp_image(img, S, m))
-    st.draw_boxes(ax, cxcywh_to_xyxy(tb) * S, ["boîte suivie"], color=st.PALETTE[5])
-    st.image_axes(ax, f"affine (échelle, translation, retournement)\n{keep.sum()} / {len(keep)} "
-                  "boîtes gardées (côté ≥ 2 px)")
+    st.draw_boxes(ax, cxcywh_to_xyxy(tb) * S, ["tracked box"], color=st.PALETTE[5])
+    st.image_axes(ax, f"affine (scale, translation, flip)\n{keep.sum()} / {len(keep)} "
+                  "boxes kept (side ≥ 2 px)")
     ax.title.set_fontsize(8)
     fiche(fig, "yolo.infer.pipeline:preprocess, resize_darknet ; yolo.data.augment:affine, "
           "transform_boxes, rgb_to_hsv, hsv_to_rgb", "cv2.resize, cv2.warpAffine, albumentations",
           "test_data_pipeline.py")
-    return finish(fig, out_dir, "pretraitement", "Prétraitement et augmentations (§1, §7.1)")
+    return finish(fig, out_dir, "pretraitement", "Preprocessing and augmentations (§1, §7.1)")
 
 
 # --- T13.43 : quantification symétrique et calibration ------------------------------------
 
 @figure("quantification", "maths", "T13.43",
-        "Quantification symétrique : l'escalier et son erreur, échelles par canal face à une "
-        "échelle par couche, choix du seuil d'écrêtage par la MSE.",
+        "Symmetric quantization: the staircase and its error, per-channel scales against one "
+        "scale per layer, choice of the clipping threshold by the MSE.",
         "yolo.quant.quantize (round_half_up, quantize, weight_scales), yolo.quant.calibrate")
 def quantification(out_dir):
     from yolo.quant.calibrate import clip_candidates, clip_rate, quant_mse
@@ -1027,7 +1027,7 @@ def quantification(out_dir):
     eq(ax, r"$q=\mathrm{clip}(\lfloor x/s+\frac{1}{2}\rfloor,-q_{max},q_{max})$", size=7.5)
     ax.legend(loc="lower right")
     ax.set_xlabel("x (ici s = 0,25, q_max = 5)")
-    ax.set_title("escalier et dents de scie ; saturation", fontsize=8.5)
+    ax.set_title("staircase and sawtooth; saturation", fontsize=8.5)
     ax = axes[1]
     rng = np.random.default_rng(SEED)
     W = rng.standard_normal((32, 16, 3, 3)) * np.exp(rng.normal(-3, 1, 32))[:, None, None, None]
@@ -1040,12 +1040,12 @@ def quantification(out_dir):
         return np.sqrt((e ** 2).reshape(32, -1).mean(1) / (W ** 2).reshape(32, -1).mean(1))
 
     order = np.argsort(sw)
-    ax.semilogy(rms(per_layer)[order], "o-", ms=3, color=st.PALETTE[7], label="une échelle par couche")
+    ax.semilogy(rms(per_layer)[order], "o-", ms=3, color=st.PALETTE[7], label="one scale per layer")
     ax.semilogy(rms(per_ch)[order], "s-", ms=3, color=st.PALETTE[0], label="s_w,f = max|W_f|/127")
-    ax.set_xlabel("canal de sortie (trié par amplitude)")
+    ax.set_xlabel("output channel (sorted by amplitude)")
     ax.set_ylabel("erreur RMS relative")
     ax.legend(loc="upper right", fontsize=7)
-    ax.set_title("échelles par canal", fontsize=8.5)
+    ax.set_title("per-channel scales", fontsize=8.5)
     ax = axes[2]
     v = np.concatenate([rng.laplace(0, 0.5, 20000), rng.laplace(0, 4, 40)])
     clips = np.linspace(0.3, np.abs(v).max(), 120)
@@ -1056,24 +1056,24 @@ def quantification(out_dir):
         ax.axvline(c, color=st.GRID, lw=0.8)
         ax.text(c, max(mse), name, rotation=90, fontsize=6, va="top", color=st.MUTED)
     ax.axvline(best, color=st.PALETTE[1], lw=1.2)
-    ax.set_xlabel("seuil d'écrêtage c (s = c/127)")
+    ax.set_xlabel("clipping threshold c (s = c/127)")
     ax.set_ylabel("MSE")
     a2 = ax.twinx()
     a2.plot(clips, [100 * clip_rate(v, c / QMAX) for c in clips], color=st.PALETTE[3], ls="--", lw=1)
-    a2.set_ylabel("saturées (%)", color=st.PALETTE[3])
+    a2.set_ylabel("saturated (%)", color=st.PALETTE[3])
     a2.grid(False)
-    ax.set_title(f"seuil MSE minimal c = {best:.2f}", fontsize=8.5)
+    ax.set_title(f"minimum-MSE threshold c = {best:.2f}", fontsize=8.5)
     fiche(fig, "yolo.quant.quantize:round_half_up, quantize, weight_scales ; "
           "yolo.quant.calibrate:clip_candidates, quant_mse, clip_rate",
           "torch.quantization, TensorRT", "test_quantize.py")
-    return finish(fig, out_dir, "quantification", "Quantification symétrique et calibration (§9.2)")
+    return finish(fig, out_dir, "quantification", "Symmetric quantization and calibration (§9.2)")
 
 
 # --- T13.44 : arithmétique entière ---------------------------------------------------------
 
 @figure("entier", "maths", "T13.44",
-        "Arithmétique entière du matériel : chaîne d'une sortie, multiplicateur fixe M0/2ⁿ, "
-        "leaky entière 13/128 et marge des accumulateurs int32.",
+        "Integer arithmetic of the hardware: chain of one output, fixed multiplier M0/2ⁿ, "
+        "integer leaky 13/128 and headroom of the int32 accumulators.",
         "yolo.quant.int_layers (conv_acc, requantize, leaky_int, clip_q), quantize.requant_params")
 def entier(out_dir):
     from yolo.quant.int_layers import clip_q, conv_acc, leaky_int, requantize
@@ -1104,7 +1104,7 @@ def entier(out_dir):
         st.block(ax, 0.1, yy - 0.6, 5.8, 1.2, f"{lab}\n{rngtxt}", st.PALETTE[k], fontsize=7)
         if k:
             st.arrow(ax, (3, yy + 1.15), (3, yy + 0.6))
-    ax.set_title("une sortie, du produit à l'octet", fontsize=8.5)
+    ax.set_title("one output, from the product to the byte", fontsize=8.5)
     ax = axes[1]
     ratio = sx * sw / sy
     err = np.abs(M0 / 2.0**n - ratio) / ratio
@@ -1117,9 +1117,9 @@ def entier(out_dir):
     t = np.arange(-64, 33)
     ax.plot(t, leaky_int(t), ".", ms=3, color=st.PALETTE[0], label="leaky_int")
     ax.plot(t, np.where(t > 0, t, 0.1 * t), color=st.PALETTE[1], lw=0.8, label="0,1·y")
-    eq(ax, r"$y<0:\ (13y+64)\gg7$, pente $13/128\approx0{,}1016$", size=7)
+    eq(ax, r"$y<0:\ (13y+64)\gg7$, slope $13/128\approx0.1016$", size=7)
     ax.legend(loc="lower right", fontsize=7)
-    ax.set_title("leaky entière", fontsize=8.5)
+    ax.set_title("integer leaky", fontsize=8.5)
     ax = axes[3]
     a = np.abs(acc[acc != 0]).astype(np.float64)
     ax.hist(np.log2(a), bins=30, color=st.PALETTE[2])
@@ -1130,14 +1130,14 @@ def entier(out_dir):
     fiche(fig, "yolo.quant.int_layers:conv_acc, requantize, leaky_int, clip_q ; "
           "yolo.quant.quantize:requant_params (= golden::requantize, leaky_int)",
           "Vitis AI, TFLite", "test_int_layers.py, test_golden_cpp.py")
-    return finish(fig, out_dir, "entier", "Arithmétique entière du matériel (§9.3)")
+    return finish(fig, out_dir, "entier", "Integer arithmetic of the hardware (§9.3)")
 
 
 # --- T13.45 : tables LUT --------------------------------------------------------------------
 
 @figure("lut", "maths", "T13.45",
-        "Sigmoïde et exponentielles par tables de 256 entrées en Q16 : valeurs, erreurs aux "
-        "points de la grille et de bout en bout, seuil entier sans sigmoïde.",
+        "Sigmoid and exponentials by 256-entry Q16 tables: values, errors at the grid points "
+        "and end to end, integer threshold without a sigmoid.",
         "yolo.quant.lut (sigmoid_lut, exp_lut, softmax_exp_lut, logit_threshold_q)")
 def lut(out_dir):
     from yolo.layers.activations import sigmoid
@@ -1159,7 +1159,7 @@ def lut(out_dir):
     ax.text(qt * s + 0.3, 0.05, f"σ(q s) > {theta} ⟺ q ≥ {qt}", fontsize=7, color=st.PALETTE[3])
     ax.legend(loc="upper left", fontsize=7)
     ax.set_xlabel("t = q·s (s = 1/8)")
-    ax.set_title("table σ, 256 entrées Q16", fontsize=8.5)
+    ax.set_title("σ table, 256 Q16 entries", fontsize=8.5)
     ax = axes[1]
     f = exp_frac_bits(s)
     ax.semilogy(t, exp_lut(s) / 2.0**f, color=st.PALETTE[0], label=f"exp_lut (Q{f})")
@@ -1172,21 +1172,21 @@ def lut(out_dir):
     ax = axes[2]
     grid_err = np.abs(sl - sigmoid(t))
     ax.semilogy(t, np.maximum(grid_err, 1e-12), ".", ms=2.5, color=st.PALETTE[0],
-                label="aux points de la grille")
+                label="at the grid points")
     assert grid_err.max() <= 2.0**-17 + 1e-15
     tc = np.linspace(-15, 15, 4001)
     qq = np.clip(np.floor(tc / s + 0.5), -128, 127).astype(int)
     e2e = np.abs(sigmoid_lut(s)[qq + 128] / ONE - sigmoid(tc))
-    ax.semilogy(tc, e2e, color=st.PALETTE[1], lw=0.7, label="de bout en bout (pas s)")
+    ax.semilogy(tc, e2e, color=st.PALETTE[1], lw=0.7, label="end to end (step s)")
     ax.axhline(2.0**-17, color=st.PALETTE[0], ls=":", lw=1)
     ax.axhline(s / 8, color=st.PALETTE[1], ls=":", lw=1)
     ax.text(-15, 2.0**-17 * 1.5, "2⁻¹⁷", fontsize=7, color=st.PALETTE[0])
     ax.text(-15, s / 8 * 1.3, "s/8 = 1/64", fontsize=7, color=st.PALETTE[1])
     ax.legend(loc="lower right", fontsize=7)
-    ax.set_title("erreur (bornes de la docstring)", fontsize=8.5)
+    ax.set_title("error (bounds of the docstring)", fontsize=8.5)
     fiche(fig, "yolo.quant.lut:sigmoid_lut, exp_lut, softmax_exp_lut, logit_threshold_q",
           "torch.sigmoid, tables Vitis AI", "test_lut.py")
-    return finish(fig, out_dir, "lut", "Sigmoïde et exponentielle par tables (§9.4)")
+    return finish(fig, out_dir, "lut", "Sigmoid and exponential by tables (§9.4)")
 
 
 # --- T13.46 : QAT, puissances de 2 et 4 bits ----------------------------------------------
@@ -1215,8 +1215,8 @@ def admm_toy(kind="mixed6", iters=2000, every=50, lr=0.05):
 
 
 @figure("basse_precision", "maths", "T13.46",
-        "Basse précision : fake-quant et estimateur straight-through, niveaux équidistants "
-        "face aux puissances de 2 et multiplication par décalages, ADMM, découpage 4 bits.",
+        "Low precision: fake-quant and straight-through estimator, uniform levels against "
+        "powers of two and multiplication by shifts, ADMM, 4-bit split.",
         "yolo.quant.fake_quant, yolo.quant.pow2, yolo.train.admm, yolo.quant.int_layers.split4")
 def basse_precision(out_dir):
     from yolo.quant.fake_quant import fq_act_backward, fq_act_forward
@@ -1230,7 +1230,7 @@ def basse_precision(out_dir):
     y, cache = fq_act_forward(x, -1.0, 15)
     dx, _ = fq_act_backward(np.ones_like(x), cache)
     ax.plot(x, y, color=st.PALETTE[0], label="avant : escalier (s = 2⁻¹)")
-    ax.plot(x, dx * 4, color=st.PALETTE[1], ls="--", label="arrière ×4 : STE (1 dans la plage)")
+    ax.plot(x, dx * 4, color=st.PALETTE[1], ls="--", label="backward ×4: STE (1 in the range)")
     ax.legend(loc="upper left", fontsize=6.5)
     ax.set_title("fake-quant 5 bits, STE", fontsize=8.5)
     ax = axes[1]
@@ -1242,16 +1242,16 @@ def basse_precision(out_dir):
     assert np.array_equal(shift_add_mul(xs, np.full(len(xs), 96)), 96 * xs)
     ax.set_xlim(-30, 100)
     ax.set_yticks([])
-    ax.set_xlabel("magnitude entière")
+    ax.set_xlabel("integer magnitude")
     ax.text(30, -0.8, "96·x = (x ≪ 6) + (x ≪ 5)\nshift_add_mul = q·x", fontsize=7)
     ax.set_ylim(-1.3, 2.6)
-    ax.set_title("niveaux et décalages", fontsize=8.5)
+    ax.set_title("levels and shifts", fontsize=8.5)
     ax = axes[2]
     path, res = admm_toy()
     ax.plot(path[:, 0], color=st.PALETTE[0], lw=1, label="W[0] (pas SGD)")
     ax.step(range(len(path)), path[:, 1], where="post", color=st.PALETTE[1], lw=1,
             label="Z[0] = Π_S(W + U)")
-    ax.set_xlabel("itération")
+    ax.set_xlabel("iteration")
     ax.legend(loc="upper right", fontsize=6.5)
     a2 = ax.twinx()
     a2.semilogy(res[:, 0], res[:, 1], "o", ms=3, color=st.PALETTE[3])
@@ -1269,18 +1269,18 @@ def basse_precision(out_dir):
     ax.hist([hi.ravel(), lo.ravel()], bins=np.arange(-8.5, 16.5), color=st.PALETTE[:2],
             label=["x ≫ 4 ∈ [−8, 7]", "x & 15 ∈ [0, 15]"])
     ax.legend(loc="upper right", fontsize=6.5)
-    ax.set_title(f"x = 16·(x≫4) + (x&15) ; conv égale : {same}", fontsize=8)
+    ax.set_title(f"x = 16·(x≫4) + (x&15); conv equal: {same}", fontsize=8)
     fiche(fig, "yolo.quant.fake_quant:fq_act_forward/backward ; yolo.quant.pow2:levels, "
           "shift_add_mul ; yolo.train.admm:ADMM ; yolo.quant.int_layers:split4, conv_acc_split4",
           "torch.ao.quantization, Brevitas", "test_fake_quant.py, test_pow2.py, test_admm.py")
-    return finish(fig, out_dir, "basse_precision", "QAT, puissances de 2 et 4 bits (§9.2)")
+    return finish(fig, out_dir, "basse_precision", "QAT, powers of two and 4 bits (§9.2)")
 
 
 # --- T13.47 : formats de fichiers ---------------------------------------------------------
 
 @figure("formats", "maths", "T13.47",
-        "Formats lus et écrits à la main : un .weights Darknet octet par octet, le parser .cfg "
-        "et l'arène exportée (décalages égaux au manifest).",
+        "Formats read and written by hand: a Darknet .weights byte by byte, the .cfg parser "
+        "and the exported arena (offsets equal to the manifest).",
         "yolo.io.darknet_weights, yolo.models.cfg.parse_cfg, yolo.io.export.layout")
 def formats(out_dir):
     import json
@@ -1304,7 +1304,7 @@ def formats(out_dir):
         with open(wpath, "rb") as f:
             header = read_header(f)
     hdr = 4 * 3 + (8 if header and (header["version"][0] * 10 + header["version"][1]) >= 2 else 4)
-    segs = [("en-tête", hdr, st.INK2)]
+    segs = [("header", hdr, st.INK2)]
     for layer, (ins, outs) in zip(spec["layers"], shapes):
         if layer["type"] != "conv":
             continue
@@ -1333,9 +1333,9 @@ def formats(out_dir):
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.6, 1.4)
     ax.set_xticks([])
-    ax.set_xlabel("décalages en octets (zoom) ; float32 petit-boutiste")
-    h = (f"en-tête lu : version {header['version']}, seen = {header['seen']}" if header
-         else "en-tête : major, minor, revision (int32), seen (int64 si ≥ 0.2)")
+    ax.set_xlabel("byte offsets (zoom); little-endian float32")
+    h = (f"header read: version {header['version']}, seen = {header['seen']}" if header
+         else "header: major, minor, revision (int32), seen (int64 if ≥ 0.2)")
     ax.set_title(f"yolov2-tiny-voc.weights : {total:_} octets ; {h}".replace("_", " "), fontsize=8.5)
     ax.grid(False)
     # 2. .cfg → dicts
@@ -1348,7 +1348,7 @@ def formats(out_dir):
     ax.text(0.3, 0.55, "parse_cfg  →", fontsize=10, weight="bold", color=st.PALETTE[0])
     dicts = "\n".join(str(d) for d in spec["layers"][:3]) + "\n…\n" + str(spec["layers"][-1])
     ax.text(0.45, 1.0, dicts, family="monospace", fontsize=6.5, va="top", wrap=True)
-    ax.set_title("le parser .cfg : sections Darknet → dicts de models/specs", fontsize=8.5)
+    ax.set_title("the .cfg parser: Darknet sections → models/specs dicts", fontsize=8.5)
     # 3. arène
     ax = axes[2]
     entries, buffers = layout(spec)
@@ -1365,10 +1365,10 @@ def formats(out_dir):
     ax.set_yticks([])
     ax.set_xlim(0, x0)
     ax.set_xlabel("octets ; alignement 64")
-    ax.set_title("arène d'activations (export.layout) : ping-pong A/B et tête H13"
-                 + (" — égale au manifest" if m is not None else ""), fontsize=8.5)
+    ax.set_title("activation arena (export.layout): ping-pong A/B and head H13"
+                 + (" — equal to the manifest" if m is not None else ""), fontsize=8.5)
     ax.grid(False)
     fiche(fig, "yolo.io.darknet_weights:read_header, load_darknet_weights ; yolo.models.cfg:"
           "parse_cfg ; yolo.io.export:layout", "darknet, onnx, Vitis AI",
           "test_darknet_weights.py, test_cfg.py, test_export.py")
-    return finish(fig, out_dir, "formats", "Formats de fichiers lus et écrits à la main")
+    return finish(fig, out_dir, "formats", "File formats read and written by hand")

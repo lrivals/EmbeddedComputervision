@@ -21,10 +21,10 @@ DS_COLORS = {"voc": st.PALETTE[0], "visdrone": st.PALETTE[1], "kitti": st.PALETT
 BATCH_COLORS = {8: "#8fbbea", 16: "#2a78d6", 32: "#123f7a"}  # rampe bleue, clair → foncé
 PART_COLORS = {"coord": st.PALETTE[0], "obj": st.PALETTE[1], "noobj": st.GREY,
                "cls": st.PALETTE[2]}
-PART_LABELS = {"coord": "coord (boîtes)", "obj": "obj (objets)",
-               "noobj": "noobj (fond)", "cls": "cls (classes)"}
-SUBSET_LABEL = {0: "tout le split", 500: "500 images"}
-FOOT = "50 images d'évaluation, palier R (non publiable) ; score = mAP@0,5 (AP50 pour FLIR)"
+PART_LABELS = {"coord": "coord (boxes)", "obj": "obj (objects)",
+               "noobj": "noobj (background)", "cls": "cls (classes)"}
+SUBSET_LABEL = {0: "whole split", 500: "500 images"}
+FOOT = "50 evaluation images, tier R (not publishable); score = mAP@0.5 (AP50 for FLIR)"
 
 
 def _B():
@@ -46,7 +46,7 @@ def _subset_label(s):
 
 
 def _fmt(v, nd=2):
-    return "—" if v is None else f"{v:.{nd}f}".replace(".", ",")
+    return "—" if v is None else f"{v:.{nd}f}"
 
 
 def _foot(fig, text=FOOT):
@@ -109,7 +109,7 @@ def plot_grilles(data, out_dir, name="balayages_grilles"):
             ax.text(j, i, f"{_fmt(r['map'])}{' ★' if best else ''}\n{_fmt(r['rel'] * 100, 0)} %",
                     ha="center", va="center", fontsize=7.5, color=_ink_on(r["rel"]),
                     fontweight="bold" if best else "normal", linespacing=1.3)
-        ax.set_xticks(range(len(subsets)), [_subset_label(s).replace(" le split", "")
+        ax.set_xticks(range(len(subsets)), [_subset_label(s).replace(" split", "")
                                              .replace(" images", " im.") for s in subsets])
         ax.set_yticks(range(len(batches)), [f"lot {b}" for b in batches]
                       if ax is axes[0][0] else [])
@@ -119,10 +119,10 @@ def plot_grilles(data, out_dir, name="balayages_grilles"):
         ax.set_title(f"{d['label']} ({_B().metric_label(d)})", fontsize=9)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(0, 100))
     cb = fig.colorbar(sm, ax=axes[0].tolist(), fraction=0.025, pad=0.02)
-    cb.set_label("% du meilleur run du jeu", fontsize=8)
+    cb.set_label("% of the best run of the dataset", fontsize=8)
     cb.outline.set_visible(False)
     fig.subplots_adjust(left=0.06, right=0.87, wspace=0.08)
-    _foot(fig, "case : score, puis % du meilleur run ; ★ meilleur run. " + FOOT)
+    _foot(fig, "cell: score, then % of the best run; ★ best run. " + FOOT)
     return st.save(fig, out_dir, name)
 
 
@@ -150,13 +150,13 @@ def plot_classements(data, out_dir, name="balayages_classements"):
     ax.set_yticks(range(1, len(names) + 1))
     ax.set_ylim(len(names) + 0.5, 0.5)
     ax.set_xlim(-0.3, len(sets) - 0.3)
-    ax.set_ylabel("rang du run dans le jeu (1 : meilleur)")
-    ax.set_title("Classement des runs, jeu par jeu")
+    ax.set_ylabel("rank of the run in the dataset (1: best)")
+    ax.set_title("Ranking of the runs, dataset by dataset")
     ax.grid(axis="x", visible=False)
     from matplotlib.lines import Line2D
-    handles = [Line2D([], [], color=_batch_color(b), lw=2, label=f"lot {b}")
+    handles = [Line2D([], [], color=_batch_color(b), lw=2, label=f"batch {b}")
                for b in sorted({B._name(n)[0] for n in names})]
-    handles += [Line2D([], [], color=st.INK2, lw=1.4, ls="-", marker="o", label="tout le split"),
+    handles += [Line2D([], [], color=st.INK2, lw=1.4, ls="-", marker="o", label="whole split"),
                 Line2D([], [], color=st.INK2, lw=1.4, ls="--", marker="o", mfc="white",
                        label="500 images")]
     ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=5,
@@ -174,9 +174,9 @@ def plot_classements(data, out_dir, name="balayages_classements"):
     axr.grid(False)
     for sp in axr.spines.values():
         sp.set_visible(False)
-    axr.set_title("Accord des classements (Spearman ρ)")
+    axr.set_title("Agreement of the rankings (Spearman ρ)")
     fig.tight_layout()
-    _foot(fig, "ρ = 1 : même ordre des 6 runs ; |ρ| < 0,83 non significatif à 5 % (n = 6). " + FOOT)
+    _foot(fig, "ρ = 1: same order of the 6 runs; |ρ| < 0.83 not significant at 5 % (n = 6). " + FOOT)
     return st.save(fig, out_dir, name)
 
 
@@ -207,8 +207,8 @@ def plot_effets(data, out_dir, name="balayages_effets"):
                  va="center", fontsize=7, color=st.INK2)
     axl.set_yticks(y, ylabels, fontsize=7.5)
     axl.set_xlim(0, 1.18)
-    axl.set_xlabel("score relatif (1 : meilleur run du jeu)")
-    axl.set_title("500 images (creux) → tout le split (plein)")
+    axl.set_xlabel("relative score (1: best run of the dataset)")
+    axl.set_title("500 images (hollow) → whole split (filled)")
     axl.grid(axis="y", visible=False)
 
     batches = sorted({r["batch"] for d in data.values() for r in d["runs"]})
@@ -225,13 +225,13 @@ def plot_effets(data, out_dir, name="balayages_effets"):
         xs = np.arange(len(batches)) + off
         axr.plot(xs, means, color=st.INK, lw=2, ls="-" if s == 0 else "--", zorder=4,
                  marker="D", ms=6, mfc=st.INK if s == 0 else "white", mec=st.INK)
-        axr.annotate(f"moyenne, {_subset_label(s)}", (xs[-1], means[-1]), xytext=(6, 0),
+        axr.annotate(f"mean, {_subset_label(s)}", (xs[-1], means[-1]), xytext=(6, 0),
                      textcoords="offset points", va="center", fontsize=7, color=st.INK)
     axr.set_xticks(range(len(batches)), [f"lot {b}" for b in batches])
     axr.set_xlim(-0.5, len(batches) - 0.1)
     axr.set_ylim(0, 1.08)
-    axr.set_ylabel("score relatif")
-    axr.set_title("Effet du lot (points : jeux)")
+    axr.set_ylabel("relative score")
+    axr.set_title("Effect of the batch (points: datasets)")
     axr.grid(axis="x", visible=False)
     _legend_datasets(axr, sets, data, loc="lower right")
     fig.tight_layout()
@@ -269,19 +269,19 @@ def plot_epoques(data, out_dir, name="balayages_epoques"):
     eps = {s: [r["epochs"] for d in data.values() for r in d["runs"]
                if r["epochs"] and r["subset"] == s] for s in (0, 500)}
     if eps[500]:
-        ax.text(42, 0.04, f"500 images :\n{min(eps[500]):.0f} à {max(eps[500]):.0f} passages",
+        ax.text(42, 0.04, f"500 images:\n{min(eps[500]):.0f} to {max(eps[500]):.0f} passes",
                 fontsize=7.5, color=st.INK2, ha="right")
     if eps[0]:
-        ax.text(0.31, 0.04, f"tout le split : {max(eps[0]):.1f} époques au plus".replace(".", ","),
+        ax.text(0.31, 0.04, f"whole split: {max(eps[0]):.1f} epochs at most",
                 fontsize=7.5, color=st.INK2)
     ax.set_xlim(0.22, 60)
     ax.set_ylim(0, 1.08)
-    ax.set_xlabel("époques vues en 600 itérations (lot × 600 / images), échelle log")
-    ax.set_ylabel("score relatif (1 : meilleur run du jeu)")
-    ax.set_title("Nombre de passages sur les données face au score")
+    ax.set_xlabel("epochs seen in 600 iterations (batch × 600 / images), log scale")
+    ax.set_ylabel("relative score (1: best run of the dataset)")
+    ax.set_title("Number of passes over the data against the score")
     _legend_datasets(ax, sets, data, loc="upper center", ncol=len(sets),
                      bbox_to_anchor=(0.5, -0.16))
-    ax.text(0.99, 0.98, "taille de la marque : lot\npleine : tout le split, creuse : 500 images",
+    ax.text(0.99, 0.98, "marker size: batch\nfilled: whole split, hollow: 500 images",
             transform=ax.transAxes, ha="right", va="top", fontsize=7, color=st.MUTED)
     _foot(fig)
     return st.save(fig, out_dir, name)
@@ -316,11 +316,11 @@ def plot_perte(data, out_dir, name="balayages_perte_score"):
                         textcoords="offset points", fontsize=6.5, color=st.INK2)
         rho = B.spearman([r["final_loss"] for r in pts], [r["map"] for r in pts])
         ax.set_title(f"{d['label']} — ρ = {_fmt(rho)}", fontsize=9)
-        ax.set_xlabel("perte finale")
+        ax.set_xlabel("final loss")
         ax.margins(x=0.25, y=0.15)
     axes[0][0].set_ylabel("score (%)")
     fig.tight_layout()
-    _foot(fig, "ρ : Spearman perte / score ; > 0 : la perte la plus basse n'a pas le meilleur "
+    _foot(fig, "ρ: Spearman loss / score; > 0: the lowest loss does not have the best "
                "score. " + FOOT)
     return st.save(fig, out_dir, name)
 
@@ -333,7 +333,7 @@ def plot_courbes(data, out_dir, name="balayages_courbes", window=25):
     plt = st.plt()
     sets = [ds for ds in data if any(r["curve"] is not None for r in data[ds]["runs"])]
     if not sets:
-        raise MissingSource("aucun journal d'entraînement dans les notebooks de balayage")
+        raise MissingSource("no training log in the sweep notebooks")
     fig, axes = plt.subplots(len(sets), 2, figsize=(st.FULL, 1.9 * len(sets) + 0.6),
                              sharex=True, squeeze=False)
     for i, ds in enumerate(sets):
@@ -347,14 +347,14 @@ def plot_courbes(data, out_dir, name="balayages_courbes", window=25):
                     continue
                 c = r["curve"]
                 ax.plot(c["it"], st.smooth(c["loss"], window), color=_batch_color(r["batch"]),
-                        lw=1.6, label=f"lot {r['batch']}" + (" (repris)" if r["resumed"] else ""))
+                        lw=1.6, label=f"batch {r['batch']}" + (" (resumed)" if r["resumed"] else ""))
             missing = [r["run"] for r in d["runs"] if r["subset"] == s and r["curve"] is None]
             if missing:
-                st.note(ax, "sans journal : " + ", ".join(missing), loc="upper right")
+                st.note(ax, "no log: " + ", ".join(missing), loc="upper right")
             if i == 0:
                 ax.set_title(_subset_label(s))
             if j == 0:
-                ax.set_ylabel(f"{d['label']}\nperte", fontsize=8)
+                ax.set_ylabel(f"{d['label']}\nloss", fontsize=8)
             # Le premier pas (têtes neuves) écrase l'échelle : on part de la fin du warm-up.
             tails = [r["curve"]["loss"][len(r["curve"]["loss"]) // 3:] for r in d["runs"]
                      if r["curve"] is not None]
@@ -364,10 +364,10 @@ def plot_courbes(data, out_dir, name="balayages_courbes", window=25):
                 ax.set_ylim(lo * 0.85, hi * 1.25)
             ax.legend(loc="upper right" if not missing else "lower left", fontsize=7)
     for ax in axes[-1]:
-        ax.set_xlabel("itération")
+        ax.set_xlabel("iteration")
     fig.tight_layout()
-    _foot(fig, f"moyenne glissante sur {window} itérations ; zone grisée : burn-in (LR montant) ; "
-               "axe coupé en haut : les premières itérations (têtes neuves) sortent du cadre")
+    _foot(fig, f"moving average over {window} iterations; grey area: burn-in (LR rising); "
+               "axis cut at the top: the first iterations (new heads) leave the frame")
     return st.save(fig, out_dir, name)
 
 
@@ -378,7 +378,7 @@ def plot_composantes(data, out_dir, name="balayages_composantes"):
     plt = st.plt()
     sets = [ds for ds in data if any(r["final_parts"] for r in data[ds]["runs"])]
     if not sets:
-        raise MissingSource("aucun journal d'entraînement dans les notebooks de balayage")
+        raise MissingSource("no training log in the sweep notebooks")
     fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 3.0), sharey=False, squeeze=False)
     for k, (ax, ds) in enumerate(zip(axes[0], sets)):
         d = data[ds]
@@ -400,7 +400,7 @@ def plot_composantes(data, out_dir, name="balayages_composantes"):
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.06))
     fig.tight_layout()
-    _foot(fig, "chiffre à droite : perte totale (journal du notebook, 50 dernières itérations)")
+    _foot(fig, "number on the right: total loss (notebook log, last 50 iterations)")
     return st.save(fig, out_dir, name)
 
 
@@ -412,7 +412,7 @@ def plot_classes(data, out_dir, name="balayages_classes"):
     plt = st.plt()
     sets = [ds for ds in data if any(r.get("classes") for r in data[ds]["runs"])]
     if not sets:
-        raise MissingSource("aucune table d'AP par classe")
+        raise MissingSource("no per-class AP table")
     sizes = [max(len(r.get("classes") or {}) for r in data[ds]["runs"]) for ds in sets]
     fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL + 1.5, 0.2 * max(sizes) + 1.8),
                              gridspec_kw={"width_ratios": [1] * len(sets), "wspace": 0.75},
@@ -448,9 +448,9 @@ def plot_classes(data, out_dir, name="balayages_classes"):
         ax.set_title(d["label"], fontsize=9)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cb = fig.colorbar(sm, ax=axes[0].tolist(), fraction=0.02, pad=0.01, extend="max")
-    cb.set_label("AP@0,5 (%)", fontsize=8)
+    cb.set_label("AP@0.5 (%)", fontsize=8)
     cb.outline.set_visible(False)
-    _foot(fig, "runs triés du meilleur au moins bon ; gris : classe sans instance dans les "
+    _foot(fig, "runs sorted from best to worst; grey: class with no instance in the "
                "50 images. " + FOOT)
     return st.save(fig, out_dir, name)
 
@@ -462,10 +462,10 @@ def plot_publies(data, out_dir, name="balayages_publies"):
     à son échelle (les scores vont de 2 à 68)."""
     plt = st.plt()
     sets = list(data)
-    series = [("affiné", "meilleur run affiné", st.PALETTE[2]),
-              ("tiny-yolov3-coco", st.NET_LABELS["tiny-yolov3-coco"] + " (publié)",
+    series = [("affiné", "best fine-tuned run", st.PALETTE[2]),
+              ("tiny-yolov3-coco", st.NET_LABELS["tiny-yolov3-coco"] + " (published)",
                st.NET_COLORS["tiny-yolov3-coco"]),
-              ("tiny-yolov2-voc", st.NET_LABELS["tiny-yolov2-voc"] + " (publié)",
+              ("tiny-yolov2-voc", st.NET_LABELS["tiny-yolov2-voc"] + " (published)",
                st.NET_COLORS["tiny-yolov2-voc"])]
     fig, axes = plt.subplots(1, len(sets), figsize=(st.FULL, 3.0), squeeze=False)
     for ax, ds in zip(axes[0], sets):
@@ -489,13 +489,13 @@ def plot_publies(data, out_dir, name="balayages_publies"):
         ax.grid(axis="x", visible=False)
         ax.set_title(f"{d['label']}\n{_B().metric_label(d)}", fontsize=9)
         if not d["baselines"]:
-            st.note(ax, "inférences des poids\npubliés pas exécutées")
+            st.note(ax, "inferences of the published\nweights not executed")
     axes[0][0].set_ylabel("score (%)")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for _, _, c in series]
     fig.legend(handles, [lab for _, lab, _ in series], loc="upper center", ncol=3,
                bbox_to_anchor=(0.5, 1.08))
     fig.tight_layout()
-    _foot(fig, "poids publiés : classes du jeu ayant un équivalent (MAPPINGS) seulement. " + FOOT)
+    _foot(fig, "published weights: classes of the dataset with an equivalent (MAPPINGS) only. " + FOOT)
     return st.save(fig, out_dir, name)
 
 
@@ -517,14 +517,14 @@ def plot_cout(data, out_dir, name="balayages_cout"):
                 if r["batch"] == b and r["duration_s"]]
         if mins:
             ax.axvline(np.median(mins), color=st.MUTED, lw=0.8, ls=":", zorder=0)
-            ax.text(np.median(mins), 1.06, f"lot {b}", ha="center", fontsize=7, color=st.INK2)
+            ax.text(np.median(mins), 1.06, f"batch {b}", ha="center", fontsize=7, color=st.INK2)
     ax.set_ylim(0, 1.12)
-    ax.set_xlabel("durée d'un run de 600 itérations (min, GPU Colab)")
-    ax.set_ylabel("score relatif")
-    ax.set_title("Coût d'un run face à son score", pad=14)
+    ax.set_xlabel("duration of a 600-iteration run (min, Colab GPU)")
+    ax.set_ylabel("relative score")
+    ax.set_title("Cost of a run against its score", pad=14)
     _legend_datasets(ax, sets, data, loc="lower right", ncol=len(sets))
-    _foot(fig, "durée : sortie du notebook, ou somme de `seconds` de loss.csv (make harvest). "
-               "Pointillés : durée médiane par lot.")
+    _foot(fig, "duration: notebook output, or sum of `seconds` of loss.csv (make harvest). "
+               "Dotted: median duration per batch.")
     return st.save(fig, out_dir, name)
 
 
@@ -535,15 +535,15 @@ PLOTS = {"grilles": plot_grilles, "classements": plot_classements, "effets": plo
 
 
 @figure("balayages", "resultats", "T13.53",
-        "Analyse transversale des balayages lot × sous-ensemble : grilles, classements, effets "
-        "du lot et du sous-ensemble, époques, perte, courbes, composantes, AP par classe, "
-        "poids publiés et coût. 50 images, palier R.",
-        "sorties des notebooks notebooks/*/*_sweep.ipynb et *_infer.ipynb", subset=True,
+        "Cross-dataset analysis of the batch × subset sweeps: grids, rankings, effects of the "
+        "batch and of the subset, epochs, loss, curves, components, AP per class, "
+        "published weights and cost. 50 images, tier R.",
+        "outputs of the notebooks notebooks/*/*_sweep.ipynb and *_infer.ipynb", subset=True,
         dest=ROOT / "docs" / "tasks" / "figures")
 def balayages(out_dir):
     data, _ = _B().load_all(ROOT / "notebooks")
     if not data:
-        raise MissingSource("aucun notebook de balayage exécuté")
+        raise MissingSource("no executed sweep notebook")
     out = []
     for fn in PLOTS.values():
         out += fn(data, out_dir)

@@ -185,11 +185,26 @@ thousands separator (56.30, 132,031).
     still named `m_sweep.ipynb` since M24 (`find_sweeps` wants `tiny-yolov3-*_sweep`), and
     seven modules missing from the code map of `tools/figures/maths.py`.
 
-### [ ] T19.7 — Figure labels
+### [x] T19.7 — Figure labels
 - **Depends on**: T19.6 · **Size**: M
 - **Deliverables**: titles, axes and legends of `tools/figures/*.py`;
   `results/figures.md`; regenerated figures (`make figures`).
 - **Acceptance**: `make figures` passes; a visual spot check of one figure per family.
+- **Done** (2026-10-27):
+  - **Labels**: titles, axes, legends, notes, captions of the registry and messages of
+    `tools/figures/*.py` (`maths`, `resultats`, `materiel`, `modeles`, `reseaux`,
+    `projet`, `balayages`, `donnees`, `auto`, `__main__`); `FAMILY_TITLES` and the code
+    map (`MODULES`) in English; numbers with a decimal point. Internal keys (`flottant`,
+    `faite`, `vérifié`…) kept, shown through label maps (`STAGE_LABELS`,
+    `CATEGORY_LABELS`, `STATE_LABELS`).
+  - **Regenerated**: `python -m tools.figures all` (164 s): 62 figures, 3 skipped for
+    missing data (`explain_cka_*`, `explain_gradcam_strip`); `results/figures.md`,
+    `notebooks/figures_live.ipynb`, `make article` (captions now English; the abstract no
+    longer says they are French).
+  - **Spot check**: `cascade_m10`, `convolution` (and the families through the tests).
+    Still French in figures: the row names that come from tool data, such as the scenarios
+    of `tools/perf_model.py` in `cascade_m10` (T19.8, code text).
+  - **Tests**: `test_figures.py` updated (`skipped`, `false control`, `single engine`…).
 
 ## C. Code and checks
 

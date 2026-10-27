@@ -13,8 +13,6 @@
 % ---- milestones and tasks linked by \ms
 \expandafter\def\csname artms:M12\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M12-profils-pc.md}
-\expandafter\def\csname artms:M19\endcsname{%
-https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M19-english.md}
 \expandafter\def\csname artms:M33\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M33-yolov5n.md}
 \expandafter\def\csname artms:M6\endcsname{%
@@ -49,6 +47,8 @@ https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M36-expla
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M14-notebooks.md}
 \expandafter\def\csname artms:M17\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M17-article.md}
+\expandafter\def\csname artms:M19\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M19-english.md}
 \expandafter\def\csname artms:M23\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M23-dsp-packing.md}
 \expandafter\def\csname artms:M24\endcsname{%
@@ -367,7 +367,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/etat_art.png}
-\caption{Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP, débit (marque creuse : projection de ce travail, par réseau et variante M23). (\texttt{etat\_art})}
+\caption{Comparison with published accelerators: GOPS and power, throughput and mAP, GOPS per DSP, throughput (hollow mark: projection of this work, per network and M23 variant). (\texttt{etat\_art})}
 \label{fig:etat_art}
 % python -m tools.figures etat_art
 \end{figure}}
@@ -375,7 +375,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/modeles/graphe_tiny-yolov2-voc.png}
-\caption{Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord épais = beaucoup de MACs). (\texttt{graphe})}
+\caption{Layer-by-layer graph (type, kernel and stride, output shape C×H×W; thick border = many MACs). (\texttt{graphe})}
 \label{fig:graphe/graphe_tiny-yolov2-voc}
 % python -m tools.figures graphe
 \end{figure}}
@@ -383,7 +383,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/reseaux/fiche_tiny-yolov2-voc.png}
-\caption{Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, champ réceptif et pas cumulé (CSV à côté de l'image). (\texttt{fiche})}
+\caption{Layer-by-layer datasheet: type, kernel, shapes, parameters, MACs and their share, receptive field and cumulative stride (CSV next to the image). (\texttt{fiche})}
 \label{fig:fiche/fiche_tiny-yolov2-voc}
 % python -m tools.figures fiche
 \end{figure}}
@@ -391,7 +391,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/modeles/graphe_tiny-yolov4-coco.png}
-\caption{Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord épais = beaucoup de MACs). (\texttt{graphe})}
+\caption{Layer-by-layer graph (type, kernel and stride, output shape C×H×W; thick border = many MACs). (\texttt{graphe})}
 \label{fig:graphe/graphe_tiny-yolov4-coco}
 % python -m tools.figures graphe
 \end{figure}}
@@ -399,7 +399,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/convolution.png}
-\caption{Convolution : la formule sur un patch, le dépliage im2col en produit de matrices, et le temps des boucles face à im2col. (\texttt{convolution})}
+\caption{Convolution: the formula on a patch, the im2col unfolding into a matrix product, and the time of the loops against im2col. (\texttt{convolution})}
 \label{fig:convolution}
 % python -m tools.figures convolution
 \end{figure}}
@@ -407,7 +407,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/retropropagation.png}
-\caption{Rétropropagation écrite à la main : formule du gradient renvoyé par chaque couche, puis l'erreur du gradcheck par couche face au seuil 1e-7. (\texttt{retropropagation})}
+\caption{Backpropagation written by hand: formula of the gradient each layer returns, then the gradcheck error per layer against the 1e-7 threshold. (\texttt{retropropagation})}
 \label{fig:retropropagation}
 % python -m tools.figures retropropagation
 \end{figure}}
@@ -415,7 +415,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/perte.png}
-\caption{Cibles et perte YOLO : encodage d'une vérité, la perte terme par terme, le poids $\omega$ = 2 − g\_w g\_h, le masque ignore et la part de chaque terme sur un lot. (\texttt{perte})}
+\caption{YOLO targets and loss: encoding of a ground truth, the loss term by term, the weight $\omega$ = 2 − g\_w g\_h, the ignore mask and the share of each term on a batch. (\texttt{perte})}
 \label{fig:perte}
 % python -m tools.figures perte
 \end{figure}}
@@ -423,7 +423,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/pr_variantes.png}
-\caption{Courbes précision-rappel par classe (11 points VOC07) pour chaque prétraitement évalué, puis les quatre superposées. (\texttt{pr})}
+\caption{Precision-recall curves per class (11-point VOC07) for each preprocessing evaluated, then the four overlaid. (\texttt{pr})}
 \label{fig:pr/pr_variantes}
 % python -m tools.figures pr
 \end{figure}}
@@ -431,7 +431,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/nms_map.png}
-\caption{NMS pas à pas, appariement détections / vérités et courbe précision-rappel, AP VOC07 sur 11 points face à l'aire sous l'enveloppe, égale à la référence du devkit. (\texttt{nms\_map})}
+\caption{NMS step by step, detection / ground-truth matching and precision-recall curve, VOC07 11-point AP against the area under the envelope, equal to the devkit reference. (\texttt{nms\_map})}
 \label{fig:nms_map}
 % python -m tools.figures nms_map
 \end{figure}}
@@ -447,7 +447,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/quantification.png}
-\caption{Quantification symétrique : l'escalier et son erreur, échelles par canal face à une échelle par couche, choix du seuil d'écrêtage par la MSE. (\texttt{quantification})}
+\caption{Symmetric quantization: the staircase and its error, per-channel scales against one scale per layer, choice of the clipping threshold by the MSE. (\texttt{quantification})}
 \label{fig:quantification}
 % python -m tools.figures quantification
 \end{figure}}
@@ -455,7 +455,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/maths/entier.png}
-\caption{Arithmétique entière du matériel : chaîne d'une sortie, multiplicateur fixe M0/2$^n$, leaky entière 13/128 et marge des accumulateurs int32. (\texttt{entier})}
+\caption{Integer arithmetic of the hardware: chain of one output, fixed multiplier M0/2$^n$, integer leaky 13/128 and headroom of the int32 accumulators. (\texttt{entier})}
 \label{fig:entier}
 % python -m tools.figures entier
 \end{figure}}
@@ -463,7 +463,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/calibration_tiny-yolov2-voc.png}
-\caption{Distribution des activations par couche et seuil de saturation retenu par la calibration ; échelles des poids par canal. (\texttt{calibration})}
+\caption{Distribution of the activations per layer and saturation threshold kept by the calibration; weight scales per channel. (\texttt{calibration})}
 \label{fig:calibration/calibration_tiny-yolov2-voc}
 % python -m tools.figures calibration
 \end{figure}}
@@ -471,7 +471,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/erreur_couches_tiny-yolov2-voc.png}
-\caption{SNR par couche entre le flottant et l'entier déquantifié, et écart entier Python $\leftrightarrow$ golden C++ (0 partout : bit-exact). (\texttt{erreur\_couches})}
+\caption{SNR per layer between float and the dequantized integer, and Python integer $\leftrightarrow$ golden C++ gap (0 everywhere: bit-exact). (\texttt{erreur\_couches})}
 \label{fig:erreur_couches/erreur_couches_tiny-yolov2-voc}
 % python -m tools.figures erreur_couches
 \end{figure}}
@@ -479,7 +479,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/chaine_verif.png}
-\caption{Chaîne de vérification bit-exact, du flottant NumPy à la carte : critère et état de chaque passage. (\texttt{chaine\_verif})}
+\caption{Bit-exact verification chain, from float NumPy to the board: criterion and state of each hand-over. (\texttt{chaine\_verif})}
 \label{fig:chaine_verif}
 % python -m tools.figures chaine_verif
 \end{figure}}
@@ -487,7 +487,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/moteur.png}
-\caption{Moteur unique : chargeurs ping-pong, réseau Tm × Tn de MACs, accumulateur, étage de sortie, et chronogramme du recouvrement sur 3 tuiles. (\texttt{moteur})}
+\caption{Single engine: ping-pong loaders, Tm × Tn MAC array, accumulator, output stage, and timing diagram of the overlap over 3 tiles. (\texttt{moteur})}
 \label{fig:moteur}
 % python -m tools.figures moteur
 \end{figure}}
@@ -495,7 +495,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/tuilage.png}
-\caption{Tuilage de deux couches : tuiles spatiales et voies d'entrée, avec le pliage de L00 (cin = 3) et la couche 13×13 couverte par une seule tuile. (\texttt{tuilage})}
+\caption{Tiling of two layers: spatial tiles and input lanes, with the folding of L00 (cin = 3) and the 13×13 layer covered by a single tile. (\texttt{tuilage})}
 \label{fig:tuilage}
 % python -m tools.figures tuilage
 \end{figure}}
@@ -503,7 +503,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/soc.png}
-\caption{Schéma du SoC : application et driver sur l'ARM, registres AXI-Lite, ports m\_axi du noyau et découpage de l'arène DDR. (\texttt{soc})}
+\caption{SoC diagram: application and driver on the ARM, AXI-Lite registers, m\_axi ports of the kernel and layout of the DDR arena. (\texttt{soc})}
 \label{fig:soc}
 % python -m tools.figures soc
 \end{figure}}
@@ -511,7 +511,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/cascade_m10.png}
-\caption{Temps par image de Tiny-YOLOv2 à chaque piste d'optimisation M10, face à la borne de calcul et au roofline KV260. (\texttt{cascade\_m10})}
+\caption{Time per image of Tiny-YOLOv2 at each M10 optimization step, against the compute bound and the KV260 roofline. (\texttt{cascade\_m10})}
 \label{fig:cascade_m10}
 % python -m tools.figures cascade_m10
 \end{figure}}
@@ -519,7 +519,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/roofline_couches_kv260.png}
-\caption{Roofline KV260 avec un point par couche de Tiny-YOLOv2, avant et après les optimisations M10. (\texttt{roofline\_couches})}
+\caption{KV260 roofline with one point per layer of Tiny-YOLOv2, before and after the M10 optimizations. (\texttt{roofline\_couches})}
 \label{fig:roofline_couches/roofline_couches_kv260}
 % python -m tools.figures roofline_couches
 \end{figure}}
@@ -527,7 +527,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/cycles_couches.png}
-\caption{Cycles par couche du noyau actuel, décomposés en chargements, calcul et stockage ; le losange donne le temps réel avec recouvrement. (\texttt{cycles\_couches})}
+\caption{Cycles per layer of the current kernel, split into loads, compute and store; the diamond gives the real time with overlap. (\texttt{cycles\_couches})}
 \label{fig:cycles_couches}
 % python -m tools.figures cycles_couches
 \end{figure}}
@@ -559,7 +559,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/map_stades.png}
-\caption{AP par classe aux stades flottant, entier et C-sim (la carte quand elle sera mesurée), et écart entier − flottant trié. (\texttt{map\_stades})}
+\caption{AP per class at the float, integer and C-sim stages (the board when measured), and integer − float gap sorted. (\texttt{map\_stades})}
 \label{fig:map_stades}
 % python -m tools.figures map_stades
 \end{figure}}
@@ -567,7 +567,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/ressources.png}
-\caption{DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2, 4 bits et 2 MAC/DSP, streaming) face au budget de la KV260 ; hachuré : estimation, plein : synthèse. (\texttt{ressources})}
+\caption{DSP, on-chip memory and LUT of the architectures (single engine INT8, pow2, 4 bits and 2 MAC/DSP, streaming) against the KV260 budget; hatched: estimate, solid: synthesis. (\texttt{ressources})}
 \label{fig:ressources}
 % python -m tools.figures ressources
 \end{figure}}
@@ -575,7 +575,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/hw_postproc.png}
-\caption{mAP avec le post-traitement matériel, avec et sans plafond de boîtes, et nombre de boîtes par image face au plafond. (\texttt{hw\_postproc})}
+\caption{mAP with the hardware post-processing, with and without a box cap, and number of boxes per image against the cap. (\texttt{hw\_postproc})}
 \label{fig:hw_postproc}
 % python -m tools.figures hw_postproc
 \end{figure}}
@@ -583,7 +583,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/map_formats.png}
-\caption{mAP de Tiny-YOLOv2 selon le format des poids (flottant, INT8, puissances de 2, 4 bits), et frontière précision / bits. (\texttt{map\_formats})}
+\caption{mAP of Tiny-YOLOv2 by weight format (float, INT8, powers of two, 4 bits), and accuracy / bits front. (\texttt{map\_formats})}
 \label{fig:map_formats}
 % python -m tools.figures map_formats
 \end{figure}}
@@ -591,7 +591,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/materiel/streaming.png}
-\caption{Architecture streaming face au moteur unique : mémoire et parallélisme par étage, cycles par couche, chronogramme sur deux images (estimations). (\texttt{streaming})}
+\caption{Streaming architecture against the single engine: memory and parallelism per stage, cycles per layer, timing diagram over two images (estimates). (\texttt{streaming})}
 \label{fig:streaming}
 % python -m tools.figures streaming
 \end{figure}}
@@ -599,7 +599,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/resultats/detections.png}
-\caption{Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : les colonnes entier et C-sim sont identiques. (\texttt{detections})}
+\caption{Ground truth, float, integer and C-sim on four VOC2007 test images: the integer and C-sim columns are identical. (\texttt{detections})}
 \label{fig:detections}
 % python -m tools.figures detections
 \end{figure}}
@@ -607,7 +607,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/projet/tests.png}
-\caption{Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest), et leur durée quand \texttt{make test-durations} a été lancé. (\texttt{tests})}
+\caption{Number of tests per Python module (pytest, slow included) and per C++ build (ctest), and their duration when \texttt{make test-durations} was run. (\texttt{tests})}
 \label{fig:tests}
 % python -m tools.figures tests
 \end{figure}}
@@ -615,7 +615,7 @@ ideal (MACs / 768, efficiency 100 \%) & 4.54 & 22.7 & 44.1 & 307.2 & 100.0 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{../../results/figures/projet/code.png}
-\caption{Lignes par dossier (python, tools, cpp, hls, sw, docs, results) commit par commit. (\texttt{code})}
+\caption{Lines per folder (python, tools, cpp, hls, sw, docs, results) commit by commit. (\texttt{code})}
 \label{fig:code}
 % python -m tools.figures code
 \end{figure}}
@@ -640,32 +640,32 @@ M9.2 & 4 & 3 & 75\,\% \\
 M9.3 & 6 & 5 & 83\,\% \\
 M9.4 & 3 & 3 & 100\,\% \\
 M10 & 14 & 0 & 0\,\% \\
-M12 & 11 & 0 & 0\,\% \\
-M11 & 8 & 1 & 12\,\% \\
+M12 & 11 & 1 & 9\,\% \\
+M11 & 8 & 2 & 25\,\% \\
 M13 & 62 & 62 & 100\,\% \\
 M14 & 12 & 8 & 67\,\% \\
 M15 & 16 & 1 & 6\,\% \\
-M16 & 20 & 18 & 90\,\% \\
-M17 & 21 & 17 & 81\,\% \\
-M18 & 11 & 9 & 82\,\% \\
-M19 & 12 & 5 & 42\,\% \\
+M16 & 20 & 19 & 95\,\% \\
+M17 & 21 & 18 & 86\,\% \\
+M18 & 11 & 10 & 91\,\% \\
+M19 & 12 & 8 & 67\,\% \\
 M20 & 10 & 9 & 90\,\% \\
-M21 & 12 & 6 & 50\,\% \\
+M21 & 12 & 9 & 75\,\% \\
 M22 & 12 & 11 & 92\,\% \\
 M23 & 6 & 6 & 100\,\% \\
 M24 & 7 & 5 & 71\,\% \\
 M25 & 11 & 5 & 45\,\% \\
 M26 & 6 & 2 & 33\,\% \\
-M27 & 8 & 3 & 38\,\% \\
+M27 & 8 & 4 & 50\,\% \\
 M28 & 7 & 6 & 86\,\% \\
 M29 & 6 & 1 & 17\,\% \\
 M30 & 5 & 1 & 20\,\% \\
 M31 & 6 & 6 & 100\,\% \\
-M32 & 14 & 3 & 21\,\% \\
+M32 & 14 & 5 & 36\,\% \\
 M33 & 9 & 7 & 78\,\% \\
 M34 & 6 & 2 & 33\,\% \\
 M35 & 8 & 5 & 62\,\% \\
-M36 & 12 & 2 & 17\,\% \\
+M36 & 12 & 3 & 25\,\% \\
 M37 & 7 & 1 & 14\,\% \\
 M38 & 12 & 7 & 58\,\% \\
 M39 & 7 & 0 & 0\,\% \\
@@ -674,10 +674,10 @@ M41 & 10 & 0 & 0\,\% \\
 M42 & 8 & 0 & 0\,\% \\
 M43 & 7 & 0 & 0\,\% \\
 \midrule
-\textbf{Total} & \textbf{458} & \textbf{262} & \textbf{57\,\%} \\
+\textbf{Total} & \textbf{458} & \textbf{277} & \textbf{60\,\%} \\
 \bottomrule
 \end{tabular}}
-\newcommand\articleetatresume{262 of 458 tasks done across 48 milestones, 8 milestones complete}
+\newcommand\articleetatresume{277 of 458 tasks done across 48 milestones, 8 milestones complete}
 \newcommand\articlestatuslist{%
 {\raggedright
 \begin{itemize}
@@ -686,4 +686,4 @@ M43 & 7 & 0 & 0\,\% \\
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
 \item \textbf{csim} (6): \texttt{abft.hls.layers}, \texttt{abft.hls.outputs}, \texttt{equiv.table}, \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{cdd244e-dirty}, 2026-10-27}
+\newcommand\articlerev{rev.~\texttt{14e7c4a-dirty}, 2026-10-27}

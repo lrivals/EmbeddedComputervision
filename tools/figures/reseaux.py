@@ -32,7 +32,7 @@ def _nets():
         except MissingSource:
             pass
     if not out:
-        raise MissingSource("aucun model/<net>/manifest.json (make export)")
+        raise MissingSource("no model/<net>/manifest.json (make export)")
     return out
 
 
@@ -86,8 +86,8 @@ def plot_layer_table(net, rows, out_dir, name):
     plt = st.plt()
     tot_m = sum(r["macs"] for r in rows)
     tot_p = sum(r["params"] for r in rows)
-    head = ["L", "type", "k/s/pad", "cin → cout", "entrée", "sortie", "paramètres", "MACs (M)",
-            "part des MACs", "champ r", "pas j", "act.", "BN"]
+    head = ["L", "type", "k/s/pad", "cin → cout", "input", "output", "parameters", "MACs (M)",
+            "share of MACs", "field r", "stride j", "act.", "BN"]
     xs = [0, 0.4, 1.35, 2.25, 3.45, 4.35, 5.25, 6.3, 7.2, 8.85, 9.65, 10.25, 10.95]
     n = len(rows)
     fig, ax = plt.subplots(figsize=(st.FULL, 0.26 * (n + 3) + 0.6))
@@ -120,9 +120,9 @@ def plot_layer_table(net, rows, out_dir, name):
     y = n + 1.1
     ax.axhline(n + 0.6, color=st.INK2, lw=0.8)
     ax.text(xs[0], y, "total", fontsize=7.5, weight="bold", va="center")
-    ax.text(xs[6], y, f"{tot_p:,}".replace(",", " "), fontsize=7.5, weight="bold", va="center")
+    ax.text(xs[6], y, f"{tot_p:,}", fontsize=7.5, weight="bold", va="center")
     ax.text(xs[7], y, f"{tot_m / 1e9:.3f} G", fontsize=7.5, weight="bold", va="center")
-    ax.set_title(f"{st.NET_LABELS.get(net, net)} — fiche couche par couche "
+    ax.set_title(f"{st.NET_LABELS.get(net, net)} — layer-by-layer datasheet "
                  "(yolo.models.specs : infer_shapes, layer_cost)")
     paths = st.save(fig, out_dir, name)
     with open(paths[0].with_suffix(".csv"), "w", newline="") as f:
@@ -133,8 +133,8 @@ def plot_layer_table(net, rows, out_dir, name):
 
 
 @figure("fiche", "reseaux", "T13.48",
-        "Fiche couche par couche : type, noyau, formes, paramètres, MACs et leur part, champ "
-        "réceptif et pas cumulé (CSV à côté de l'image).",
+        "Layer-by-layer datasheet: type, kernel, shapes, parameters, MACs and their share, "
+        "receptive field and cumulative stride (CSV next to the image).",
         "model/<net>/manifest.json, yolo.models.specs")
 def fiche(out_dir):
     paths = []
@@ -169,14 +169,14 @@ def plot_receptive(nets, out_dir, name="champ_receptif"):
         c = st.NET_COLORS[net]
         lw = 3.2 if "v2" in net else 1.4  # tronc commun : v2 en trait épais sous v3
         ax.step(range(len(rf)), [r for r, _ in rf], where="post", color=c, lw=lw,
-                alpha=0.55 if "v2" in net else 1, label=f"{st.NET_LABELS[net]} : champ r")
+                alpha=0.55 if "v2" in net else 1, label=f"{st.NET_LABELS[net]}: field r")
         ax.step(range(len(rf)), [j for _, j in rf], where="post", color=c, ls="--", lw=lw,
-                alpha=0.55 if "v2" in net else 1, label=f"{st.NET_LABELS[net]} : pas j")
+                alpha=0.55 if "v2" in net else 1, label=f"{st.NET_LABELS[net]}: stride j")
     ax.axhline(416, color=st.MUTED, lw=0.9, ls=":")
     ax.text(23, 430, "image 416", fontsize=7, color=st.MUTED, ha="right")
     ax.set_yscale("log", base=2)
-    ax.set_xlabel("indice de couche")
-    ax.set_ylabel("pixels d'entrée")
+    ax.set_xlabel("layer index")
+    ax.set_ylabel("input pixels")
     ax.set_title("r_l = r_{l−1} + (k_l − 1)·j_{l−1},  j_l = j_{l−1}·s_l")
     ax.legend(loc="lower right", fontsize=7)
     # cellules sur une image
@@ -204,18 +204,18 @@ def plot_receptive(nets, out_dir, name="champ_receptif"):
         for w_, h_ in anchors:
             ax2.add_patch(Rectangle((x0 + cell / 2 - w_ / 2, y0 + cell / 2 - h_ / 2), w_, h_,
                                     fill=False, ec=c, lw=0.7, alpha=0.8))
-        ax2.plot([], [], color=c, label=f"{st.NET_SHORT[net]} L{hid} : {S}×{S}, "
-                 f"pas {j:g} px, r = {r:g} px")
-    st.image_axes(ax2, "cellule, champ réceptif (tirets) et ancres")
+        ax2.plot([], [], color=c, label=f"{st.NET_SHORT[net]} L{hid}: {S}×{S}, "
+                 f"stride {j:g} px, r = {r:g} px")
+    st.image_axes(ax2, "cell, receptive field (dashes) and anchors")
     ax2.legend(loc="lower center", fontsize=6.5, bbox_to_anchor=(0.5, -0.2), frameon=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("champ_receptif", "reseaux", "T13.49",
-        "Champ réceptif et pas cumulé par couche, puis une cellule de chaque tête sur une image "
-        "416 avec son champ réceptif et ses ancres.",
-        "model/<net>/manifest.json, yolo.models.cfg (ancres, masques)")
+        "Receptive field and cumulative stride per layer, then one cell of each head on a 416 "
+        "image with its receptive field and its anchors.",
+        "model/<net>/manifest.json, yolo.models.cfg (anchors, masks)")
 def champ_receptif(out_dir):
     return plot_receptive(_nets(), out_dir)
 
@@ -298,14 +298,14 @@ def plot_flow(net, desc, out_dir, name):
     ax.set_ylim(-(rows - 1) * pitch - 6.0, 3.0)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"{st.NET_LABELS.get(net, net)} — flux des tenseurs C×H×W (largeur ∝ log₂ C, "
-                 "hauteur ∝ log₂ H ; formes de infer_shapes)")
+    ax.set_title(f"{st.NET_LABELS.get(net, net)} — flow of the C×H×W tensors (width ∝ log₂ C, "
+                 "height ∝ log₂ H; shapes of infer_shapes)")
     return st.save(fig, out_dir, name)
 
 
 @figure("flux", "reseaux", "T13.50",
-        "Flux des tenseurs couche par couche, un bloc par tenseur (largeur selon C, hauteur "
-        "selon H) ; en v3, route, upsample et seconde tête.",
+        "Flow of the tensors layer by layer, one block per tensor (width by C, height by H); "
+        "in v3, route, upsample and the second head.",
         "model/<net>/manifest.json, yolo.models.specs.infer_shapes")
 def flux(out_dir):
     paths = []
@@ -369,21 +369,21 @@ def plot_head(v, out_dir, name="tete"):
             if r == 0:
                 ax.text(c + 0.46, 1.05, HEAD_FIELDS[c] if c < 5 else names[c - 5][:5],
                         rotation=60, fontsize=6.5, ha="left", va="bottom")
-        ax.text(-0.3, -r + 0.42, f"ancre {r}", ha="right", va="center", fontsize=7)
+        ax.text(-0.3, -r + 0.42, f"anchor {r}", ha="right", va="center", fontsize=7)
     ax.add_patch(Rectangle((0, -v["anchor"]), 5 + C - 0.08, 0.85, fill=False, ec=st.INK, lw=1.4))
     ax.set_xlim(-2.2, 5 + C + 0.4)
     ax.set_ylim(-a + 0.6, 3.4)
     ax.axis("off")
-    ax.set_title(f"Sortie (A·(5 + C), S, S) = ({a * (5 + C)}, {v['S']}, {v['S']}) vue en "
-                 f"(A, 5 + C, S, S) : {a} × (5 + {C}) — en v3 COCO, 3 × (5 + 80) = 255 par tête",
+    ax.set_title(f"Output (A·(5 + C), S, S) = ({a * (5 + C)}, {v['S']}, {v['S']}) seen as "
+                 f"(A, 5 + C, S, S): {a} × (5 + {C}) — in v3 COCO, 3 × (5 + 80) = 255 per head",
                  fontsize=9)
     # vecteur décodé
     ax2 = fig.add_axes([0.07, 0.08, 0.4, 0.42])
     x = np.arange(5)
-    ax2.bar(x - 0.2, v["t"][:5], 0.4, color=st.PALETTE[0], label="t (int8 × échelle)")
+    ax2.bar(x - 0.2, v["t"][:5], 0.4, color=st.PALETTE[0], label="t (int8 × scale)")
     dec = [v["box"][0] * v["S"] - v["cell"][1], v["box"][1] * v["S"] - v["cell"][0],
            v["box"][2], v["box"][3], v["obj"]]
-    ax2.bar(x + 0.2, dec, 0.4, color=st.PALETTE[1], label="décodé")
+    ax2.bar(x + 0.2, dec, 0.4, color=st.PALETTE[1], label="decoded")
     for xi, qv in zip(x, v["q"][:5]):
         ax2.text(xi - 0.2, 0, f"q={qv}", rotation=90, fontsize=6.5, ha="center",
                  va="bottom" if v["t"][xi] < 0 else "top", color=st.INK2)
@@ -391,7 +391,7 @@ def plot_head(v, out_dir, name="tete"):
                        r"$\sigma(t_o)$"])
     ax2.axhline(0, color=st.INK2, lw=0.8)
     ax2.legend(loc="upper left")
-    ax2.set_title(f"cellule {v['cell']}, ancre {v['anchor']} ({v['image']}, échelle "
+    ax2.set_title(f"cell {v['cell']}, anchor {v['anchor']} ({v['image']}, scale "
                   f"{v['scale']:.4f})", fontsize=8.5)
     ax3 = fig.add_axes([0.56, 0.08, 0.41, 0.42])
     top = np.argsort(-v["scores"])[:6]
@@ -403,14 +403,14 @@ def plot_head(v, out_dir, name="tete"):
     ax3.invert_yaxis()
     ax3.set_xlim(0, 1)
     ax3.legend(loc="lower right")
-    ax3.set_title("classes : softmax (v2) ou sigmoïdes indépendantes (v3)", fontsize=8.5)
+    ax3.set_title("classes: softmax (v2) or independent sigmoids (v3)", fontsize=8.5)
     return st.save(fig, out_dir, name)
 
 
 @figure("tete", "reseaux", "T13.51",
-        "La tête de sortie : disposition des canaux (ancres × (5 + C)), puis le vecteur d'une "
-        "cellule en int8 et décodé (sigmoïdes, exponentielles, softmax).",
-        "model/<net>/dumps/<image>/L<tête>.npy, manifest, yolo.infer.decode.decode_head")
+        "The output head: layout of the channels (anchors × (5 + C)), then the vector of one "
+        "cell in int8 and decoded (sigmoids, exponentials, softmax).",
+        "model/<net>/dumps/<image>/L<head>.npy, manifest, yolo.infer.decode.decode_head")
 def tete(out_dir):
     return plot_head(head_vector(), out_dir)
 
@@ -419,18 +419,18 @@ def tete(out_dir):
 
 ONE_LAYER = 2  # L02 de v2 : conv 3×3 16 → 32, BN, leaky, maxpool fusionné (L03)
 STAGES = [  # (titre, fichier, fonctions vérifiées dans le fichier, lignes affichées)
-    ("flottant", "python/yolo/models/graph.py", ["_conv_forward"],
-     ["conv 3×3 (float32)", "BN : γ(x − μ)/σ + β", "leaky 0,1", "maxpool 2×2/2"]),
-    ("BN fusionnée", "python/yolo/quant/fuse_bn.py", ["fuse_bn"],
+    ("float", "python/yolo/models/graph.py", ["_conv_forward"],
+     ["conv 3×3 (float32)", "BN: γ(x − μ)/σ + β", "leaky 0.1", "maxpool 2×2/2"]),
+    ("BN folded", "python/yolo/quant/fuse_bn.py", ["fuse_bn"],
      ["W' = s·W, s = γ/√(σ² + ε)", "b' = β + s(b − μ)", "float32"]),
-    ("entier Python", "python/yolo/quant/int_layers.py",
+    ("Python integer", "python/yolo/quant/int_layers.py",
      ["conv_acc", "requantize", "leaky_int", "clip_q", "maxpool_int"],
-     ["conv_acc : int8·int8 → int32", "requantize : (acc·M0 + 2ⁿ⁻¹)≫n",
-      "leaky_int : (13y + 64) ≫ 7", "clip_q → int8", "maxpool_int"]),
+     ["conv_acc: int8·int8 → int32", "requantize: (acc·M0 + 2ⁿ⁻¹)≫n",
+      "leaky_int: (13y + 64) ≫ 7", "clip_q → int8", "maxpool_int"]),
     ("golden C++", "cpp/golden/include/golden/conv.hpp", ["conv_layer", "requantize", "leaky_int"],
      ["golden::conv_layer", "golden::requantize", "golden::leaky_int", "int8 / int32"]),
     ("HLS (C-sim)", "hls/kernels/conv_pe.cpp", ["load_input", "load_weights", "compute"],
-     ["load_input / load_weights", "compute : Tm × Tn MAC", "store_tile →",
+     ["load_input / load_weights", "compute: Tm × Tn MAC", "store_tile →",
       "golden::requantize"]),
 ]
 
@@ -447,7 +447,7 @@ def one_layer_facts(net="tiny-yolov2-voc", layer=ONE_LAYER):
         text = need(ROOT / path).read_text()
         missing = [n for n in names if not re.search(rf"\b{n}\b", text)]
         if missing:
-            raise AssertionError(f"{path} : fonctions absentes {missing}")
+            raise AssertionError(f"{path}: functions missing {missing}")
     require = materiel.require_names
     require(materiel.OUTPUT_STAGE, ["store_tile", "golden::requantize"])
     errs = resultats.load_layer_errors(net)
@@ -466,12 +466,12 @@ def plot_one_layer(facts, out_dir, name="une_couche"):
     st.schema_axes(ax, (0, 4.4 * n - 0.8), (0, 5.2))
     snr = facts["snr"]
     gaps = [
-        "même réseau\n(fusion exacte)",
-        f"SNR {min(snr):.1f} à {max(snr):.1f} dB\n({facts['images']} dumps)" if snr else "SNR ?",
-        ("0 octet différent" if facts["golden"] and not any(facts["golden"]) else
-         f"{facts['golden']} octets" if facts["golden"] else "golden non lancé") +
+        "same network\n(exact folding)",
+        f"SNR {min(snr):.1f} to {max(snr):.1f} dB\n({facts['images']} dumps)" if snr else "SNR ?",
+        ("0 byte different" if facts["golden"] and not any(facts["golden"]) else
+         f"{facts['golden']} bytes" if facts["golden"] else "golden not run") +
         f"\n({len(facts['golden'] or [])} dumps)",
-        f"0 écart (tb_net)\n{facts['csim']}",
+        f"0 gap (tb_net)\n{facts['csim']}",
     ]
     widths = ["float32", "float32", "int8 → int32 → int8", "int8 → int32 → int8", "mots 64 bits"]
     for i, (title, path, _, lines) in enumerate(STAGES):
@@ -485,16 +485,16 @@ def plot_one_layer(facts, out_dir, name="une_couche"):
         if i:
             st.arrow(ax, (x - 0.8, 2.5), (x, 2.5), lw=1.6)
             ax.text(x - 0.4, 0.45, gaps[i - 1], ha="center", va="top", fontsize=6.3,
-                    color=st.PALETTE[5] if "0 " in gaps[i - 1] or "exacte" in gaps[i - 1]
+                    color=st.PALETTE[5] if "0 " in gaps[i - 1] or "exact" in gaps[i - 1]
                     else st.INK2)
-    ax.set_title(f"Une couche (L{ONE_LAYER:02d} de Tiny-YOLOv2 : conv 3×3 16 → 32, BN, leaky, "
-                 "maxpool) à travers toutes les représentations", fontsize=9)
+    ax.set_title(f"One layer (L{ONE_LAYER:02d} of Tiny-YOLOv2: conv 3×3 16 → 32, BN, leaky, "
+                 "maxpool) through every representation", fontsize=9)
     return st.save(fig, out_dir, name)
 
 
 @figure("une_couche", "reseaux", "T13.52",
-        "Une couche suivie du flottant au noyau HLS : formules, types et largeurs, écarts "
-        "mesurés entre stades (SNR, octets).",
-        "model/<net>/dumps, build/golden/out, suivi du README ; noms vérifiés dans le code")
+        "One layer followed from float to the HLS kernel: formulas, types and widths, gaps "
+        "measured between stages (SNR, bytes).",
+        "model/<net>/dumps, build/golden/out, README progress; names checked in the code")
 def une_couche(out_dir):
     return plot_one_layer(one_layer_facts(), out_dir)

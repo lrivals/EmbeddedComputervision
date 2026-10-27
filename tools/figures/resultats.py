@@ -34,13 +34,15 @@ def _tools(name):
 # --- T13.13 : mAP aux stades -------------------------------------------------------------
 
 STAGES = ("flottant", "entier", "csim", "carte")
+STAGE_LABELS = {"flottant": "float", "entier": "integer", "csim": "C-sim", "carte": "board",
+                "vérité": "ground truth"}
 
 
 def load_map_stades(path):
     """JSON de `tools/map_stades.py --json` : {classes, stages: [{key, name, map, aps, eq}]}."""
     d = _read_json(path)
     if d["images"] != VOC_IMAGES:
-        raise MissingSource(f"{path} : {d['images']} images, pas {VOC_IMAGES}")
+        raise MissingSource(f"{path}: {d['images']} images, not {VOC_IMAGES}")
     return d
 
 
@@ -57,16 +59,16 @@ def plot_map_stades(d, out_dir, name="map_stades"):
         ax.bar(x + (k - (len(done) - 1) / 2) * w, np.array(s["aps"]) * 100, w * 0.92,
                color=st.STAGE_COLORS[s["key"]], hatch=st.STAGE_HATCH[s["key"]],
                edgecolor="white", linewidth=0.4,
-               label=f"{s['name']} : mAP {s['map'] * 100:.2f}")
+               label=f"{STAGE_LABELS.get(s['key'], s['name'])}: mAP {s['map'] * 100:.2f}")
     from matplotlib.patches import Patch
 
     handles = ax.get_legend_handles_labels()[0]
     handles += [Patch(fc="white", ec=st.STAGE_COLORS[s["key"]], hatch=st.STAGE_HATCH[s["key"]],
-                      label=f"{s['name']} : à mesurer") for s in pending]
+                      label=f"{STAGE_LABELS.get(s['key'], s['name'])}: to measure") for s in pending]
     ax.set_xticks(x, classes, rotation=40, ha="right")
     ax.set_ylabel("AP (%)")
     ax.set_ylim(0, 100)
-    ax.set_title(f"{d['net']} — AP par classe aux stades (VOC2007 test, {d['images']} images)")
+    ax.set_title(f"{d['net']} — AP per class at the stages (VOC2007 test, {d['images']} images)")
     ax.legend(handles=handles, loc="upper left", ncol=2)
     ax.grid(axis="x", visible=False)
 
@@ -78,20 +80,20 @@ def plot_map_stades(d, out_dir, name="map_stades"):
             color=[st.PALETTE[7] if v < 0 else st.PALETTE[2] for v in diff[order]], width=0.7)
     ax2.axhline(0, color=st.INK2, lw=0.8)
     ax2.axhline(diff.mean(), color=st.INK2, lw=0.8, ls="--")
-    ax2.text(len(classes) - 0.5, diff.mean(), f" moyenne {diff.mean():+.2f}", va="bottom",
+    ax2.text(len(classes) - 0.5, diff.mean(), f" mean {diff.mean():+.2f}", va="bottom",
              ha="right", fontsize=7, color=st.INK2)
     ax2.set_xticks(np.arange(len(classes)), [classes[i] for i in order], rotation=40,
                    ha="right")
-    ax2.set_ylabel("Δ AP entier − flottant (points)")
-    ax2.set_title("Effet de la quantification INT8 par classe (trié)")
+    ax2.set_ylabel("Δ AP integer − float (points)")
+    ax2.set_title("Effect of the INT8 quantization per class (sorted)")
     ax2.grid(axis="x", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("map_stades", "resultats", "T13.13",
-        "AP par classe aux stades flottant, entier et C-sim (la carte quand elle sera mesurée), "
-        "et écart entier − flottant trié.",
+        "AP per class at the float, integer and C-sim stages (the board when measured), "
+        "and integer − float gap sorted.",
         "build/m8/<net>/map_stades.json (tools/map_stades.py --json)")
 def map_stades(out_dir):
     return plot_map_stades(load_map_stades(need(ROOT / "build" / "m8" / NET / "map_stades.json")),
@@ -102,13 +104,13 @@ def map_stades(out_dir):
 
 # (étiquette, fichier, clé de résultat, bits de poids, remarque)
 FORMATS = [
-    ("flottant", "build/m8/{net}/eval_float_int.json", "float", 32, ""),
+    ("float", "build/m8/{net}/eval_float_int.json", "float", 32, ""),
     ("INT8 PTQ", "build/m8/{net}/eval_float_int.json", "int", 8, ""),
     ("uniform6 PTQ", "build/m9/map_{net}-uniform6-ptq.json", "int", 6, ""),
     ("pow2 mixed6 PTQ", "build/m9/map_{net}-pow2-ptq.json", "int", 6, ""),
-    ("pow2 mixed6 ADMM", "build/m9/map_{net}-pow2-admm.json", "int", 6, "non convergé"),
+    ("pow2 mixed6 ADMM", "build/m9/map_{net}-pow2-admm.json", "int", 6, "not converged"),
     ("w4a4 PTQ", "build/m9/map_{net}-w4a4-ptq.json", "int", 4, ""),
-    ("w4a4 QAT", "build/m9/map_{net}-w4a4-qat.json", "int", 4, "QAT court (600 it.)"),
+    ("w4a4 QAT", "build/m9/map_{net}-w4a4-qat.json", "int", 4, "short QAT (600 it.)"),
 ]
 
 
@@ -125,7 +127,7 @@ def load_map_formats(net=NET, root=None):
             continue
         rows.append((label, d["results"][key]["map"], bits, remark))
     if not rows:
-        raise MissingSource("aucune mAP 4 952 images dans build/m8 ni build/m9")
+        raise MissingSource("no 4,952-image mAP in build/m8 or build/m9")
     return rows
 
 
@@ -151,8 +153,8 @@ def plot_map_formats(rows, out_dir, name="map_formats"):
                 va="center", fontsize=8, color=st.INK)
     ax.set_yticks(y, [f"{r[0]}  [{r[2]} b]" for r in rows])
     ax.set_xlim(0, 75)
-    ax.set_xlabel("mAP VOC2007 test (%)")
-    ax.set_title("mAP par format numérique (4 952 images)")
+    ax.set_xlabel("VOC2007 test mAP (%)")
+    ax.set_title("mAP per number format (4,952 images)")
     ax.grid(axis="y", visible=False)
 
     pts = [(r[2], r[1] * 100) for r in rows]
@@ -165,21 +167,21 @@ def plot_map_formats(rows, out_dir, name="map_formats"):
         ax2.annotate(r[0], (b, m), textcoords="offset points", fontsize=7, color=st.INK2,
                      xytext=(6, -11 if close else 3))
     ax2.plot([pts[i][0] for i in front], [pts[i][1] for i in front], color=st.PALETTE[1],
-             lw=1.2, ls="--", label="frontière de Pareto")
+             lw=1.2, ls="--", label="Pareto front")
     ax2.set_xscale("log", base=2)
     ax2.set_xticks([4, 6, 8, 32], ["4", "6", "8", "32"])
-    ax2.set_xlabel("bits par poids (coût mémoire et multiplieur)")
+    ax2.set_xlabel("bits per weight (memory and multiplier cost)")
     ax2.set_ylabel("mAP (%)")
-    ax2.set_title("Précision face au coût")
-    ax2.plot([], [], "o", mfc="white", mec=st.PALETTE[0], label="non convergé / QAT court")
+    ax2.set_title("Accuracy against cost")
+    ax2.plot([], [], "o", mfc="white", mec=st.PALETTE[0], label="not converged / short QAT")
     ax2.legend(loc="lower right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("map_formats", "resultats", "T13.14",
-        "mAP de Tiny-YOLOv2 selon le format des poids (flottant, INT8, puissances de 2, "
-        "4 bits), et frontière précision / bits.",
+        "mAP of Tiny-YOLOv2 by weight format (float, INT8, powers of two, 4 bits), "
+        "and accuracy / bits front.",
         "build/m8/<net>/eval_float_int.json, build/m9/map_*.json")
 def map_formats(out_dir):
     return plot_map_formats(load_map_formats(), out_dir)
@@ -246,9 +248,9 @@ def plot_pr(curves, out_dir, name, title):
     for ax in list(axes.flat)[len(classes):]:
         ax.set_visible(False)
     for ax in axes[-1]:
-        ax.set_xlabel("rappel")
+        ax.set_xlabel("recall")
     for ax in axes[:, 0]:
-        ax.set_ylabel("précision")
+        ax.set_ylabel("precision")
     maps = ", ".join(f"{v} : mAP {np.mean([c[2] for c in curves[v].values()]) * 100:.2f}"
                      for v in variants)
     fig.suptitle(f"{title}\n{maps}", fontsize=9)
@@ -274,13 +276,13 @@ def test_samples(devkit=None):
 
 
 @figure("pr", "resultats", "T13.15",
-        "Courbes précision-rappel par classe (11 points VOC07) pour chaque prétraitement "
-        "évalué, puis les quatre superposées.",
-        "build/eval/<net>-<variante>/comp4_det_test_*.txt + data/VOCdevkit")
+        "Precision-recall curves per class (11-point VOC07) for each preprocessing evaluated, "
+        "then the four overlaid.",
+        "build/eval/<net>-<variant>/comp4_det_test_*.txt + data/VOCdevkit")
 def pr(out_dir):
     dirs = eval_dirs()
     if not dirs:
-        raise MissingSource("aucune détection dans build/eval/ (make eval-float)")
+        raise MissingSource("no detection in build/eval/ (make eval-float)")
     samples = test_samples()
     curves = {d.name.removeprefix(NET + "-"): load_pr(d, samples) for d in dirs}
     paths = []
@@ -288,7 +290,7 @@ def pr(out_dir):
         paths += plot_pr({v: c}, out_dir, f"pr_{v}", f"{NET}, {v} — VOC2007 test")
     if len(curves) > 1:
         paths += plot_pr(curves, out_dir, "pr_variantes",
-                         f"{NET} — prétraitements comparés (VOC2007 test)")
+                         f"{NET} — preprocessings compared (VOC2007 test)")
     return paths
 
 
@@ -332,7 +334,7 @@ def plot_sensitivity(panels, out_dir, name="sensibilite"):
         lo, hi = ax.get_ylim()
         ax.set_ylim(lo, hi + 0.25 * (hi - lo))
         ax.set_xticks(x, [f"L{i:02d}" for i in layers])
-        ax.set_ylabel("perte de mAP (points)")
+        ax.set_ylabel("mAP loss (points)")
         ax.set_title(title)
         ax.legend(loc="upper right", ncol=len(series))
         ax.grid(axis="x", visible=False)
@@ -341,8 +343,8 @@ def plot_sensitivity(panels, out_dir, name="sensibilite"):
 
 
 @figure("sensibilite", "resultats", "T13.16",
-        "Perte de mAP quand une seule couche est quantifiée (INT8 en fake-quant face au "
-        "flottant ; uniform6, uniform4, mixed6 face à l'INT8). Sous-ensembles de VOC2007 test.",
+        "mAP loss when a single layer is quantized (INT8 fake-quant against float; "
+        "uniform6, uniform4, mixed6 against INT8). Subsets of VOC2007 test.",
         "build/quant/<net>/eval_test_*_fq*.json, build/m10/mixed/sensitivity.csv",
         subset=True)
 def sensibilite(out_dir):
@@ -350,15 +352,15 @@ def sensibilite(out_dir):
     fq = sorted((ROOT / "build" / "quant" / NET).glob("eval_test_*_float-fqall-*.json"))
     if fq:
         f, fall, n, per = load_fq_sensitivity(fq[-1])
-        panels.append((f"INT8 seule couche face au flottant ({n} images, flottant {f:.2f}, "
-                       f"tout INT8 {fall:.2f})", {"INT8 (fake-quant)": per}))
+        panels.append((f"INT8 single layer against float ({n} images, float {f:.2f}, "
+                       f"all INT8 {fall:.2f})", {"INT8 (fake-quant)": per}))
     sens = ROOT / "build" / "m10" / "mixed" / "sensitivity.csv"
     if sens.exists():
         ref, per = load_sensitivity(sens)
-        panels.append((f"Poids basse précision, une couche à la fois, face à l'INT8 "
+        panels.append((f"Low-precision weights, one layer at a time, against INT8 "
                        f"(500 images, INT8 {ref:.2f})", per))
     if not panels:
-        raise MissingSource("ni eval_test_*_fq*.json ni build/m10/mixed/sensitivity.csv")
+        raise MissingSource("neither eval_test_*_fq*.json nor build/m10/mixed/sensitivity.csv")
     return plot_sensitivity(panels, out_dir)
 
 
@@ -393,12 +395,12 @@ def plot_calibration(net, layers, samples, out_dir, name):
         ax.axvline(clip, color=st.PALETTE[7], lw=1.4)
         ax.set_xlim(0, hi)
         ax.set_title(f"L{layer['id']:02d} {layer['act']} — {layer['pick']}, "
-                     f"saturé {sat * 100:.3f} %", fontsize=7.5, fontweight="normal")
+                     f"saturated {sat * 100:.3f} %", fontsize=7.5, fontweight="normal")
         ax.tick_params(labelsize=6.5)
     for ax in list(axes.flat)[n:]:
         ax.set_visible(False)
-    fig.suptitle(f"{net} — |activations| (log) et seuil de saturation retenu 127·s (rouge) ; "
-                 "candidats en pointillé", fontsize=9)
+    fig.suptitle(f"{net} — |activations| (log) and saturation threshold kept 127·s (red); "
+                 "candidates dotted", fontsize=9)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -427,16 +429,16 @@ def plot_weight_scales(net, scales, out_dir, name):
                medianprops=dict(color=st.PALETTE[1]), boxprops=dict(color=st.PALETTE[0]))
     ax.set_xticks(range(1, len(ids) + 1), [f"L{i:02d}" for i in ids])
     ax.set_yscale("log")
-    ax.set_ylabel("échelle s_w,f = max|W'_f| / 127")
-    ax.set_title(f"{net} — échelles des poids par canal de sortie (BN fusionnée)")
+    ax.set_ylabel("scale s_w,f = max|W'_f| / 127")
+    ax.set_title(f"{net} — weight scales per output channel (BN folded)")
     ax.grid(axis="x", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("calibration", "resultats", "T13.17",
-        "Distribution des activations par couche et seuil de saturation retenu par la "
-        "calibration ; échelles des poids par canal.",
+        "Distribution of the activations per layer and saturation threshold kept by the "
+        "calibration; weight scales per channel.",
         "build/quant/<net>/calib.json, build/m9/stats_<net>.npz, weights/")
 def calibration(out_dir):
     paths = []
@@ -459,7 +461,7 @@ def calibration(out_dir):
         except MissingSource:
             pass
     if not paths:
-        raise MissingSource("aucun build/quant/<net>/calib.json (make calibrate)")
+        raise MissingSource("no build/quant/<net>/calib.json (make calibrate)")
     return paths
 
 
@@ -496,7 +498,7 @@ def load_layer_errors(net, images=None):
     if images:
         dumps = [d for d in dumps if d.name in images]
     if not dumps:
-        raise MissingSource(f"model/{net}/dumps/ vide (make export)")
+        raise MissingSource(f"model/{net}/dumps/ empty (make export)")
     model = build(net)
     load_darknet_weights(model, need(ROOT / "weights" / PRETRAINED[net]))
     fused = fuse_network(model)
@@ -540,9 +542,9 @@ def plot_layer_errors(net, errors, golden, out_dir, name):
         ids = [r[0] for r in rows]
         ax.plot(ids, [r[1] for r in rows], marker=markers[k % 5], ms=5, lw=1.2,
                 color=st.PALETTE[k], label=f"image {img}")
-    ax.set_ylabel("SNR flottant / entier (dB)")
-    ax.set_title(f"{net} — erreur de quantification par couche (sortie entière déquantifiée "
-                 "face au flottant à BN fusionnée)")
+    ax.set_ylabel("SNR float / integer (dB)")
+    ax.set_title(f"{net} — quantization error per layer (dequantized integer output "
+                 "against float with BN folded)")
     ax.legend(loc="upper right", ncol=len(errors))
     ids = [r[0] for r in errors[0][1]]
     if golden:
@@ -554,14 +556,14 @@ def plot_layer_errors(net, errors, golden, out_dir, name):
         ax2.bar(ids, vals, color=st.PALETTE[2], width=0.6)
         ax2.set_ylim(0, max(1, max(vals)) * 1.2)
         ok = all(v == 0 for v in vals)
-        ax2.text(0.5, 0.5, f"{'0 octet différent' if ok else 'ÉCARTS'} sur {len(golden)} "
-                 f"images × {len(ids)} couches : entier Python == golden C++",
+        ax2.text(0.5, 0.5, f"{'0 byte different' if ok else 'GAPS'} over {len(golden)} "
+                 f"images × {len(ids)} layers: Python integer == golden C++",
                  transform=ax2.transAxes, ha="center", va="center", fontsize=9,
                  color=st.PALETTE[5] if ok else st.PALETTE[7], fontweight="bold")
     else:
-        ax2.text(0.5, 0.5, "golden C++ non exécuté (make golden-check)",
+        ax2.text(0.5, 0.5, "golden C++ not run (make golden-check)",
                  transform=ax2.transAxes, ha="center", va="center", color=st.MUTED)
-    ax2.set_ylabel("octets ≠")
+    ax2.set_ylabel("bytes ≠")
     ax2.set_xticks(ids, [f"L{i:02d}" for i in ids], rotation=90)
     ax2.grid(axis="x", visible=False)
     fig.tight_layout()
@@ -569,8 +571,8 @@ def plot_layer_errors(net, errors, golden, out_dir, name):
 
 
 @figure("erreur_couches", "resultats", "T13.18",
-        "SNR par couche entre le flottant et l'entier déquantifié, et écart entier Python ↔ "
-        "golden C++ (0 partout : bit-exact).",
+        "SNR per layer between float and the dequantized integer, and Python integer ↔ "
+        "golden C++ gap (0 everywhere: bit-exact).",
         "model/<net>/dumps/, build/golden/out/<net>/, weights/")
 def erreur_couches(out_dir):
     paths = []
@@ -582,7 +584,7 @@ def erreur_couches(out_dir):
         paths += plot_layer_errors(net, errors, load_golden_diffs(net), out_dir,
                                    f"erreur_couches_{net}")
     if not paths:
-        raise MissingSource("ni dumps (make export) ni poids Darknet (make get-weights)")
+        raise MissingSource("neither dumps (make export) nor Darknet weights (make get-weights)")
     return paths
 
 
@@ -615,22 +617,22 @@ def plot_cycles(per_net, out_dir, name="cycles_couches", title=""):
                    edgecolor="white", linewidth=0.5, label=part)
             bottom += v
         ax.plot(x, [r["overlapped"] / 1e6 for r in rows], "D", ms=6, color=st.INK,
-                mfc="white", mew=1.4, label="recouvert (temps réel)", zorder=3)
+                mfc="white", mew=1.4, label="overlapped (real time)", zorder=3)
         ax.set_xticks(x, [f"L{r['layer']:02d}" for r in rows])
         ax.set_ylabel("Mcycles")
         tot = sum(r["overlapped"] for r in rows)
-        ax.set_title(f"{st.NET_LABELS.get(net, net)} — {tot / 1e6:.2f} Mcycles recouverts "
-                     f"({tot / 200e3:.1f} ms à 200 MHz){title}")
+        ax.set_title(f"{st.NET_LABELS.get(net, net)} — {tot / 1e6:.2f} Mcycles overlapped "
+                     f"({tot / 200e3:.1f} ms at 200 MHz){title}")
         ax.grid(axis="x", visible=False)
-    st.note(axes[0, 0], "projection C-sim (compteurs de count_cycles)", "upper left")
+    st.note(axes[0, 0], "C-sim projection (count_cycles counters)", "upper left")
     fig.legend(*axes[0, 0].get_legend_handles_labels(), loc="lower center", ncol=5)
     fig.tight_layout(rect=(0, 0.05, 1, 1))
     return st.save(fig, out_dir, name)
 
 
 @figure("cycles_couches", "resultats", "T13.20",
-        "Cycles par couche du noyau actuel, décomposés en chargements, calcul et stockage ; "
-        "le losange donne le temps réel avec recouvrement.",
+        "Cycles per layer of the current kernel, split into loads, compute and store; "
+        "the diamond gives the real time with overlap.",
         "build/hls/cycles_conv.csv (make hls-cycles)")
 def cycles_couches(out_dir):
     return plot_cycles(load_cycles(need(ROOT / "build" / "hls" / "cycles_conv.csv")), out_dir)
@@ -679,10 +681,10 @@ def plot_cascade(steps, bound, roof, out_dir, name="cascade_m10"):
     for yi, (label, ms, fps, done) in zip(y, steps):
         ax.barh(yi, ms, 0.62, color=st.PALETTE[0] if done else "white",
                 edgecolor=st.PALETTE[0], hatch="" if done else "///", linewidth=1)
-        gain = "" if ms == ref else f"  (×{ref / ms:.1f} face à M6)"
+        gain = "" if ms == ref else f"  (×{ref / ms:.1f} against M6)"
         ax.text(ms + 2, yi, f"{ms:.1f} ms · {fps:.1f} img/s{gain}", va="center", fontsize=8)
     ax.axvline(bound, color=st.PALETTE[1], lw=1.2, ls="--")
-    ax.text(bound, y[0] + 0.7, f" borne calcul M6 {bound:.1f} ms", color=st.INK2, fontsize=7.5)
+    ax.text(bound, y[0] + 0.7, f" M6 compute bound {bound:.1f} ms", color=st.INK2, fontsize=7.5)
     if roof:
         ax.axvline(roof, color=st.PALETTE[6], lw=1.2, ls=":")
         ax.text(roof, y[-1] - 0.85, f" roofline KV260 {roof:.1f} ms", color=st.INK2,
@@ -690,22 +692,22 @@ def plot_cascade(steps, bound, roof, out_dir, name="cascade_m10"):
     ax.set_yticks(y, [s[0] for s in steps])
     ax.set_xlim(0, max(s[1] for s in steps) * 1.35)
     ax.set_ylim(y[-1] - 1.2, y[0] + 1.2)
-    ax.set_xlabel("temps de l'accélérateur par image (ms, 200 MHz)")
-    ax.set_title("Tiny-YOLOv2 — pistes d'optimisation M10 (modèle de cycles == C-sim)")
+    ax.set_xlabel("accelerator time per image (ms, 200 MHz)")
+    ax.set_title("Tiny-YOLOv2 — M10 optimization steps (cycle model == C-sim)")
     ax.grid(axis="y", visible=False)
     from matplotlib.patches import Patch
 
-    ax.legend(handles=[Patch(fc=st.PALETTE[0], ec=st.PALETTE[0], label="piste faite (noyau)"),
+    ax.legend(handles=[Patch(fc=st.PALETTE[0], ec=st.PALETTE[0], label="step done (kernel)"),
                        Patch(fc="white", ec=st.PALETTE[0], hatch="///",
-                             label="piste projetée")], loc="lower right")
-    st.note(ax, "projection C-sim, pas une mesure carte", "upper right")
+                             label="step projected")], loc="lower right")
+    st.note(ax, "C-sim projection, not a board measurement", "upper right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("cascade_m10", "resultats", "T13.21",
-        "Temps par image de Tiny-YOLOv2 à chaque piste d'optimisation M10, face à la borne "
-        "de calcul et au roofline KV260.",
+        "Time per image of Tiny-YOLOv2 at each M10 optimization step, against the compute "
+        "bound and the KV260 roofline.",
         "tools/perf_model.py (SCENARIOS, scenario_table), tools/roofline.py")
 def cascade_m10(out_dir):
     return plot_cascade(*load_cascade(), out_dir)
@@ -719,7 +721,7 @@ def load_roofline_layers(net=NET, board="kv260"):
     try:
         b = rl.load_board(need(ROOT / "hw" / "boards" / f"{board}.yaml"))
     except ImportError as e:
-        raise MissingSource(f"pyyaml absent ({e})") from e
+        raise MissingSource(f"pyyaml missing ({e})") from e
     layers = pm.conv_layers(need(ROOT / "model" / net / "manifest.json"))
     pts = rl.layer_points(layers, b, before=lambda d: pm.layer_cycles(d)["overlapped"],
                           after=lambda d: pm.kernel_cycles(d)["overlapped"],
@@ -736,13 +738,13 @@ def plot_roofline_layers(board, pts, net, out_dir, name):
     x = np.logspace(np.log10(ctc.min() / 3), np.log10(ctc.max() * 3), 100)
     ax.plot(x, np.minimum(board["bw_bytes"] * x / 1e9, peak), color=st.INK2, lw=1.4)
     ax.text(x[3], board["bw_bytes"] * x[3] / 1e9 * 1.3,
-            f"DDR {board['bw_bytes'] / 1e9:.1f} Go/s", fontsize=7.5, color=st.INK2, rotation=28)
-    ax.text(x[-1], peak * 1.08, f"calcul Tm·Tn = {tm}×{tn} : {peak:.0f} GOPS", ha="right",
+            f"DDR {board['bw_bytes'] / 1e9:.1f} GB/s", fontsize=7.5, color=st.INK2, rotation=28)
+    ax.text(x[-1], peak * 1.08, f"compute Tm·Tn = {tm}×{tn}: {peak:.0f} GOPS", ha="right",
             fontsize=7.5, color=st.INK2)
     # PE paquetée à Tm 64 (M23, T23.3) : 2 MAC par DSP, même nombre de DSP, toit doublé.
     ax.plot(x, np.minimum(board["bw_bytes"] * x / 1e9, 2 * peak), color=st.INK2, lw=1.0,
             ls=st.PROJECTED["linestyle"], zorder=0)
-    ax.text(x[-1], 2 * peak * 1.08, f"2 MAC/DSP, Tm {2 * tm} : {2 * peak:.0f} GOPS (projeté)",
+    ax.text(x[-1], 2 * peak * 1.08, f"2 MAC/DSP, Tm {2 * tm}: {2 * peak:.0f} GOPS (projected)",
             ha="right", fontsize=7.5, color=st.MUTED)
     for layer, c, g0, g1 in pts:
         ax.annotate("", (c, g1), (c, g0), arrowprops=dict(arrowstyle="->", color=st.GREY,
@@ -751,22 +753,22 @@ def plot_roofline_layers(board, pts, net, out_dir, name):
         ax.plot(c, g1, "o", ms=7, mfc="white", mec=st.PALETTE[0], mew=1.8)
         ax.annotate(f"L{layer:02d}", (c, g1), textcoords="offset points", xytext=(5, 2),
                     fontsize=7, color=st.INK2)
-    ax.plot([], [], "o", mfc="white", mec=st.PALETTE[1], label="noyau M6 (ports 8 bits)")
-    ax.plot([], [], "o", mfc="white", mec=st.PALETTE[0], mew=1.8, label="noyau actuel (M10)")
+    ax.plot([], [], "o", mfc="white", mec=st.PALETTE[1], label="M6 kernel (8-bit ports)")
+    ax.plot([], [], "o", mfc="white", mec=st.PALETTE[0], mew=1.8, label="current kernel (M10)")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("intensité opérationnelle (opérations / octet DDR, modèle §10.2)")
-    ax.set_ylabel("GOPS par couche")
-    ax.set_title(f"{board['name']} — {net}, roofline par couche")
+    ax.set_xlabel("operational intensity (operations / DDR byte, §10.2 model)")
+    ax.set_ylabel("GOPS per layer")
+    ax.set_title(f"{board['name']} — {net}, per-layer roofline")
     ax.legend(loc="lower right")
-    st.note(ax, "projection C-sim (marques creuses) ; mesure carte à venir", "upper left")
+    st.note(ax, "C-sim projection (hollow marks); board measurement to come", "upper left")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("roofline_couches", "resultats", "T13.22",
-        "Roofline KV260 avec un point par couche de Tiny-YOLOv2, avant et après les "
-        "optimisations M10.",
+        "KV260 roofline with one point per layer of Tiny-YOLOv2, before and after the "
+        "M10 optimizations.",
         "hw/boards/kv260.yaml, model/<net>/manifest.json, tools/perf_model.py")
 def roofline_couches(out_dir):
     b, pts = load_roofline_layers()
@@ -842,8 +844,8 @@ def plot_benchmarks(rows, out_dir, name="etat_art"):
                     fontsize=6.5, color=st.INK2)
 
     panels = [
-        (axes[0], "gops", "puissance_w", "puissance (W)", "GOPS", "GOPS face à la puissance"),
-        (axes[1], "fps", "map_voc", "mAP VOC (%)", "img/s", "Débit face à la précision"),
+        (axes[0], "gops", "puissance_w", "power (W)", "GOPS", "GOPS against power"),
+        (axes[1], "fps", "map_voc", "VOC mAP (%)", "img/s", "Throughput against accuracy"),
     ]
     missing = {}
     for ax, ky, kx, xl, yl, title in panels:
@@ -887,11 +889,11 @@ def plot_benchmarks(rows, out_dir, name="etat_art"):
         ax.set_xlim(0, max([value(r) for r in ok], default=1) * 1.18)
 
     bars(axes[2], "dsp", lambda r: r["gops"] / r["dsp"] if r["gops"] and r["dsp"] else None,
-         "{:.2f}", "GOPS / DSP", "Efficacité par DSP")
-    bars(axes[3], "fps", lambda r: r["fps"], "{:.1f}", "img/s (accélérateur seul pour ce travail)",
-         "Débit")
-    foot = ["Marque creuse, barre hachurée : projection (ce travail, C-sim, * dans les "
-            "étiquettes ; couleur = réseau v2 / v3 / v4). Lignes sans valeur, omises du panneau :"]
+         "{:.2f}", "GOPS / DSP", "Efficiency per DSP")
+    bars(axes[3], "fps", lambda r: r["fps"], "{:.1f}", "img/s (accelerator alone for this work)",
+         "Throughput")
+    foot = ["Hollow mark, hatched bar: projection (this work, C-sim, * in the "
+            "labels; colour = network v2 / v3 / v4). Rows without a value, left out of the panel:"]
     foot += [f"  {k} : {', '.join(sorted(set(v)))}" for k, v in missing.items()]
     fig.tight_layout(rect=(0, 0.018 * len(foot), 1, 1))
     fig.text(0.01, 0.005, "\n".join(foot), fontsize=6.5, color=st.MUTED, va="bottom")
@@ -899,8 +901,8 @@ def plot_benchmarks(rows, out_dir, name="etat_art"):
 
 
 @figure("etat_art", "resultats", "T13.23",
-        "Comparaison aux accélérateurs publiés : GOPS et puissance, débit et mAP, GOPS par DSP, "
-        "débit (marque creuse : projection de ce travail, par réseau et variante M23).",
+        "Comparison with published accelerators: GOPS and power, throughput and mAP, GOPS per DSP, "
+        "throughput (hollow mark: projection of this work, per network and M23 variant).",
         "results/benchmarks.csv")
 def etat_art(out_dir):
     return plot_benchmarks(load_benchmarks(need(ROOT / "results" / "benchmarks.csv")), out_dir)
@@ -910,11 +912,11 @@ def etat_art(out_dir):
 
 BRAM18_BYTES = 18 * 1024 // 8
 URAM_BYTES = 288 * 1024 // 8
-EST, MES = "estimation", "synthèse"
+EST, MES = "estimate", "synthesis"
 # Rapports csynth de chaque variante (make hls-synth, hls-synth-pow2, hls-synth-stream). Le
 # 4 bits n'a pas de noyau HLS propre : il reste une estimation (2 MAC par DSP).
-SYNTH_DIRS = {"moteur unique INT8": "synth", "moteur unique pow2": "synth_pow2",
-              "moteur unique 2 MAC/DSP": "synth_pack", "streaming W8A8": "synth_stream"}
+SYNTH_DIRS = {"single engine INT8": "synth", "single engine pow2": "synth_pow2",
+              "single engine 2 MAC/DSP": "synth_pack", "streaming W8A8": "synth_stream"}
 
 
 def load_synth(board_file, step):
@@ -939,23 +941,23 @@ def load_resources(board="kv260"):
     try:
         b = rl.load_board(need(ROOT / "hw" / "boards" / f"{board}.yaml"))
     except ImportError as e:
-        raise MissingSource(f"pyyaml absent ({e})") from e
+        raise MissingSource(f"pyyaml missing ({e})") from e
     t = pm.TILES
     mem = rl.bram18(t["tm"], t["tn"], t["tr"], t["tc"]) * BRAM18_BYTES
     rows = [
-        {"name": "moteur unique INT8", "dsp": (rl.dsp(t["tm"], t["tn"], 1), EST),
+        {"name": "single engine INT8", "dsp": (rl.dsp(t["tm"], t["tn"], 1), EST),
          "mem": (mem, EST), "lut": None},
         # MAC par décalages : plus de DSP de multiplication, seule la requantification reste.
-        {"name": "moteur unique pow2", "dsp": (rl.REQUANT_DSP * t["tm"], EST),
+        {"name": "single engine pow2", "dsp": (rl.REQUANT_DSP * t["tm"], EST),
          "mem": (mem, EST), "lut": (rl.lut_pow2(t["tm"], t["tn"]), EST)},
-        {"name": "moteur unique 4 bits", "dsp": (rl.dsp(t["tm"], t["tn"], 2), EST),
+        {"name": "single engine 4 bits", "dsp": (rl.dsp(t["tm"], t["tn"], 2), EST),
          "mem": (mem, EST), "lut": None},
     ]
     # PE paquetée (M23, T23.2-T23.3) : mêmes tuiles (make hls-synth-pack), puis les deux façons
     # de prendre le gain de perf_model.PACK_OPTIONS.
     for label, tm, tn in (("", t["tm"], t["tn"]), (", Tm 64", 2 * t["tm"], t["tn"]),
                           (", Tn 32", t["tm"], 32)):
-        rows.append({"name": f"moteur unique 2 MAC/DSP{label}",
+        rows.append({"name": f"single engine 2 MAC/DSP{label}",
                      "dsp": (pm.kernel_dsp(tm, tn, pack=2), EST),
                      "mem": (rl.bram18(tm, tn, t["tr"], t["tc"]) * BRAM18_BYTES, EST),
                      "lut": None})
@@ -979,7 +981,7 @@ def load_resources(board="kv260"):
 
 def plot_resources(board, rows, budget, out_dir, name="ressources"):
     plt = st.plt()
-    panels = [(k, lab) for k, lab in (("dsp", "DSP"), ("mem", "mémoire sur puce"), ("lut", "LUT"))
+    panels = [(k, lab) for k, lab in (("dsp", "DSP"), ("mem", "on-chip memory"), ("lut", "LUT"))
               if budget.get(k)]
     fig, axes = plt.subplots(1, len(panels), figsize=(st.FULL, 0.45 * len(rows) + 1.9),
                              sharey=True, squeeze=False)
@@ -988,7 +990,7 @@ def plot_resources(board, rows, budget, out_dir, name="ressources"):
         tot = budget[k]
         for yi, r in zip(y, rows):
             if r.get(k) is None:
-                ax.text(1.5, yi, "à mesurer", va="center", fontsize=7, color=st.MUTED,
+                ax.text(1.5, yi, "to measure", va="center", fontsize=7, color=st.MUTED,
                         style="italic")
                 continue
             v, status = r[k]
@@ -1005,24 +1007,24 @@ def plot_resources(board, rows, budget, out_dir, name="ressources"):
         ax.axvline(80, color=st.MUTED, lw=0.9, ls="--")
         ax.text(80, y[-1] - 0.55, " 80 %", fontsize=7, color=st.MUTED, va="center")
         ax.set_xlim(0, 150)
-        ax.set_xlabel(f"% du budget {board['name']}")
+        ax.set_xlabel(f"% of the {board['name']} budget")
         total = f"{tot / 1e6:.2f} Mo" if k == "mem" else f"{tot:,.0f}".replace(",", " ")
         ax.set_title(f"{lab} — total {total}", fontsize=9)
         ax.grid(axis="y", visible=False)
     axes[0][0].set_yticks(y, [r["name"] for r in rows], fontsize=8)
     fig.tight_layout(rect=(0, 0.06, 1, 1))
-    fig.text(0.01, 0.01, "Hachuré : estimation (modèles roofline, streaming, LUT par MAC de "
-             "req_yolo.md, perf_model.kernel_dsp pour la PE paquetée) ; plein : rapport csynth "
-             "(make hls-synth, hls-synth-pow2, hls-synth-pack, hls-synth-stream). « à mesurer » : "
-             "aucune estimation.", fontsize=6.5,
+    fig.text(0.01, 0.01, "Hatched: estimate (roofline and streaming models, LUT per MAC of "
+             "req_yolo.md, perf_model.kernel_dsp for the packed PE); solid: csynth report "
+             "(make hls-synth, hls-synth-pow2, hls-synth-pack, hls-synth-stream). \"to measure\": "
+             "no estimate.", fontsize=6.5,
              color=st.MUTED)
     return st.save(fig, out_dir, name)
 
 
 @figure("ressources", "resultats", "T13.24",
-        "DSP, mémoire sur puce et LUT des architectures (moteur unique INT8, pow2, 4 bits et "
-        "2 MAC/DSP, streaming) face au budget de la KV260 ; hachuré : estimation, plein : "
-        "synthèse.",
+        "DSP, on-chip memory and LUT of the architectures (single engine INT8, pow2, 4 bits and "
+        "2 MAC/DSP, streaming) against the KV260 budget; hatched: estimate, solid: "
+        "synthesis.",
         "hw/boards/kv260.yaml, tools/roofline.py, build/m9/stream_plan_w*.json, "
         "hls/proj_kv260_synth*/sol/syn/report/csynth.xml")
 def ressources(out_dir):
@@ -1054,26 +1056,26 @@ def plot_hwpp(m_arm, m_cap, m_nocap, counts, out_dir, name="hw_postproc"):
     plt = st.plt()
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(st.FULL, 3.6),
                                   gridspec_kw={"width_ratios": [2, 3]})
-    bars = [("ARM\n(tri + NMS)", m_arm), (f"matériel\n{HW_CAP} places", m_cap)]
+    bars = [("ARM\n(sort + NMS)", m_arm), (f"hardware\n{HW_CAP} slots", m_cap)]
     if m_nocap is not None:
-        bars.append(("matériel\nsans plafond", m_nocap))
+        bars.append(("hardware\nno cap", m_nocap))
     for k, (lab, m) in enumerate(bars):
         ax.bar(k, m * 100, 0.6, color=st.PALETTE[k], hatch=("", "//", "..")[k])
         ax.text(k, m * 100 + 0.6, f"{m * 100:.2f}", ha="center", fontsize=8)
     ax.set_xticks(range(len(bars)), [b[0] for b in bars], fontsize=7.5)
     ax.set_ylim(0, 70)
     ax.set_ylabel("mAP (%)")
-    ax.set_title("mAP selon le post-traitement (4 952 images)")
+    ax.set_title("mAP by post-processing (4,952 images)")
     ax.grid(axis="x", visible=False)
     if counts is not None:
         ax2.hist(counts, bins=60, color=st.PALETTE[0])
         ax2.axvline(HW_CAP, color=st.PALETTE[7], lw=1.4)
         over = float((counts > HW_CAP).mean())
-        ax2.text(HW_CAP, ax2.get_ylim()[1] * 0.9, f" plafond {HW_CAP}\n {over * 100:.1f} % "
-                 "des images au-delà", fontsize=7.5, color=st.INK2)
-        ax2.set_xlabel("boîtes gardées par image (modèle entier, seuil 0,005, après NMS)")
+        ax2.text(HW_CAP, ax2.get_ylim()[1] * 0.9, f" cap {HW_CAP}\n {over * 100:.1f} % "
+                 "of the images above", fontsize=7.5, color=st.INK2)
+        ax2.set_xlabel("boxes kept per image (integer model, threshold 0.005, after NMS)")
         ax2.set_ylabel("images")
-        ax2.set_title("Boîtes par image face au plafond")
+        ax2.set_title("Boxes per image against the cap")
     else:
         ax2.set_visible(False)
     fig.tight_layout()
@@ -1081,8 +1083,8 @@ def plot_hwpp(m_arm, m_cap, m_nocap, counts, out_dir, name="hw_postproc"):
 
 
 @figure("hw_postproc", "resultats", "T13.25",
-        "mAP avec le post-traitement matériel, avec et sans plafond de boîtes, et nombre de "
-        "boîtes par image face au plafond.",
+        "mAP with the hardware post-processing, with and without a box cap, and number of "
+        "boxes per image against the cap.",
         "build/m9/hwpp_map.json, hwpp_map_nocap.json, build/m8/<net>/int.jsonl")
 def hw_postproc(out_dir):
     return plot_hwpp(*load_hwpp(), out_dir)
@@ -1103,7 +1105,7 @@ def load_training(run_dir):
 
     loss = cols(need(run_dir / "loss.csv"))
     if loss is None:
-        raise MissingSource(f"{run_dir}/loss.csv vide")
+        raise MissingSource(f"{run_dir}/loss.csv empty")
     admm = run_dir / "admm.csv"
     return {"name": run_dir.name, "loss": loss, "admm": cols(admm) if admm.exists() else None}
 
@@ -1127,10 +1129,10 @@ def plot_training(runs, out_dir, name):
         color = st.PALETTE[k]
         axes[0].plot(L["it"], L["loss"], color=color, alpha=0.18, lw=0.8)
         axes[0].plot(L["it"], st.smooth(L["loss"], w), color=color, lw=1.8,
-                     label=f"{r['name']} (lissée sur {w})")
+                     label=f"{r['name']} (smoothed over {w})")
         axes[-1 - has_admm].plot(L["it"], L["lr"], color=color, lw=1.4)
-    axes[0].set_ylabel("perte / image")
-    axes[0].set_title("Perte d'entraînement" + (f" — {runs[0]['name']}" if single else ""))
+    axes[0].set_ylabel("loss / image")
+    axes[0].set_title("Training loss" + (f" — {runs[0]['name']}" if single else ""))
     axes[0].legend(loc="upper right")
     if single:
         L = runs[0]["loss"]
@@ -1139,7 +1141,7 @@ def plot_training(runs, out_dir, name):
             axes[1].plot(L["it"], st.smooth(L[part], w), color=st.PALETTE[k + 1], lw=1.6,
                          ls=("-", "--", "-.", ":")[k], label=part)
         axes[1].set_ylabel("composante")
-        axes[1].set_title("Composantes de la perte (lissées)")
+        axes[1].set_title("Loss components (smoothed)")
         axes[1].legend(loc="upper right", ncol=4)
     lr_ax = axes[-1 - has_admm]
     lr_ax.set_ylabel("lr")
@@ -1152,9 +1154,9 @@ def plot_training(runs, out_dir, name):
             axes[-1].plot(A["it"], A[c], color=cmap(k / max(1, len(res) - 1)), lw=1.2,
                           marker=".", label=f"L{int(c[4:]):02d}")
         axes[-1].set_ylabel("‖W − Z‖ / ‖W‖")
-        axes[-1].set_title("ADMM : résidu primal par couche (doit tendre vers 0)")
+        axes[-1].set_title("ADMM: primal residual per layer (should tend to 0)")
         axes[-1].legend(loc="upper left", ncol=min(len(res), 9), fontsize=6.5)
-    axes[-1].set_xlabel("itération")
+    axes[-1].set_xlabel("iteration")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -1165,8 +1167,8 @@ def train_runs(root=None):
 
 
 @figure("entrainement", "resultats", "T13.26",
-        "Courbes d'entraînement : perte et composantes lissées, taux d'apprentissage, résidus "
-        "ADMM ; puis tous les runs superposés.",
+        "Training curves: loss and smoothed components, learning rate, ADMM residuals; "
+        "then every run overlaid.",
         "build/train/<run>/loss.csv, admm.csv (tools/train.py --out)")
 def entrainement(out_dir):
     runs = []
@@ -1176,7 +1178,7 @@ def entrainement(out_dir):
         except MissingSource:
             pass
     if not runs:
-        raise MissingSource("aucun build/train/<run>/loss.csv")
+        raise MissingSource("no build/train/<run>/loss.csv")
     paths = []
     for r in runs:
         paths += plot_training([r], out_dir, f"entrainement_{r['name']}")
@@ -1194,7 +1196,7 @@ def plot_eval_json(d, out_dir, name):
     names = d.get("classes") or VOC_CLASSES
     res = {k: v for k, v in d["results"].items() if len(v.get("aps", [])) == len(names)}
     if not res:
-        raise MissingSource("pas d'AP par classe dans le JSON")
+        raise MissingSource("no per-class AP in the JSON")
     plt = st.plt()
     fig, ax = plt.subplots(figsize=(st.FULL if len(names) <= 30 else st.FULL * 2, 3.8))
     x = np.arange(len(names))
@@ -1203,7 +1205,7 @@ def plot_eval_json(d, out_dir, name):
     for k, v in enumerate(shown):
         ax.bar(x + (k - (len(shown) - 1) / 2) * w, np.array(res[v]["aps"]) * 100, w * 0.92,
                color=st.PALETTE[k], edgecolor="white", linewidth=0.3,
-               label=f"{v} : mAP {res[v]['map'] * 100:.2f}")
+               label=f"{v}: mAP {res[v]['map'] * 100:.2f}")
     ax.set_xticks(x, names, rotation=40 if len(names) <= 30 else 90, ha="right",
                   fontsize=8 if len(names) <= 30 else 6)
     ax.set_ylabel("AP (%)")
@@ -1212,7 +1214,7 @@ def plot_eval_json(d, out_dir, name):
     ax.set_title(f"{d.get('net', '')}, {d.get('images', '?')} images{sub}")
     rest = [v for v in res if v not in shown]
     ax.legend(loc="upper left", ncol=min(4, len(shown)),
-              title=f"+ {len(rest)} variantes non tracées" if rest else None)
+              title=f"+ {len(rest)} variants not plotted" if rest else None)
     ax.grid(axis="x", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -1221,7 +1223,7 @@ def plot_eval_json(d, out_dir, name):
 def plot_map_summary(rows, out_dir, name="map_resume", title=""):
     """`rows` : [(étiquette, mAP, images)] ; une barre par évaluation, triées par mAP."""
     if not rows:
-        raise MissingSource("aucune mAP")
+        raise MissingSource("no mAP")
     plt = st.plt()
     rows = sorted(rows, key=lambda r: r[1])
     fig, ax = plt.subplots(figsize=(st.FULL, 0.28 * len(rows) + 1.3))
@@ -1234,7 +1236,7 @@ def plot_map_summary(rows, out_dir, name="map_resume", title=""):
     ax.set_yticks(y, [r[0] for r in rows], fontsize=7)
     ax.set_xlim(0, 80)
     ax.set_xlabel("mAP (%)")
-    ax.set_title(title or "mAP des évaluations (hachuré : sous-ensemble d'images)")
+    ax.set_title(title or "mAP of the evaluations (hatched: subset of images)")
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -1270,7 +1272,7 @@ def load_detections(ids=DET_IMAGES, root=None):
     ints = read_jsonl([need(m8 / "int.jsonl")])
     sims = read_jsonl(sorted(m8.glob("sim/dets_*.jsonl")))
     if not sims:
-        raise MissingSource(f"{m8.relative_to(ROOT)}/sim/dets_*.jsonl absent (make bench-sim)")
+        raise MissingSource(f"{m8.relative_to(ROOT)}/sim/dets_*.jsonl missing (make bench-sim)")
     samples = {s["id"]: s for s in test_samples()}
     model = load_net(NET)
     out = {}
@@ -1314,19 +1316,20 @@ def plot_detections(dets, out_dir, name="detections"):
             st.draw_boxes(ax, xyxy, texts, color=color, lw=1.4)
             ax.set_xlim(0, s["width"])
             ax.set_ylim(s["height"], 0)
-            label = {"csim": "C-sim"}.get(key, key)
+            label = STAGE_LABELS.get(key, key)
             if key == "csim":
-                label += " (= entier)" if same_detections(d["csim"], d["entier"]) else " (≠ entier !)"
-            st.image_axes(ax, f"{iid} : {label}, {len(b)}" if c == 0 else f"{label}, {len(b)}")
+                label += (" (= integer)" if same_detections(d["csim"], d["entier"])
+                          else " (≠ integer!)")
+            st.image_axes(ax, f"{iid}: {label}, {len(b)}" if c == 0 else f"{label}, {len(b)}")
     fig.suptitle(f"{NET}, VOC2007 test, stretch, score > {DET_CONF}", fontsize=9)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     return st.save(fig, out_dir, name)
 
 
 @figure("detections", "resultats", "T13.19",
-        "Vérité terrain, flottant, entier et C-sim sur quatre images de VOC2007 test : les "
-        "colonnes entier et C-sim sont identiques.",
-        "weights/, build/m8/<net>/int.jsonl et sim/dets_*.jsonl, data/VOCdevkit")
+        "Ground truth, float, integer and C-sim on four VOC2007 test images: the integer "
+        "and C-sim columns are identical.",
+        "weights/, build/m8/<net>/int.jsonl and sim/dets_*.jsonl, data/VOCdevkit")
 def detections(out_dir):
     return plot_detections(load_detections(), out_dir)
 
@@ -1394,11 +1397,11 @@ def load_balayages(path):
         if sweep or infer:
             out[title.strip()] = {"sweep": sweep, "infer": infer}
     if not out:
-        raise MissingSource(f"aucune table de balayage dans {path}")
+        raise MissingSource(f"no sweep table in {path}")
     return out
 
 
-SUBSET_STYLE = {0: dict(label="tout le split", color=st.PALETTE[0], hatch="", fill=True),
+SUBSET_STYLE = {0: dict(label="whole split", color=st.PALETTE[0], hatch="", fill=True),
                 500: dict(label="500 images", color=st.PALETTE[1], hatch="///", fill=False)}
 
 
@@ -1443,20 +1446,20 @@ def plot_balayage_map(data, out_dir, name="balayage_map"):
                        edgecolor=sty["color"], hatch=sty["hatch"], linewidth=1.2,
                        label=sty["label"] if xi == 0 else None)
                 star = " ★" if r is best else ""
-                ax.text(xb, r["map"] + top * 0.02, f"{r['map']:.2f}{star}".replace(".", ","),
+                ax.text(xb, r["map"] + top * 0.02, f"{r['map']:.2f}{star}",
                         ha="center", va="bottom", fontsize=7, color=st.INK,
                         fontweight="bold" if r is best else "normal")
         ax.set_xticks(x, [str(b) for b in batches])
-        ax.set_xlabel("lot")
+        ax.set_xlabel("batch")
         ax.set_axisbelow(True)
         ax.set_ylim(0, top * 1.18)
         ax.set_ylabel("mAP (%)")
-        ax.set_title(f"{ds}\nmeilleur : {best['run']}", fontsize=9)
+        ax.set_title(f"{ds}\nbest: {best['run']}", fontsize=9)
         ax.grid(axis="x", visible=False)
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.07))
     fig.tight_layout()
-    fig.text(0.99, -0.02, "50 images, palier R (non publiable)", ha="right", va="top",
+    fig.text(0.99, -0.02, "50 images, tier R (not publishable)", ha="right", va="top",
              fontsize=7, color=st.MUTED)
     return st.save(fig, out_dir, name)
 
@@ -1488,13 +1491,13 @@ def plot_balayage_perte(data, out_dir, name="balayage_perte"):
             for r in pts:
                 ax.annotate(r["run"], (r["loss"], r["map"]), xytext=_label_offset(r, runs),
                             textcoords="offset points", fontsize=7, color=st.INK2)
-        ax.set_xlabel("perte finale")
+        ax.set_xlabel("final loss")
         ax.set_ylabel("mAP (%)")
         ax.set_title(ds)
         ax.margins(x=0.18, y=0.15)
     handles, labels = flat[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=len(labels), bbox_to_anchor=(0.5, 1.04))
-    fig.text(0.99, 0.0, "perte finale après 600 itérations ; 50 images, palier R", ha="right",
+    fig.text(0.99, 0.0, "final loss after 600 iterations; 50 images, tier R", ha="right",
              va="top", fontsize=7, color=st.MUTED)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -1512,7 +1515,7 @@ def plot_balayage_modeles(data, out_dir, name="balayage_modeles"):
         for yi, r in zip(y, rows):
             color = st.NET_COLORS.get(r["model"], st.PALETTE[2])
             ax.barh(yi, r["map"], 0.6, color=color)
-            ax.text(r["map"] + top * 0.02, yi, f"{r['map']:.2f}".replace(".", ","),
+            ax.text(r["map"] + top * 0.02, yi, f"{r['map']:.2f}",
                     va="center", fontsize=7, color=st.INK)
         labels = [f"{r['model'].split()[0]}\n({r['classes']} classes)" if r["classes"]
                   else r["model"] for r in rows]
@@ -1523,15 +1526,15 @@ def plot_balayage_modeles(data, out_dir, name="balayage_modeles"):
         ax.set_title(ds)
         ax.grid(axis="y", visible=False)
     fig.tight_layout(rect=(0, 0.06, 1, 1))
-    fig.text(0.99, 0.01, "50 images, palier R ; hors domaine : classes communes seulement",
+    fig.text(0.99, 0.01, "50 images, tier R; out of domain: shared classes only",
              ha="right", va="bottom", fontsize=7, color=st.MUTED)
     return st.save(fig, out_dir, name)
 
 
 @figure("balayage", "resultats", "T13.53",
-        "Balayages lot × sous-ensemble, un panneau par jeu : mAP par lot, perte finale face à la "
-        "mAP, et run affiné face aux poids publiés. 50 images, palier R.",
-        f"{BALAYAGES_MD} (tables des notebooks _sweep et _infer)", subset=True,
+        "Batch × subset sweeps, one panel per dataset: mAP per batch, final loss against the "
+        "mAP, and fine-tuned run against the published weights. 50 images, tier R.",
+        f"{BALAYAGES_MD} (tables of the _sweep and _infer notebooks)", subset=True,
         dest=ROOT / "docs" / "tasks" / "figures")
 def balayage(out_dir):
     data = load_balayages(ROOT / BALAYAGES_MD)
@@ -1555,7 +1558,7 @@ def load_pack_options(nets=None, board="kv260"):
     try:
         b = rl.load_board(need(ROOT / "hw" / "boards" / f"{board}.yaml"))
     except ImportError as e:
-        raise MissingSource(f"pyyaml absent ({e})") from e
+        raise MissingSource(f"pyyaml missing ({e})") from e
     ff = [rl.wbuf_ff(o["tm"], o["tn"]) for _, o in pm.PACK_OPTIONS]
     return {net: pm.pack_table(net) for net in nets}, ff, b
 

@@ -38,7 +38,7 @@ def _eval_json(path, out):
     paths = r.plot_eval_json(d, out, f"map_{stem}")
     if any(k.startswith("fq:") for k in d["results"]):
         f, fall, n, per = r.load_fq_sensitivity(path)
-        paths += r.plot_sensitivity([(f"INT8 seule couche face au flottant ({n} images)",
+        paths += r.plot_sensitivity([(f"INT8 single layer against float ({n} images)",
                                       {"INT8 (fake-quant)": per})], out, f"sensibilite_{stem}")
     return paths
 
@@ -54,7 +54,7 @@ def _eval_voc(path, out, dets=None, samples=None, names=None, title=""):
     else:
         curves = {Path(path).name: r.pr_curves(dets, samples, list(names))}
     if len(next(iter(curves.values()))) > 20:
-        print("figures : courbes PR limitées aux jeux de 20 classes au plus")
+        print("figures: PR curves limited to datasets of 20 classes at most")
         return []
     return r.plot_pr(curves, out, "pr", title or f"{Path(path).name}, {len(samples)} images")
 
@@ -76,7 +76,7 @@ def _perf_model(path, out):
         b, pts = r.load_roofline_layers()
         paths += r.plot_roofline_layers(b, pts, r.NET, out, f"roofline_couches_{b['file']}")
     except Exception as e:  # pyyaml absent : la cascade suffit
-        print(f"figures : roofline par couche sautée ({e})")
+        print(f"figures: per-layer roofline skipped ({e})")
     return paths
 
 
@@ -103,12 +103,12 @@ def _scan(path, out):
             try:
                 paths += _eval_json(js, out)
             except Exception as e:
-                print(f"figures : {js.name} ignoré ({e})")
+                print(f"figures: {js.name} ignored ({e})")
     if len(summary) > 1:
         from tools.figures import resultats as r
 
-        paths += r.plot_map_summary(summary, out, title=f"mAP de {path.name}/ "
-                                    "(hachuré : sous-ensemble d'images)")
+        paths += r.plot_map_summary(summary, out, title=f"mAP of {path.name}/ "
+                                    "(hatched: subset of images)")
     return paths
 
 
@@ -127,10 +127,10 @@ def after_run(kind, path, out=None, **kw):
     try:
         import matplotlib  # noqa: F401
     except ImportError:
-        print("figures : matplotlib absent, figures sautées (pip install -e 'python[plots]')")
+        print("figures: matplotlib missing, figures skipped (pip install -e 'python[plots]')")
         return []
     if kind not in HANDLERS:
-        print(f"figures : type de run inconnu {kind!r} ({', '.join(KINDS)})")
+        print(f"figures: unknown run type {kind!r} ({', '.join(KINDS)})")
         return []
     path = Path(path)
     if out is None:
@@ -138,7 +138,7 @@ def after_run(kind, path, out=None, **kw):
     try:
         paths = HANDLERS[kind](path, Path(out), **kw)
     except Exception as e:
-        print(f"figures : échec du tracé ({type(e).__name__}: {e}) — le run n'est pas affecté")
+        print(f"figures: plot failed ({type(e).__name__}: {e}) — the run is not affected")
         if os.environ.get("YOLO_FIGURES_DEBUG"):
             traceback.print_exc()
         return []

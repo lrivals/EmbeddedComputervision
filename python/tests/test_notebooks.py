@@ -131,7 +131,7 @@ def test_visionneuse_generee_et_affichage_seul(tmp_path):
     from tools.notebooks.gabarits import VIEWER_STATIC
     pngs = {p.relative_to(ROOT).as_posix() for top in VIEWER_STATIC for p in (ROOT / top).rglob("*.png")}
     assert sorted(links) == sorted(pngs)
-    assert "## Résultats (D)" in shown and "### T13.53 — `balayage`" in shown
+    assert "## Results (D)" in shown and "### T13.53 — `balayage`" in shown
     assert FIGURES["map_stades"].caption in shown
     src = "\n".join(_code(nb))
     assert "Image(data=" in src and "SystemExit" in src

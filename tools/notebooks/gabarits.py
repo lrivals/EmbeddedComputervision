@@ -31,7 +31,11 @@ FULL_RUN = {"coco/tiny-yolov4-coco_infer.ipynb": {"SUBSET": 0, "INT8": True, "HW
             "voc/tiny-yolov4-voc_train.ipynb": {"SUBSET": 0},
             "voc/tiny-yolov4-voc_infer.ipynb": {"SUBSET": 0, "INT8": True},
             "visdrone/tiny-yolov4-visdrone_train.ipynb": {"SUBSET": 0},
-            "visdrone/tiny-yolov4-visdrone_infer.ipynb": {"SUBSET": 0, "INT8": True}}
+            "visdrone/tiny-yolov4-visdrone_infer.ipynb": {"SUBSET": 0, "INT8": True},
+            # T37.2: VOC2007 test through MAPPINGS, the baseline of the VOC fine-tunings.
+            "voc/yolov5n-coco_infer.ipynb": {"SUBSET": 0},
+            "voc/tiny-yolov7-coco_infer.ipynb": {"SUBSET": 0},
+            "voc/yolov8n-coco_infer.ipynb": {"SUBSET": 0}}
 # Run long VisDrone (M15, T15.8) : géométrie de l'éval (stretch) à l'entraînement, 6 000
 # itérations (≈ 15 époques à lot 16), LR ÷ 10 à 80 % et 90 %.
 VISDRONE_TRAIN = {"ITERS": 6000, "STEPS": "4800,5400", "SCALES": "0.1,0.1",

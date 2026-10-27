@@ -81,15 +81,15 @@ def plot_classes(stats, out_dir, name="classes"):
         c = np.asarray(a["comptes"]["per_class"])
         ax.bar(x + (k - (len(parts) - 1) / 2) * width, c, width * 0.95, color=st.PALETTE[k],
                hatch=("", "//", "..")[k % 3], edgecolor="white", linewidth=0.4,
-               label=f"{n} : {c.sum():,} objets".replace(",", " "))
+               label=f"{n}: {c.sum():,} objects")
     allc = np.asarray(_whole(stats)["comptes"]["per_class"])
     nz = allc[allc > 0]
     if len(nz) and nz.max() / nz.min() > 20:
         ax.set_yscale("log")
     ax.set_xticks(x, classes, rotation=40 if len(classes) > 6 else 0, ha="right"
                   if len(classes) > 6 else "center")
-    ax.set_ylabel("objets")
-    ax.set_title(_title(stats, "objets par classe (split entier)"))
+    ax.set_ylabel("objects")
+    ax.set_title(_title(stats, "objects per class (whole split)"))
     ax.grid(axis="x", visible=False)
     ax.legend(loc="upper right")
     fig.tight_layout()
@@ -111,8 +111,8 @@ def plot_cooc(stats, out_dir, name="cooccurrence"):
     ax.set_xticks(range(n), stats["classes"], rotation=60, ha="right")
     ax.set_yticks(range(n), stats["classes"])
     ax.grid(False)
-    fig.colorbar(im, ax=ax, fraction=0.04, label="part des images de la ligne")
-    ax.set_title(_title(stats, "co-occurrence des classes"))
+    fig.colorbar(im, ax=ax, fraction=0.04, label="share of the images of the row")
+    ax.set_title(_title(stats, "class co-occurrence"))
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -129,7 +129,7 @@ def plot_tailles(stats, out_dir, name="tailles"):
     edges = _edges(stats, "area")
     fig, ax = plt.subplots(figsize=(st.COL, 3.6))
     lab = "×".join(str(v) for v in g["size"][::-1])
-    for k, (mode, text, ls) in enumerate((("orig", "image d'origine", "-"),
+    for k, (mode, text, ls) in enumerate((("orig", "original image", "-"),
                                           ("letterbox", f"letterbox {lab}", "-"),
                                           ("stretch", f"stretch {lab}", "--"))):
         ax.stairs(_share(g[mode]["area"]), edges, color=st.PALETTE[k], lw=1.6, ls=ls,
@@ -138,18 +138,18 @@ def plot_tailles(stats, out_dir, name="tailles"):
         ax.axvline(b, color=st.MUTED, lw=0.9, ls=":")
     for k, (grid, stride) in enumerate(g["strides"].items()):
         ax.axvline(stride ** 2, color=st.INK2, lw=0.9, ls="-.")
-        ax.annotate(f"cellule {grid}", (stride ** 2, 0.02), xycoords=("data", "axes fraction"),
+        ax.annotate(f"cell {grid}", (stride ** 2, 0.02), xycoords=("data", "axes fraction"),
                     rotation=90, va="bottom", ha="right", fontsize=7, color=st.INK2)
     m = g["resize"]
     c = np.asarray(g[m]["coco"], dtype=np.float64)
-    st.note(ax, f"{m} : petits {100 * c[0] / max(c.sum(), 1):.0f} %, moyens "
-            f"{100 * c[1] / max(c.sum(), 1):.0f} %, grands {100 * c[2] / max(c.sum(), 1):.0f} %",
+    st.note(ax, f"{m}: small {100 * c[0] / max(c.sum(), 1):.0f} %, medium "
+            f"{100 * c[1] / max(c.sum(), 1):.0f} %, large {100 * c[2] / max(c.sum(), 1):.0f} %",
             "upper left")
     ax.set_xscale("log")
     ax.set_xlim(*_span(edges, *(g[m]["area"] for m in ("orig", "letterbox", "stretch"))))
-    ax.set_xlabel("aire de la boîte (px²)")
-    ax.set_ylabel("part des objets")
-    ax.set_title(_title(stats, "aires des boîtes (seuils 32² et 96²)"))
+    ax.set_xlabel("box area (px²)")
+    ax.set_ylabel("share of the objects")
+    ax.set_title(_title(stats, "box areas (thresholds 32² and 96²)"))
     ax.legend(loc="upper left", bbox_to_anchor=(0, 0.92))
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -170,9 +170,9 @@ def plot_letterbox_stretch(stats, out_dir, name="letterbox_stretch"):
     ax.axvline(8, color=st.MUTED, lw=0.9, ls=":")
     ax.set_xscale("log")
     ax.set_xlim(*_span(edges, g["letterbox"]["h"], g["stretch"]["h"]))
-    ax.set_xlabel("hauteur de la boîte (px d'entrée)")
-    ax.set_ylabel("part des objets")
-    ax.set_title(_title(stats, "hauteurs à l'entrée : letterbox / stretch"))
+    ax.set_xlabel("box height (input px)")
+    ax.set_ylabel("share of the objects")
+    ax.set_title(_title(stats, "heights at the input: letterbox / stretch"))
     ax.legend(loc="upper right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -185,10 +185,10 @@ def plot_centres(stats, out_dir, name="centres"):
     plt = st.plt()
     fig, ax = plt.subplots(figsize=(st.COL * 0.7, st.COL * 0.6))
     im = ax.imshow(np.asarray(g["centers"]), cmap=SEQ, extent=(0, 1, 1, 0))
-    st.image_axes(ax, _title(stats, "centres des boîtes"))
-    ax.set_xlabel("x / largeur")
-    ax.set_ylabel("y / hauteur")
-    fig.colorbar(im, ax=ax, fraction=0.046, label="objets")
+    st.image_axes(ax, _title(stats, "box centres"))
+    ax.set_xlabel("x / width")
+    ax.set_ylabel("y / height")
+    fig.colorbar(im, ax=ax, fraction=0.046, label="objects")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -207,7 +207,7 @@ def plot_densite(stats, out_dir, name="densite"):
         h = np.asarray(a["densite"]["per_image"], dtype=np.float64)
         top = max(top, len(h))
         ax.stairs(_share(h), np.arange(len(h) + 1) - 0.5, color=st.PALETTE[k], lw=1.4,
-                  ls=("-", "--")[k % 2], label=f"{n} : méd. {a['densite']['median']:.0f}, "
+                  ls=("-", "--")[k % 2], label=f"{n}: med. {a['densite']['median']:.0f}, "
                                                f"max {a['densite']['max']}")
     for s in (256, 1024):
         if top > s * 0.5:
@@ -217,9 +217,9 @@ def plot_densite(stats, out_dir, name="densite"):
     ax.set_yscale("log")
     if top > 60:
         ax.set_xscale("symlog", linthresh=10)
-    ax.set_xlabel("objets par image")
-    ax.set_ylabel("part des images")
-    ax.set_title(_title(stats, "objets par image"))
+    ax.set_xlabel("objects per image")
+    ax.set_ylabel("share of the images")
+    ax.set_title(_title(stats, "objects per image"))
     ax.legend(loc="upper right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -246,11 +246,11 @@ def plot_collisions(stats, out_dir, name="collisions"):
         ax.text(s, yy, f" {s:.1f} % ({int(n)})", va="center", fontsize=7, color=st.INK2)
     ax.set_yticks(y, classes)
     ax.invert_yaxis()
-    ax.set_xlabel("cibles perdues (% des objets de la classe)")
+    ax.set_xlabel("lost targets (% of the objects of the class)")
     ax.set_xlim(0, max(share.max() * 1.35, 1))
     ax.grid(axis="y", visible=False)
-    ax.set_title(_title(stats, f"collisions de cibles ({100 * col['lost_share']:.2f} % au total)"))
-    st.note(ax, f"ancres de {Path(col['net']).stem}", "lower right")
+    ax.set_title(_title(stats, f"target collisions ({100 * col['lost_share']:.2f} % in total)"))
+    st.note(ax, f"anchors of {Path(col['net']).stem}", "lower right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -272,10 +272,10 @@ def plot_resolutions(stats, out_dir, name="resolutions"):
             ax.annotate(text, (np.log2(r), 0.98), xycoords=("data", "axes fraction"),
                         rotation=90, va="top", ha="right", fontsize=7, color=st.INK2)
     top = ", ".join(f"{w}×{h}" for w, h, _ in im["resolutions"][:3])
-    st.note(ax, f"{im['distinct']} résolutions ; {top}", "upper left")
-    ax.set_xlabel("log2(largeur / hauteur) de l'image")
-    ax.set_ylabel("part des images")
-    ax.set_title(_title(stats, "rapport d'aspect des images (split entier)"))
+    st.note(ax, f"{im['distinct']} resolutions; {top}", "upper left")
+    ax.set_xlabel("log2(width / height) of the image")
+    ax.set_ylabel("share of the images")
+    ax.set_title(_title(stats, "image aspect ratio (whole split)"))
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -295,12 +295,12 @@ def plot_intensites(stats, out_dir, name="intensites"):
         ax.stairs(_share(ref["lum_hist"]), v, color=st.PALETTE[1], lw=1.4, ls="--",
                   label=f"VOC2007 test ({ref['images']} images) : moy. {ref['lum_mean']:.0f}")
     lv = px["levels"]
-    st.note(ax, f"niveaux occupés : {lv['8bit']} en 8 bits → {lv['int8']} en INT8 "
-            f"(échelle 1/127)", "upper left")
+    st.note(ax, f"levels used: {lv['8bit']} in 8 bits → {lv['int8']} in INT8 "
+            f"(scale 1/127)", "upper left")
     ax.set_xlim(-1, 256)
     ax.set_xlabel("luminance (8 bits)")
-    ax.set_ylabel("part des pixels")
-    ax.set_title(_title(stats, f"luminance sur {px['images']} images (graine {px['seed']})"))
+    ax.set_ylabel("share of the pixels")
+    ax.set_title(_title(stats, f"luminance on {px['images']} images (seed {px['seed']})"))
     ax.legend(loc="upper right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -330,8 +330,8 @@ def plot_eclairage(stats, out_dir, name="eclairage"):
     ax.invert_yaxis()
     ax.set_xlim(0, 255)
     ax.grid(axis="y", visible=False)
-    ax.set_xlabel("luminance moyenne (8 bits)")
-    ax.set_title(_title(stats, "luminance par type d'éclairage"))
+    ax.set_xlabel("mean luminance (8 bits)")
+    ax.set_title(_title(stats, "luminance per lighting type"))
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
@@ -347,7 +347,7 @@ def plot_ancres(stats, out_dir, name="ancres"):
     fig, ax = plt.subplots(figsize=(st.COL, st.COL * 0.75))
     wh = np.asarray(a["scatter"], dtype=np.float64)
     ax.scatter(wh[:, 0], wh[:, 1], s=3, color=st.GREY, alpha=0.5, lw=0,
-               label=f"{len(wh)} boîtes sur {a['boxes']}")
+               label=f"{len(wh)} boxes of {a['boxes']}")
     cfg = next((k for k in a["refs"] if k.startswith("cfg")), None)
     if cfg:
         c = np.asarray(a["refs"][cfg]["anchors"])
@@ -358,9 +358,9 @@ def plot_ancres(stats, out_dir, name="ancres"):
                lw=1.5, label=f"k-means k = 6 : IoU {a['kmeans_iou']['6']:.3f}")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("largeur (px d'entrée, letterbox)")
-    ax.set_ylabel("hauteur (px)")
-    ax.set_title(_title(stats, "boîtes et ancres"))
+    ax.set_xlabel("width (input px, letterbox)")
+    ax.set_ylabel("height (px)")
+    ax.set_title(_title(stats, "boxes and anchors"))
     ax.legend(loc="upper left")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -380,9 +380,9 @@ def plot_ancres_k(stats, out_dir, name="ancres_k"):
         ax.plot([k], [r["iou"]], "D", ms=7, mfc="white", mec=st.PALETTE[1 + j % 7], mew=1.8,
                 label=f"{n} : {r['iou']:.3f}")
     ax.set_xticks(ks)
-    ax.set_xlabel("nombre d'ancres k")
-    ax.set_ylabel("IoU moyenne de la meilleure ancre")
-    ax.set_title(_title(stats, "IoU moyenne selon k"))
+    ax.set_xlabel("number of anchors k")
+    ax.set_ylabel("mean IoU of the best anchor")
+    ax.set_title(_title(stats, "mean IoU against k"))
     ax.legend(loc="lower right", fontsize=7)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
@@ -404,9 +404,9 @@ def plot_ecart(stats, out_dir, name="ecart"):
                hatch=("", "//")[k], edgecolor="white", linewidth=0.4, label=text)
     ax.set_xticks(x, classes, rotation=40 if len(classes) > 6 else 0,
                   ha="right" if len(classes) > 6 else "center")
-    ax.set_ylabel("part des objets (%)")
+    ax.set_ylabel("share of the objects (%)")
     ax.grid(axis="x", visible=False)
-    ax.set_title(_title(stats, f"classes en train et en test (variation totale "
+    ax.set_title(_title(stats, f"classes in train and test (total variation "
                                f"{e.get('classes', 0):.3f})"))
     ax.legend(loc="upper right")
     fig.tight_layout()
@@ -459,11 +459,11 @@ def plot_voc_stats(view, out_dir, name="voc_stats"):
     for k, sp in enumerate(splits):
         ax.bar(x + (k - 0.5) * 0.4, view[sp]["per_class"], 0.38, color=st.PALETTE[k],
                hatch=("", "//")[k], edgecolor="white", linewidth=0.4,
-               label=f"{sp} : {view[sp]['per_class'].sum()} objets, {view[sp]['images']} images")
+               label=f"{sp}: {view[sp]['per_class'].sum()} objects, {view[sp]['images']} images")
     ax.set_xticks(x, VOC_CLASSES, rotation=40, ha="right")
     ax.set_yscale("log")
-    ax.set_ylabel("objets (non-difficult)")
-    ax.set_title("Objets par classe")
+    ax.set_ylabel("objects (non-difficult)")
+    ax.set_title("Objects per class")
     ax.legend(loc="upper left")
     ax.grid(axis="x", visible=False)
 
@@ -481,13 +481,13 @@ def plot_voc_stats(view, out_dir, name="voc_stats"):
     frac = [h[centers < AREA_BINS[0]].sum() / tot,
             h[(centers >= AREA_BINS[0]) & (centers < AREA_BINS[1])].sum() / tot,
             h[centers >= AREA_BINS[1]].sum() / tot]
-    st.note(ax2, f"{splits[-1]} : petits {frac[0] * 100:.0f} %, moyens {frac[1] * 100:.0f} %, "
-            f"grands {frac[2] * 100:.0f} %", "upper left")
+    st.note(ax2, f"{splits[-1]}: small {frac[0] * 100:.0f} %, medium {frac[1] * 100:.0f} %, "
+            f"large {frac[2] * 100:.0f} %", "upper left")
     ax2.set_xscale("log")
     ax2.set_xlim(10, 500 * 500)
-    ax2.set_xlabel("aire de la boîte (px², image d'origine)")
-    ax2.set_ylabel("part des objets")
-    ax2.set_title("Aires des boîtes (seuils 32² et 96²)")
+    ax2.set_xlabel("box area (px², original image)")
+    ax2.set_ylabel("share of the objects")
+    ax2.set_title("Box areas (thresholds 32² and 96²)")
     ax2.legend(loc="upper left", bbox_to_anchor=(0, 0.92))
 
     ax3 = fig.add_subplot(gs[1, 1])
@@ -496,9 +496,9 @@ def plot_voc_stats(view, out_dir, name="voc_stats"):
         c = np.concatenate([c[:25], [c[25:].sum()]]) if len(c) > 25 else c
         ax3.stairs(_share(c), np.arange(len(c) + 1) - 0.5, color=st.PALETTE[k], lw=1.6,
                    ls=("-", "--")[k], label=sp)
-    ax3.set_xlabel("objets par image (25 = 25 et plus)")
-    ax3.set_ylabel("part des images")
-    ax3.set_title("Objets par image")
+    ax3.set_xlabel("objects per image (25 = 25 or more)")
+    ax3.set_ylabel("share of the images")
+    ax3.set_title("Objects per image")
     ax3.legend(loc="upper right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)

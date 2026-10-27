@@ -256,7 +256,7 @@ def main():
             aps, m, rec = evaluate(dets[v], samples, len(view.names), use_07=True,
                                    with_recall=True)
             res[v] = {"map": m, "aps": list(aps), "recall": float(rec.mean())}
-            line = f"mAP {m * 100:.2f}  rappel {rec.mean() * 100:.1f}"
+            line = f"mAP {m * 100:.2f}  recall {rec.mean() * 100:.1f}"
         res[v]["dets_per_image"] = n_det
         if v == "int-hwpp":
             res[v]["overflow"] = overflow

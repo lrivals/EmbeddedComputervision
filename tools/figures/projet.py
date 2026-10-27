@@ -17,7 +17,7 @@ MILESTONE = re.compile(r"^(M\d+(?:\.\d+)?) : ")
 
 def _git(*args):
     if not (ROOT / ".git").exists() or not shutil.which("git"):
-        raise MissingSource("dépôt git absent")
+        raise MissingSource("git repository missing")
     return subprocess.run(["git", "-C", str(ROOT), *args], check=True, capture_output=True,
                           text=True).stdout
 
@@ -45,7 +45,7 @@ def load_commits():
         date, _, subject = line.partition("|")
         rows.append((datetime.fromisoformat(date), subject))
     if not rows:
-        raise MissingSource("aucun commit")
+        raise MissingSource("no commit")
     return rows
 
 
@@ -72,23 +72,23 @@ def plot_chronology(commits, spans, pending, out_dir, name="chronologie"):
             a, b = spans[m]
             width = max((b - a).total_seconds() / 86400, 1 / 48)
             ax.barh(y, width, left=mdates.date2num(a), height=0.6, color=st.PALETTE[0])
-            ax.text(mdates.date2num(b) + 0.01, y, b.strftime(" %d/%m %Hh%M"), va="center",
+            ax.text(mdates.date2num(b) + 0.01, y, b.strftime(" %m-%d %H:%M"), va="center",
                     fontsize=7, color=st.INK2)
         else:
             ax.barh(y, 0.08, left=mdates.date2num(end) + 0.02, height=0.6, color=st.GREY,
                     hatch="///", edgecolor="white")
-            ax.text(mdates.date2num(end) + 0.11, y, " non commencé", va="center", fontsize=7,
+            ax.text(mdates.date2num(end) + 0.11, y, " not started", va="center", fontsize=7,
                     color=st.MUTED)
     for date, subject in commits:
         if subject.startswith("docs"):
             ax.axvline(mdates.date2num(date), color=st.PALETTE[1], lw=0.8, ls=":")
-    ax.plot([], [], color=st.PALETTE[1], lw=0.8, ls=":", label="commit de documentation")
+    ax.plot([], [], color=st.PALETTE[1], lw=0.8, ls=":", label="documentation commit")
     ax.set_yticks(range(len(names)), names)
     ax.invert_yaxis()
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:00"))
     ax.xaxis.set_major_locator(mdates.HourLocator(byhour=range(0, 24, 6)))
     ax.tick_params(axis="x", rotation=30)
-    ax.set_title("Chronologie des jalons (du commit précédent au commit « Mx : »)")
+    ax.set_title("Milestone timeline (from the previous commit to the \"Mx:\" commit)")
     ax.legend(loc="lower left")
     ax.grid(axis="y", visible=False)
     fig.tight_layout()
@@ -96,8 +96,8 @@ def plot_chronology(commits, spans, pending, out_dir, name="chronologie"):
 
 
 @figure("chronologie", "projet", "T13.27",
-        "Gantt des jalons reconstruit depuis les commits « Mx : », avec les commits de "
-        "documentation en pointillé et les jalons non commencés en gris.",
+        "Gantt chart of the milestones rebuilt from the \"Mx:\" commits, with the "
+        "documentation commits dotted and the milestones not started in grey.",
         "git log --date=iso")
 def chronologie(out_dir):
     commits = load_commits()
@@ -110,6 +110,7 @@ def chronologie(out_dir):
 
 STATUS = {"x": "faite", "~": "partielle", " ": "ouverte"}
 CATEGORIES = ("faite", "partielle", "vérifiée sur PC, carte en attente", "ouverte")
+CATEGORY_LABELS = dict(zip(CATEGORIES, ("done", "partial", "checked on PC, board pending", "open")))
 PC_WORDS = ("C-sim", "sim", "PC", "outillés", "estimations", "en attente",
             "tooled", "estimates", "pending")
 
@@ -143,7 +144,7 @@ def load_tracking(readme=None):
     text = readme.read_text()
     text = text.split("## Progress" if "## Progress" in text else "## Suivi", 1)
     if len(text) < 2:
-        raise MissingSource("README sans section Suivi")
+        raise MissingSource("README without a Progress section")
     out = {}
     for m in re.finditer(r"^\| (M[\d.]+) \| (\d+)[^|]* \| (\d+)([^|]*)\|", text[1], flags=re.M):
         out[m.group(1)] = (int(m.group(2)), int(m.group(3)), m.group(4).strip(" ()"))
@@ -185,7 +186,8 @@ def plot_progress(prog, mismatches, out_dir, name="avancement"):
     for k, cat in enumerate(CATEGORIES):
         v = np.array([prog[m][cat] for m in names])
         ax.barh(range(len(names)), v, left=left, height=0.62, color=colors[k],
-                hatch=("", "..", "//", "")[k], edgecolor="white", linewidth=0.6, label=cat)
+                hatch=("", "..", "//", "")[k], edgecolor="white", linewidth=0.6,
+                label=CATEGORY_LABELS[cat])
         left += v
     for y, m in enumerate(names):
         done = prog[m]["faite"]
@@ -193,24 +195,24 @@ def plot_progress(prog, mismatches, out_dir, name="avancement"):
                 color=st.INK2)
     ax.set_yticks(range(len(names)), names)
     ax.invert_yaxis()
-    ax.set_xlabel("tâches")
-    ax.set_title("Avancement par jalon (titres ### [x] / [~] / [ ] de docs/tasks/)")
+    ax.set_xlabel("tasks")
+    ax.set_title("Progress per milestone (### [x] / [~] / [ ] headings of docs/tasks/)")
     ax.legend(loc="upper right", ncol=2)
     ax.grid(axis="y", visible=False)
     if mismatches:
-        st.note(ax, "écarts avec le suivi du README : " + ", ".join(
+        st.note(ax, "gaps with the README progress table: " + ", ".join(
             f"{m} {g[1]}/{g[0]} ≠ {r[1]}/{r[0]}" for m, g, r in mismatches), "lower right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("avancement", "projet", "T13.28",
-        "Tâches faites, partielles, vérifiées sur PC (carte en attente) et ouvertes, par jalon.",
-        "docs/tasks/M*.md, tableau de suivi de docs/tasks/README.md")
+        "Tasks done, partial, checked on PC (board pending) and open, per milestone.",
+        "docs/tasks/M*.md, progress table of docs/tasks/README.md")
 def avancement(out_dir):
     tasks = load_tasks()
     if not tasks:
-        raise MissingSource("aucun docs/tasks/M*.md")
+        raise MissingSource("no docs/tasks/M*.md")
     tracking = load_tracking()
     return plot_progress(progress(tasks, tracking), tracking_mismatches(tasks, tracking),
                          out_dir)
@@ -244,7 +246,7 @@ def load_code_history():
     if dates:
         rows.append(dict(cur))
     if not rows:
-        raise MissingSource("aucun commit")
+        raise MissingSource("no commit")
     return dates, subjects, {k: np.array([r[k] for r in rows]) for k in rows[0]}
 
 
@@ -260,17 +262,17 @@ def plot_code(subjects, series, out_dir, name="code"):
               ("docs" if s.startswith("docs") else "") for s in subjects]
     ax.set_xticks(x, labels, rotation=60, fontsize=7)
     ax.set_xlim(0, len(x) - 1)
-    ax.set_ylabel("milliers de lignes")
+    ax.set_ylabel("thousands of lines")
     total = sum(series[k][-1] for k in keys)
     n = f"{total:,}".replace(",", " ")
-    ax.set_title(f"Volume de code par dossier, commit par commit ({n} lignes)")
+    ax.set_title(f"Code volume per folder, commit by commit ({n} lines)")
     ax.legend(loc="upper left", ncol=2, reverse=True)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("code", "projet", "T13.29",
-        "Lignes par dossier (python, tools, cpp, hls, sw, docs, results) commit par commit.",
+        "Lines per folder (python, tools, cpp, hls, sw, docs, results) commit by commit.",
         "git log --numstat")
 def code(out_dir):
     _, subjects, series = load_code_history()
@@ -284,7 +286,7 @@ def load_pytest_counts():
     import sys
 
     if not (ROOT / "python" / "tests").exists():
-        raise MissingSource("python/tests absent")
+        raise MissingSource("python/tests missing")
     r = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q", "-m", ""],
                        cwd=ROOT / "python", capture_output=True, text=True)
     counts = {}
@@ -293,7 +295,7 @@ def load_pytest_counts():
         if m:
             counts[m.group(1)] = counts.get(m.group(1), 0) + 1
     if not counts:
-        raise MissingSource("pytest --collect-only n'a rien collecté")
+        raise MissingSource("pytest --collect-only collected nothing")
     return counts
 
 
@@ -351,7 +353,7 @@ def plot_tests(py, cpp, out_dir, durations=None, name="tests"):
     ax.set_yticks(y, [k for k, _ in items], fontsize=6.5)
     ax.set_xscale("log")
     ax.set_xlabel("tests (log)")
-    ax.set_title(f"Tests : {sum(py.values())} pytest (slow compris, {len(py)} modules) + "
+    ax.set_title(f"Tests: {sum(py.values())} pytest (slow included, {len(py)} modules) + "
                  f"{sum(cpp.values())} ctest", fontsize=9)
     ax.grid(axis="y", visible=False)
     if durations:
@@ -360,10 +362,10 @@ def plot_tests(py, cpp, out_dir, durations=None, name="tests"):
         ax2.barh(y, [max(t or 0, 1e-3) for t in secs], 0.7, color=colors)
         for yi, t in zip(y, secs):
             if t is None:
-                ax2.text(1.2e-3, yi, "non relancé", va="center", fontsize=6, color=st.MUTED)
+                ax2.text(1.2e-3, yi, "not run again", va="center", fontsize=6, color=st.MUTED)
         ax2.set_xscale("log")
-        ax2.set_xlabel("durée (s, log)")
-        ax2.set_title(f"Durée : {sum(t for t in secs if t) / 60:.1f} min au total "
+        ax2.set_xlabel("duration (s, log)")
+        ax2.set_title(f"Duration: {sum(t for t in secs if t) / 60:.1f} min in total "
                       "(make test-durations)", fontsize=9)
         ax2.grid(axis="y", visible=False)
     fig.tight_layout()
@@ -371,8 +373,8 @@ def plot_tests(py, cpp, out_dir, durations=None, name="tests"):
 
 
 @figure("tests", "projet", "T13.30",
-        "Nombre de tests par module Python (pytest, slow compris) et par build C++ (ctest), "
-        "et leur durée quand `make test-durations` a été lancé.",
+        "Number of tests per Python module (pytest, slow included) and per C++ build (ctest), "
+        "and their duration when `make test-durations` was run.",
         "pytest --collect-only -q, ctest -N, build/figures/pytest.xml, build/*/ctest.xml")
 def tests(out_dir):
     return plot_tests(load_pytest_counts(), load_ctest_counts(), out_dir,
@@ -392,7 +394,7 @@ def load_mermaid(readme=None):
         raise MissingSource(f"{readme} absent")
     m = re.search(r"```mermaid\n(.*?)```", readme.read_text(), flags=re.S)
     if not m:
-        raise MissingSource("README sans graphe mermaid")
+        raise MissingSource("README without a mermaid graph")
     nodes, edges = {}, []
     for line in m.group(1).splitlines()[1:]:
         parts = ARROW.split(line.strip())
@@ -440,15 +442,15 @@ def dependency_dot(nodes, edges, prog):
         if dashed:
             attrs.append("style=dashed")
         lines.append(f"  {s} -> {d}{' [' + ', '.join(attrs) + ']' if attrs else ''};")
-    lines.append('  label="vert : jalon fait · ambre : commencé ou vérifié sur PC · gris : à faire '
-                 '· n/N : tâches faites"; labelloc=b; fontname="Helvetica"; fontsize=10;')
+    lines.append('  label="green: milestone done · amber: started or checked on PC · grey: to do '
+                 '· n/N: tasks done"; labelloc=b; fontname="Helvetica"; fontsize=10;')
     lines.append("}")
     return "\n".join(lines) + "\n"
 
 
 @figure("dependances", "projet", "T13.30",
-        "Graphe des jalons du README (défini une seule fois, en mermaid), coloré selon "
-        "l'avancement de T13.28.",
+        "Milestone graph of the README (defined once, in mermaid), coloured by the "
+        "progress of T13.28.",
         "docs/tasks/README.md (mermaid et suivi), docs/tasks/M*.md (Graphviz dot)")
 def dependances(out_dir):
     dot = shutil.which("dot")

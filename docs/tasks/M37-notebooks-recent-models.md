@@ -128,6 +128,10 @@ Weights per notebook:
     VOC fine-tuning must beat.
 - **Notes**: the Tiny-YOLOv3 / v4 rows of the same notebooks (`voc/tiny-yolov3-coco_infer`,
   `voc/tiny-yolov4-coco_infer`) give the comparison.
+- **Progress** (2026-10-27): the three notebooks set to the full split by default
+  (`FULL_RUN` of `gabarits.py`, `SUBSET = 0`) and regenerated, versioned empty. Their
+  execution (`jupyter nbconvert --execute --inplace`, ≈ 30-45 min for the three) was
+  stopped twice by the end of the session: to run again.
 
 ### [ ] T37.3 — VOC training notebooks
 - **Spec**: §7 · **Depends on**: T37.0, T35.6 · **Size**: M

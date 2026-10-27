@@ -41,7 +41,7 @@ def plot_profile(profiles, out_dir, name="profil_couches"):
                              gridspec_kw={"height_ratios": [3, 3, 3, 2]})
     nets = list(profiles)
     w = 0.8 / len(nets)
-    specs = [(2, "MACs (G)", 1e9), (3, "paramètres (M)", 1e6), (4, "sortie int8 (Mo)", 1e6)]
+    specs = [(2, "MACs (G)", 1e9), (3, "parameters (M)", 1e6), (4, "int8 output (MB)", 1e6)]
     for k, net in enumerate(nets):
         rows = profiles[net]
         x = np.array([r[0] for r in rows]) + (k - (len(nets) - 1) / 2) * w
@@ -49,32 +49,32 @@ def plot_profile(profiles, out_dir, name="profil_couches"):
         for ax, (col, _, div) in zip(axes, specs):
             ax.bar(x, [r[col] / div for r in rows], w * 0.92, color=color,
                    hatch=st.NET_HATCH[net], edgecolor="white", linewidth=0.4,
-                   label=f"{st.NET_LABELS[net]} : total {sum(r[col] for r in rows) / div:.3f}")
+                   label=f"{st.NET_LABELS[net]}: total {sum(r[col] for r in rows) / div:.3f}")
         macs = np.cumsum([r[2] for r in rows]) / sum(r[2] for r in rows) * 100
         prm = np.cumsum([r[3] for r in rows]) / max(1, sum(r[3] for r in rows)) * 100
         xi = [r[0] for r in rows]
         axes[3].plot(xi, macs, color=color, lw=1.8, label=f"MACs {st.NET_LABELS[net]}")
         axes[3].plot(xi, prm, color=color, lw=1.4, ls="--",
-                     label=f"paramètres {st.NET_LABELS[net]}")
+                     label=f"parameters {st.NET_LABELS[net]}")
     for ax, (_, lab, _) in zip(axes, specs):
         ax.set_ylabel(lab)
         ax.legend(loc="upper right")
         ax.grid(axis="x", visible=False)
-    axes[3].set_ylabel("cumul (%)")
+    axes[3].set_ylabel("cumulative (%)")
     axes[3].set_ylim(0, 102)
     axes[3].legend(loc="lower right", ncol=2)
-    axes[3].set_xlabel("indice de couche")
+    axes[3].set_xlabel("layer index")
     n = max(len(r) for r in profiles.values())
     axes[3].set_xticks(range(n))
-    axes[0].set_title("Profil par couche : les couches 13×13 portent les poids, les premières "
-                      "les activations")
+    axes[0].set_title("Profile per layer: the 13×13 layers carry the weights, the first ones "
+                      "the activations")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("profil_couches", "modeles", "T13.2",
-        "MACs, paramètres et taille des sorties int8 par couche, Tiny-YOLOv2 et Tiny-YOLOv3 "
-        "superposés, avec les cumuls.",
+        "MACs, parameters and size of the int8 outputs per layer, Tiny-YOLOv2 and Tiny-YOLOv3 "
+        "overlaid, with the cumulative sums.",
         "model/<net>/manifest.json via tools/count_macs.py")
 def profil_couches(out_dir):
     profiles = {}
@@ -84,7 +84,7 @@ def profil_couches(out_dir):
         except MissingSource:
             pass
     if not profiles:
-        raise MissingSource("aucun model/<net>/manifest.json (make export)")
+        raise MissingSource("no model/<net>/manifest.json (make export)")
     return plot_profile(profiles, out_dir)
 
 
@@ -105,7 +105,7 @@ def graph_dot(net):
     lines = [f'digraph "{net}" {{', "  rankdir=TB; nodesep=0.25; ranksep=0.22;",
              '  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, '
              'fillcolor="white"];', '  edge [color="#8a8984", arrowsize=0.6];',
-             f'  input [label="entrée\\n{"×".join(map(str, desc["input"]))}", '
+             f'  input [label="input\\n{"×".join(map(str, desc["input"]))}", '
              'shape=box, style="rounded", color="#52514e"];']
     for i, (layer, (_, out)) in enumerate(zip(desc["layers"], shapes)):
         t = layer["type"]
@@ -129,8 +129,8 @@ def graph_dot(net):
 
 
 @figure("graphe", "modeles", "T13.1",
-        "Graphe couche par couche (type, noyau et stride, forme de sortie C×H×W ; bord épais "
-        "= beaucoup de MACs).",
+        "Layer-by-layer graph (type, kernel and stride, output shape C×H×W; thick border "
+        "= many MACs).",
         "model/<net>/manifest.json, yolo.models.specs (Graphviz dot)")
 def graphe(out_dir):
     dot = shutil.which("dot")
@@ -150,7 +150,7 @@ def graphe(out_dir):
         stem.with_suffix(".dot").unlink()
         paths.append(stem.with_suffix(".png"))
     if not paths:
-        raise MissingSource("aucun manifest (make export)")
+        raise MissingSource("no manifest (make export)")
     return paths
 
 
@@ -187,8 +187,8 @@ def plot_memory(net, rows, arena, bram, bram_bytes, out_dir, name):
     plt = st.plt()
     fig, ax = plt.subplots(figsize=(st.FULL, 4.2))
     x = np.arange(len(rows))
-    parts = [("poids int8", 1), ("biais int32", 2), ("activations entrée", 3),
-             ("activations sortie", 4)]
+    parts = [("int8 weights", 1), ("int32 biases", 2), ("input activations", 3),
+             ("output activations", 4)]
     bottom = np.zeros(len(rows))
     for k, (lab, col) in enumerate(parts):
         v = np.array([r[col] for r in rows], dtype=np.float64)
@@ -198,17 +198,17 @@ def plot_memory(net, rows, arena, bram, bram_bytes, out_dir, name):
     ax.set_yscale("log")
     ax.set_ylim(1e3, max(bottom.max(), arena) * 3)
     ax.axhline(bram_bytes, color=st.PALETTE[7], lw=1.4)
-    ax.text(len(rows) - 0.5, bram_bytes * 1.12, f"tampons BRAM du noyau : {bram} BRAM18 = "
-            f"{bram_bytes / 1024:.0f} Kio", ha="right", fontsize=7.5, color=st.INK2,
+    ax.text(len(rows) - 0.5, bram_bytes * 1.12, f"BRAM buffers of the kernel: {bram} BRAM18 = "
+            f"{bram_bytes / 1024:.0f} KiB", ha="right", fontsize=7.5, color=st.INK2,
             bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
     ax.axhline(arena, color=st.PALETTE[6], lw=1.4, ls="--")
-    ax.text(len(rows) - 0.5, arena * 1.12, f"arène d'activations DDR du driver : "
-            f"{arena / 1e6:.2f} Mo", ha="right", fontsize=7.5, color=st.INK2,
+    ax.text(len(rows) - 0.5, arena * 1.12, f"DDR activation arena of the driver: "
+            f"{arena / 1e6:.2f} MB", ha="right", fontsize=7.5, color=st.INK2,
             bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
     ax.set_xticks(x, [f"L{r[0]:02d}" for r in rows])
-    ax.set_ylabel("octets (log)")
-    ax.set_title(f"{st.NET_LABELS.get(net, net)} — empreinte mémoire par conv : rien ne tient "
-                 "en BRAM d'un seul coup, d'où le moteur couche par couche")
+    ax.set_ylabel("bytes (log)")
+    ax.set_title(f"{st.NET_LABELS.get(net, net)} — memory footprint per conv: nothing fits "
+                 "in BRAM at once, hence the layer-by-layer engine")
     ax.legend(loc="upper left", ncol=4)
     ax.grid(axis="x", visible=False)
     fig.tight_layout()
@@ -216,8 +216,8 @@ def plot_memory(net, rows, arena, bram, bram_bytes, out_dir, name):
 
 
 @figure("memoire", "modeles", "T13.3",
-        "Empreinte mémoire par conv (poids, biais, activations) face aux tampons BRAM du "
-        "noyau et à l'arène DDR du driver.",
+        "Memory footprint per conv (weights, biases, activations) against the BRAM buffers of "
+        "the kernel and the DDR arena of the driver.",
         "model/<net>/manifest.json, sw/driver/program.hpp, tools/roofline.py")
 def memoire(out_dir):
     paths = []
@@ -228,7 +228,7 @@ def memoire(out_dir):
             continue
         paths += plot_memory(net, *data, out_dir, f"memoire_{net}")
     if not paths:
-        raise MissingSource("aucun manifest (make export)")
+        raise MissingSource("no manifest (make export)")
     return paths
 
 
@@ -246,7 +246,7 @@ def load_anchors_md(path):
             out[int(m.group(1))] = (parse(m.group(2)), float(m.group(3)), m.group(4).strip(),
                                     parse(m.group(5)), float(m.group(6)))
     if not out:
-        raise MissingSource(f"{path} sans tableau d'ancres")
+        raise MissingSource(f"{path} without an anchor table")
     return out
 
 
@@ -259,26 +259,26 @@ def plot_anchors(wh, anchors, out_dir, name="ancres"):
         ax.hexbin(wh[:, 0], wh[:, 1], gridsize=60, bins="log", cmap="Greys", mincnt=1,
                   linewidths=0, rasterized=True)
         ax.plot(ours[:, 0], ours[:, 1], "o", ms=9, mfc=st.PALETTE[0], mec="white", mew=1.5,
-                label=f"k-means k={k} : IoU {iou:.4f}")
+                label=f"k-means k={k}: IoU {iou:.4f}")
         ax.plot(dark[:, 0], dark[:, 1], "D", ms=8, mfc="white", mec=st.PALETTE[1], mew=1.8,
-                label=f"Darknet {dname} : IoU {diou:.4f}")
+                label=f"Darknet {dname}: IoU {diou:.4f}")
         lim = max(416, float(np.max(dark)) * 1.05)
         ax.set_xlim(0, lim)
         ax.set_ylim(0, lim)
         ax.set_aspect("equal")
-        ax.set_xlabel("largeur (px, letterbox 416)")
+        ax.set_xlabel("width (px, letterbox 416)")
         ax.set_title(f"k = {k}")
         ax.legend(loc="upper right")
-    np.atleast_1d(axes)[0].set_ylabel("hauteur (px)")
-    fig.suptitle(f"Boîtes VOC07+12 trainval non-difficult ({len(wh)}), densité log, et ancres",
+    np.atleast_1d(axes)[0].set_ylabel("height (px)")
+    fig.suptitle(f"VOC07+12 trainval non-difficult boxes ({len(wh)}), log density, and anchors",
                  fontsize=9)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("ancres", "modeles", "T13.4",
-        "Nuage (w, h) des boîtes VOC avec les ancres k-means (distance 1 − IoU) et les "
-        "ancres Darknet.",
+        "Scatter (w, h) of the VOC boxes with the k-means anchors (distance 1 − IoU) and the "
+        "Darknet anchors.",
         "data/VOCdevkit, results/anchors.md, tools/kmeans_anchors.py:dataset_wh")
 def ancres(out_dir):
     anchors = load_anchors_md(need(ROOT / "results" / "anchors.md"))
@@ -311,9 +311,9 @@ def load_voc_stats(devkit=None):
 
 
 @figure("voc_stats", "modeles", "T13.7",
-        "Statistiques de VOC : objets par classe en trainval et en test, aires des boîtes, "
-        "objets par image.",
-        "data/VOCdevkit, tools/data_stats.py (comptes égaux à tools/voc_stats.py)")
+        "VOC statistics: objects per class in trainval and test, box areas, "
+        "objects per image.",
+        "data/VOCdevkit, tools/data_stats.py (counts equal to tools/voc_stats.py)")
 def voc_stats(out_dir):
     return plot_voc_stats(load_voc_stats(), out_dir)
 
@@ -346,16 +346,16 @@ def plot_anchors_k(by_k, ref, out_dir, name="ancres_k"):
         ax.annotate(f"{iou:.4f}", (k, iou), xytext=(6, -12), textcoords="offset points",
                     fontsize=7, color=st.INK2)
     ax.set_xticks(ks)
-    ax.set_xlabel("nombre d'ancres k")
-    ax.set_ylabel("IoU moyenne boîte ↔ ancre la plus proche")
-    ax.set_title("Ancres VOC07+12 : rendement décroissant au-delà de k = 5")
+    ax.set_xlabel("number of anchors k")
+    ax.set_ylabel("mean IoU box ↔ closest anchor")
+    ax.set_title("VOC07+12 anchors: diminishing returns beyond k = 5")
     ax.legend(loc="lower right")
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("ancres_k", "modeles", "T13.4",
-        "IoU moyenne des ancres k-means selon k (1 à 12), avec les ancres Darknet en repère.",
+        "Mean IoU of the k-means anchors against k (1 to 12), with the Darknet anchors as a mark.",
         "data/VOCdevkit, yolo.data.anchors.kmeans_anchors")
 def ancres_k(out_dir):
     ref = load_anchors_md(need(ROOT / "results" / "anchors.md"))
@@ -447,7 +447,7 @@ def plot_yolo_stages(net, d, names, out_dir, name):
     for g in np.arange(S + 1) * size / S:
         ax.axhline(g, color="white", lw=0.5, alpha=0.8)
         ax.axvline(g, color="white", lw=0.5, alpha=0.8)
-    st.image_axes(ax, f"entrée {size}×{size}\ngrille {S}×{S}")
+    st.image_axes(ax, f"input {size}×{size}\ngrid {S}×{S}")
     # 2. cellules responsables et ancres de la tête 0
     ax = axes[1]
     ax.imshow(img)
@@ -462,32 +462,32 @@ def plot_yolo_stages(net, d, names, out_dir, name):
         st.draw_boxes(ax, np.c_[cx - anc[:, 0] / 2, cy - anc[:, 1] / 2,
                                 cx + anc[:, 0] / 2, cy + anc[:, 1] / 2],
                       color=st.PALETTE[4], lw=0.9, ls="--")
-    st.image_axes(ax, f"cellules responsables\net leurs {len(heads_[0]['anchors_px'])} ancres")
+    st.image_axes(ax, f"responsible cells\nand their {len(heads_[0]['anchors_px'])} anchors")
     # 3. boîtes avant NMS, par tête
     for k, h in enumerate(heads_):
         ax = axes[2 + k]
         ax.imshow(img)
         b, s = h["all"]
         st.draw_boxes(ax, _xyxy(b, size), color=st.PALETTE[k], lw=0.8)
-        st.image_axes(ax, f"avant NMS, tête {h['S']}×{h['S']}\n{len(b)} boîtes > 0,25")
+        st.image_axes(ax, f"before NMS, head {h['S']}×{h['S']}\n{len(b)} boxes > 0.25")
     # 4. après NMS
     ax = axes[-1]
     ax.imshow(img)
     st.draw_boxes(ax, _xyxy(fb, size), [f"{names[c]} {v:.2f}" for c, v in zip(fl, fs)],
                   color=st.PALETTE[5], lw=1.8)
-    st.image_axes(ax, f"après NMS\n{len(fb)} détections")
+    st.image_axes(ax, f"after NMS\n{len(fb)} detections")
     for ax in axes:
         ax.set_xlim(0, size)
         ax.set_ylim(size, 0)
-    fig.suptitle(f"{st.NET_LABELS.get(net, net)} — de la sortie brute aux détections "
-                 "(decode_head, seuil 0,25, NMS 0,45)", fontsize=9)
+    fig.suptitle(f"{st.NET_LABELS.get(net, net)} — from the raw output to the detections "
+                 "(decode_head, threshold 0.25, NMS 0.45)", fontsize=9)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     return st.save(fig, out_dir, name)
 
 
 @figure("sortie_yolo", "modeles", "T13.5",
-        "Sortie YOLO pas à pas sur une image : grille, cellules responsables et ancres, boîtes "
-        "décodées avant NMS (par tête), détections finales.",
+        "YOLO output step by step on one image: grid, responsible cells and anchors, boxes "
+        "decoded before NMS (per head), final detections.",
         "weights/*.weights, VOC2007/JPEGImages/000001.jpg, yolo.infer.decode et nms")
 def sortie_yolo(out_dir):
     image = need(DEVKIT / "VOC2007" / "JPEGImages" / f"{DEMO_IMAGE}.jpg")
@@ -500,7 +500,7 @@ def sortie_yolo(out_dir):
         d = yolo_stages(model, image)
         paths += plot_yolo_stages(net, d, class_names(net), out_dir, f"sortie_yolo_{net}")
     if not paths:
-        raise MissingSource("aucun poids dans weights/ (make get-weights)")
+        raise MissingSource("no weights in weights/ (make get-weights)")
     return paths
 
 
@@ -539,20 +539,20 @@ def plot_augment_grid(rows, out_dir, name="augmentations"):
             ax.imshow(chw.transpose(1, 2, 0))
             st.draw_boxes(ax, _xyxy(boxes, size), [VOC_CLASSES[i] for i in labels],
                           color=st.PALETTE[5], lw=1.2)
-            st.image_axes(ax, (f"{iid} : letterbox" if c == 0 else f"tirage {c - 1}")
+            st.image_axes(ax, (f"{iid}: letterbox" if c == 0 else f"draw {c - 1}")
                           if r == 0 else "")
             if c == 0 and r:
-                ax.set_title(f"{iid} : letterbox")
-    fig.suptitle("Augmentations (affine ±20 %, retournement, HSV ×1,5) et boîtes cibles",
+                ax.set_title(f"{iid}: letterbox")
+    fig.suptitle("Augmentations (affine ±20 %, flip, HSV ×1.5) and target boxes",
                  fontsize=9)
     fig.tight_layout()
     return st.save(fig, out_dir, name)
 
 
 @figure("augmentations", "modeles", "T13.6",
-        "Images d'origine (letterbox) puis quatre tirages d'augmentation, boîtes cibles "
-        "transformées.",
-        "data/VOCdevkit, yolo.data.loader.VOCDataset (tirages de tools/show_augment.py)")
+        "Original images (letterbox), then four augmentation draws, target boxes "
+        "transformed.",
+        "data/VOCdevkit, yolo.data.loader.VOCDataset (draws of tools/show_augment.py)")
 def augmentations(out_dir):
     need(DEVKIT / "VOC2007" / "ImageSets" / "Main" / "trainval.txt")
     from yolo.data.voc import load_split
