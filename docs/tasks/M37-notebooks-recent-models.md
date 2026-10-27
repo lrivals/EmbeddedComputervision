@@ -196,6 +196,14 @@ Weights per notebook:
   - `make notebooks-smoke` passes, skipping a notebook whose Ultralytics weights are
     missing (AGPL, not on the Drive);
   - `make ci` (`--check`) passes.
+- **Done so far** (2026-10-27): M14 matrix rows and the M37 links in T33.4 … T35.6 in
+  place. `make notebooks-smoke` passes (106 passed, 54 skipped for missing data or
+  weights, 2 h 29 on 8 cores). In `make ci`, lint and every `--check` pass (notebooks,
+  article, traceability, equivalence, safety case, golden). `test-py` has 1 failure left,
+  outside M37: `test_data_stats.py::test_split_images_releves` wants a TrashNet test count
+  in `tools/notebooks/matrice.py::SPLIT_IMAGES`, and the TrashNet split is not prepared on
+  the PC (M32, `tools/prep_datasets.py trashnet`).
+- **Remaining**: the TrashNet count once its split exists, then `make ci` again.
 
 ## Dependencies
 
