@@ -181,7 +181,7 @@ only the fine-tuned ones. `notebooks/asl/` holds `asl_stats`, `tiny-yolov3-asl_i
   `test_mappings_valid` accepts a dataset without mapping.
 - **Acceptance**: `load("asl")` gives the val counts of the summary.
 
-### [ ] T21.3 — Visual check of the boxes
+### [x] T21.3 — Visual check of the boxes
 - **Depends on**: T21.1 · **Size**: S
 - **Deliverables**: `python tools/prep_datasets.py asl --preview build/asl_preview.png`;
   detection rate per class in the summary.
@@ -197,8 +197,29 @@ only the fine-tuned ones. `notebooks/asl/` holds `asl_stats`, `tiny-yolov3-asl_i
   byte-identical (detections, annotations, rejects): 87.5 % kept, N 67.5 %. MediaPipe is
   deterministic, so a rerun without new settings changes nothing; preview in
   `build/asl_preview.png` (58 images).
-- **Notes**: to raise N, B, M, E and A (closed fists, the hardest hands for MediaPipe),
-  try `ASL_CONF` below 0.1 or a third try at ×3 with padding; check the preview again.
+- **Tuning tried** (2026-10-27): on 400 images of N, B, M, E and A (80 each), kept share
+  for each setting:
+
+  | Setting | Kept | N | B | M | E | A |
+  |---|---|---|---|---|---|---|
+  | current (`ASL_CONF` 0.1, ×2, ×2 padded) | 79.0 % | 68 | 80 | 84 | 82 | 81 |
+  | `ASL_CONF` 0.05 | 81.0 % | 72 | 81 | 85 | 82 | 84 |
+  | current + ×3 padded 150 px | 79.0 % | 68 | 80 | 84 | 82 | 81 |
+  | 0.05 + ×3 padded | 81.5 % | 72 | 84 | 85 | 82 | 84 |
+  | 0.02 + ×3 padded | 82.2 % | 72 | 84 | 88 | 84 | 84 |
+  | 0.05 + ×1 first + ×3 padded | 81.8 % | 74 | 84 | 85 | 82 | 84 |
+  | 0.05 + ×3 padded + ×4 | 82.5 % | 74 | 84 | 88 | 82 | 85 |
+
+  Full run of the last one (11 min): **88.7 %** kept, N **72.5 %**: still under both
+  targets. The lower threshold moves the landmarks of most images, not only the hard ones
+  (72,793 of 75,565 images found by both runs get other landmarks), and the preview shows
+  two wrong boxes out of 56 (U2720 on a fingertip, del2988 on the border), against none
+  before. The ×3 and ×4 tries add only 203 images.
+- **Decision** (2026-10-27): the settings stay as they are (87.5 %, N 67.5 %, boxes on the
+  hand). The last points cost wrong boxes, which become wrong training targets; a lower
+  recall on closed fists only means fewer images of those letters. The output in `data/asl/`
+  is the one of the settings kept (restored from the backup, byte-identical to a rerun).
+  Closed with the target not met.
 
 ## B. Registry and notebooks
 
@@ -229,12 +250,14 @@ only the fine-tuned ones. `notebooks/asl/` holds `asl_stats`, `tiny-yolov3-asl_i
 - **Notes**: run again after `tools/m11.sh asl-prep`, so that collisions use the dataset's
   anchors.
 
-### [ ] T21.8 — Drive upload
+### [x] T21.8 — Drive upload
 - **Depends on**: T21.1 · **Size**: S
 - **Deliverables**: `tools/get_datasets.sh push asl`; row in
   [donnees-drive.md](donnees-drive.md).
 - **Notes**: the archive follows the hard links of `data/asl/images/` (≈ 1 GB) and holds
   the annotation files: Colab does not need MediaPipe.
+- **Done** (2026-10-27): `asl.tar` pushed in 56 s, 1,214,136,320 bytes, same size on
+  `gdrive:EmbeddedCV/data` (`rclone lsl`); row in [donnees-drive.md](donnees-drive.md).
 
 ### [ ] T21.9 — Fine-tuning and sweep
 - **Depends on**: T21.7, T21.8 · **Size**: L
