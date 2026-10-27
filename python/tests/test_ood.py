@@ -130,3 +130,26 @@ def test_pool_int():
     m = np.arange(2 * 3 * 2 * 2, dtype=np.int8).reshape(2, 3, 2, 2)
     p = ood.pool_int(m)
     assert p.shape == (2, 6) and p[0, 0] == 0 + 1 + 2 + 3 and p[0, 3] == 3
+
+
+# ------------------------------------------------------------- alarms for T27.7 (T29.1)
+def test_write_flags(tmp_path):
+    import json
+    import sys
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    import ood_monitor as OM
+
+    assert OM.flag_name("failure (miss, int)") == "failure-miss-int"
+    L = SimpleNamespace(name="fit", ids=np.array([f"a{i}" for i in range(100)]))
+    A = SimpleNamespace(name="lab", ids=np.array([f"b{i}" for i in range(200)]))
+    val = np.arange(100) < 100
+    scorers = {"s": lambda X: np.arange(len(X.ids), dtype=float) + (1000 if X is A else 0)}
+    OM.write_flags(L, A, scorers, tmp_path, val, rates=(0.05,))
+    rows = [json.loads(x) for x in (tmp_path / "lab__s__0.05.jsonl").read_text().splitlines()]
+    assert len(rows) == 200 and all(r["alarm"] for r in rows)  # threshold of L: all above
+    OM.write_flags(L, A, scorers, tmp_path, val, rates=(0.05,), rate_on="apply")
+    rows = [json.loads(x) for x in (tmp_path / "lab__s__0.05__apply.jsonl").read_text().splitlines()]
+    assert sum(r["alarm"] for r in rows) == 10 and rows[-1] == {"image": "b199", "alarm": True}
