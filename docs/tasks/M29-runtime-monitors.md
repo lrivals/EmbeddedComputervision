@@ -22,8 +22,9 @@ the best one in the integer chain and the HLS kernel.
 **State** (2026-10-27): T29.0 done ([results/ood_monitor.md](../../results/ood_monitor.md)).
 No monitor wins on both shifts: the detector's max score is the best on ExDark (AUROC 0.81),
 the activation patterns on FLIR (AUROC 0.93). T29.2 done on PREWID: the conformal threshold
-does not hold its bound across CCTV blocks, and loses it under every degradation. T29.1 and
-T29.3 run on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data.
+does not hold its bound across CCTV blocks, and loses it under every degradation. T29.3 measured on
+PREWID `lab` and MOT17: the hold 1/3 helps on short gaps only; its T25.8 part waits.
+T29.1 runs on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data.
 
 ### [x] T29.0 — Monitor comparison
 - **Spec**: §4, §8 · **Depends on**: T25.5 · **Runs on**: PC · **Size**: M
@@ -105,6 +106,21 @@ T29.3 run on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data.
   [T25.8](M25-dependability.md) by temporal incoherence
 - **Notes**: Rech 2024 reports ≈ 70 % of critical errors detected by temporal coherence
   (other work, not comparable).
+- **Progress** (2026-10-27; the T25.8 part waits for T25.8):
+  - **Code**: `python/yolo/infer/temporal.py` (k-of-n per IoU-associated track, the last box
+    held); `tools/dreaded_event.py --votes k/n,…` (each vote at the T27.4 threshold and at a
+    threshold re-tuned to 0.1 FPPI after the vote, events counted as T27.4, added latency
+    per episode); tests in `python/tests/test_temporal.py` and `test_person_safety.py`. 1/1
+    reproduces T27.4 exactly on both sets.
+  - **PREWID `lab`** (YOLOv4-tiny integer, 10 frames/s assumed): at equal FPPI the hold
+    1/3 lowers the per-frame miss from 9.11 to 7.20 % and the 10-frame events from 3 to 1,
+    for +0.25 frame of latency on average. Confirmations (2/2, 3/3) add misses and 1 to
+    4 frames of latency (up to 14).
+  - **MOT17 train**: the detector misses 80 % of the person-frames at 0.1 FPPI (crowds,
+    small persons), and no vote changes that. At equal FPPI the 10-frame events go from
+    869 to 823 at best (1/3), at +9.5 frames of latency on average.
+  - **Reading**: a hold helps when the misses are short gaps (PREWID), not when the
+    detector is blind to a person (MOT17). The vote cannot replace a better detector.
 
 ### [ ] T29.4 — Monitor in the integer chain and the HLS kernel
 - **Spec**: §10.2 · **Depends on**: T29.1, T6.3 · **Size**: L

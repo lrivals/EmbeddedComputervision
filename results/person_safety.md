@@ -405,3 +405,49 @@ tiny-yolov4-coco on prewid `lab` (3000 images): person score threshold calibrate
 | integer | 10.0 | per person (split conformal) | 20 | 0.1332 [0.002835, 0.4349] | 12.7 [2.2, 39.9] | 9.9 (8.2-11.7) | 9 / 20 | 0.722 [0.007, 6.595] | 0.194 [0.108, 0.237] | 86.3 [52.3, 96.3] |
 | integer | 10.0 | per image (risk control) | 20 | 0.3487 [0.1442, 0.777] | 13.4 [1.5, 46.8] | ≤ 10.0 | 7 / 20 | 0.013 [0.001, 0.025] | – | – |
 <!-- /m27:conformal-prewid-lab-tiny-yolov4-coco -->
+
+<!-- m27:vote-prewid-lab-tiny-yolov4-coco -->
+## Temporal vote: tiny-yolov4-coco, prewid lab (T29.3)
+
+tiny-yolov4-coco on prewid `lab`, persons ≥ 30 px. k-of-n vote of `yolo.infer.temporal` (IoU association ≥ 0.3, no Re-ID; a track is reported when detected in k of its last n frames, with its last box), at the T27.4 threshold (0.1 FPPI of the detector alone) and at a threshold re-tuned so the voted output stays at 0.1 FPPI. 1/1 is the detector alone. **Events**: miss runs of at least N frames (count, and per hour) as T27.4. **Added latency**: frames from the first report of the detector alone to the first report with the vote, per episode (mean / max; a hold can report earlier when it bridges a gap).
+
+| Stage | k/n | Threshold of | Threshold | FPPI | Per-frame miss % | Events N = 3 (/h) | N = 5 (/h) | N = 10 (/h) | Added latency (frames) |
+|---|---|---|---|---|---|---|---|---|---|
+| integer | 1/1 | T27.4 | 0.0953 | 0.097 | 9.11 | 18 (216) | 11 (132) | 3 (36) | +0.00 / +0 |
+| integer | 1/1 | 0.1 FPPI | 0.0946 | 0.097 | 9.11 | 18 (216) | 11 (132) | 3 (36) | +0.00 / +0 |
+| integer | 1/2 | T27.4 | 0.0953 | 0.134 | 7.71 | 17 (204) | 10 (120) | 1 (12) | +0.00 / +0 |
+| integer | 1/2 | 0.1 FPPI | 0.107 | 0.100 | 7.97 | 18 (216) | 10 (120) | 1 (12) | +0.25 / +1 |
+| integer | 1/3 | T27.4 | 0.0953 | 0.160 | 6.18 | 14 (168) | 8 (96) | 1 (12) | +0.00 / +0 |
+| integer | 1/3 | 0.1 FPPI | 0.118 | 0.100 | 7.20 | 16 (192) | 9 (108) | 1 (12) | +0.25 / +1 |
+| integer | 2/2 | T27.4 | 0.0953 | 0.061 | 10.58 | 20 (240) | 13 (156) | 5 (60) | +1.25 / +3 |
+| integer | 2/2 | 0.1 FPPI | 0.0762 | 0.100 | 10.01 | 18 (216) | 12 (144) | 5 (60) | +1.00 / +3 |
+| integer | 2/3 | T27.4 | 0.0953 | 0.088 | 9.56 | 21 (252) | 12 (144) | 3 (36) | +1.00 / +2 |
+| integer | 2/3 | 0.1 FPPI | 0.0884 | 0.100 | 9.56 | 21 (252) | 12 (144) | 3 (36) | +1.00 / +2 |
+| integer | 3/3 | T27.4 | 0.0953 | 0.045 | 11.79 | 17 (204) | 14 (168) | 7 (84) | +6.50 / +20 |
+| integer | 3/3 | 0.1 FPPI | 0.0689 | 0.098 | 11.22 | 19 (228) | 14 (168) | 5 (60) | +4.00 / +14 |
+| integer | 3/5 | T27.4 | 0.0953 | 0.087 | 9.31 | 15 (180) | 13 (156) | 5 (60) | +5.00 / +15 |
+| integer | 3/5 | 0.1 FPPI | 0.0866 | 0.100 | 9.31 | 15 (180) | 13 (156) | 5 (60) | +5.00 / +15 |
+<!-- /m27:vote-prewid-lab-tiny-yolov4-coco -->
+
+<!-- m27:vote-mot17-train-tiny-yolov4-coco -->
+## Temporal vote: tiny-yolov4-coco, mot17 train (T29.3)
+
+tiny-yolov4-coco on mot17 `train`, persons ≥ 30 px. k-of-n vote of `yolo.infer.temporal` (IoU association ≥ 0.3, no Re-ID; a track is reported when detected in k of its last n frames, with its last box), at the T27.4 threshold (0.1 FPPI of the detector alone) and at a threshold re-tuned so the voted output stays at 0.1 FPPI. 1/1 is the detector alone. **Events**: miss runs of at least N frames (count, and per hour) as T27.4. **Added latency**: frames from the first report of the detector alone to the first report with the vote, per episode (mean / max; a hold can report earlier when it bridges a gap).
+
+| Stage | k/n | Threshold of | Threshold | FPPI | Per-frame miss % | Events N = 3 (/h) | N = 5 (/h) | N = 10 (/h) | Added latency (frames) |
+|---|---|---|---|---|---|---|---|---|---|
+| integer | 1/1 | T27.4 | 0.727 | 0.099 | 80.48 | 1648 (2.77e+04) | 1266 (2.13e+04) | 869 (1.46e+04) | +0.00 / +0 |
+| integer | 1/1 | 0.1 FPPI | 0.727 | 0.099 | 80.48 | 1648 (2.77e+04) | 1266 (2.13e+04) | 869 (1.46e+04) | +0.00 / +0 |
+| integer | 1/2 | T27.4 | 0.727 | 0.156 | 78.73 | 1521 (2.56e+04) | 1203 (2.02e+04) | 824 (1.39e+04) | -1.15 / +0 |
+| integer | 1/2 | 0.1 FPPI | 0.774 | 0.098 | 81.05 | 1513 (2.54e+04) | 1198 (2.01e+04) | 840 (1.41e+04) | +2.09 / +89 |
+| integer | 1/3 | T27.4 | 0.727 | 0.227 | 77.67 | 1415 (2.38e+04) | 1143 (1.92e+04) | 804 (1.35e+04) | -1.43 / +0 |
+| integer | 1/3 | 0.1 FPPI | 0.817 | 0.100 | 82.85 | 1360 (2.29e+04) | 1121 (1.89e+04) | 823 (1.38e+04) | +9.54 / +345 |
+| integer | 2/2 | T27.4 | 0.727 | 0.065 | 82.36 | 1654 (2.78e+04) | 1282 (2.16e+04) | 871 (1.46e+04) | +4.72 / +150 |
+| integer | 2/2 | 0.1 FPPI | 0.679 | 0.100 | 80.73 | 1638 (2.75e+04) | 1278 (2.15e+04) | 879 (1.48e+04) | +0.35 / +77 |
+| integer | 2/3 | T27.4 | 0.727 | 0.104 | 80.56 | 1498 (2.52e+04) | 1179 (1.98e+04) | 840 (1.41e+04) | +3.78 / +150 |
+| integer | 2/3 | 0.1 FPPI | 0.728 | 0.100 | 80.66 | 1495 (2.51e+04) | 1175 (1.98e+04) | 842 (1.42e+04) | +4.15 / +150 |
+| integer | 3/3 | T27.4 | 0.727 | 0.050 | 83.68 | 1754 (2.95e+04) | 1290 (2.17e+04) | 882 (1.48e+04) | +10.47 / +394 |
+| integer | 3/3 | 0.1 FPPI | 0.667 | 0.100 | 81.22 | 1770 (2.98e+04) | 1277 (2.15e+04) | 894 (1.5e+04) | +2.57 / +108 |
+| integer | 3/5 | T27.4 | 0.727 | 0.125 | 80.62 | 1390 (2.34e+04) | 1134 (1.91e+04) | 822 (1.38e+04) | +7.30 / +357 |
+| integer | 3/5 | 0.1 FPPI | 0.751 | 0.100 | 81.81 | 1384 (2.33e+04) | 1128 (1.9e+04) | 820 (1.38e+04) | +11.98 / +400 |
+<!-- /m27:vote-mot17-train-tiny-yolov4-coco -->

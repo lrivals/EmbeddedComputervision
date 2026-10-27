@@ -142,12 +142,15 @@ def count_events(eps, max_n=MAX_N):
     return events, dangerous, (k, u)
 
 
-def analyse(samples, dets, det_class, thr, fps, min_height=MIN_HEIGHT, max_n=MAX_N):
-    """Event statistics of one stage at threshold `thr` (samples reduced to class 0)."""
-    gts = M.class_gts(samples, 0)
-    ids, scores, boxes = P.person_dets(dets, samples, det_class)
-    _, _, _, gt_score = M.match_class(ids, scores, boxes, gts)
-    reported = {i: np.nan_to_num(v, nan=np.inf) >= thr for i, v in gt_score.items()}
+def analyse(samples, dets, det_class, thr, fps, min_height=MIN_HEIGHT, max_n=MAX_N,
+            reported=None):
+    """Event statistics of one stage at threshold `thr` (samples reduced to class 0);
+    `reported` ({id: (k,) bool}) replaces the detector's own (the temporal vote, T29.3)."""
+    if reported is None:
+        gts = M.class_gts(samples, 0)
+        ids, scores, boxes = P.person_dets(dets, samples, det_class)
+        _, _, _, gt_score = M.match_class(ids, scores, boxes, gts)
+        reported = {i: np.nan_to_num(v, nan=np.inf) >= thr for i, v in gt_score.items()}
     track_mode = bool(samples) and all("track" in s for s in samples)
     runs = contiguous_runs(samples)
     eps = episodes(runs, reported, min_height, track_mode)
@@ -173,6 +176,78 @@ def analyse(samples, dets, det_class, thr, fps, min_height=MIN_HEIGHT, max_n=MAX
     }
 
 
+# --------------------------------------------------------------- temporal vote (T29.3)
+def voted(samples, dets, det_class, thr, k, n, iou=0.3):
+    """k-of-n vote of the detections ≥ `thr`, run by run: ({id: (k,) bool reported per
+    ground truth}, false positives per image)."""
+    from yolo.infer import temporal as TV
+
+    ids, scores, boxes = [], [], []
+    for run in contiguous_runs(samples):
+        frames = []
+        for s in run:
+            b, sc, lab = dets[s["id"]]
+            m = (lab == det_class) & (sc >= thr)
+            frames.append((b[m], sc[m]))
+        for s, (b, sc) in zip(run, TV.vote(frames, k, n, iou)):
+            ids += [s["id"]] * len(sc)
+            scores.append(sc)
+            boxes.append(b)
+    scores = np.concatenate(scores) if scores else np.zeros(0)
+    boxes = np.concatenate(boxes).reshape(-1, 4) if boxes else np.zeros((0, 4))
+    _, _, fp, gt_score = M.match_class(ids, scores, boxes, M.class_gts(samples, 0), 0.5,
+                                       M.ignore_regions(samples))
+    reported = {i: ~np.isneginf(v) for i, v in gt_score.items()}  # NaN: difficult
+    return reported, float(fp.sum()) / max(len(samples), 1)
+
+
+def first_reported(eps):
+    """Index of the first reported unit of each episode (None if never reported)."""
+    return [next((i for i, m in enumerate(missed) if not m), None) for _, missed in eps]
+
+
+def vote_threshold(samples, dets, det_class, k, n, fppi, lo=0.005, hi=0.99, iters=14):
+    """Lowest threshold in [lo, hi] whose FPPI after the vote is ≤ `fppi`: bisection in log
+    scale (the FPPI falls as the threshold rises), to a ratio (hi / lo)^(2^−iters) ≈ 1.04 %
+    with the defaults."""
+    if voted(samples, dets, det_class, lo, k, n)[1] <= fppi:
+        return float(lo)
+    if voted(samples, dets, det_class, hi, k, n)[1] > fppi:
+        return float(hi)
+    a, b = np.log(lo), np.log(hi)
+    for _ in range(iters):
+        mid = (a + b) / 2
+        if voted(samples, dets, det_class, float(np.exp(mid)), k, n)[1] <= fppi:
+            b = mid
+        else:
+            a = mid
+    return float(np.exp(b))
+
+
+def vote_rows(ev, dets, det_class, thr0, fps, votes, fppi, min_height, stage):
+    """Rows of the T29.3 table for one stage: each (k, n) at the T27.4 threshold `thr0` and
+    at a threshold re-tuned to `fppi` after the vote."""
+    base, _ = voted(ev, dets, det_class, thr0, 1, 1)
+    track_mode = bool(ev) and all("track" in s for s in ev)
+    eps0 = episodes(contiguous_runs(ev), base, min_height, track_mode)
+    first0 = first_reported(eps0)
+    rows = []
+    for k, n in votes:
+        for label, thr in (("T27.4", thr0),
+                           (f"{fppi} FPPI", vote_threshold(ev, dets, det_class, k, n, fppi))):
+            rep, fp = voted(ev, dets, det_class, thr, k, n)
+            r = analyse(ev, dets, det_class, thr, fps, min_height, reported=rep)
+            eps = episodes(contiguous_runs(ev), rep, min_height, track_mode)
+            lag = [b - a for a, b in zip(first0, first_reported(eps))
+                   if a is not None and b is not None]
+            rows.append([P.STAGE_NAMES[stage], f"{k}/{n}", label, f"{thr:.3g}", f"{fp:.3f}",
+                         f"{100 * r['frame_fn_rate']:.2f}",
+                         *(f"{r['counts'][str(m)]} ({r['per_hour'][str(m)]:.3g})"
+                           for m in (3, 5, 10)),
+                         f"{np.mean(lag):+.2f} / {max(lag, default=0):+d}" if lag else "–"])
+    return rows
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--dataset", choices=P.ALL_DATASETS, default="prewid")
@@ -187,6 +262,8 @@ def main(argv=None):
                     help="frame rate (assumption when the set gives none)")
     ap.add_argument("--min-height", type=float, default=MIN_HEIGHT)
     ap.add_argument("--max-n", type=int, default=MAX_N)
+    ap.add_argument("--votes", default=None,
+                    help="k/n[,k/n…]: temporal vote of T29.3 instead of the T27.4 tables")
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args(argv)
 
@@ -213,6 +290,11 @@ def main(argv=None):
         if thr is None:
             m = M.person_metrics(P.person_dets(dets, ev, det_class), ev, fppi_targets=(args.fppi,))
             thr = m["at"][args.fppi]["thr"]
+        if args.votes:
+            votes = [tuple(int(x) for x in v.split("/")) for v in args.votes.split(",")]
+            rows += vote_rows(ev, dets, det_class, thr, fps, votes, args.fppi,
+                              args.min_height, st)
+            continue
         r = analyse(ev, dets, det_class, thr, fps, args.min_height, args.max_n)
         r.update(dataset=args.dataset, split=split, net=args.net, stage=st,
                  fps_source=fps_source, fppi=None if args.thr is not None else args.fppi,
@@ -232,6 +314,8 @@ def main(argv=None):
         last = r
     if not rows:
         raise SystemExit("no stage to analyse")
+    if args.votes:
+        return write_votes(args, split, rows)
     unit = "person-frames" if last["mode"] == "track" else "frames with a person"
     body = [f"{args.net} on {args.dataset} `{split}`, {last['mode']} mode, persons ≥ "
             f"{args.min_height:g} px, operating point "
@@ -255,6 +339,26 @@ def main(argv=None):
     if args.write:
         P.write_section(f"events-{P.section_tag(args.dataset, split)}",
                         f"Dreaded event on video: {args.dataset} {split} (T27.4)",
+                        "\n".join(body))
+
+
+def write_votes(args, split, rows):
+    body = [f"{args.net} on {args.dataset} `{split}`, persons ≥ {args.min_height:g} px. "
+            "k-of-n vote of `yolo.infer.temporal` (IoU association ≥ 0.3, no Re-ID; a track "
+            "is reported when detected in k of its last n frames, with its last box), at the "
+            f"T27.4 threshold ({args.fppi} FPPI of the detector alone) and at a threshold "
+            f"re-tuned so the voted output stays at {args.fppi} FPPI. 1/1 is the detector "
+            "alone. **Events**: miss runs of at least N frames (count, and per hour) as "
+            "T27.4. **Added latency**: frames from the first report of the detector alone to "
+            "the first report with the vote, per episode (mean / max; a hold can report "
+            "earlier when it bridges a gap).", "",
+            P.table(["Stage", "k/n", "Threshold of", "Threshold", "FPPI", "Per-frame miss %",
+                     "Events N = 3 (/h)", "N = 5 (/h)", "N = 10 (/h)",
+                     "Added latency (frames)"], rows)]
+    print("\n".join(body))
+    if args.write:
+        P.write_section(f"vote-{P.section_tag(args.dataset, split)}-{Path(args.net).stem}",
+                        f"Temporal vote: {args.net}, {args.dataset} {split} (T29.3)",
                         "\n".join(body))
 
 

@@ -219,6 +219,22 @@ def test_dreaded_event_counts(track):
     assert r["dangerous"]["4"] == 1
 
 
+@pytest.mark.parametrize("track", [False, True])
+def test_vote_events(track):
+    samples, dets = _seq_samples({3, 4, 5, 8}, track=track)
+    rep, fppi = E.voted(samples, dets, 0, 0.5, 1, 1)
+    r = E.analyse(samples, dets, 0, 0.5, fps=10, min_height=0, max_n=4, reported=rep)
+    assert r["counts"] == E.analyse(samples, dets, 0, 0.5, fps=10, min_height=0,
+                                    max_n=4)["counts"] and fppi == 0.0
+    # a hold of 1 of 3 bridges the 3-frame gap only in part, the 1-frame gap entirely
+    rep, _ = E.voted(samples, dets, 0, 0.5, 1, 3)
+    r = E.analyse(samples, dets, 0, 0.5, fps=10, min_height=0, max_n=4, reported=rep)
+    assert r["counts"] == {"1": 1, "2": 0, "3": 0, "4": 0}  # only frame 5 stays missed
+    rows = E.vote_rows(samples, dets, 0, 0.5, 10, [(1, 1), (2, 2)], 0.1, 0, "int")
+    assert [r[1] for r in rows] == ["1/1", "1/1", "2/2", "2/2"]
+    assert rows[2][-1] == "+1.00 / +1"  # the confirmation reports the person one frame later
+
+
 def test_dreaded_event_gap_ends_run():
     # frame 4 absent: misses 3 and 5 are two runs, not one of length 3
     samples, dets = _seq_samples({3, 5}, gap_at=4)
