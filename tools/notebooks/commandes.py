@@ -111,25 +111,41 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
     return cmd + ["--out", str(out)]
 
 
-# Mémoire d'un processus d'évaluation (réseau, lot de 8 images en float32, im2col), large.
-JOB_MEMORY = 1.5e9
+# Mémoire d'un processus d'évaluation (réseau, lot de 8 images en float32, im2col), large;
+# 2.5 GB covers the 640 networks of M33-M35.
+JOB_MEMORY = 2.5e9
 
 
 def auto_jobs(jobs=None):
     """`JOBS` des notebooks : le nombre donné, ou None → un processus par cœur CPU
     disponible, plafonné par la mémoire (`JOB_MEMORY` chacun). Colab : 2 sur le runtime
-    CPU, des dizaines sur un runtime TPU (le TPU ne sert pas, l'évaluation est en NumPy)."""
+    CPU, des dizaines sur un runtime TPU (le TPU ne sert pas, l'évaluation est en NumPy).
+    The memory is the available one (`MemAvailable`), not the physical one: with other runs
+    on the PC, the total RAM let the evaluation fill the memory and the OOM killer took
+    the editor (2026-10-27)."""
     if jobs:
         return int(jobs)
     try:
         n = len(os.sched_getaffinity(0))
     except AttributeError:
         n = os.cpu_count() or 1
+    mem = available_memory()
+    return n if mem is None else max(1, min(n, int(mem // JOB_MEMORY)))
+
+
+def available_memory():
+    """Available memory in bytes (`MemAvailable` of /proc/meminfo, else the physical
+    memory), None if unknown."""
     try:
-        mem = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    try:
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     except (ValueError, OSError, AttributeError):
-        return n
-    return max(1, min(n, int(mem // JOB_MEMORY)))
+        return None
 
 
 def cmd_eval_voc(net, weights, dataset="voc", resize="stretch", subset=0, metric=None,
