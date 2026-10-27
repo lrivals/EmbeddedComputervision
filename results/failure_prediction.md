@@ -68,6 +68,14 @@ Split fit / val / test 60 / 20 / 20, seed 0.
 | tiny-yolov4-coco_coco-val2017 | int | val | 539 | 2127 | 36.8 % | 45.3 % | 1.2 |
 | tiny-yolov4-coco_coco-val2017 | int | test | 538 | 2121 | 36.1 % | 46.5 % | 1.2 |
 | tiny-yolov4-coco_coco-val2017 | int | all | 2693 | 10777 | 36.8 % | 47.0 % | 1.1 |
+| tiny-yolov4-coco_exdark-test | float | fit | 1538 | 1386 | 38.9 % | 17.2 % | 4.8 |
+| tiny-yolov4-coco_exdark-test | float | val | 513 | 353 | 37.4 % | 15.8 % | 5.3 |
+| tiny-yolov4-coco_exdark-test | float | test | 512 | 496 | 39.5 % | 18.0 % | 4.6 |
+| tiny-yolov4-coco_exdark-test | float | all | 2563 | 2235 | 38.8 % | 17.1 % | 4.9 |
+| tiny-yolov4-coco_exdark-test | int | fit | 1538 | 1386 | 41.1 % | 18.3 % | 4.5 |
+| tiny-yolov4-coco_exdark-test | int | val | 513 | 353 | 38.5 % | 16.2 % | 5.2 |
+| tiny-yolov4-coco_exdark-test | int | test | 512 | 496 | 41.7 % | 18.9 % | 4.3 |
+| tiny-yolov4-coco_exdark-test | int | all | 2563 | 2235 | 40.8 % | 18.0 % | 4.6 |
 | tiny-yolov4-coco_prewid-lab | float | fit | 1800 | 945 | 10.7 % | 5.6 % | 16.8 |
 | tiny-yolov4-coco_prewid-lab | float | val | 600 | 317 | 13.2 % | 7.0 % | 13.3 |
 | tiny-yolov4-coco_prewid-lab | float | test | 600 | 312 | 12.5 % | 6.5 % | 14.4 |
@@ -94,6 +102,8 @@ Causes of the missed persons (T36.5, fixed order of tests):
 |---|---|---|---|---|---|---|---|---|---|
 | tiny-yolov4-coco_coco-val2017 | float | 3915 | 0.0 % | 52.6 % | 31.9 % | 2.7 % | 2.4 % | 5.3 % | 5.1 % |
 | tiny-yolov4-coco_coco-val2017 | int | 3962 | 4.7 % | 51.7 % | 29.2 % | 2.5 % | 3.0 % | 4.0 % | 4.9 % |
+| tiny-yolov4-coco_exdark-test | float | 867 | 0.0 % | 14.0 % | 66.3 % | 5.4 % | 3.7 % | 6.8 % | 3.8 % |
+| tiny-yolov4-coco_exdark-test | int | 912 | 10.0 % | 12.8 % | 58.2 % | 5.7 % | 4.5 % | 5.0 % | 3.7 % |
 | tiny-yolov4-coco_prewid-lab | float | 182 | 0.0 % | 17.0 % | 28.6 % | 0.0 % | 9.9 % | 44.5 % | 0.0 % |
 | tiny-yolov4-coco_prewid-lab | int | 148 | 4.7 % | 20.9 % | 23.0 % | 0.0 % | 5.4 % | 45.9 % | 0.0 % |
 | tiny-yolov4-coco_prewid-test | float | 37 | 0.0 % | 10.8 % | 54.1 % | 5.4 % | 16.2 % | 5.4 % | 8.1 % |
@@ -143,6 +153,17 @@ recall over all images), and the share of images accepted.
 | max_score | int | 0.597 | 0.597 | 2.5 % | 9.8 % | 64.8 % | 67.5 % | 63.9 % | 68.7 % | 85.3 % | 0 B | 0 |
 | head_miss | int | 0.840 | 0.840 | 2.0 % | 15.7 % | 64.6 % | 69.6 % | 63.9 % | 69.7 % | 78.3 % | 196,868 B | 49,184 |
 | head_tcp | int | 0.843 | 0.843 | 3.4 % | 17.9 % | 65.2 % | 70.4 % | 63.9 % | 67.9 % | 82.3 % | 196,868 B | 49,184 |
+
+**tiny-yolov4-coco_exdark-test** (test split, 512 images, threshold 0.0953):
+
+| Monitor | Stage | AUROC | AUROC, images with persons | Missed flagged @1 % | @5 % | System recall @1 % | @5 % | Detector recall | Person recall accepted @5 % FPR | Accepted | Memory | MACs |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| max_score | float | 0.233 | 0.709 | 0.0 % | 0.5 % | 60.5 % | 60.7 % | 60.5 % | 60.6 % | 95.7 % | 0 B | 0 |
+| head_miss | float | 0.814 | 0.607 | 6.1 % | 21.9 % | 62.9 % | 69.2 % | 60.5 % | 62.4 % | 89.6 % | 196,868 B | 49,184 |
+| head_tcp | float | 0.818 | 0.488 | 4.6 % | 17.9 % | 62.3 % | 67.5 % | 60.5 % | 55.8 % | 91.2 % | 196,868 B | 49,184 |
+| max_score | int | 0.223 | 0.696 | 0.0 % | 0.0 % | 58.3 % | 58.3 % | 58.3 % | 58.3 % | 96.1 % | 0 B | 0 |
+| head_miss | int | 0.842 | 0.662 | 2.9 % | 19.3 % | 59.5 % | 66.3 % | 58.3 % | 56.0 % | 90.2 % | 196,868 B | 49,184 |
+| head_tcp | int | 0.818 | 0.487 | 6.3 % | 16.4 % | 60.9 % | 65.1 % | 58.3 % | 53.9 % | 91.8 % | 196,868 B | 49,184 |
 <!-- /m39:head -->
 
 <!-- m39:monitors-tiny-yolov3-coco_coco-val2017-float -->
@@ -384,3 +405,23 @@ over all test images.
 | failure (miss, int) | learned | 0.840 | 0.840 | 2.0 % | 15.7 % | 69.6 % | 63.9 % | 196,868 B | 49,184 |
 | failure (tcp, int) | learned | 0.843 | 0.843 | 3.4 % | 17.9 % | 70.4 % | 63.9 % | 196,868 B | 49,184 |
 <!-- /m39:monitors-tiny-yolov4-coco_coco-val2017-int -->
+
+<!-- m39:monitors-tiny-yolov4-coco_exdark-test-int -->
+## T29.0 monitors and learned heads against missed persons: tiny-yolov4-coco_exdark-test, int stage (T39.1)
+
+`tools/ood_monitor.py compare --labels … --failure …`, test split. The T29.0
+monitors are fitted on the fit split (pooled features of the labelled network, integer for
+the boxes and patterns); raw score or typicality, whichever has the better val AUROC. The
+autoencoder is left out (it needs the full maps; T29.0 found it dominated). Alarm rates are
+over all test images.
+
+| Monitor | Score | AUROC | AUROC, images with persons | Missed flagged @1 % | @5 % | System recall @5 % | Detector recall | Memory | Ops per image |
+|---|---|---|---|---|---|---|---|---|---|
+| norm | raw | 0.604 | 0.520 | 1.9 % | 14.0 % | 64.1 % | 58.3 % | 0 B | 1,536 |
+| mahalanobis | raw | 0.540 | 0.487 | 2.4 % | 10.6 % | 62.7 % | 58.3 % | 9,443,328 B | 2,360,832 |
+| max_score | typ | 0.714 | 0.304 | 3.4 % | 9.2 % | 62.1 % | 58.3 % | 0 B | 1 |
+| boxes | typ | 0.526 | 0.559 | 0.0 % | 8.7 % | 61.9 % | 58.3 % | 49,152 B | 12,288 |
+| patterns | raw | 0.456 | 0.371 | 0.0 % | 2.4 % | 59.3 % | 58.3 % | 12,800 B | 6,208 |
+| failure (miss, int) | learned | 0.842 | 0.662 | 2.9 % | 19.3 % | 66.3 % | 58.3 % | 196,868 B | 49,184 |
+| failure (tcp, int) | learned | 0.818 | 0.487 | 6.3 % | 16.4 % | 65.1 % | 58.3 % | 196,868 B | 49,184 |
+<!-- /m39:monitors-tiny-yolov4-coco_exdark-test-int -->

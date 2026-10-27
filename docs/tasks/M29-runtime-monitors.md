@@ -25,8 +25,8 @@ the activation patterns on FLIR (AUROC 0.93). T29.2 done on PREWID: the conforma
 does not hold its bound across CCTV blocks, and loses it under every degradation. T29.3 measured on
 PREWID `lab` and MOT17: the hold 1/3 helps on short gaps only; its T25.8 part waits.
 T29.1 measured at the T27.2 point on PREWID and COCO: the OOD scores are blind to the
-missed persons (AUROC ≤ 0.62), the learned head of T39.1 is not (0.84-0.97); CrowdHuman, ExDark
-and the degraded sets pending.
+missed persons (AUROC ≤ 0.62), the learned head of T39.1 is not (0.84-0.97); ExDark measured;
+CrowdHuman and the degraded sets pending.
 
 ### [x] T29.0 — Monitor comparison
 - **Spec**: §4, §8 · **Depends on**: T25.5 · **Runs on**: PC · **Size**: M
@@ -78,12 +78,14 @@ and the degraded sets pending.
       (patterns), 3 % (max score), 53 % (head).
     - The OOD scores stay blind to in-domain misses, as the note expected. Mahalanobis costs
       9.4 MB and 2.4 M ops for nothing.
+    - ExDark (real low light): the norm reaches 0.60 and the max score 0.71 (typicality),
+      the head 0.84. 14 % of the missed persons flagged at 5 % by the norm, 19 % by the head.
   - **Alarms for T27.7**: `compare --apply <labels> --flags <dir> [--rate-on val|apply]`
     writes the per-image alarms of every monitor at 1 % and 5 % on another set. The
     thresholds of `test` do not transfer to `lab` (0 or 100 % alarms), so the rows of T27.7
     set the alarm rate on the `lab` scores.
   - **Not run**: CrowdHuman val, the T27.3 degraded sets (`failure_labels.py` has no
-    `--degrade` yet), ExDark (labels running).
+    `--degrade` yet).
 
 ### [x] T29.2 — Conformal threshold for persons
 - **Spec**: §8.1 · **Depends on**: T27.2 · **Runs on**: PC · **Size**: M

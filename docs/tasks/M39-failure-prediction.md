@@ -24,7 +24,7 @@ The claim of the draft is not the idea of failure prediction but its **joint tra
 the detector, its integer form and its cost on the chip. Outside the base of the spec: the
 method comes from the failure-prediction literature above.
 
-**State** (2026-10-27): T39.0 and T39.1 run at the T27.2 point on PREWID and COCO (YOLOv4-tiny), CrowdHuman pending. The code of T39.0 to T39.5 is written and tested
+**State** (2026-10-27): T39.0 and T39.1 run at the T27.2 point on PREWID, COCO and ExDark (YOLOv4-tiny), CrowdHuman pending. The code of T39.0 to T39.5 is written and tested
 (`python/tests/test_failure.py`); reduced runs with `tiny-yolov3-coco` on COCO persons and
 PREWID test are in [results/failure_prediction.md](../../results/failure_prediction.md), at a
 **provisional** threshold of 0.25. Every task stays open until T27.2 gives the operating
@@ -71,8 +71,10 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
     - **Causes**: COCO misses are mostly `no_anchor` (52 %; as in Tiny-YOLOv3, anchor 0
       belongs to no head of YOLOv4-tiny); on `lab`, `nms_suppressed` (45 %, workers close
       together).
-    - ExDark failed (`People` has no `person` class name), fixed in `person_index`
-      (`eval_view`, commit 5c6b5c9), rerun under way.
+    - ExDark test (2,563 images, real low light): first failed because the class is called
+      `People`, not `person`; fixed in `person_index` (`eval_view`, commit 5c6b5c9). 40.8 %
+      of the persons missed (integer), 18 % of the images, 4.6 failure-free images per
+      failing one.
     - The provisional Tiny-YOLOv3 files at 0.25 are moved to `build/m39/labels_provisional_v3/`.
 
 ### [ ] T39.1 — Post-hoc learned monitor
@@ -106,6 +108,8 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
       score 3 %).
     - PREWID `test`: 0.937 against 0.572, on only 3 failing test images, so noisy.
     - COCO persons: 0.840 against 0.597.
+    - ExDark: 0.842 against 0.223 raw (0.714 as typicality, T29.1); on the images with
+      persons alone 0.66 against 0.70, so low light blurs what the head learned.
     - On the frames with persons alone the max score stays strong on PREWID (0.965 on `lab`,
       the head 0.955).
     - The `tcp` target is close (0.93 / 0.87 / 0.84).
