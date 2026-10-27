@@ -683,8 +683,11 @@ synthesized. The equivalence evidence and the
 latency bound of Section~\ref{sec:safety} stop at the \gls{csim}: the \gls{cosim} and
 board rows, the measured \gls{burst} latency and the latency distribution on the board are
 pending. The person-detection safety metrics (\ms{M27}) are measured on the industrial
-PREWID set only, and the runtime monitors (\ms{M29}) wait for them on CrowdHuman, whose data
-is not on the PC; the assurance case (\ms{M31}) is written on the results present today and
+PREWID set only. Of the runtime monitors (\ms{M29}), the conformal person threshold and the
+temporal vote are measured on PREWID and MOT17: the conformal bound does not hold across
+camera blocks and is lost under every degradation, and a k-of-n hold only bridges short
+gaps in the detections. The comparison of the monitors on the missed persons waits for
+CrowdHuman, whose data is not on the PC; the assurance case (\ms{M31}) is written on the results present today and
 stays provisional until those runs. The explanation of the decisions (\ms{M36}) has its code
 and a first run on \gls{voc}, its full runs are open. The long runs still open are listed with their durations in
 \repo{docs/tasks/long-runs.md}. Table~\ref{tab:etat} gives the progress by milestone.
@@ -787,6 +790,8 @@ v5 & 2026-10-27 & Full proofreading (\ms{T17.17}): every chunk citation checked 
   \texttt{pdb verify}, five replaced by a chunk that carries the claim; the state of
   YOLOv5n, YOLOv7-tiny, YOLOv8n, \ms{M27}, \ms{M31} and \ms{M36} brought up to date; the
   state-of-the-art figure called out. \\
+v6 & 2026-10-27 & First update after a milestone moved (\ms{T17.18}): conformal person
+  threshold and temporal vote of \ms{M29} in the limitations; no number changed. \\
 \bottomrule
 \end{tabularx}
 \end{center}

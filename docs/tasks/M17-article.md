@@ -415,14 +415,16 @@ Shared acceptance of the writing tasks:
 
 ## C. Maintenance
 
-### [ ] T17.18 — First version and log
+### [x] T17.18 — First version and log
 - **Depends on**: T17.17 · **Size**: S
 - **Deliverables**: "v0" entry of the version log; procedure **Update at each milestone**
   applied once end to end.
 - **Acceptance**: a milestone that moves (for example a row of M15) is reflected in the
   article by `make article` and a proofreading of the relevant section only.
-- **Remaining**: the v0 entry of the version log is written; the update procedure has not
-  yet been applied to a milestone that moved.
+- **Done** (2026-10-27): v0 entry of the version log written with T17.0. The procedure
+  was applied end to end for M29 (T29.2, T29.3). `make article` changed no key (0 keys).
+  The narrative of the only section where a status moved, §13 Limitations, was reread and
+  corrected. Entry v6 is in the log, and `--check` is green.
 
 ### [ ] T17.19 — Switch "projection → measurement" (board)
 - **Depends on**: T7.4, T8.1-T8.3 on the board · **Size**: M
@@ -456,5 +458,5 @@ evidence came with M25 and M28.
 | 10 | Dependability | proofread (2026-10-27, T17.17) |
 | 11 | Safety evidence | proofread (2026-10-27, T17.17) |
 | 12 | Beyond VOC | proofread (2026-10-27, T17.17) |
-| 13 | Limitations and future work | proofread (2026-10-27, T17.17) |
+| 13 | Limitations and future work | up to date at rev. 6d62f34 (2026-10-27, M29, T17.18) |
 | 14 | Reproducibility | proofread (2026-10-27, T17.17) |
