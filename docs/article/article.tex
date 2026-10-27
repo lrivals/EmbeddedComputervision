@@ -149,18 +149,18 @@ several networks with one \gls{bitstream}, at the price of \gls{ddr} traffic at 
 \citet[\#009.0, \#010.2]{2015-zhang}.
 
 Table~\ref{tab:benchmarks} lists the results of the \gls{base} (specification §10.4) next to
-ours. Most rows cannot be compared directly with this work, for reasons the numbers alone
-do not show:
+ours, and Figure~\ref{fig:etat_art} plots them. Most rows cannot be compared directly with
+this work, for reasons the numbers alone do not show:
 \begin{itemize}
 \item \textbf{2024-zhang} is the only reference on the same model (Tiny-YOLOv2 416, \gls{int8},
   batch of 1). It runs on an \gls{fpga} without an \gls{arm} core, packs two multiplications per \gls{dsp}
-  \cite[\#011.0]{2024-zhang} and includes hardware post-processing
+  \cite[\#008.0]{2024-zhang} and includes hardware post-processing
   \cite[\#013.1]{2024-zhang}.
 \item \textbf{2026-fata} runs on the same KV260, but with a preconfigured \gls{dpu}, a
-  YOLOv3-tiny pruned at 70\,\% and \gls{qat} \cite[\#015.0]{2026-fata}: pruning divides the \glspl{mac}
+  YOLOv3-tiny pruned at 70\,\% and \gls{qat} \cite[\#014.4, \#015.0]{2026-fata}: pruning divides the \glspl{mac}
   by about three, so images per second do not convert.
 \item \textbf{2023-zhai} uses \gls{int16} and a pruned network on a vehicle dataset; only the
-  order of magnitude of its \gls{gops} compares \cite[\#004.1]{2023-zhai}.
+  order of magnitude of its \gls{gops} compares \cite[\#002.0]{2023-zhai}.
 \item \textbf{2019-ding} (REQ-YOLO) uses FFT-based convolutions and power-of-two weights
   chosen by \gls{admm} \cite[\#008.1, \#009.4]{2019-ding}, on another architecture.
 \item \textbf{2025-kim} is a slow functional prototype of the full YOLOv2 on a Zybo, with
@@ -205,7 +205,8 @@ existing buffer, so it costs no compute and no copy. YOLOv7-tiny
 spatial pyramid pooling with stride-1 max pools of $5\times5$, $9\times9$ and
 $13\times13$. The export rewrites the two larger pools as chained $5\times5$ pools and
 copies the pooled input by an identity $1\times1$ convolution; this network is work in
-progress (float, \gls{calibration} and export done, accuracy not yet measured). YOLOv5n and
+progress (float, \gls{calibration} and export done; its float \gls{coco} accuracy is in
+\repo{results/map\_coco.md}, the integer one is not measured yet). YOLOv5n and
 YOLOv8n (Ultralytics, \gls{silu} activation, \glslink{anchor}{anchor-free} head for v8n, outside the \gls{base}) are read
 from their checkpoints without PyTorch: a reader of the pickle format and the network
 rebuilt from its YAML description give a trainable NumPy YOLOv5n equal to the reference to
@@ -231,7 +232,7 @@ The loss is the YOLOv3 one: direct regression of the box offsets, whose gradient
 for it \cite[\#003.1]{1804.02767}, and multi-label binary cross-entropy for the classes
 \cite[\#004.0]{1804.02767}. Targets are assigned to the best \gls{anchor} by \gls{iou} of the shapes;
 \glspl{anchor} come from k-means with the distance $1-\mathrm{IoU}$ \cite[\#002.4]{1612.08242}.
-The training loop (\gls{sgd}, \gls{burnin}, multi-scale inputs \cite[\#003.2]{1612.08242}) overfits a
+The training loop (\gls{sgd}, \gls{burnin}, multi-scale inputs \cite[\#003.3]{1612.08242}) overfits a
 single image, which validates targets, loss and optimizer together
 (Figure~\ref{fig:perte}).
 
@@ -400,7 +401,7 @@ and a \gls{roofline} point of \chiffre{perf.kv260.roofline.ms}~ms
 \articlefig{cycles_couches}
 
 \paragraph{Two INT8 multiplications per DSP.} The compute bound only falls if the
-multiplications per cycle rise. As in 2024-zhang \cite[\#011.0]{2024-zhang}, the weights of
+multiplications per cycle rise. As in 2024-zhang \cite[\#008.0]{2024-zhang}, the weights of
 two output channels that share an input are packed into the 27-bit port of a \gls{dsp}48E2,
 $A = w_a 2^{18} + w_b$, and one product gives both (Figure~\ref{fig:dsp_packing}). The low
 lane stays exact for a sum of eight products under the contract of the integer model
@@ -425,7 +426,7 @@ Figure~\ref{fig:pack_options}). The YOLOv4-tiny projection with the current kern
 \articlefig{pack_options}
 
 \paragraph{Winograd.} An integer-exact Winograd $F(2\times2, 3\times3)$ removes more than half
-of the multiplications of the $3\times3$ convolutions \cite[\#004.0]{2023-zhai} and is
+of the multiplications of the $3\times3$ convolutions \cite[\#036.1]{2023-zhai} and is
 slightly ahead of packing on the compute bound alone. Once the loads are counted it is not
 (Table~\ref{tab:winograd}, Figure~\ref{fig:winograd}): the transformed weights are wider and
 consumed faster, its weight buffer exceeds the flip-flops of the board, and its products do
@@ -476,8 +477,8 @@ Resources will only be known after synthesis; Figure~\ref{fig:ressources} compar
 Against 2024-zhang, the only reference on the same model, packing closes the gap in
 multipliers (Section~\ref{sec:hls}); what remains is the share of time our kernel still
 spends outside the \gls{mac} loop, in the weight and input loads of the $1\times1$ and
-$13\times13$ layers and in the output stage of the first layer. On the same board, the projected throughput of the current
-kernel exceeds the \gls{dpu} of 2026-fata in images per second, without pruning
+$13\times13$ layers and in the output stage of the first layer. On the same board, the
+projected throughput of the current kernel exceeds the \gls{dpu} of 2026-fata in images per second, without pruning
 (Table~\ref{tab:benchmarks}).
 
 % ---------------------------------------------------------------------------------------
@@ -531,7 +532,8 @@ chip of the KV260, so the plan is hybrid: the small layers stream with their wei
 chip, the two largest read theirs from \gls{ddr} once per image. The resource model estimates
 \chiffre{stream.w8.fps} images/s with \chiffre{stream.w8.dsp} \glspl{dsp}, at a latency of
 \chiffre{stream.w8.latency}~ms, and \chiffre{stream.w4.fps} images/s with 4-bit weights
-(Figure~\ref{fig:streaming}). The streaming kernel equals the \gls{golden} in \gls{csim}, stage by stage; these figures are estimates until synthesis.
+(Figure~\ref{fig:streaming}). The streaming kernel equals the \gls{golden} in \gls{csim}, stage
+by stage; these figures are estimates until synthesis.
 
 \articlefig{streaming}
 
@@ -555,8 +557,8 @@ in the \gls{golden} and in the \gls{hls} kernel. The kernel computes the checksu
 output lane in the same pipelined loop and compares it in the \gls{requant} pass; the
 failing pixels go to a status register read by the \gls{arm} driver. Without fault, every
 \gls{bitexact} test passes with no \gls{abft} error (\chiffre{abft.hls.layers} layers of the four
-exports, \chiffre{abft.hls.outputs} layer outputs of the network test bench, in \gls{csim}), and every injected accumulator fault is detected. The cost of the lane waits
-for synthesis.
+exports, \chiffre{abft.hls.outputs} layer outputs of the network test bench, in \gls{csim}),
+and every injected accumulator fault is detected. The cost of the lane waits for synthesis.
 
 \paragraph{Faults in the kernel buffers.} A fault hook of the \gls{csim}, absent from the
 synthesis, flips one bit per kernel run in an on-chip buffer of the convolution: input \gls{tile},
@@ -674,14 +676,18 @@ of an epoch (Section~\ref{sec:extensions}); the training from scratch in NumPy
 (fine-tuning on \gls{voc}, \ms{M2}) is not finished, so the reference \gls{map} uses the published Darknet
 weights; the datasets beyond \gls{voc} have only been explored at \gls{tier} R
 (Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on \gls{coco} and
-quantization-aware training to come within one point; YOLOv7-tiny has no accuracy yet, and
-YOLOv5n and YOLOv8n are read without PyTorch, but their decoding, targets, losses and
-training in NumPy are still to write (\ms{M33} to \ms{M35}). The fault campaign has only run as a \glslink{smokerun}{smoke test}, and the \gls{abft} lane of the kernel is not synthesized. The equivalence evidence and the
+quantization-aware training to come within one point. YOLOv7-tiny, YOLOv5n and YOLOv8n
+have their float \gls{coco} accuracy (\repo{results/map\_coco.md}) and their training recipes
+in NumPy, but no integer model yet (\ms{M26}, \ms{M33} to \ms{M35}). The fault campaign has
+only run as a \glslink{smokerun}{smoke test}, and the \gls{abft} lane of the kernel is not
+synthesized. The equivalence evidence and the
 latency bound of Section~\ref{sec:safety} stop at the \gls{csim}: the \gls{cosim} and
 board rows, the measured \gls{burst} latency and the latency distribution on the board are
-pending. The person-detection safety metrics, the runtime monitors and the assurance case
-(\ms{M27}, \ms{M29}, \ms{M31}) wait for the CrowdHuman data on the PC; the explanation of the decisions
-(\ms{M36}) is planned. The long runs still open are listed with their durations in
+pending. The person-detection safety metrics (\ms{M27}) are measured on the industrial
+PREWID set only, and the runtime monitors (\ms{M29}) wait for them on CrowdHuman, whose data
+is not on the PC; the assurance case (\ms{M31}) is written on the results present today and
+stays provisional until those runs. The explanation of the decisions (\ms{M36}) has its code
+and a first run on \gls{voc}, its full runs are open. The long runs still open are listed with their durations in
 \repo{docs/tasks/long-runs.md}. Table~\ref{tab:etat} gives the progress by milestone.
 
 \begin{table}[htbp]
@@ -778,6 +784,10 @@ v3 & 2026-10-22 & New section on safety evidence: equivalence matrix, operator t
 v4 & 2026-10-22 & Glossary of acronyms and lexicon (\texttt{glossary.tex}); every term,
   milestone, task and repository path of the text is a link, references link back to the
   pages that cite them; checked by --check. \\
+v5 & 2026-10-27 & Full proofreading (\ms{T17.17}): every chunk citation checked with
+  \texttt{pdb verify}, five replaced by a chunk that carries the claim; the state of
+  YOLOv5n, YOLOv7-tiny, YOLOv8n, \ms{M27}, \ms{M31} and \ms{M36} brought up to date; the
+  state-of-the-art figure called out. \\
 \bottomrule
 \end{tabularx}
 \end{center}

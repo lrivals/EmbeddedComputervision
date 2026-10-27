@@ -391,15 +391,27 @@ Shared acceptance of the writing tasks:
   `palier-R`; §12: `make` commands, R/M/N profiles ([M12](M12-profils-pc.md)), notebooks
   ([M14](M14-notebooks.md)), revision.
 
-### [ ] T17.17 — References and full proofreading
+### [x] T17.17 — References and full proofreading
 - **Depends on**: T17.5-T17.16 · **Size**: M
 - **Deliverables**: complete `refs.md`; proofreading (consistency of the notation with the
   specification, a single definition per acronym, figures called out in the text).
 - **Acceptance**: each `[chunk_id]` citation passes `bin/pdb verify`; all the sections in
   the "proofread" state.
-- **Remaining**: `refs.md` is complete (§12 of the specification); the citations still
-  have to pass `bin/pdb verify` (tool of the base, outside the repository) and the sections
-  a full proofreading.
+- **Done** (2026-10-27):
+  - **Citations**: the 32 chunks cited in `article.tex` each pass `bin/pdb verify` (OK,
+    1.00) with the quote that carries the claim. Five chunks did not carry it and were
+    replaced: 2023-zhai INT16 and pruning (#004.1 → #002.0), its Winograd count
+    (#004.0 → #036.1), 2024-zhang packing (#011.0 → #008.0, twice), 2026-fata pruned at
+    70 % (#014.4 added), YOLOv2 multi-scale training (#003.2 → #003.3).
+  - **Proofreading** of every section: the state of YOLOv5n, YOLOv7-tiny, YOLOv8n (float
+    COCO accuracy and NumPy training now exist), M27 (PREWID measured), M31 (written,
+    provisional) and M36 (code and a VOC run) was stale in §3 and §13, now up to date;
+    `fig:etat_art` was never called out; long lines reflowed; v5 entry in the version
+    log. Every figure and table is called out; acronyms are defined once, in
+    `glossary.tex`, and used through `\gls`.
+  - **Left as known**: the figure captions come from the figure registry and are still in
+    French (T19.7); the PDF was not rebuilt (no xelatex on this PC), `python -m
+    tools.article --check` passes.
 
 ## C. Maintenance
 
@@ -426,19 +438,23 @@ Shared acceptance of the writing tasks:
 
 Writing state of each section, updated by the update procedure: *to write*, *draft*,
 *proofread*, *up to date at rev. X*.
+The numbering is the one of `article.tex` (§0 = abstract); Dependability and Safety
+evidence came with M25 and M28.
 
 | § | Section | State |
 |---|---|---|
-| 0 | Abstract | draft |
-| 1 | Introduction and contributions | draft |
-| 2 | Related work | draft |
-| 3 | Networks and NumPy building blocks | draft |
-| 4 | Inference and evaluation | draft |
-| 5 | INT8 quantization | draft |
-| 6 | C++ golden model and verification chain | draft |
-| 7 | HLS accelerator and SoC integration | draft |
-| 8 | Results | draft |
-| 9 | Extensions | draft |
-| 10 | Beyond VOC | draft |
-| 11 | Limitations and future work | draft |
-| 12 | Reproducibility | draft |
+| 0 | Abstract | proofread (2026-10-27, T17.17) |
+| 1 | Introduction and contributions | proofread (2026-10-27, T17.17) |
+| 2 | Related work | proofread (2026-10-27, T17.17) |
+| 3 | Networks and NumPy building blocks | proofread (2026-10-27, T17.17) |
+| 4 | Inference and evaluation | proofread (2026-10-27, T17.17) |
+| 5 | INT8 quantization | proofread (2026-10-27, T17.17) |
+| 6 | Golden C++ model and verification chain | proofread (2026-10-27, T17.17) |
+| 7 | HLS accelerator and SoC integration | proofread (2026-10-27, T17.17) |
+| 8 | Results | proofread (2026-10-27, T17.17) |
+| 9 | Extensions | proofread (2026-10-27, T17.17) |
+| 10 | Dependability | proofread (2026-10-27, T17.17) |
+| 11 | Safety evidence | proofread (2026-10-27, T17.17) |
+| 12 | Beyond VOC | proofread (2026-10-27, T17.17) |
+| 13 | Limitations and future work | proofread (2026-10-27, T17.17) |
+| 14 | Reproducibility | proofread (2026-10-27, T17.17) |
