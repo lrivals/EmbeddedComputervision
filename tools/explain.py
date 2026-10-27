@@ -6,6 +6,7 @@
     python tools/explain.py intattr  --n 20 --jobs 20   # T36.3: exact split, integer LRP
     python tools/explain.py evaluate --n 50 --jobs 20   # T36.4: pointing, deletion, insertion
     python tools/explain.py misses   --n 500 --jobs 20  # T36.5: causes of the missed persons
+    python tools/explain.py misses   --dataset exdark   # same on ExDark (keys <net>@exdark)
     python tools/explain.py concepts --jobs 20          # T36.6: dissection, TCAV
     python tools/explain.py cka      --jobs 20          # T36.8: float / int, checkpoints
     python tools/explain.py record   --run build/explain/record/clean  # T36.7 summary
@@ -88,12 +89,13 @@ def load_image(path):
     return x[None], wh
 
 
-def gt_of(name, s):
-    """Ground truth of sample `s` in the model's classes: (boxes (k, 4), labels (k,))."""
+def gt_of(name, s, dataset="voc"):
+    """Ground truth of sample `s` of `dataset` in the model's classes (`MAPPINGS`):
+    (boxes (k, 4), labels (k,))."""
     from yolo.data import datasets
 
     net, _, _, _ = models(name)
-    lut = datasets.class_lut("voc", net.net["classes"])
+    lut = datasets.class_lut(dataset, net.net["classes"])
     lab = lut[np.asarray(s["labels"], dtype=np.int64)]
     keep = (lab >= 0) & ~np.asarray(s["difficult"], dtype=bool)
     return np.asarray(s["boxes"], dtype=np.float64)[keep], lab[keep]
@@ -324,10 +326,10 @@ def _misses(task):
     from yolo.explain.targets import grid_sizes
     from yolo.quant.quantize import quantize_input
 
-    name, s = task
+    name, s, dataset = task
     net, qm, inet, luts = models(name)
     x, (w, h) = load_image(s["image"])
-    boxes, labels = gt_of(name, s)
+    boxes, labels = gt_of(name, s, dataset)
     pc = person_class(name)
     fo = M.float_outputs(net.forward(x, train=False), net.net, CONF, IOU)
     io = M.int_outputs(inet.forward(quantize_input(x)), qm.net, luts, CONF, IOU)
@@ -343,13 +345,32 @@ def _misses(task):
     return rows
 
 
-def cmd_misses(args):
+def person_samples(dataset, n):
+    """First `n` test images of `dataset` with a non-difficult object mapped to `person`."""
+    from yolo.data import datasets
     from yolo.data.voc import CLASS_INDEX
 
-    tasks = {n: [(n, s) for s in samples(args.n, only_class=CLASS_INDEX["person"])]
+    if dataset == "voc":
+        return samples(n, only_class=CLASS_INDEX["person"])
+    src = [c for c, v in datasets.MAPPINGS[(dataset, "voc")].items() if v == "person"]
+    idx = [datasets.info(dataset).classes.index(c) for c in src]
+    out = [s for s in datasets.load(dataset)
+           if np.isin(np.asarray(s["labels"])[~np.asarray(s["difficult"], dtype=bool)],
+                      idx).any()]
+    return out[:n]
+
+
+def cmd_misses(args):
+    """`--dataset voc`: `misses.json` keyed by network; another dataset (ExDark) adds its
+    keys `<net>@<dataset>` to the same file, the VOC entries are kept."""
+    tasks = {n: [(n, s, args.dataset) for s in person_samples(args.dataset, args.n)]
              for n in args.nets}
     res = run_pool(args, _misses, tasks)
-    save("misses", {n: [r for rows in v for r in rows] for n, v in res.items()})
+    res = {n: [r for rows in v for r in rows] for n, v in res.items()}
+    if args.dataset != "voc":
+        old = json.loads((OUT / "misses.json").read_text()) if (OUT / "misses.json").exists() else {}
+        res = {**old, **{f"{n}@{args.dataset}": v for n, v in res.items()}}
+    save("misses", res)
 
 
 # ---------------------------------------------------------------- T36.6 concepts
@@ -668,6 +689,9 @@ def main():
         if name == "stages":
             p.add_argument("--golden", type=int, default=5,
                            help="images whose int map is checked against the golden")
+        if name == "misses":
+            p.add_argument("--dataset", default="voc",
+                           help="test split of a dataset with a person mapping (exdark)")
         if name == "concepts":
             p.add_argument("--layer", type=int, default=13)
         if name == "cka":

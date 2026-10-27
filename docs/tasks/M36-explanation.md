@@ -198,6 +198,9 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     39 %, v4 18 %. Low objectness dominates (69-89 %); mislocalized is 11-12 % for v2 only;
     quantization adds 5-11 % of the integer misses.
   - **Not run**: CrowdHuman, T27.3 and ExDark (CrowdHuman is not in `data/`).
+  - **ExDark** (2026-10-27): `tools/explain.py misses --dataset exdark` written (ground truth
+    through `MAPPINGS`, `People` → `person`; results under `<net>@exdark` in
+    `build/explain/misses.json`, the VOC entries kept); smoke run on 6 images. Full run open.
 
 ### [x] T36.6 — Concepts and channels
 - **Spec**: §4 · **Depends on**: T36.1 · **Runs on**: PC · **Size**: M
