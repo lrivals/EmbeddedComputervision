@@ -24,7 +24,7 @@ The claim of the draft is not the idea of failure prediction but its **joint tra
 the detector, its integer form and its cost on the chip. Outside the base of the spec: the
 method comes from the failure-prediction literature above.
 
-**State** (2026-10-26): the code of T39.0 to T39.5 is written and tested
+**State** (2026-10-27): T39.0 and T39.1 run at the T27.2 point on PREWID and COCO (YOLOv4-tiny), CrowdHuman pending. The code of T39.0 to T39.5 is written and tested
 (`python/tests/test_failure.py`); reduced runs with `tiny-yolov3-coco` on COCO persons and
 PREWID test are in [results/failure_prediction.md](../../results/failure_prediction.md), at a
 **provisional** threshold of 0.25. Every task stays open until T27.2 gives the operating
@@ -60,6 +60,20 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
     0.25. 61 % of the COCO persons missed (70 % of the images), 56 % of the PREWID persons
     (30 % of the frames). Imbalance: 0.4 and 2.3 failure-free images per failing one.
   - **Not run**: CrowdHuman val (data and weights not on the PC), the T27.2 threshold.
+  - **At the T27.2 point** (2026-10-27, YOLOv4-tiny, threshold 0.0953 = 0.1 FPPI of the
+    integer stage on PREWID `lab`, the T27.7 point), in
+    [results/failure_prediction.md](../../results/failure_prediction.md):
+    - **Labelled**: PREWID `test` (592), `lab` (3,000), COCO val2017 persons (2,693
+      images), float and integer. The `lab` integer labels give the 148 / 1,574 misses of
+      T27.7, the same miss.
+    - **Imbalance**: 17.5 (`test`) and 19.3 (`lab`) failure-free frames per failing one,
+      1.1 on COCO.
+    - **Causes**: COCO misses are mostly `no_anchor` (52 %; as in Tiny-YOLOv3, anchor 0
+      belongs to no head of YOLOv4-tiny); on `lab`, `nms_suppressed` (45 %, workers close
+      together).
+    - ExDark failed (`People` has no `person` class name), fixed in `person_index`
+      (`eval_view`, commit 5c6b5c9), rerun under way.
+    - The provisional Tiny-YOLOv3 files at 0.25 are moved to `build/m39/labels_provisional_v3/`.
 
 ### [ ] T39.1 — Post-hoc learned monitor
 - **Spec**: §8.3 · **Depends on**: T39.0, T29.0 · **Runs on**: PC · **Size**: M
@@ -86,6 +100,18 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
     int) against 0.77 for the max score and ≤ 0.54 for the other T29.0 monitors. PREWID:
     head 0.94 overall but 0.87 on the frames with persons, where the max score gets 0.94.
     The head is 49 k parameters and 49 k MACs.
+  - **At the T27.2 point** (2026-10-27, YOLOv4-tiny, integer, test split): AUROC of the
+    `miss` head against the max score:
+    - PREWID `lab`: 0.974 against 0.595; flags 53 % of the missed persons at 5 % alarms (max
+      score 3 %).
+    - PREWID `test`: 0.937 against 0.572, on only 3 failing test images, so noisy.
+    - COCO persons: 0.840 against 0.597.
+    - On the frames with persons alone the max score stays strong on PREWID (0.965 on `lab`,
+      the head 0.955).
+    - The `tcp` target is close (0.93 / 0.87 / 0.84).
+    - Across cameras (fitted on `test`, applied to `lab`) the head flags 5 % of the misses
+      at 5 % alarms: see T27.7.
+    - Not run: CrowdHuman val.
 
 ### [ ] T39.2 — Joint training of the detector and the failure head
 - **Spec**: §6, §7 · **Depends on**: T39.1 · **Runs on**: PC / Colab · **Size**: L

@@ -265,9 +265,21 @@ tiny-yolov4-coco integer on prewid `lab`, operating point 0.1 FPPI (threshold 0.
 | Monitor | Unit | Unflagged / total | Rate % | 95 % CI | Alarms % |
 |---|---|---|---|---|---|
 | detector alone | person | 148 / 1574 | 9.40 | [8.01, 10.95] | 0.0 |
+| tiny-yolov4-coco_prewid-lab__boxes__0.05__apply | person | 148 / 1574 | 9.40 | [8.01, 10.95] | 4.9 |
+| tiny-yolov4-coco_prewid-lab__failure-miss-int__0.05__apply | person | 141 / 1574 | 8.96 | [7.59, 10.48] | 5.0 |
+| tiny-yolov4-coco_prewid-lab__failure-tcp-int__0.05__apply | person | 143 / 1574 | 9.09 | [7.71, 10.61] | 5.0 |
+| tiny-yolov4-coco_prewid-lab__mahalanobis__0.05__apply | person | 145 / 1574 | 9.21 | [7.83, 10.75] | 5.0 |
+| tiny-yolov4-coco_prewid-lab__max_score__0.05__apply | person | 141 / 1574 | 8.96 | [7.59, 10.48] | 5.0 |
+| tiny-yolov4-coco_prewid-lab__norm__0.05__apply | person | 148 / 1574 | 9.40 | [8.01, 10.95] | 5.0 |
+| tiny-yolov4-coco_prewid-lab__patterns__0.05__apply | person | 148 / 1574 | 9.40 | [8.01, 10.95] | 2.5 |
 | detector alone | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
-
-Monitor rows pending: T29.1 (`tools/ood_monitor.py compare`), T39.1 (`tools/failure_prediction.py`) and M40, at the same alarm rate; pass their per-image alarms with `--flags`.
+| tiny-yolov4-coco_prewid-lab__boxes__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__failure-miss-int__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__failure-tcp-int__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__mahalanobis__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__max_score__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__norm__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
+| tiny-yolov4-coco_prewid-lab__patterns__0.05__apply | episode (N = 5) | 3 / 4 | 75.00 | [19.41, 99.37] | – |
 <!-- /m27:unflagged-prewid-lab-tiny-yolov4-coco -->
 
 <!-- m27:events-mot17-train -->

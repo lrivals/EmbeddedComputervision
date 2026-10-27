@@ -404,24 +404,39 @@ def cmd_compare_misses(args):
     maha = ood.Mahalanobis().fit(x[fit])
     boxes = ood.AbstractionBoxes(k=args.clusters, seed=args.seed).fit(pi[fit])
     patterns = ood.ActivationPatterns(bits=args.bits).fit(pi[fit])
-    raw = {"norm": (ood.norm(x), 0, d), "mahalanobis": (maha.score(x), d * (d + 1) * 4, d * d + d),
-           "max_score": (1.0 - getattr(L, f"top_{stage}"), 0, 1),
-           "boxes": (boxes.score(pi), boxes.memory_bytes, boxes.ops(d)),
-           "patterns": (patterns.score(pi), patterns.memory_bytes, patterns.ops(d))}
-    rows = []
-    for k, (sc, mem, ops) in raw.items():
-        best = None
-        for kind, v in (("raw", sc), ("typ", ood.typicality(sc, float(np.median(sc[val]))))):
+
+    def raw_scores(Lx):
+        """Scores of the fitted monitors on the images of a labels file (same network)."""
+        xx, pp = Lx.features(stage), Lx.feat_int.astype(np.int64)
+        return {"norm": ood.norm(xx), "mahalanobis": maha.score(xx),
+                "max_score": 1.0 - getattr(Lx, f"top_{stage}"),
+                "boxes": boxes.score(pp), "patterns": patterns.score(pp)}
+
+    cost = {"norm": (0, d), "mahalanobis": (d * (d + 1) * 4, d * d + d), "max_score": (0, 1),
+            "boxes": (boxes.memory_bytes, boxes.ops(d)),
+            "patterns": (patterns.memory_bytes, patterns.ops(d))}
+    rows, scorers = [], {}
+    for k, sc in raw_scores(L).items():
+        med, best = float(np.median(sc[val])), None
+        for kind, v in (("raw", sc), ("typ", ood.typicality(sc, med))):
             auc = ood.auroc(v[val & ~fails], v[val & fails])
             if best is None or auc > best[0]:
                 best = (auc, kind, v)
+        mem, ops = cost[k]
         rows.append({"monitor": k, "variant": best[1], "memory": int(mem), "macs": int(ops),
                      **metrics(L, stage, np.asarray(best[2], np.float64))})
+        scorers[k] = (lambda Lx, k=k, kind=best[1], med=med: raw_scores(Lx)[k] if kind == "raw"
+                      else ood.typicality(raw_scores(Lx)[k], med))
     for path in args.failure or ():
         h, meta = load_head(path)
-        rows.append({"monitor": f"failure ({h.target}, {meta['stage']})", "variant": "learned",
+        name = f"failure ({h.target}, {meta['stage']})"
+        rows.append({"monitor": name, "variant": "learned",
                      "memory": h.memory_bytes, "macs": h.macs,
                      **metrics(L, stage, h.score(L.features(meta["stage"])))})
+        scorers[name] = lambda Lx, h=h, st=meta["stage"]: h.score(Lx.features(st))
+    if args.flags:
+        write_flags(L, Labels(args.apply) if args.apply else L, scorers, args.flags, val,
+                    rate_on=args.rate_on)
     res = {"labels": L.name, "stage": stage, "rows": rows}
     (args.out / f"misses_{L.name}_{stage}.json").write_text(json.dumps(res, indent=1) + "\n")
     lines = ["| Monitor | Score | AUROC | AUROC, images with persons | Missed flagged @1 % | @5 % "
@@ -441,6 +456,32 @@ def cmd_compare_misses(args):
         write_section(f"monitors-{L.name}-{stage}", f"T29.0 monitors and learned heads against "
                       f"missed persons: {L.name}, {stage} stage (T39.1)",
                       MISSES_NOTE + "\n\n" + "\n".join(lines))
+
+
+def flag_name(monitor):
+    """File stem of a monitor's alarms: `failure (miss, int)` → `failure-miss-int`."""
+    return monitor.replace(" (", "-").replace(", ", "-").replace(")", "")
+
+
+def write_flags(L, A, scorers, out, val, rates=(0.01, 0.05), rate_on="val"):
+    """Per-image alarms `{image, alarm}` of each monitor on the images of `A` (T27.7
+    `person_safety.py unflagged --flags`): `<out>/<A>__<monitor>__<rate>[__<rate_on>].jsonl`.
+    The threshold gives each alarm rate on the val split of `L` (`rate_on="val"`), or on the
+    scores of `A` itself (`"apply"`: no label used, the alarm rate set on the deployment
+    camera, for monitors whose thresholds do not transfer)."""
+    out.mkdir(parents=True, exist_ok=True)
+    for k, score in scorers.items():
+        s_val = np.asarray(score(L), np.float64)[val]
+        s_app = np.asarray(score(A), np.float64)
+        for r in rates:
+            thr = float(np.quantile(s_val if rate_on == "val" else s_app, 1.0 - r))
+            tag = "" if rate_on == "val" else f"__{rate_on}"
+            path = out / f"{A.name}__{flag_name(k)}__{r:g}{tag}.jsonl"
+            path.write_text("".join(json.dumps({"image": str(i), "alarm": bool(v > thr)}) + "\n"
+                                    for i, v in zip(A.ids, s_app)))
+            src = f"{L.name} val" if rate_on == "val" else f"{A.name} scores"
+            print(f"{path.name}: alarms {100 * np.mean(s_app > thr):.1f} % "
+                  f"(threshold from {src} at {100 * r:g} %)")
 
 
 MISSES_NOTE = """`tools/ood_monitor.py compare --labels … --failure …`, test split. The T29.0
@@ -491,6 +532,12 @@ def main():
     p.add_argument("--stage", choices=("float", "int"), default="int")
     p.add_argument("--failure", type=Path, nargs="*", default=None,
                    help="T39.1 heads (build/m39/heads/*.npz) added as rows")
+    p.add_argument("--apply", type=Path, default=None,
+                   help="labels whose images get the alarms of --flags (default: --labels)")
+    p.add_argument("--flags", type=Path, default=None,
+                   help="folder of per-image alarms at 1 %% and 5 %% (T27.7 --flags)")
+    p.add_argument("--rate-on", choices=("val", "apply"), default="val",
+                   help="alarm-rate threshold from the val split of --labels or from --apply")
     p.add_argument("--write", action="store_true", help="section of results/failure_prediction.md")
     args = ap.parse_args()
     if args.cmd == "compare" and args.labels:

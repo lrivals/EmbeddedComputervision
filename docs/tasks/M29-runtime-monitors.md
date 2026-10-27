@@ -24,7 +24,9 @@ No monitor wins on both shifts: the detector's max score is the best on ExDark (
 the activation patterns on FLIR (AUROC 0.93). T29.2 done on PREWID: the conformal threshold
 does not hold its bound across CCTV blocks, and loses it under every degradation. T29.3 measured on
 PREWID `lab` and MOT17: the hold 1/3 helps on short gaps only; its T25.8 part waits.
-T29.1 runs on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data.
+T29.1 measured at the T27.2 point on PREWID and COCO: the OOD scores are blind to the
+missed persons (AUROC ≤ 0.62), the learned head of T39.1 is not (0.84-0.97); CrowdHuman, ExDark
+and the degraded sets pending.
 
 ### [x] T29.0 — Monitor comparison
 - **Spec**: §4, §8 · **Depends on**: T25.5 · **Runs on**: PC · **Size**: M
@@ -67,7 +69,21 @@ T29.1 runs on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data
     [results/failure_prediction.md](../../results/failure_prediction.md)): on COCO persons
     every OOD score stays at AUROC 0.38-0.54 while the max score reaches 0.66-0.77, so they
     are blind to in-domain misses, as the note expected.
-  - **Not run**: CrowdHuman val, the T27.3 sets, ExDark, at the T27.2 point.
+  - **At the T27.2 point** (2026-10-27, YOLOv4-tiny integer, test splits of PREWID `test`,
+    `lab` and the COCO persons, [results/failure_prediction.md](../../results/failure_prediction.md)):
+    - Best AUROC of the OOD scores for "this image has a missed person": 0.60 / 0.62 / 0.58
+      (activation patterns, Mahalanobis); max score 0.57 / 0.60 / 0.61; learned head of
+      T39.1 0.94 / 0.97 / 0.84.
+    - Missed persons flagged at 5 % alarms on `lab`: 0 % (norm, Mahalanobis, boxes), 6 %
+      (patterns), 3 % (max score), 53 % (head).
+    - The OOD scores stay blind to in-domain misses, as the note expected. Mahalanobis costs
+      9.4 MB and 2.4 M ops for nothing.
+  - **Alarms for T27.7**: `compare --apply <labels> --flags <dir> [--rate-on val|apply]`
+    writes the per-image alarms of every monitor at 1 % and 5 % on another set. The
+    thresholds of `test` do not transfer to `lab` (0 or 100 % alarms), so the rows of T27.7
+    set the alarm rate on the `lab` scores.
+  - **Not run**: CrowdHuman val, the T27.3 degraded sets (`failure_labels.py` has no
+    `--degrade` yet), ExDark (labels running).
 
 ### [x] T29.2 — Conformal threshold for persons
 - **Spec**: §8.1 · **Depends on**: T27.2 · **Runs on**: PC · **Size**: M

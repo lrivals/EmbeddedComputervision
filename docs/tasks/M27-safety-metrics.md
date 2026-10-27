@@ -23,12 +23,12 @@ The chain of the repo gives the three stages (float, integer, C-sim) on CrowdHum
 adds the metrics and the test conditions. Outside the base of the spec: the method comes
 from the pedestrian-detection literature (miss rate against FPPI) and from DEEL.
 
-**State** (2026-10-26): code and tests of every task done; runs done on PREWID (`test`,
+**State** (2026-10-27): code and tests of every task done; runs done on PREWID (`test`,
 592 frames of which 289 empty, and the 3,000-frame `lab` sequence). Done: T27.0 (metrics,
 checked by hand and against a brute-force reference). Code done, PREWID measured, CrowdHuman
 / MOT17 / ExDark runs pending (data not in `data/`, no `tiny-yolov3-crowdhuman` checkpoint,
 T15.14): T27.1-T27.5. T27.6 slot and procedure done, waiting for the ARCYS images. T27.7
-metric done, detector-alone row measured, monitor rows waiting for T29.1 / T39.1 / M40.
+done on PREWID `lab` with the monitor rows of T29.1 / T39.1 (M40 to add).
 Results: [results/person_safety.md](../../results/person_safety.md); figure
 `miss_fppi` (T13.61).
 
@@ -228,7 +228,7 @@ $P unflagged --dataset prewid --split lab --net tiny-yolov4-coco \
   out-of-domain person AP50 89.9 on `test` (YOLOv4-tiny COCO, T38.6). The `industrial`
   slot can reuse the PREWID loader (one JSON per split, empty frames kept).
 
-### [ ] T27.7 — Unflagged dangerous false negatives
+### [x] T27.7 — Unflagged dangerous false negatives
 - **Spec**: §8.3 · **Depends on**: T27.2, T27.4, T29.1, T39.1 · **Runs on**: PC · **Size**: S
 - **Deliverables**: in `python/yolo/infer/metrics.py`: the unflagged-miss rate;
   `results/person_safety.md` section
@@ -249,8 +249,17 @@ $P unflagged --dataset prewid --split lab --net tiny-yolov4-coco \
   persons missed (9.40 %, CI [8.01, 10.95]); per episode (N = 5 frames), 3 of the 4 long
   presence episodes hold a 5-frame miss (75 %, CI [19, 99]): four episodes is too few for
   a useful interval, the counts are written next to the rate.
-- **Pending**: the monitor rows (T29.1, T39.1, M40): write their per-image alarms at the
-  chosen alarm rate as `{image, alarm}` JSONL and pass them with `--flags`.
+- **Done** (2026-10-27, monitor rows): the seven monitors of T29.1 and T39.1 are fitted
+  on PREWID `test` (out of sample for `lab`). Their per-image alarms on the 3,000 `lab`
+  frames are written by `tools/ood_monitor.py compare --labels <test> --apply <lab> --flags
+  build/m39/flags --rate-on apply`, at the same alarm rate for all, 1 % and 5 % (threshold
+  set on the `lab` scores, no label). At 5 % alarms the best rows, the learned miss head and
+  the max score, leave 141 / 1,574 persons unflagged (8.96 %, CI [7.59, 10.48]) against
+  148 for the detector alone. The episodes do not move (3 / 4). M40 stays to add.
+- **Reading**: the learned head flags 53 % of the misses inside one camera (T39.1, `lab` test
+  split) but 5 % from the cameras of `test` to `lab`. With thresholds taken from `test`
+  instead (`--rate-on val`), every monitor goes to 0 % or 100 % alarms on `lab`: neither the
+  monitors nor their thresholds transfer across cameras.
 
 ## Dependencies
 
