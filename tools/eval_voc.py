@@ -218,7 +218,7 @@ def run_inference(net, samples, size, mode, interp, conf, iou, batch, workers, j
 
 
 def table(aps, m, title, names):
-    lines = [f"### {title}", "", "| Classe | AP |", "|---|---|"]
+    lines = [f"### {title}", "", "| Class | AP |", "|---|---|"]
     lines += [f"| {name} | {ap * 100:.1f} |" for name, ap in zip(names, aps)]
     lines += [f"| **mAP** | **{m * 100:.2f}** |", ""]
     return "\n".join(lines)
@@ -229,7 +229,7 @@ def coco_table(res, title, names):
     lines = [f"### {title}", "", "| " + " | ".join(coco_eval.STATS) + " |",
              "|---" * len(coco_eval.STATS) + "|",
              "| " + " | ".join(f"{res[k] * 100:.1f}" for k in coco_eval.STATS) + " |", "",
-             "| Classe | AP | AP50 |", "|---|---|---|"]
+             "| Class | AP | AP50 |", "|---|---|---|"]
     lines += [f"| {n} | {a * 100:.1f} | {b * 100:.1f} |"
               for n, a, b in zip(names, res["ap_class"], res["ap50_class"])]
     return "\n".join(lines + [""])
@@ -306,24 +306,24 @@ def main():
         tag = datasets.tag(args.dataset, split)
         out = args.out or ROOT / "build" / "eval" / (f"{run}-{tag}" if tag else run)
         write_detections(dets, view.names, out)
-        print(f"détections : {out}")
+        print(f"detections: {out}")
         wname = args.weights.name if args.weights else ul_net_file(args.net)
         title = (f"{args.net} ({wname}), {where}, {len(samples)} images, "
                  f"{size_label(args.size)} {args.resize} ({args.interp}), conf {args.conf}, "
                  f"NMS {args.iou}" + (f", max {args.max_det}" if args.max_det else ""))
         if args.tiles:
-            title += (f", tuiles {args.tiles} px (recouvrement {args.overlap:g}"
-                      + (", sans l'image entière)" if args.no_full else ", + image entière)"))
+            title += (f", tiles {args.tiles} px (overlap {args.overlap:g}"
+                      + (", without the whole image)" if args.no_full else ", + whole image)"))
 
     if metric == "coco":
         res = coco_eval.evaluate(dets, samples, len(view.names))
-        text = coco_table(res, title + ", métrique COCO (101 points)", view.names)
+        text = coco_table(res, title + ", COCO metric (101 points)", view.names)
     else:
         aps, m = evaluate(dets, samples, len(view.names), use_07=not args.area,
                           use_ignore=not args.no_ignore)
-        title += ", AP " + ("aire" if args.area else "11 points")
+        title += ", AP " + ("area" if args.area else "11 points")
         if any(len(s.get("ignore_xyxy", ())) for s in samples):
-            title += ", régions ignorées " + ("comptées FP" if args.no_ignore else "exclues")
+            title += ", ignored regions " + ("counted as FP" if args.no_ignore else "excluded")
         text = table(aps, m, title, view.names)
     print(text)
     if args.markdown:

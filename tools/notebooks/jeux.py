@@ -39,17 +39,32 @@ SLOTS = 256  # yolo_post slots (M9.1)
 VOC_LUMINANCE = 112.0  # VOC2007 mean luminance (INT8 calibration, M4) when VOC is not loaded
 SHIFT = ("classes", "area_in", "w_in", "h_in", "aspect", "per_image")
 
-# Table kind ← start of its header row (first cells, as written by tools/data_stats.py).
-KINDS = [("synthese", "| partie | images | objets | difficult"),
-         ("classes", "| classe | "),
-         ("geometrie", "| repère | petits"),
-         ("densite", "| partie | objets/image moy."),
-         ("images", "| partie | résolutions"),
-         ("ancres", "| ancres | w,h"),
-         ("qualite", "| partie | retirées"),
-         ("ecart", "| grandeur (train ↔ test)"),
-         ("couverture", "| split | classes du modèle"),
-         ("eclairage", "| éclairage |")]
+# Table kind ← start of its header row (first cells, as written by tools/data_stats.py), in
+# English (T19.6) or in French (notebooks executed before it, kept by --archive). The cells
+# of an English table are put in the French number format before parsing (`_to_fr`).
+KINDS = [("synthese", "| partie | images | objets | difficult", "fr"),
+         ("synthese", "| part | images | objects | difficult", "en"),
+         ("classes", "| classe | ", "fr"),
+         ("classes", "| class | ", "en"),
+         ("geometrie", "| repère | petits", "fr"),
+         ("geometrie", "| frame | small", "en"),
+         ("densite", "| partie | objets/image moy.", "fr"),
+         ("densite", "| part | objects/image mean", "en"),
+         ("images", "| partie | résolutions", "fr"),
+         ("images", "| part | resolutions", "en"),
+         ("ancres", "| ancres | w,h", "fr"),
+         ("ancres", "| anchors | w,h", "en"),
+         ("qualite", "| partie | retirées", "fr"),
+         ("qualite", "| part | removed", "en"),
+         ("ecart", "| grandeur (train ↔ test)", "fr"),
+         ("ecart", "| quantity (train ↔ test)", "en"),
+         ("couverture", "| split | classes du modèle", "fr"),
+         ("couverture", "| split | model classes", "en"),
+         ("eclairage", "| éclairage |", "fr"),
+         ("eclairage", "| lighting |", "en")]
+# English row and text words → the French ones the parsers below look for.
+EN_WORDS = (("all", "ensemble"), ("train group", "groupe train"),
+            ("original image", "image d'origine"))
 
 
 # ------------------------------------------------------------------------- parsing
@@ -106,17 +121,35 @@ def _blocks(text):
     return out
 
 
+def _to_fr(cell):
+    """English cell → French number format: `1,234.5` → `1 234,5`, `13x13: 4` → `13x13 : 4`,
+    row names of `EN_WORDS`; the w,h pairs of the anchor table (`10,14`) stay as they are."""
+    if re.fullmatch(r"`[\d,\s]+`", cell):
+        return cell
+    cell = re.sub(r"(?<=\d),(?=\d{3}\b)", " ", cell)
+    cell = re.sub(r"(?<=\d)\.(?=\d)", ",", cell)
+    cell = re.sub(r"(\d+x\d+): ", r"\1 : ", cell)
+    return dict(EN_WORDS).get(cell, cell)
+
+
 def _tables(cells):
-    """[(kind, header, rows, text after the table)] of the Markdown outputs, in order."""
+    """[(kind, header, rows, text after the table)] of the Markdown outputs, in order; the
+    English tables come back in the French format of the parsers."""
     out = []
     for _, text, _ in cells:
         for b, after in _blocks(text):
-            kind = next((k for k, h in KINDS if b.startswith(h)), None)
+            kind, lang = next(((k, lg) for k, h, lg in KINDS if b.startswith(h)), (None, None))
             if kind is None:
                 continue
-            if kind == "classes" and "objets (images)" not in b.splitlines()[0]:
+            if kind == "classes" and not re.search(r"(objets|objects) \(images\)",
+                                                   b.splitlines()[0]):
                 continue  # class mapping (VOC / COCO) or per-class AP table
             head, rows = _rows(b)
+            if lang == "en":
+                head = [h.replace(": objects (images)", " : objets (images)") for h in head]
+                rows = [[_to_fr(c) for c in r] for r in rows]
+                after = _to_fr(after.replace("Ratio of the most / least frequent class:",
+                                             "fréquente :"))
             out.append((kind, head, rows, after))
     return out
 
@@ -233,12 +266,13 @@ def parse_stats(path):
     cells = _cells(path)
     ds = path.parent.name
     text = "\n".join(t for _, t, _ in cells)
-    m = re.search(r"révision (\w+)", text) or re.search(r"@ (\w+) ;", text)
+    m = (re.search(r"(?:révision|revision) (\w+)", text)
+         or re.search(r"@ (\w+)(?: ;|;)", text))
     cfg = re.search(r"; cfg (\S+)\s*$", text, re.M)
     d = {"dataset": ds, "label": LABELS.get(ds, ds), "notebook": _rel(path),
          "family": "aerial" if ds in AERIAL else "ground",
          "rev": m.group(1) if m else None, "net": cfg.group(1) if cfg else None,
-         "fallback": bool(re.search(r"cfg \S+ absente", text))}
+         "fallback": bool(re.search(r"cfg \S+ (?:absente|missing)", text))}
     for kind, head, rows, after in _tables(cells):
         if not rows:
             continue

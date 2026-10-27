@@ -78,7 +78,7 @@ def find_runs(model_dir):
 
 def listing(runs):
     if not runs:
-        return "aucun run entraîné"
+        return "no trained run"
     def when(r):
         return time.strftime("%Y-%m-%d %H:%M", time.localtime(r.mtime))
     return "\n".join(f"  {r.name:12s} {r.weights}  ({when(r)})" for r in runs)
@@ -94,9 +94,9 @@ def pick(model_dir, name=None, hint=""):
     hit = [r for r in runs if r.name == name]
     if hit:
         return hit[0]
-    want = f"run {name!r}" if name else "un run entraîné"
-    raise Prerequis(f"{want} introuvable dans {model_dir} ; runs disponibles :\n"
-                    f"{listing(runs)}\n  à lancer : {hint or 'le notebook _train ou _sweep'}")
+    want = f"run {name!r}" if name else "a trained run"
+    raise Prerequis(f"{want} not found in {model_dir}; runs available:\n"
+                    f"{listing(runs)}\n  to run: {hint or 'the _train or _sweep notebook'}")
 
 
 # ----------------------------------------------------------------------- comparaison
@@ -178,19 +178,19 @@ def evaluate(run, net, dataset, resize, subset, metric=None, split=None, size=No
 def row(run, map_, subset=None):
     m = run.meta
     batch = m.get("batch")
-    return {"run": run.name, "lot": batch, "images": m.get("subset", "") or "tout",
-            "graine": m.get("seed", 0), "itérations": m.get("iters", ""),
-            "géométrie": m.get("resize", "letterbox") + (f" crop {m['crop']}" if m.get("crop")
-                                                         else ""),
+    return {"run": run.name, "batch": batch, "images": m.get("subset", "") or "all",
+            "seed": m.get("seed", 0), "iterations": m.get("iters", ""),
+            "geometry": m.get("resize", "letterbox") + (f" crop {m['crop']}" if m.get("crop")
+                                                        else ""),
             "backend": m.get("device", ""),
-            "perte finale": last_loss(run.dir), "mAP": map_,
-            "s/image": s_per_image(run.dir, batch), "éval.": subset or "tout"}
+            "final loss": last_loss(run.dir), "mAP": map_,
+            "s/image": s_per_image(run.dir, batch), "eval.": subset or "all"}
 
 
 def table(rows):
     """Table markdown des runs, triée par mAP décroissante."""
     if not rows:
-        return "aucun run"
+        return "no run"
     cols = list(rows[0])
 
     def fmt(v):
@@ -209,7 +209,8 @@ def table(rows):
 def parse_eval(text):
     """Bloc de `tools/eval_voc.py` → {metric, map, ap, ap50, coco, classes, classes50,
     ms_image} ; AP de classe None si la classe n'a aucune instance (-100 de COCO)."""
-    out = {"metric": "coco" if "métrique COCO" in text else "voc", "map": None, "ap": None,
+    out = {"metric": "coco" if re.search(r"métrique COCO|COCO metric", text) else "voc",
+           "map": None, "ap": None,
            "ap50": None, "coco": {}, "classes": {}, "classes50": {}, "ms_image": None}
     m = re.search(r"\((\d+) ms/image\)", text)
     if m:
@@ -222,7 +223,7 @@ def parse_eval(text):
         if head[:2] == ["AP", "AP50"] and not out["coco"]:  # résumé COCO
             vals = [float(c) for c in lines[i + 2].strip().strip("|").split("|")]
             out["coco"] = dict(zip(head, vals))
-        elif head[0] == "Classe" and not out["classes"]:
+        elif head[0] in ("Classe", "Class") and not out["classes"]:  # FR: before T19.6
             for row in lines[i + 2:]:
                 if not row.startswith("|"):
                     break

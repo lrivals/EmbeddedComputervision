@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 
+from yolo import fmt  # noqa: E402
 from yolo.models.specs import NETWORKS, infer_shapes, layer_cost  # noqa: E402
 
 
@@ -54,16 +55,15 @@ def table(net):
 def print_table(net):
     rows = table(net)
     print(f"## {net['name']}\n")
-    print("| # | Couche | k/s | C_in→C_out | Sortie | Paramètres | MACs (M) |")
+    print("| # | Layer | k/s | C_in→C_out | Output | Parameters | MACs (M) |")
     print("|---|---|---|---|---|---|---|")
     for i, name, ks, chans, out, params, macs in rows:
-        p = f"{params:,}".replace(",", " ") if params else ""
-        mm = f"{macs / 1e6:,.1f}".replace(",", " ").replace(".", ",") if macs else ""
+        p = fmt.num(int(params)) if params else ""
+        mm = fmt.num(macs / 1e6, 1) if macs else ""
         print(f"| {i} | {name} | {ks} | {chans} | {out} | {p} | {mm} |")
     total_p = sum(r[5] for r in rows)
     total_m = sum(r[6] for r in rows)
-    print(f"| | **Total** | | | | **{total_p / 1e6:.2f} M** | **{total_m / 1e9:.2f} G** |\n"
-          .replace(".", ","))
+    print(f"| | **Total** | | | | **{total_p / 1e6:.2f} M** | **{total_m / 1e9:.2f} G** |\n")
 
 
 def main():

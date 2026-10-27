@@ -1337,10 +1337,11 @@ BALAYAGES_MD = "docs/tasks/resultats-balayages.md"
 
 
 def _md_number(cell):
-    """« **36,27** » → 36.27 ; None si la cellule n'est pas un nombre."""
+    """« **36.27** » → 36.27 (English format since T19.6: commas are thousands) ; None si la
+    cellule n'est pas un nombre."""
     t = cell.replace("*", "").replace("`", "").replace(" ", "").replace(" ", "")
     try:
-        return float(t.replace(",", "."))
+        return float(t.replace(",", ""))
     except ValueError:
         return None
 
@@ -1376,18 +1377,18 @@ def load_balayages(path):
             mcol = next((i for h, i in col.items() if h.startswith("map")), None)
             if mcol is None:
                 continue
-            if "lot" in col:
+            if "batch" in col:
                 for r in rows:
-                    sweep.append({"run": r[col["run"]], "batch": int(r[col["lot"]]),
-                                  "subset": 0 if r[col["images"]] == "tout"
+                    sweep.append({"run": r[col["run"]], "batch": int(r[col["batch"]]),
+                                  "subset": 0 if r[col["images"]] == "all"
                                   else int(r[col["images"]]),
-                                  "loss": _md_number(r[col["perte finale"]]),
+                                  "loss": _md_number(r[col["final loss"]]),
                                   "map": _md_number(r[mcol])})
-            elif "modèle" in col:
+            elif "model" in col:
                 ccol = next((i for h, i in col.items() if h.startswith("classes")), None)
                 for r in rows:
                     classes = r[ccol].split()[0] if ccol is not None else ""
-                    infer.append({"model": r[col["modèle"]].replace("`", ""),
+                    infer.append({"model": r[col["model"]].replace("`", ""),
                                   "classes": int(classes) if classes.isdigit() else None,
                                   "map": _md_number(r[mcol])})
         if sweep or infer:

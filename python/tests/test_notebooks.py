@@ -499,10 +499,10 @@ def test_runs_trouves_et_choisis(tmp_path, monkeypatch):
     assert runs.pick("m", "train").weights == "m/final.weights"
     with pytest.raises(Prerequis, match="b16-sall"):
         runs.pick("m", "b64-sall")
-    with pytest.raises(Prerequis, match="aucun run"):
+    with pytest.raises(Prerequis, match="no trained run"):
         runs.pick("vide")
     row = runs.row(found[2], 41.5, 50)
-    assert row["perte finale"] == 3.0 and row["s/image"] == 1.0 and row["images"] == 500
+    assert row["final loss"] == 3.0 and row["s/image"] == 1.0 and row["images"] == 500
     text = runs.table([runs.row(found[1], 30.0), row, runs.row(found[0], None)])
     assert text.splitlines()[2].startswith("| b8-s500 | 8 | 500 |")
     assert text.splitlines()[-1].startswith("| train |")

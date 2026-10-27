@@ -41,7 +41,7 @@ def map_table(rows):
     def fmt(v, spec):
         return "—" if v is None else format(v, spec)
 
-    lines = ["| Fichier | Variante | Images | resize | conf | iou | mAP | dét./image | perdues |",
+    lines = ["| File | Variant | Images | resize | conf | iou | mAP | det./image | lost |",
              "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         lines.append(f"| {r['file']} | {r['variant']} | {r['images']} | {r['resize'] or '—'} | "
@@ -117,26 +117,26 @@ def main():
     if args.cmd == "map":
         print(map_table(map_rows(args.files)))
     elif args.cmd == "loss":
-        print(f"| Essai | Itérations | Perte début (moy. {args.window}) | Perte fin | Écart | "
-              "s / itération |\n|---|---|---|---|---|---|")
+        print(f"| Run | Iterations | Start loss (mean {args.window}) | End loss | Change | "
+              "s / iteration |\n|---|---|---|---|---|---|")
         for f in args.files:
             s = loss_summary(f, args.window)
             spi = "—" if s["s_per_iter"] is None else f"{s['s_per_iter']:.2f}"
             print(f"| {f.parent.name} | {s['iters']} | {s['start']:.3f} | {s['end']:.3f} | "
                   f"{s['change'] * 100:+.1f} % | {spi} |")
     elif args.cmd == "admm":
-        print("| Essai | Pas Z/U | Itération | ρ | Résidu max (couche) | Pente moyenne | "
-              "< 0,01 |\n|---|---|---|---|---|---|---|")
+        print("| Run | Z/U steps | Iteration | ρ | Max residual (layer) | Mean slope | "
+              "< 0.01 |\n|---|---|---|---|---|---|---|")
         for f in args.files:
             s = admm_summary(f)
             print(f"| {f.parent.name} | {s['updates']} | {s['it']} | {s['rho']:.3g} | "
                   f"{s['max_res']:.4f} (L{s['worst']}) | {s['mean_slope']:+.4f} | "
-                  f"{'oui' if s['converged'] else 'non'} |")
+                  f"{'yes' if s['converged'] else 'no'} |")
     else:
         n, diff, missing = dets_compare(args.ref, args.got)
-        print(f"{n} images comparées, {len(diff)} différentes"
-              + (f" (ex. {diff[:5]})" if diff else "")
-              + (f", {len(missing)} absentes de la référence" if missing else ""))
+        print(f"{n} images compared, {len(diff)} different"
+              + (f" (e.g. {diff[:5]})" if diff else "")
+              + (f", {len(missing)} missing from the reference" if missing else ""))
         sys.exit(1 if diff or missing or n == 0 else 0)
 
 

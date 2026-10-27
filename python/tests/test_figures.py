@@ -341,25 +341,25 @@ BALAYAGES = """# Résultats
 
 ## VOC
 
-### Balayage
+### Sweep
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b32-sall** | 32 | tout | 1,16 | 14,66 | **36,27** |
-| b8-s500 | 8 | 500 | 9,60 | 18,00 | 30,14 |
+| **b32-sall** | 32 | all | 1.16 | 14.66 | **36.27** |
+| b8-s500 | 8 | 500 | 9.60 | 18.00 | 30.14 |
 
-### Inférence
+### Inference
 
-| modèle | poids | classes évaluées | mAP |
+| model | weights | classes evaluated | mAP |
 |---|---|---|---|
-| `tiny-yolov3-coco` | Darknet | 20 (via `MAPPINGS`) | **68,45** |
-| `tiny-yolov3-voc` | run `b32-sall` | 20 | 36,27 |
+| `tiny-yolov3-coco` | Darknet | 20 (via `MAPPINGS`) | **68.45** |
+| `tiny-yolov3-voc` | run `b32-sall` | 20 | 36.27 |
 
 ## VisDrone
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| b16-s500 | 16 | 500 | 19,20 | 220,65 | 1,35 |
+| b16-s500 | 16 | 500 | 19.20 | 220.65 | 1.35 |
 
 ## Meilleurs paramètres
 

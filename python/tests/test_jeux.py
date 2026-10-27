@@ -190,3 +190,29 @@ def test_versioned_kitti_notebook():
     d = J.parse_stats(p)
     assert d["synthese"]["images"] > 7000 and len(d["classes"]["names"]) == 8
     assert d["densite"]["orphan"] + d["densite"]["collide"] == d["densite"]["lost"]
+
+
+def test_english_tables_parse_as_french(tmp_path):
+    """T19.6: tables written in English (decimal point, comma thousands) give the same
+    values as the French tables of the notebooks executed before."""
+    en = (SYNTH.replace("| partie | images | objets | difficult | images vides | "
+                        "objets/image (méd. / max) | petits < 32² à 416×416 | "
+                        "plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |",
+                        "| part | images | objects | difficult | empty images | "
+                        "objects/image (med. / max) | small < 32² at 416×416 | "
+                        "smaller than a cell | lost targets | images > 256 / > 1,024 |")
+          .replace("1 000", "1,000").replace("12 000", "12,000").replace("1 500", "1,500")
+          .replace("18 000", "18,000").replace(",0 %", ".0 %").replace(",5 %", ".5 %")
+          .replace("20,00 %", "20.00 %").replace("21,50 %", "21.50 %")
+          .replace("| ensemble |", "| all |"))
+    dens = ("| part | objects/image mean | med. | max | > 256 / > 1,024 | lost targets | "
+            "per head (lost / objects) | images hit |\n|---|---|---|---|---|---|---|---|\n"
+            "| all | 12.0 | 10 | 300 | 1 / 0 | 3,870 / 18,000 (21.50 %) | "
+            "13x13: 20 / 2,000 · 26x26: 250 / 12,400 | 900 |\n")
+    path = _notebook(tmp_path / "visdrone" / "visdrone_stats.ipynb", [
+        [_stream("outputs: build/notebooks/x/stats/; revision abc1234\n"), _md(en)],
+        [_md(dens)]])
+    d = J.parse_stats(path)
+    fr = J.parse_stats(_toy(tmp_path / "fr"))
+    assert d["rev"] == "abc1234" and d["synthese"] == fr["synthese"]
+    assert d["densite"] == fr["densite"]

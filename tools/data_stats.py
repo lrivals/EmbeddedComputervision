@@ -37,6 +37,7 @@ for _p in (ROOT, ROOT / "python"):
         sys.path.insert(0, str(_p))
 
 from yolo.data import datasets as D  # noqa: E402
+from yolo import fmt  # noqa: E402
 from yolo.data.anchors import kmeans_anchors, mean_best_iou  # noqa: E402
 from yolo.data.letterbox import as_hw, boxes_to_letterbox, parse_size, size_label  # noqa: E402
 from yolo.data.targets import anchor_ref, anchors_frac, build_targets, heads  # noqa: E402
@@ -92,155 +93,157 @@ FICHES = {
         "name": "PASCAL VOC 2007 + 2012",
         "source": "http://host.robots.ox.ac.uk/pascal/VOC/",
         "version": "VOC2007 (test, trainval), VOC2012 (trainval)",
-        "license": "images Flickr (conditions de Flickr), annotations pour la recherche",
-        "sensor": "photos grand public de Flickr, scènes de la vie courante, couleur",
+        "license": "Flickr images (Flickr terms), annotations for research",
+        "sensor": "consumer photos from Flickr, everyday scenes, colour",
         "resolution": "≈ 500×375",
         "classes": D.VOC_CLASSES,
         "official": {"2007:test": (4952, 12032), "2007:trainval": (5011, 12608),
                      "2012:trainval": (11540, 27450)},
-        "objects": "objets non-difficult (tableaux « Main » du devkit)",
-        "notes": ["objets `difficult` gardés, ignorés par l'évaluation VOC",
-                  "test : 2007:test ; calibration : 2007:trainval ; affinage : 07+12 trainval"],
+        "objects": "non-difficult objects (\"Main\" tables of the devkit)",
+        "notes": ["`difficult` objects kept, ignored by the VOC evaluation",
+                  "test: 2007:test; calibration: 2007:trainval; fine-tuning: 07+12 trainval"],
     },
     "coco": {
         "name": "MS COCO 2017",
         "source": "https://cocodataset.org",
-        "version": "2017 (val2017, train2017 ; calib2017 de tools/coco_subset.py)",
-        "license": "annotations CC BY 4.0, images Flickr (conditions de Flickr)",
-        "sensor": "photos Flickr, scènes encombrées, couleur",
+        "version": "2017 (val2017, train2017; calib2017 of tools/coco_subset.py)",
+        "license": "annotations CC BY 4.0, Flickr images (Flickr terms)",
+        "sensor": "Flickr photos, cluttered scenes, colour",
         "resolution": "≈ 640×480",
         "classes": D.COCO_CLASSES,
         "official": {"val2017": (5000, 36781), "train2017": (118287, 860001),
                      "calib2017": (None, None)},
-        "objects": "toutes les annotations, `iscrowd` compris",
-        "notes": ["boîtes gardées sans rognage (`clip=False`, comme COCOeval)",
-                  "`iscrowd` en `difficult` et `crowd`",
-                  "calib2017 : 500 images annotées de train2017 (tools/coco_subset.py)"],
+        "objects": "every annotation, `iscrowd` included",
+        "notes": ["boxes kept without clipping (`clip=False`, as COCOeval)",
+                  "`iscrowd` as `difficult` and `crowd`",
+                  "calib2017: 500 annotated images of train2017 (tools/coco_subset.py); "
+                  "train2017 read from its annotations only (images not on the PC)"],
     },
     "kitti": {
         "name": "KITTI 2D object",
         "source": "https://www.cvlibs.net/datasets/kitti/eval_object.php",
-        "version": "object 2012, training/ (le test n'a pas d'annotations publiques)",
+        "version": "object 2012, training/ (the test has no public annotations)",
         "license": "CC BY-NC-SA 3.0",
-        "sensor": "caméra couleur stéréo (Point Grey Flea 2) sur voiture, Karlsruhe, de jour",
+        "sensor": "stereo colour camera (Point Grey Flea 2) on a car, Karlsruhe, by day",
         "resolution": "≈ 1242×375",
         "classes": D.KITTI_CLASSES,
         "official": {"train": (5985, None), "val": (1496, None)},
-        "objects": "découpage maison de 7 481 images (`kitti_ids`, 20 % en val, graine 0)",
-        "notes": ["`DontCare` retiré par le chargeur",
-                  "train/val : permutation à graine fixe des identifiants (`kitti_ids`)"],
+        "objects": "own split of 7,481 images (`kitti_ids`, 20 % in val, seed 0)",
+        "notes": ["`DontCare` removed by the loader",
+                  "train/val: permutation of the ids with a fixed seed (`kitti_ids`)"],
     },
     "visdrone": {
         "name": "VisDrone2019-DET",
         "source": "https://github.com/VisDrone/VisDrone-Dataset",
         "version": "VisDrone2019-DET (train, val, test-dev)",
-        "license": "recherche, non commerciale",
-        "sensor": "caméras de drones, 14 villes de Chine, altitudes et angles variés",
-        "resolution": "960×540 à 2000×1500",
+        "license": "research, non-commercial",
+        "sensor": "drone cameras, 14 cities of China, varied altitudes and angles",
+        "resolution": "960×540 to 2000×1500",
         "classes": D.VISDRONE_CLASSES,
         "official": {"train": (6471, None), "val": (548, None)},
-        "objects": "objets des 10 classes",
-        "notes": ["régions ignorées (catégorie 0) et « others » (11) retirées par le chargeur"],
+        "objects": "objects of the 10 classes",
+        "notes": ["ignored regions (category 0) and \"others\" (11) removed by the loader"],
     },
     "crowdhuman": {
         "name": "CrowdHuman",
         "source": "https://www.crowdhuman.org",
-        "version": "2018 (annotation_train.odgt, annotation_val.odgt), boîtes `fbox`",
-        "license": "recherche, non commerciale",
-        "sensor": "images web de foules, couleur",
-        "resolution": "variable (≈ 800 à 1400 px de large)",
+        "version": "2018 (annotation_train.odgt, annotation_val.odgt), `fbox` boxes",
+        "license": "research, non-commercial",
+        "sensor": "web images of crowds, colour",
+        "resolution": "varies (≈ 800 to 1,400 px wide)",
         "classes": D.CROWDHUMAN_CLASSES,
         "official": {"train": (15000, 339565), "val": (4370, 99481)},
-        "objects": "personnes annotées hors `mask` et `ignore`",
-        "notes": ["`mask` (régions de foule) et `extra.ignore` gardés en `difficult`",
-                  "boîte entière (`fbox`), qui peut déborder de l'image : rognée"],
+        "objects": "annotated persons, `mask` and `ignore` excluded",
+        "notes": ["`mask` (crowd regions) and `extra.ignore` kept as `difficult`",
+                  "full box (`fbox`), which can extend past the image: clipped"],
     },
     "exdark": {
         "name": "ExDark (Exclusively Dark)",
         "source": "https://github.com/cs-chan/Exclusively-Dark-Image-Dataset",
-        "version": "2019, découpage officiel de imageclasslist.txt",
-        "license": "BSD 3-Clause (dépôt), recherche",
-        "sensor": "photos en faible luminosité, 10 types d'éclairage, couleur",
-        "resolution": "variable",
+        "version": "2019, official split of imageclasslist.txt",
+        "license": "BSD 3-Clause (repository), research",
+        "sensor": "low-light photos, 10 lighting types, colour",
+        "resolution": "varies",
         "classes": D.EXDARK_CLASSES,
         "official": {"train": (3000, None), "val": (1800, None), "test": (2563, None)},
-        "objects": "7 363 images au total, 12 classes",
-        "notes": ["type d'éclairage (3e colonne de imageclasslist.txt) lu par data_stats, "
-                  "pas par `load_exdark`"],
+        "objects": "7,363 images in total, 12 classes",
+        "notes": ["lighting type (3rd column of imageclasslist.txt) read by data_stats, "
+                  "not by `load_exdark`"],
     },
     "flir": {
         "name": "Teledyne FLIR ADAS Thermal v2",
         "source": "https://www.flir.com/oem/adas/adas-dataset-form/",
-        "version": "v2 (2022), images_thermal_train et images_thermal_val",
-        "license": "licence Teledyne FLIR du jeu ADAS, recherche non commerciale",
-        "sensor": "caméra thermique Boson/Tau2 sur voiture, jour et nuit, 8 bits",
+        "version": "v2 (2022), images_thermal_train and images_thermal_val",
+        "license": "Teledyne FLIR licence of the ADAS dataset, non-commercial research",
+        "sensor": "Boson/Tau2 thermal camera on a car, day and night, 8 bits",
         "resolution": "640×512",
         "classes": D.FLIR_CLASSES,
         "official": {"train": (10742, None), "val": (1144, None)},
-        "objects": "15 catégories retenues (`FLIR_CLASSES`), les autres ignorées",
-        "notes": ["catégories hors `FLIR_CLASSES` ignorées par `parse_coco`",
-                  "images 8 bits du jeu ; analyse 16 bits hors périmètre"],
+        "objects": "15 categories kept (`FLIR_CLASSES`), the others ignored",
+        "notes": ["categories outside `FLIR_CLASSES` ignored by `parse_coco`",
+                  "8-bit images of the dataset; 16-bit analysis out of scope"],
     },
-    # Jeux drone et thermiques de M18 (docs/tasks/M18-jeux-drone.md).
+    # Drone and thermal datasets of M18 (docs/tasks/M18-jeux-drone.md).
     "auair": {
         "name": "AU-AIR",
         "source": "https://bozcani.github.io/auairdataset",
-        "version": "2019 (annotations.json, 8 vidéos) ; découpage maison par vidéo",
-        "license": "CC BY-NC-SA 2.0 (champ `licenses` du JSON)",
-        "sensor": "drone Parrot Bebop 2, caméra couleur, Aarhus (Danemark), vues obliques "
-                  "et verticales, altitude et attitude par trame",
+        "version": "2019 (annotations.json, 8 videos); own split by video",
+        "license": "CC BY-NC-SA 2.0 (`licenses` field of the JSON)",
+        "sensor": "Parrot Bebop 2 drone, colour camera, Aarhus (Denmark), oblique and "
+                  "vertical views, altitude and attitude per frame",
         "resolution": "1920×1080",
         "classes": D.AUAIR_CLASSES,
         "official": {"train": (27880, None), "val": (4943, None)},
-        "objects": "32 823 trames annotées, 132 031 boîtes (8 classes)",
-        "notes": ["pas de découpage officiel : val = 3 vidéos entières (`AUAIR_VAL`)",
-                  "clé `image_width:` (sic) et noms `_xx_` du JSON tolérés",
-                  "boîtes vides après rognage retirées (54)"],
+        "objects": "32,823 annotated frames, 132,031 boxes (8 classes)",
+        "notes": ["no official split: val = 3 whole videos (`AUAIR_VAL`)",
+                  "key `image_width:` (sic) and `_xx_` names of the JSON tolerated",
+                  "boxes empty after clipping removed (54)"],
     },
     "dronevehicle": {
         "name": "DroneVehicle (RGB)",
         "source": "https://github.com/VisDrone/DroneVehicle",
-        "version": "version YOLO-OBB de Roboflow (M. Mandal), re-découpée depuis le train "
-                   "d'origine ; tools/prep_datasets.py dronevehicle",
+        "version": "YOLO-OBB version of Roboflow (M. Mandal), re-split from the original "
+                   "train; tools/prep_datasets.py dronevehicle",
         "license": "CC BY-NC-SA 4.0",
-        "sensor": "drone, caméra couleur (la moitié infrarouge du jeu d'origine est absente), "
-                  "jour et nuit",
-        "resolution": "640×512 (840×712 avec le cadre blanc d'origine)",
+        "sensor": "drone, colour camera (the infrared half of the original dataset is "
+                  "missing), day and night",
+        "resolution": "640×512 (840×712 with the original white frame)",
         "classes": D.DRONEVEHICLE_CLASSES,
         "official": {"train": (12118, 193940), "val": (2599, 42220), "test": (2608, 41918)},
-        "objects": "boîtes orientées ramenées à leur boîte englobante",
-        "notes": ["cadre blanc de 100 px recadré par `prep_datasets.py`",
-                  "small-vehicle : voiture et van ; large-vehicle : bus, camion, fourgon"],
+        "objects": "oriented boxes turned into their bounding box",
+        "notes": ["100 px white frame cropped by `prep_datasets.py`",
+                  "small-vehicle: car and van; large-vehicle: bus, truck, freight van"],
     },
     "hituav": {
-        "name": "HIT-UAV (infrarouge thermique)",
+        "name": "HIT-UAV (thermal infrared)",
         "source": "https://github.com/suojiashun/HIT-UAV-Infrared-Thermal-Dataset",
         "version": "2022, version YOLO (train, val, test)",
-        "license": "à vérifier (page du jeu)",
-        "sensor": "caméra thermique sur drone, 60 à 130 m d'altitude, jour et nuit, 8 bits, "
-                  "un canal",
+        "license": "to check (dataset page)",
+        "sensor": "thermal camera on a drone, 60 to 130 m altitude, day and night, 8 bits, "
+                  "one channel",
         "resolution": "640×512",
         "classes": D.HITUAV_CLASSES,
         "official": {"train": (2008, 17518), "val": (287, 2453), "test": (571, 4780)},
-        "objects": "4 classes ; DontCare retiré",
-        "notes": ["`DontCare` (classe 4) retiré par le chargeur",
-                  "nom de fichier : `<période>_<altitude>_<angle>_…` (jour ou nuit, altitude 60 à "
-                  "130 m, angle 30 à 90°)"],
+        "objects": "4 classes; DontCare removed",
+        "notes": ["`DontCare` (class 4) removed by the loader",
+                  "file name: `<period>_<altitude>_<angle>_…` (day or night, altitude 60 to "
+                  "130 m, angle 30 to 90°)"],
     },
     "uavdt": {
         "name": "UAVDT-DET",
         "source": "https://sites.google.com/view/grli-uavdt",
-        "version": "export Supervisely de DatasetNinja ; séquences M seules "
+        "version": "Supervisely export of DatasetNinja; M sequences only "
                    "(tools/prep_datasets.py uavdt)",
-        "license": "recherche seulement",
-        "sensor": "drone, caméra couleur, scènes urbaines, altitudes et météo variées "
-                  "(tags jour, nuit, brouillard)",
+        "license": "research only",
+        "sensor": "drone, colour camera, urban scenes, varied altitudes and weather "
+                  "(day, night, fog tags)",
         "resolution": "1024×540",
         "classes": D.UAVDT_CLASSES,
         "official": {"train": (24143, 422911), "test": (16592, 375884)},
-        "objects": "30 séquences en train, 20 en test, trames consécutives",
-        "notes": ["séquences S du test (suivi d'un objet) écartées par `prep_datasets.py`",
-                  "régions ignorées du jeu d'origine absentes de l'export"],
+        "objects": "30 sequences in train, 20 in test, consecutive frames",
+        "notes": ["S sequences of the test (single-object tracking) left out by "
+                  "`prep_datasets.py`",
+                  "ignored regions of the original dataset missing from the export"],
     },
     # M21 (docs/tasks/M21-asl-alphabet.md): a classification dataset, boxes made on disk.
     "asl": {
@@ -1058,16 +1061,12 @@ def gallery(stats, parts, out, n, seed):
 # ---------------------------------------------------------------------------- markdown
 
 def _f(x, d=1):
-    """Nombre à la française (virgule décimale, espace des milliers)."""
-    if x is None:
-        return "—"
-    if isinstance(x, (int, np.integer)):
-        return f"{int(x):,}".replace(",", " ")
-    return f"{x:,.{d}f}".replace(",", " ").replace(".", ",")
+    """Number of the generated tables (`yolo.fmt`: decimal point, comma thousands)."""
+    return fmt.num(x, d)
 
 
 def _pct(x, d=1):
-    return "—" if x is None else f"{_f(100 * x, d)} %"
+    return fmt.pct(x, d)
 
 
 def table(head, rows):
@@ -1079,28 +1078,28 @@ def table(head, rows):
 def _parts(stats):
     """[(nom, analyses)] : splits, groupes de plusieurs splits, ensemble."""
     out = list(stats["splits"].items())
-    out += [(f"groupe {g}", v) for g, v in stats["groupes"].items() if isinstance(v, dict)]
+    out += [(f"{g} group", v) for g, v in stats["groupes"].items() if isinstance(v, dict)]
     if stats.get("ensemble"):
-        out.append(("ensemble", stats["ensemble"]))
+        out.append(("all", stats["ensemble"]))
     return out
 
 
 def md_fiche(stats):
     f = stats.get("fiche") or {}
-    rows = [("jeu", f.get("name", stats["dataset"])), ("source", f.get("source", "—")),
+    rows = [("dataset", f.get("name", stats["dataset"])), ("source", f.get("source", "—")),
             ("version", f.get("version", "—")), ("licence", f.get("license", "—")),
-            ("capteur", f.get("sensor", "—")), ("résolution typique", f.get("resolution", "—")),
-            ("classes", f"{len(stats['classes'])} : {', '.join(stats['classes'])}")]
+            ("sensor", f.get("sensor", "—")), ("typical resolution", f.get("resolution", "—")),
+            ("classes", f"{len(stats['classes'])}: {', '.join(stats['classes'])}")]
     ds = D.DATASETS[stats["dataset"]]
-    rows.append(("splits du dépôt", f"test `{ds.test}`, calibration `{ds.calib}`, "
-                                    f"affinage `{ds.train}`"))
+    rows.append(("splits of the repository", f"test `{ds.test}`, calibration `{ds.calib}`, "
+                                             f"fine-tuning `{ds.train}`"))
     for sp, (i, o) in (f.get("official") or {}).items():
-        rows.append((f"officiel {sp}", f"{_f(i) if i else '—'} images, "
-                                       f"{_f(o) if o else '—'} objets"))
+        rows.append((f"official {sp}", f"{_f(i) if i else '—'} images, "
+                                       f"{_f(o) if o else '—'} objects"))
     if f.get("objects"):
-        rows.append(("objets officiels", f["objects"]))
+        rows.append(("official objects", f["objects"]))
     for n in f.get("notes", []):
-        rows.append(("chargeur", n))
+        rows.append(("loader", n))
     return table(["", ""], rows)
 
 
@@ -1136,9 +1135,9 @@ def md_synthese(stats):
                      _pct(d["collisions"]["lost_share"], 2) if d else "—",
                      f"{d['over']['256']} / {d['over']['1024']}" if d else "—"])
     p = stats["params"]
-    head = ["partie", "images", "objets", "difficult", "images vides",
-            "objets/image (méd. / max)", f"petits < 32² à {size_label(p['size'])}",
-            "plus petits qu'une cellule", "cibles perdues", "images > 256 / > 1 024"]
+    head = ["part", "images", "objects", "difficult", "empty images",
+            "objects/image (med. / max)", f"small < 32² at {size_label(p['size'])}",
+            "smaller than a cell", "lost targets", "images > 256 / > 1,024"]
     return table(head, rows)
 
 
@@ -1149,9 +1148,9 @@ def md_classes(stats):
         return ""
     w = whole(stats)
     g = w.get("geometrie")
-    head = ["classe"] + [f"{n} : objets (images)" for n, _ in parts]
+    head = ["class"] + [f"{n}: objects (images)" for n, _ in parts]
     if g:
-        head += [f"côté médian (px, {g['resize']})", "petits"]
+        head += [f"median side (px, {g['resize']})", "small"]
     rows = []
     for k, c in enumerate(classes):
         r = [c] + [f"{_f(a['comptes']['per_class'][k])} ({_f(a['comptes']['images_with'][k])})"
@@ -1160,7 +1159,7 @@ def md_classes(stats):
             r += [_f(g["per_class"]["median_side_in"][k], 0), _pct(g["per_class"]["small_in"][k], 0)]
         rows.append(r)
     imb = w.get("comptes", {}).get("imbalance")
-    return table(head, rows) + (f"\n\nRapport classe la plus / la moins fréquente : "
+    return table(head, rows) + (f"\n\nRatio of the most / least frequent class: "
                                 f"{_f(imb, 0)}." if imb else "")
 
 
@@ -1205,8 +1204,8 @@ def md_par_classe(stats, ap=None):
         if ap is not None:
             r.append(_f(ap.get(name), 1))
         rows.append(r)
-    head = ["classe", "objets (test, non-difficult)", "part", "côté médian (px)", "petits",
-            "cibles perdues"] + (["AP"] if ap is not None else [])
+    head = ["class", "objects (test, non-difficult)", "share", "median side (px)", "small",
+            "lost targets"] + (["AP"] if ap is not None else [])
     return table(head, rows)
 
 
@@ -1216,7 +1215,7 @@ def md_geometrie(stats):
         return ""
     lab = size_label(w["size"])
     rows = []
-    for mode, name in (("orig", "image d'origine"), ("letterbox", f"letterbox {lab}"),
+    for mode, name in (("orig", "original image"), ("letterbox", f"letterbox {lab}"),
                        ("stretch", f"stretch {lab}")):
         c = w[mode]["coco"]
         n = max(sum(c), 1)
@@ -1225,9 +1224,9 @@ def md_geometrie(stats):
                      " · ".join(f"{k} {_pct(v)}" for k, v in w[mode].get("fit_cell", {}).items())
                      or "—",
                      _pct(w[mode]["h_under"]["8"]) if "h_under" in w[mode] else "—"])
-    return table(["repère", "petits", "moyens", "grands", "côté médian (px)",
-                  "plus petits qu'une cellule", "hauteur < 8 px"], rows) + \
-        f"\n\n{_f(w['n'])} objets non-difficult ; pas des têtes : " + \
+    return table(["frame", "small", "medium", "large", "median side (px)",
+                  "smaller than a cell", "height < 8 px"], rows) + \
+        f"\n\n{_f(w['n'])} non-difficult objects; head strides: " + \
         ", ".join(f"{k} → {_f(v, 0)} px" for k, v in w["strides"].items()) + "."
 
 
@@ -1238,7 +1237,7 @@ def md_densite(stats):
         if not d:
             continue
         col = d["collisions"]
-        heads_ = " · ".join(f"{k} : {_f(v['lost'])} / {_f(v['objects'])}"
+        heads_ = " · ".join(f"{k}: {_f(v['lost'])} / {_f(v['objects'])}"
                             for k, v in col["per_head"].items())
         rows.append([name, _f(d["mean"], 1), _f(d["median"], 0), _f(d["max"]),
                      f"{d['over']['256']} / {d['over']['1024']}",
@@ -1247,9 +1246,9 @@ def md_densite(stats):
     if not rows:
         return ""
     net = whole(stats)["densite"]["collisions"]["net"]
-    return table(["partie", "objets/image moy.", "méd.", "max", "> 256 / > 1 024",
-                  "cibles perdues", "par tête (perdues / objets)", "images touchées"], rows) + \
-        f"\n\nAncres de `{net}` ; objets non-difficult, comme à l'entraînement."
+    return table(["part", "objects/image mean", "med.", "max", "> 256 / > 1,024",
+                  "lost targets", "per head (lost / objects)", "images hit"], rows) + \
+        f"\n\nAnchors of `{net}`; non-difficult objects, as in training."
 
 
 def md_images(stats):
@@ -1269,13 +1268,13 @@ def md_images(stats):
                      f"{px['levels']['8bit']} → {px['levels']['int8']}" if px else "—"])
     if not rows:
         return ""
-    text = table(["partie", "résolutions (3 premières)", "distinctes", "pixels sur",
-                  "canaux", "moyenne par canal", "écart type par canal", "luminance moy.",
-                  "niveaux 8 bits → INT8"], rows)
+    text = table(["part", "resolutions (first 3)", "distinct", "pixels on",
+                  "channels", "mean per channel", "standard deviation per channel",
+                  "mean luminance", "8-bit levels → INT8"], rows)
     if stats.get("voc_ref"):
         v = stats["voc_ref"]
-        text += (f"\n\nRéférence VOC2007 test ({v['images']} images, graine {v['seed']}) : "
-                 f"luminance moyenne {_f(v['lum_mean'], 1)}, moyenne par canal "
+        text += (f"\n\nVOC2007 test reference ({v['images']} images, seed {v['seed']}): "
+                 f"mean luminance {_f(v['lum_mean'], 1)}, mean per channel "
                  f"{' / '.join(_f(m, 1) for m in v['mean'])}.")
     return text
 
@@ -1287,11 +1286,11 @@ def md_ancres(stats):
     rows = [[n, "`" + "  ".join(f"{w:.0f},{h:.0f}" for w, h in r["anchors"]) + "`",
              _f(r["iou"], 4)] for n, r in a["refs"].items()]
     for k in ("5", "6"):
-        rows.append([f"k-means k = {k} (graine {a['seed']})",
+        rows.append([f"k-means k = {k} (seed {a['seed']})",
                      "`" + "  ".join(f"{w:.0f},{h:.0f}" for w, h in a["kmeans"][k]) + "`",
                      _f(a["kmeans_iou"][k], 4)])
-    return table(["ancres", f"w,h (px à {size_label(a['size'])})", "IoU moyenne"], rows) + \
-        f"\n\n{_f(a['boxes'])} boîtes non-difficult du groupe train, letterbox " \
+    return table(["anchors", f"w,h (px at {size_label(a['size'])})", "mean IoU"], rows) + \
+        f"\n\n{_f(a['boxes'])} non-difficult boxes of the train group, letterbox " \
         f"{size_label(a['size'])}."
 
 
@@ -1307,14 +1306,14 @@ def md_qualite(stats):
                      _f(q["duplicates"]), reg])
     if not rows:
         return ""
-    return table(["partie", "retirées (make_sample)", "rognées", "côté < 2 px (orig. / entrée)",
-                  "doublons (IoU > 0,95)", "régions retirées par le chargeur"], rows)
+    return table(["part", "removed (make_sample)", "clipped", "side < 2 px (orig. / input)",
+                  "duplicates (IoU > 0.95)", "regions removed by the loader"], rows)
 
 
 def md_ecart(stats):
     e = stats.get("ecart")
     rows = [[k, _f(v, 3)] for k, v in (e or {}).items() if not k.startswith("share")]
-    text = table(["grandeur (train ↔ test)", "variation totale"], rows) if rows else ""
+    text = table(["quantity (train ↔ test)", "total variation"], rows) if rows else ""
     cov = []
     for name, a in stats["splits"].items():
         for fam, c in a.get("comptes", {}).get("coverage", {}).items():
@@ -1322,33 +1321,33 @@ def md_ecart(stats):
                         _f(c["evaluated"])])
     if cov:
         text += ("\n\n" if text else "") + table(
-            ["split", "classes du modèle", "objets couverts", "part", "évalués (non-difficult)"],
+            ["split", "model classes", "objects covered", "share", "evaluated (non-difficult)"],
             cov)
     return text
 
 
 def markdown(stats):
     p = stats["params"]
-    parts = [f"# Statistiques de {stats['dataset']}", "",
-             f"Révision `{p['revision']}` · splits {', '.join(f'`{s}`' for s in p['splits'])} · "
-             f"entrée {size_label(p['size'])} ({p['resize']}) · cfg `{p['net']}` · pixels sur "
-             f"{p['sample']} images par partie (graine {p['seed']}).", "",
-             "## Fiche", "", md_fiche(stats), "", "## Synthèse", "", md_synthese(stats)]
+    parts = [f"# Statistics of {stats['dataset']}", "",
+             f"Revision `{p['revision']}` · splits {', '.join(f'`{s}`' for s in p['splits'])} · "
+             f"input {size_label(p['size'])} ({p['resize']}) · cfg `{p['net']}` · pixels on "
+             f"{p['sample']} images per part (seed {p['seed']}).", "",
+             "## Datasheet", "", md_fiche(stats), "", "## Summary", "", md_synthese(stats)]
     chk = check_official(stats)
     if chk:
-        parts += ["", table(["split", "images", "objets", "officiel (images / objets)", ""],
+        parts += ["", table(["split", "images", "objects", "official (images / objects)", ""],
                             [[sp, _f(i), _f(o), f"{_f(a) if a else '—'} / {_f(b) if b else '—'}",
-                              "ok" if ok else "écart"] for sp, i, o, (a, b), ok in chk])]
-    for title, fn in (("Classes", md_classes), ("Géométrie des boîtes", md_geometrie),
-                      ("Densité et collisions", md_densite), ("Images", md_images),
-                      ("Ancres", md_ancres), ("Qualité des annotations", md_qualite),
-                      ("Écart entre splits et couverture", md_ecart)):
+                              "ok" if ok else "gap"] for sp, i, o, (a, b), ok in chk])]
+    for title, fn in (("Classes", md_classes), ("Box geometry", md_geometrie),
+                      ("Density and collisions", md_densite), ("Images", md_images),
+                      ("Anchors", md_ancres), ("Annotation quality", md_qualite),
+                      ("Gap between splits and coverage", md_ecart)):
         body = fn(stats)
         if body:
             parts += ["", f"## {title}", "", body]
     if stats.get("exdark_light"):
-        parts += ["", "## Luminance par type d'éclairage", "", table(
-            ["éclairage", "images", "luminance moy."],
+        parts += ["", "## Luminance per lighting type", "", table(
+            ["lighting", "images", "mean luminance"],
             [[k, v["images"], _f(v["lum_mean"], 1)] for k, v in stats["exdark_light"].items()])]
     return "\n".join(parts) + "\n"
 
@@ -1375,9 +1374,9 @@ def comparatif(all_stats):
                      _pct(d["collisions"]["lost_share"], 2) if d else "—",
                      _f(d["over"]["256"]) if d else "—",
                      _f(px["lum_mean"], 0) if px else "—", _f(cfg_iou, 3)])
-    return table(["jeu", "classes", "images", "objets", "objets/image (méd.)",
-                  "petits à l'entrée", "plus petits qu'une cellule fine", "cibles perdues",
-                  "images > 256", "luminance moy.", "IoU ancres de la cfg"], rows)
+    return table(["dataset", "classes", "images", "objects", "objects/image (med.)",
+                  "small at the input", "smaller than a fine cell", "lost targets",
+                  "images > 256", "mean luminance", "IoU of the cfg anchors"], rows)
 
 
 def _replace_block(text, key, body):
@@ -1399,20 +1398,20 @@ def report(doc, paths=None):
     order = list(D.DATASETS)
     all_stats.sort(key=lambda s: order.index(s["dataset"]) if s["dataset"] in order else 99)
     doc = Path(doc)
-    text = doc.read_text() if doc.exists() else "# Statistiques des jeux (M16)\n"
+    text = doc.read_text() if doc.exists() else "# Dataset statistics (M16)\n"
     text = _replace_block(text, "comparatif", comparatif(all_stats))
     for st in all_stats:
         p = st["params"]
-        body = [f"Révision `{p['revision']}`, entrée {size_label(p['size'])} ({p['resize']}), "
-                f"cfg `{p['net']}`, pixels sur {p['sample']} images (graine {p['seed']}). "
-                f"Commande : `python tools/data_stats.py --dataset {st['dataset']} "
+        body = [f"Revision `{p['revision']}`, input {size_label(p['size'])} ({p['resize']}), "
+                f"cfg `{p['net']}`, pixels on {p['sample']} images (seed {p['seed']}). "
+                f"Command: `python tools/data_stats.py --dataset {st['dataset']} "
                 f"--split {','.join(p['splits'])} --sample {p['sample']}`.", "",
                 md_synthese(st)]
         chk = check_official(st)
         if chk:
-            body += ["", table(["split", "images", "objets", "officiel", ""],
+            body += ["", table(["split", "images", "objects", "official", ""],
                                [[sp, _f(i), _f(o), f"{_f(a) if a else '—'} / "
-                                 f"{_f(b) if b else '—'}", "ok" if ok else "écart"]
+                                 f"{_f(b) if b else '—'}", "ok" if ok else "gap"]
                                 for sp, i, o, (a, b), ok in chk])]
         text = _replace_block(text, st["dataset"], "\n".join(body))
     doc.write_text(text)

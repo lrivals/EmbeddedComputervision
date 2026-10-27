@@ -73,42 +73,42 @@ effects of the batch and of the subset):
 
 ## VOC
 
-### Balayage `tiny-yolov3-voc` (16 551 images d'entraînement, VOC07+12)
+### Sweep `tiny-yolov3-voc` (16,551 training images, VOC07+12)
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b32-sall** | 32 | tout | 1,16 | 14,66 | **36,27** |
-| b16-sall | 16 | tout | 0,58 | 17,45 | 34,70 |
-| b8-s500 | 8 | 500 | 9,60 | 18,00 | 30,14 |
-| b16-s500 | 16 | 500 | 19,20 | 13,78 | 25,58 |
-| b32-s500 | 32 | 500 | 38,40 | 11,95 | 24,01 |
-| b8-sall | 8 | tout | 0,29 | 18,29 | 12,41 |
+| **b32-sall** | 32 | all | 1.16 | 14.66 | **36.27** |
+| b16-sall | 16 | all | 0.58 | 17.45 | 34.70 |
+| b8-s500 | 8 | 500 | 9.60 | 18.00 | 30.14 |
+| b16-s500 | 16 | 500 | 19.20 | 13.78 | 25.58 |
+| b32-s500 | 32 | 500 | 38.40 | 11.95 | 24.01 |
+| b8-sall | 8 | all | 0.29 | 18.29 | 12.41 |
 
 Duration: about 10 min per batch-32 run on the Colab GPU (624 s for b32-sall).
 
 ### Inference on the same 50 images
 
-| modèle | poids | classes évaluées | mAP |
+| model | weights | classes evaluated | mAP |
 |---|---|---|---|
-| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 20 (via `MAPPINGS`) | **68,45** |
-| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 20 | 63,51 |
-| `tiny-yolov3-voc` | run `b32-sall` | 20 | 36,27 |
+| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 20 (via `MAPPINGS`) | **68.45** |
+| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 20 | 63.51 |
+| `tiny-yolov3-voc` | run `b32-sall` | 20 | 36.27 |
 
 AP of the `b32-sall` run: aeroplane and bicycle 100, cat 75.6, bus 59.1, tvmonitor 54.5,
 bird 50.6, person 47.2; bottle and sofa 0, boat 1.8, cow 2.1, pottedplant 1.3.
 
 ## VisDrone
 
-### Balayage `tiny-yolov3-visdrone` (cfg `build/m11/cfg/tiny-yolov3-visdrone.cfg`, 10 classes, 6 471 images)
+### Sweep `tiny-yolov3-visdrone` (cfg `build/m11/cfg/tiny-yolov3-visdrone.cfg`, 10 classes, 6,471 images)
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b32-sall** | 32 | tout | 2,97 | 185,96 | **2,24** |
-| b16-s500 | 16 | 500 | 19,20 | 220,65 | 1,35 |
-| b8-sall | 8 | tout | 0,74 | 208,68 | 1,24 |
-| b16-sall | 16 | tout | 1,48 | 203,54 | 1,15 |
-| b32-s500 | 32 | 500 | 38,40 | 200,33 | 0,78 |
-| b8-s500 | 8 | 500 | 9,60 | 252,11 | 0,56 |
+| **b32-sall** | 32 | all | 2.97 | 185.96 | **2.24** |
+| b16-s500 | 16 | 500 | 19.20 | 220.65 | 1.35 |
+| b8-sall | 8 | all | 0.74 | 208.68 | 1.24 |
+| b16-sall | 16 | all | 1.48 | 203.54 | 1.15 |
+| b32-s500 | 32 | 500 | 38.40 | 200.33 | 0.78 |
+| b8-s500 | 8 | 500 | 9.60 | 252.11 | 0.56 |
 
 Only the `car` class takes off (AP 17.4 for b32-sall); van 2.0, truck 1.7, the others
 under 0.5. Losses from 186 to 252: no run converged.
@@ -147,11 +147,11 @@ Procedure in [M15](M15-campagne-entrainement.md#c-visdrone).
 
 ### Out-of-domain inference (T11.2) on the same 50 images
 
-| modèle | classes évaluées | mAP |
+| model | classes evaluated | mAP |
 |---|---|---|
-| `tiny-yolov3-coco` | 6 (person, bicycle, car, motorbike, bus, truck) | 6,95 |
-| `tiny-yolov2-voc` | 5 (person, bicycle, car, motorbike, bus) | 4,85 |
-| `tiny-yolov3-visdrone` `b32-sall` | 10 | 2,24 |
+| `tiny-yolov3-coco` | 6 (person, bicycle, car, motorbike, bus, truck) | 6.95 |
+| `tiny-yolov2-voc` | 5 (person, bicycle, car, motorbike, bus) | 4.85 |
+| `tiny-yolov3-visdrone` `b32-sall` | 10 | 2.24 |
 
 The out-of-domain mAPs cover the classes that have an equivalent (`MAPPINGS`: pedestrian
 and people → person, van → car, motor → motorbike; tricycle and awning-tricycle ignored):
@@ -160,16 +160,16 @@ against 17.4 for the fine-tuned run.
 
 ## KITTI
 
-### Balayage `tiny-yolov3-kitti` (cfg `build/m11/cfg/tiny-yolov3-kitti.cfg`, 8 classes, 5 985 images)
+### Sweep `tiny-yolov3-kitti` (cfg `build/m11/cfg/tiny-yolov3-kitti.cfg`, 8 classes, 5,985 images)
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b32-sall** | 32 | tout | 3,21 | 19,52 | **2,38** |
-| b16-sall | 16 | tout | 1,60 | 20,29 | 2,23 |
-| b8-sall | 8 | tout | 0,80 | 22,12 | 2,18 |
-| b32-s500 | 32 | 500 | 38,40 | 17,99 | 2,02 |
-| b16-s500 | 16 | 500 | 19,20 | 20,39 | 0,50 |
-| b8-s500 | 8 | 500 | 9,60 | 21,49 | 0,49 |
+| **b32-sall** | 32 | all | 3.21 | 19.52 | **2.38** |
+| b16-sall | 16 | all | 1.60 | 20.29 | 2.23 |
+| b8-sall | 8 | all | 0.80 | 22.12 | 2.18 |
+| b32-s500 | 32 | 500 | 38.40 | 17.99 | 2.02 |
+| b16-s500 | 16 | 500 | 19.20 | 20.39 | 0.50 |
+| b8-s500 | 8 | 500 | 9.60 | 21.49 | 0.49 |
 
 Same ranking as on VOC and VisDrone: `b32-sall` first, the runs on the whole split ahead
 of those on 500 images. The first four are within 0.4 point, within the noise at 50
@@ -182,11 +182,11 @@ thirds of their relative height. This is the argument for the 640×192 input of 
 
 ### Out-of-domain inference (T11.2) on the same 50 images
 
-| modèle | classes évaluées | mAP |
+| model | classes evaluated | mAP |
 |---|---|---|
-| `tiny-yolov3-coco` | 4 (person, car, train, truck) | 20,55 |
-| `tiny-yolov2-voc` | 3 (car, person, train) | 17,50 |
-| `tiny-yolov3-kitti` `b32-sall` | 8 | 2,38 |
+| `tiny-yolov3-coco` | 4 (person, car, train, truck) | 20.55 |
+| `tiny-yolov2-voc` | 3 (car, person, train) | 17.50 |
+| `tiny-yolov3-kitti` `b32-sall` | 8 | 2.38 |
 
 Mappings (`MAPPINGS`): Car and Van → car, Pedestrian and Person_sitting → person, Tram →
 train, Truck → truck (COCO only); Cyclist and Misc ignored. Per class, `car` is at 49.7 for
@@ -196,16 +196,16 @@ COCO and 29.6 for Tiny-YOLOv2 VOC, against 16.8 for the fine-tuned run.
 
 ## FLIR
 
-### Balayage `tiny-yolov3-flir` (cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, 15 classes, 1 canal, 10 742 images)
+### Sweep `tiny-yolov3-flir` (cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, 15 classes, 1 channel, 10,742 images)
 
-| run | lot | images | époques | perte finale | mAP AP@[.5:.95] (50 images) | AP50 |
+| run | batch | images | epochs | final loss | mAP AP@[.5:.95] (50 images) | AP50 |
 |---|---|---|---|---|---|---|
-| **b8-sall** | 8 | tout | 0,45 | 67,27 | **0,7** | 2,9 |
-| **b16-sall** | 16 | tout | 0,89 | 64,38 | **0,7** | 2,6 |
-| b16-s500 | 16 | 500 | 19,20 | 55,84 | 0,6 | 1,5 |
-| b32-sall | 32 | tout | 1,79 | 59,68 | 0,4 | 1,7 |
-| b32-s500 | 32 | 500 | 38,40 | 52,19 | 0,3 | 1,4 |
-| b8-s500 | 8 | 500 | 9,60 | 63,55 | 0,3 | 1,3 |
+| **b8-sall** | 8 | all | 0.45 | 67.27 | **0.7** | 2.9 |
+| **b16-sall** | 16 | all | 0.89 | 64.38 | **0.7** | 2.6 |
+| b16-s500 | 16 | 500 | 19.20 | 55.84 | 0.6 | 1.5 |
+| b32-sall | 32 | all | 1.79 | 59.68 | 0.4 | 1.7 |
+| b32-s500 | 32 | 500 | 38.40 | 52.19 | 0.3 | 1.4 |
+| b8-s500 | 8 | 500 | 9.60 | 63.55 | 0.3 | 1.3 |
 
 No run learns: AP50 at most 2.9, all the gaps are within the noise at 50 images, and the
 ranking of the other datasets (`b32-sall` first) does not hold. Per class, only person
@@ -220,11 +220,11 @@ domain, and 600 iterations (fewer than two epochs) are not enough to adapt it. D
 
 ### Inference on the same 50 images
 
-| modèle | classes évaluées | mAP AP@[.5:.95] | AP50 |
+| model | classes evaluated | mAP AP@[.5:.95] | AP50 |
 |---|---|---|---|
-| `tiny-yolov3-coco` | 11 (dont 5 présentes : person, bicycle, car, traffic light, fire hydrant) | **3,7** | 9,9 |
-| `tiny-yolov2-voc` | 7 (dont 3 présentes : person, bicycle, car) | 2,3 | 8,3 |
-| `tiny-yolov3-flir` `b32-sall` | 15 (dont 8 présentes) | 0,4 | 1,7 |
+| `tiny-yolov3-coco` | 11 (5 present: person, bicycle, car, traffic light, fire hydrant) | **3.7** | 9.9 |
+| `tiny-yolov2-voc` | 7 (3 present: person, bicycle, car) | 2.3 | 8.3 |
+| `tiny-yolov3-flir` `b32-sall` | 15 (8 present) | 0.4 | 1.7 |
 
 The published weights run in RGB on the thermal image (the same channel three times); the
 fine-tuned run takes one channel. Mappings (`MAPPINGS`): bike → bicycle, motor →
@@ -243,16 +243,16 @@ rebuilt from the anchor table of the run (`env.restore_cfg`, fresh Colab runtime
 
 ## ExDark
 
-### Balayage `tiny-yolov3-exdark` (cfg `build/m11/cfg/tiny-yolov3-exdark.cfg`, 12 classes, 3 000 images)
+### Sweep `tiny-yolov3-exdark` (cfg `build/m11/cfg/tiny-yolov3-exdark.cfg`, 12 classes, 3,000 images)
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b32-sall** | 32 | tout | 6,40 | 21,25 | **13,29** |
-| b32-s500 | 32 | 500 | 38,40 | 13,13 | 9,26 |
-| b8-sall | 8 | tout | 1,60 | 28,09 | 7,86 |
-| b16-sall | 16 | tout | 3,20 | 24,04 | 7,06 |
-| b16-s500 | 16 | 500 | 19,20 | 15,23 | 6,68 |
-| b8-s500 | 8 | 500 | 9,60 | 18,11 | 2,75 |
+| **b32-sall** | 32 | all | 6.40 | 21.25 | **13.29** |
+| b32-s500 | 32 | 500 | 38.40 | 13.13 | 9.26 |
+| b8-sall | 8 | all | 1.60 | 28.09 | 7.86 |
+| b16-sall | 16 | all | 3.20 | 24.04 | 7.06 |
+| b16-s500 | 16 | 500 | 19.20 | 15.23 | 6.68 |
+| b8-s500 | 8 | 500 | 9.60 | 18.11 | 2.75 |
 
 Night and low-light images, a small training split (3,000 images): at batch 32, 600
 iterations already make 6.4 epochs. `b32-sall` is first, as on VOC, VisDrone and KITTI,
@@ -263,11 +263,11 @@ IoU 0.615 against 0.609). AP of `b32-sall`: Boat 55.3, Bus 36.4, People 23.7, Bi
 
 ### Inference on the same 50 images
 
-| modèle | poids | classes évaluées | mAP |
+| model | weights | classes evaluated | mAP |
 |---|---|---|---|
-| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 12 | **24,61** |
-| `tiny-yolov3-exdark` | run `b32-sall` | 12 | 13,29 |
-| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 11 (sans cup) | 11,84 |
+| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 12 | **24.61** |
+| `tiny-yolov3-exdark` | run `b32-sall` | 12 | 13.29 |
+| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 11 (sans cup) | 11.84 |
 
 Mappings (`MAPPINGS`): People → person, Table → diningtable, the other classes under their
 own name; Cup does not exist in VOC. The fine-tuned run beats Tiny-YOLOv2 VOC but stays
@@ -276,16 +276,16 @@ inference notebook gets back exactly the measurement of the sweep (13.29).
 
 ## CrowdHuman
 
-### Balayage `tiny-yolov3-crowdhuman` (cfg `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`, 1 classe, 15 000 images)
+### Sweep `tiny-yolov3-crowdhuman` (cfg `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`, 1 class, 15,000 images)
 
-| run | lot | images | époques | perte finale | mAP (50 images) |
+| run | batch | images | epochs | final loss | mAP (50 images) |
 |---|---|---|---|---|---|
-| **b16-sall** | 16 | tout | 0,64 | 54,77 | **35,87** |
-| b32-sall | 32 | tout | 1,28 | 53,17 | 30,61 |
-| b16-s500 | 16 | 500 | 19,20 | 49,17 | 27,81 |
-| b32-s500 | 32 | 500 | 38,40 | 44,79 | 27,44 |
-| b8-s500 | 8 | 500 | 9,60 | 52,35 | 27,06 |
-| b8-sall | 8 | tout | 0,32 | 67,22 | 17,67 |
+| **b16-sall** | 16 | all | 0.64 | 54.77 | **35.87** |
+| b32-sall | 32 | all | 1.28 | 53.17 | 30.61 |
+| b16-s500 | 16 | 500 | 19.20 | 49.17 | 27.81 |
+| b32-s500 | 32 | 500 | 38.40 | 44.79 | 27.44 |
+| b8-s500 | 8 | 500 | 9.60 | 52.35 | 27.06 |
+| b8-sall | 8 | all | 0.32 | 67.22 | 17.67 |
 
 A single class (`person`), dense crowds: the only dataset where the fine-tuned run gets
 close to the published weights. `b16-sall` moves ahead of `b32-sall` (5 points, within the
@@ -297,11 +297,11 @@ only reaches its value at the end). The k-means anchors are much smaller than Da
 
 ### Inference on the same 50 images
 
-| modèle | poids | classes évaluées | mAP |
+| model | weights | classes evaluated | mAP |
 |---|---|---|---|
-| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 1 (person) | **38,37** |
-| `tiny-yolov3-crowdhuman` | run `b32-sall` | 1 | 30,61 |
-| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 1 (person) | 26,29 |
+| `tiny-yolov3-coco` | Darknet COCO (`yolov3-tiny.weights`) | 1 (person) | **38.37** |
+| `tiny-yolov3-crowdhuman` | run `b32-sall` | 1 | 30.61 |
+| `tiny-yolov2-voc` | Darknet VOC (`yolov2-tiny-voc.weights`) | 1 (person) | 26.29 |
 
 The inference notebook takes the most recent run (`RUN = None`), here `b32-sall`, and gets
 back exactly the measurement of the sweep (30.61). The best run of the sweep, `b16-sall`

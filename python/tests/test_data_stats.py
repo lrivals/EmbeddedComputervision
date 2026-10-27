@@ -205,7 +205,7 @@ def test_compute_json_markdown_figures(fake, tmp_path):
     path = DS.write(stats, tmp_path)
     data = json.loads(path.read_text())
     md = (tmp_path / "stats.md").read_text()
-    assert "## Synthèse" in md and "## Densité et collisions" in md
+    assert "## Summary" in md and "## Density and collisions" in md
     from tools.figures import donnees
 
     pngs = donnees.plot_all(data, tmp_path / "figures")

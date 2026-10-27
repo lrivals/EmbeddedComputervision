@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from tools.notebooks import NB_DIR, ROOT
+from yolo import fmt
 from tools.notebooks.runs import parse_eval, summarize  # noqa: F401  (parse_eval : API)
 
 ORDER = ("voc", "visdrone", "kitti", "flir", "exdark", "crowdhuman")  # ordre des figures
@@ -180,7 +181,7 @@ def parse_sweep(path):
         r.update(parse_eval(body))
     for name, row in _comparison(text).items():
         r = get(name)
-        r["table_loss"] = _num(row.get("perte finale"))
+        r["table_loss"] = _num(row.get("final loss", row.get("perte finale")))
         if r["map"] is None:  # évaluation réutilisée : seule la table la donne
             r["map"] = _num(row.get("mAP"))
     sall = [r["images"] for r in runs.values() if r["subset"] == 0 and r["images"]]
@@ -199,7 +200,7 @@ def parse_sweep(path):
     order = sorted(runs.values(), key=lambda r: (r["batch"], r["subset"] == 0, r["subset"],
                                                  r["seed"]))
     metric = next((r["metric"] for r in order if "metric" in r), None)
-    m = re.search(r"révision (\w+)", text)
+    m = re.search(r"(?:révision|revision) (\w+)", text)
     return {"dataset": path.parent.name, "label": LABELS.get(path.parent.name, path.parent.name),
             "net": _param(cells, "NET"), "notebook": _rel(path),
             "metric": metric, "n_train": n_train, "iters": iters,
@@ -249,7 +250,8 @@ def parse_full(dataset, model, metric=None, nb_dir=NB_DIR, build=None):
     if metric != "coco" and p.exists() and _executed(p):
         text = "\n".join(t for _, t, _ in _cells(p))
         for name, row in _comparison(text).items():
-            if row.get("éval.") == "tout" and _num(row.get("mAP")) is not None:
+            if (row.get("eval.", row.get("éval.")) in ("all", "tout")  # FR: before T19.6
+                    and _num(row.get("mAP")) is not None):
                 out.setdefault(name, _num(row["mAP"]))
     return out
 
@@ -402,7 +404,7 @@ def effects(data):
 # ------------------------------------------------------------------------- texte
 
 def _f(v, nd=2):
-    return "—" if v is None else f"{v:.{nd}f}".replace(".", ",")
+    return fmt.num(None if v is None else float(v), nd)
 
 
 def metric_label(d):
@@ -411,8 +413,8 @@ def metric_label(d):
 
 def summary_table(data):
     """Table Markdown : un jeu par ligne, meilleur et pire run, écart, poids publiés."""
-    lines = ["| jeu | images d'entr. | métrique | meilleur run | score | pire run | score | "
-             "écart max/min | perte finale (min–max) | meilleur poids publié |",
+    lines = ["| dataset | training images | metric | best run | score | worst run | score | "
+             "max/min ratio | final loss (min–max) | best published weights |",
              "|---|---|---|---|---|---|---|---|---|---|"]
     for ds, d in data.items():
         scored = [r for r in d["runs"] if r.get("map") is not None]
@@ -431,12 +433,12 @@ def summary_table(data):
 
 def runs_table(data):
     """Table Markdown longue : tous les runs de tous les jeux."""
-    lines = ["| jeu | run | lot | images | époques | perte finale | score | relatif | rang | "
-             "durée (min) |", "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| dataset | run | batch | images | epochs | final loss | score | relative | rank | "
+             "duration (min) |", "|---|---|---|---|---|---|---|---|---|---|"]
     for d in data.values():
         for r in sorted(d["runs"], key=lambda r: r.get("rank") or 99):
             lines.append(f"| {d['label']} | {r['run']} | {r['batch']} | "
-                         f"{r['subset'] or 'tout'} | {_f(r['epochs'])} | {_f(r['final_loss'])} | "
+                         f"{r['subset'] or 'all'} | {_f(r['epochs'])} | {_f(r['final_loss'])} | "
                          f"{_f(r.get('map'))} | {_f(r['rel'])} | {_f(r.get('rank'), 1)} | "
                          f"{_f(r['duration_s'] / 60 if r['duration_s'] else None, 1)} |")
     return "\n".join(lines)
@@ -446,8 +448,8 @@ def full_table(data):
     """Table Markdown du split complet (T15.1) : score sur `SUBSET` images (balayage) et sur
     tout le split, rang sur chacun ; Spearman des deux classements par jeu. Vide si aucun
     jeu n'a de score sur le split complet."""
-    lines = ["| jeu | run | lot | images | score (balayage) | rang | score (split complet) | "
-             "rang |", "|---|---|---|---|---|---|---|---|"]
+    lines = ["| dataset | run | batch | images | score (sweep) | rank | score (full split) | "
+             "rank |", "|---|---|---|---|---|---|---|---|"]
     rhos = []
     for d in data.values():
         rs = [r for r in d["runs"] if r.get("map_full") is not None]
@@ -455,7 +457,7 @@ def full_table(data):
             continue
         rank_full = dict(zip((r["run"] for r in rs), _ranks([-r["map_full"] for r in rs])))
         for r in sorted(rs, key=lambda r: -r["map_full"]):
-            lines.append(f"| {d['label']} | {r['run']} | {r['batch']} | {r['subset'] or 'tout'} | "
+            lines.append(f"| {d['label']} | {r['run']} | {r['batch']} | {r['subset'] or 'all'} | "
                          f"{_f(r.get('map'))} | {_f(r.get('rank'), 1)} | **{_f(r['map_full'])}** | "
                          f"{_f(float(rank_full[r['run']]), 1)} |")
         both = [r for r in rs if r.get("map") is not None]
@@ -464,7 +466,7 @@ def full_table(data):
             rhos.append(f"{d['label']} ρ = {_f(rho)} ({len(both)} runs)")
     if len(lines) == 2:
         return ""
-    return "\n".join(lines) + ("\n\nClassement balayage / split complet : " + " ; ".join(rhos)
+    return "\n".join(lines) + ("\n\nSweep / full-split ranking: " + "; ".join(rhos)
                                + "." if rhos else "")
 
 
@@ -473,11 +475,11 @@ def noise_table(data):
     def ms(v):
         return f"{_f(v['mean'])} ± {_f(v['std'])} (n = {v['n']})" if v else "—"
 
-    lines = ["| jeu | lot | images | graines | score (split complet) | score (balayage) |",
+    lines = ["| dataset | batch | images | seeds | score (full split) | score (sweep) |",
              "|---|---|---|---|---|---|"]
     for d in data.values():
         for row in d.get("noise", []):
-            lines.append(f"| {d['label']} | {row['batch']} | {row['subset'] or 'tout'} | "
+            lines.append(f"| {d['label']} | {row['batch']} | {row['subset'] or 'all'} | "
                          f"{', '.join(map(str, row['seeds']))} | {ms(row['map_full'])} | "
                          f"{ms(row['map'])} |")
     return "\n".join(lines) if len(lines) > 2 else ""
@@ -492,29 +494,30 @@ def observations(data):
     order = np.argsort(-mean_rel)
     wins = {n: sum(data[ds]["best"] == n for ds in sets) for n in names}
     obs["grilles"] = (
-        f"Sur {len(sets)} jeux, le score relatif moyen classe les runs ainsi : "
+        f"Over {len(sets)} datasets, the mean relative score ranks the runs as: "
         + ", ".join(f"`{names[i]}` {_f(mean_rel[i])}" for i in order)
-        + ". Meilleur run par jeu : "
+        + ". Best run per dataset: "
         + ", ".join(f"{data[ds]['label']} `{data[ds]['best']}`" for ds in sets)
-        + f" (`{max(wins, key=wins.get)}` gagne {max(wins.values())} fois sur {len(sets)}).")
+        + f" (`{max(wins, key=wins.get)}` wins {max(wins.values())} times out of {len(sets)}).")
     s, rho = rank_agreement(data)
     iu = np.triu_indices(len(s), 1)
     pairs = sorted(((rho[i, j], s[i], s[j]) for i, j in zip(*iu)), reverse=True)
     if pairs:
         obs["classements"] = (
-            f"Spearman moyen entre jeux : {_f(float(np.mean(rho[iu])))}. Classements les plus "
-            f"proches : {LABELS[pairs[0][1]]}–{LABELS[pairs[0][2]]} ({_f(pairs[0][0])}) ; les "
-            f"plus éloignés : {LABELS[pairs[-1][1]]}–{LABELS[pairs[-1][2]]} "
-            f"({_f(pairs[-1][0])}). Avec 6 runs, |ρ| < 0,83 n'est pas significatif à 5 %.")
+            f"Mean Spearman between datasets: {_f(float(np.mean(rho[iu])))}. Closest "
+            f"rankings: {LABELS[pairs[0][1]]}–{LABELS[pairs[0][2]]} ({_f(pairs[0][0])}); "
+            f"furthest: {LABELS[pairs[-1][1]]}–{LABELS[pairs[-1][2]]} "
+            f"({_f(pairs[-1][0])}). With 6 runs, |ρ| < 0.83 is not significant at 5 %.")
     eff = effects(data)
     deltas = [v for per in eff["sall_minus_s500"].values() for v in per.values()]
     pos = sum(v > 0 for v in deltas)
     bb = eff["by_batch"]
     obs["effets"] = (
-        f"Tout le split bat 500 images dans {pos} cas sur {len(deltas)} (jeu × lot), de "
-        f"{_f(float(np.mean(deltas)))} en score relatif moyen. Score relatif moyen par lot : "
-        + " ; ".join(f"{'tout' if s_ == 0 else str(s_) + ' images'} : "
-                     + ", ".join(f"lot {b} {_f(v)}" for b, v in sorted(per.items()))
+        f"The whole split beats 500 images in {pos} cases out of {len(deltas)} (dataset × "
+        f"batch), by {_f(float(np.mean(deltas)))} in mean relative score. Mean relative score "
+        "per batch: "
+        + "; ".join(f"{'all' if s_ == 0 else str(s_) + ' images'}: "
+                     + ", ".join(f"batch {b} {_f(v)}" for b, v in sorted(per.items()))
                      for s_, per in sorted(bb.items(), key=lambda kv: kv[0] != 0)) + ".")
     ep = [(r["epochs"], r["rel"], r["subset"]) for d in data.values() for r in d["runs"]
           if r["epochs"] and r["rel"] is not None]
@@ -522,22 +525,22 @@ def observations(data):
     e500 = [e for e, _, s in ep if s]
     eall = [e for e, _, s in ep if not s]
     obs["epoques"] = (
-        f"Corrélation de rangs entre époques vues et score relatif, tous jeux : "
-        f"{_f(spearman(x, y))}. Les runs à 500 images font {_f(min(e500), 1)} à "
-        f"{_f(max(e500), 1)} époques ; ceux sur tout le split, {_f(min(eall), 2)} à "
-        f"{_f(max(eall), 2)}. Score relatif moyen : {_f(float(np.mean([v for _, v, s in ep if not s])))} "
-        f"sur tout le split, {_f(float(np.mean([v for _, v, s in ep if s])))} à 500 images.")
+        f"Rank correlation between epochs seen and relative score, all datasets: "
+        f"{_f(spearman(x, y))}. The runs on 500 images do {_f(min(e500), 1)} to "
+        f"{_f(max(e500), 1)} epochs; those on the whole split, {_f(min(eall), 2)} to "
+        f"{_f(max(eall), 2)}. Mean relative score: {_f(float(np.mean([v for _, v, s in ep if not s])))} "
+        f"on the whole split, {_f(float(np.mean([v for _, v, s in ep if s])))} on 500 images.")
     lines = []
     for ds, d in data.items():
         pts = [(r["final_loss"], r["map"]) for r in d["runs"]
                if r["final_loss"] is not None and r.get("map") is not None]
         rho_ = spearman([p[0] for p in pts], [p[1] for p in pts])
         low = min(d["runs"], key=lambda r: r["final_loss"])
-        lines.append(f"{d['label']} ρ = {_f(rho_)} (perte la plus basse : `{low['run']}`, "
-                     f"rang {_f(low.get('rank'), 0)})")
-    obs["perte"] = ("Corrélation de rangs perte finale / score, par jeu : " + " ; ".join(lines)
-                    + ". Une corrélation positive veut dire : plus la perte est basse, plus "
-                    "la mAP est basse (surapprentissage des runs à 500 images).")
+        lines.append(f"{d['label']} ρ = {_f(rho_)} (lowest loss: `{low['run']}`, "
+                     f"rank {_f(low.get('rank'), 0)})")
+    obs["perte"] = ("Rank correlation final loss / score, per dataset: " + "; ".join(lines)
+                    + ". A positive correlation means: the lower the loss, the lower the mAP "
+                    "(overfitting of the runs on 500 images).")
     lines = []
     for ds, d in data.items():
         by_b = {}
@@ -549,10 +552,10 @@ def observations(data):
             gain = 1 - np.mean(by_b[hi]) / np.mean(by_b[lo])
             lines.append(f"{d['label']} {_f(100 * gain, 0)} %")
     obs["courbes"] = (
-        "Les courbes des trois lots se superposent pendant l'essentiel du burn-in (LR "
-        "montant en (it/burn-in)⁴ : moins de 20 % de sa valeur avant 66 % du burn-in) et ne "
-        "s'écartent qu'à la fin. Perte finale du plus grand lot, "
-        "en moins par rapport au plus petit (runs avec journal) : "
+        "The curves of the three batches overlap during most of the burn-in (LR rising "
+        "as (it/burn-in)⁴: under 20 % of its value before 66 % of the burn-in) and only part "
+        "at the end. Final loss of the largest batch, lower than the smallest one by (runs "
+        "with a log): "
         + (", ".join(lines) if lines else "—") + ".")
     parts = []
     for ds, d in data.items():
@@ -560,7 +563,7 @@ def observations(data):
         tot = sum(r["final_parts"].values()) or 1
         dom = max(r["final_parts"], key=r["final_parts"].get)
         parts.append(f"{d['label']} {dom} {_f(100 * r['final_parts'][dom] / tot, 0)} %")
-    obs["composantes"] = ("Terme dominant de la perte finale du meilleur run : "
+    obs["composantes"] = ("Dominant term of the final loss of the best run: "
                           + ", ".join(parts) + ".")
     cls = []
     for ds, d in data.items():
@@ -569,23 +572,24 @@ def observations(data):
         present = {k: v for k, v in ap.items() if v is not None}
         nz = [k for k, v in present.items() if v >= 5]
         top = max(present, key=present.get) if present else "—"
-        cls.append(f"{d['label']} {len(nz)}/{len(present)} (meilleure : {top} "
+        cls.append(f"{d['label']} {len(nz)}/{len(present)} (best: {top} "
                    f"{_f(present.get(top), 1)})")
-    obs["classes"] = ("Classes présentes au-dessus de 5 points d'AP@0,5, meilleur run : "
-                      + " ; ".join(cls) + ".")
+    obs["classes"] = ("Classes present above 5 points of AP@0.5, best run: "
+                      + "; ".join(cls) + ".")
     gaps = []
     for ds, d in data.items():
         if not d["baselines"]:
             continue
         name, b = max(d["baselines"].items(), key=lambda kv: kv[1]["map"])
-        gaps.append(f"{d['label']} {_f(d['top'])} contre {_f(b['map'])} ({name}, "
-                    f"{b['n_classes']} classes évaluées)")
-    obs["publies"] = ("Meilleur run affiné face au meilleur poids publié : " + " ; ".join(gaps)
-                      + "." if gaps else "Aucune inférence des poids publiés exécutée.")
+        gaps.append(f"{d['label']} {_f(d['top'])} against {_f(b['map'])} ({name}, "
+                    f"{b['n_classes']} classes evaluated)")
+    obs["publies"] = ("Best fine-tuned run against the best published weights: "
+                      + "; ".join(gaps)
+                      + "." if gaps else "No inference of the published weights executed.")
     dur = [(r["batch"], r["duration_s"]) for d in data.values() for r in d["runs"]
            if r["duration_s"]]
-    obs["cout"] = ("Durée moyenne d'un run de 600 itérations : "
-                   + ", ".join(f"lot {b} {_f(np.mean([s for bb_, s in dur if bb_ == b]) / 60, 1)} min"
+    obs["cout"] = ("Mean duration of a 600-iteration run: "
+                   + ", ".join(f"batch {b} {_f(np.mean([s for bb_, s in dur if bb_ == b]) / 60, 1)} min"
                                for b in sorted({b for b, _ in dur})) + ".")
     return obs
 
@@ -598,21 +602,21 @@ def conclusions(data, pending=None):
     best = names[int(np.argmax(mean_rel))]
     eff = effects(data)
     deltas = [v for per in eff["sall_minus_s500"].values() for v in per.values()]
-    out = [f"- **Configuration la plus robuste : `{best}`**, score relatif moyen "
-           f"{_f(float(mean_rel.max()))} sur {len(sets)} jeux "
-           f"(meilleur run de {sum(data[ds]['best'] == best for ds in sets)} jeux).",
-           f"- **Tout le split plutôt que 500 images** : gain moyen de "
-           f"{_f(float(np.mean(deltas)))} en score relatif ({sum(v > 0 for v in deltas)} cas "
-           f"sur {len(deltas)}).",
-           "- **Affinage trop court** : le meilleur run reste sous les poids publiés hors "
-           "domaine sur "
-           + (", ".join(f"{d['label']} ({_f(d['top'])} contre "
+    out = [f"- **Most robust configuration: `{best}`**, mean relative score "
+           f"{_f(float(mean_rel.max()))} over {len(sets)} datasets "
+           f"(best run of {sum(data[ds]['best'] == best for ds in sets)} datasets).",
+           f"- **The whole split rather than 500 images**: mean gain of "
+           f"{_f(float(np.mean(deltas)))} in relative score ({sum(v > 0 for v in deltas)} cases "
+           f"out of {len(deltas)}).",
+           "- **Fine-tuning too short**: the best run stays below the out-of-domain published "
+           "weights on "
+           + (", ".join(f"{d['label']} ({_f(d['top'])} against "
                         f"{_f(max(b['map'] for b in d['baselines'].values()))})"
                         for d in data.values() if d["baselines"] and d["top"]
-                        < max(b["map"] for b in d["baselines"].values())) or "aucun jeu")
-           + " ; 600 itérations (moins de 7 époques) ne suffisent pas à réapprendre les têtes."]
+                        < max(b["map"] for b in d["baselines"].values())) or "no dataset")
+           + "; 600 iterations (under 7 epochs) are not enough to learn the heads again."]
     if pending:
-        out.append("- Balayages pas encore exécutés : "
+        out.append("- Sweeps not executed yet: "
                    + ", ".join(f"`{p}`" for p in pending.values()) + ".")
     return "\n".join(out)
 
@@ -640,13 +644,13 @@ def main(argv=None):
     args = ap.parse_args(argv)
     data, pending = load_all(datasets=args.datasets.split(",") if args.datasets else None)
     if not data:
-        raise SystemExit("aucun balayage exécuté dans notebooks/*/*_sweep.ipynb")
+        raise SystemExit("no executed sweep in notebooks/*/*_sweep.ipynb")
     print(summary_table(data))
     if args.runs:
         print()
         print(runs_table(data))
-    for title, table in (("Split complet (T15.1)", full_table(data)),
-                         ("Bruit d'un run (T15.2)", noise_table(data))):
+    for title, table in (("Full split (T15.1)", full_table(data)),
+                         ("Noise of a run (T15.2)", noise_table(data))):
         if table:
             print(f"\n{title}\n\n{table}")
     print()
@@ -654,7 +658,7 @@ def main(argv=None):
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(to_json(data))
-        print(f"\ndonnées : {args.json}")
+        print(f"\ndata: {args.json}")
     return 0
 
 

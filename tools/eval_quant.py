@@ -190,7 +190,7 @@ def run(args, samples, variants):
     if raw is not None:
         raw.close()
     if "int-hwpp" in variants:
-        print(f"int-hwpp : {overflow} candidates perdues (sélection pleine, {args.hw_cap})")
+        print(f"int-hwpp: {overflow} candidates lost (selection full, {args.hw_cap})")
     dets = {v: {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4))
                 for c, d in pc.items()} for v, pc in per.items()}
     return dets, overflow
@@ -260,7 +260,7 @@ def main():
         res[v]["dets_per_image"] = n_det
         if v == "int-hwpp":
             res[v]["overflow"] = overflow
-        print(f"{v:8s} {line}  ({n_det:.1f} détections par image)")
+        print(f"{v:8s} {line}  ({n_det:.1f} detections per image)")
     tag = datasets.tag(args.dataset, split)
     split_name = tag or split.split(":")[-1]
     out = args.out or ROOT / "build" / "quant" / net_tag(args.net) / (
@@ -274,7 +274,7 @@ def main():
                                "model_dir": str(args.model_dir) if args.model_dir else None,
                                "hw_cap": args.hw_cap if "int-hwpp" in variants else None,
                                "results": res}, indent=1) + "\n")
-    print(f"résultats : {out}")
+    print(f"results: {out}")
     if not args.no_figures:
         sys.path.insert(0, str(ROOT))
         from tools.figures.auto import after_run

@@ -16,41 +16,41 @@ anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0
 ## Comparison
 
 <!-- data_stats:comparatif -->
-| jeu | classes | images | objets | objets/image (méd.) | petits à l'entrée | plus petits qu'une cellule fine | cibles perdues | images > 256 | luminance moy. | IoU ancres de la cfg |
+| dataset | classes | images | objects | objects/image (med.) | small at the input | smaller than a fine cell | lost targets | images > 256 | mean luminance | IoU of the cfg anchors |
 |---|---|---|---|---|---|---|---|---|---|---|
-| voc | 20 | 21 503 | 62 199 | 2 | 8,4 % | 0,3 % | 0,69 % | 0 | 112 | 0,603 |
-| coco | 80 | 123 287 | 896 782 | 4 | 44,3 % | 14,6 % | 25,82 % | 0 | 111 | 0,550 |
-| visdrone | 10 | 7 019 | 381 963 | 43 | 97,0 % | 75,3 % | 32,40 % | 24 | 97 | 0,601 |
-| crowdhuman | 1 | 19 370 | 566 493 | 20 | 47,5 % | 10,0 % | 19,82 % | 32 | 113 | 0,679 |
-| exdark | 12 | 5 563 | 17 498 | 2 | 18,1 % | 1,0 % | 0,74 % | 0 | 33 | 0,615 |
-| flir | 15 | 11 886 | 191 728 | 15 | 85,6 % | 50,7 % | 17,70 % | 0 | 133 | 0,564 |
-| auair | 8 | 32 823 | 131 977 | 3 | 79,8 % | 34,7 % | 8,88 % | 0 | 123 | 0,668 |
-| dronevehicle | 2 | 14 726 | 235 858 | 12 | 65,4 % | 0,4 % | 2,88 % | 0 | 80 | 0,735 |
-| hituav | 4 | 2 579 | 22 298 | 6 | 84,2 % | 44,6 % | 7,76 % | 0 | 125 | 0,698 |
-| uavdt | 3 | 40 735 | 798 795 | 15 | 96,9 % | 56,9 % | 14,68 % | 0 | 97 | 0,711 |
-| asl | 28 | 76 522 | 73 522 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 132 | 0,768 |
-| pets | 37 | 6 964 | 6 964 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 114 | 0,824 |
-| prewid | 1 | 3 413 | 1 924 | 1 | 38,5 % | 0,4 % | 0,16 % | 0 | 138 | 0,777 |
+| voc | 20 | 21,503 | 62,199 | 2 | 8.4 % | 0.3 % | 0.69 % | 0 | 112 | 0.603 |
+| coco | 80 | 123,287 | 896,782 | 4 | 44.3 % | 14.6 % | 25.82 % | 0 | 111 | 0.550 |
+| visdrone | 10 | 7,019 | 381,963 | 43 | 97.0 % | 75.3 % | 32.40 % | 24 | 97 | 0.601 |
+| crowdhuman | 1 | 19,370 | 566,493 | 20 | 47.5 % | 10.0 % | 19.82 % | 32 | 113 | 0.679 |
+| exdark | 12 | 5,563 | 17,498 | 2 | 18.1 % | 1.0 % | 0.74 % | 0 | 33 | 0.615 |
+| flir | 15 | 11,886 | 191,728 | 15 | 85.6 % | 50.7 % | 17.70 % | 0 | 133 | 0.564 |
+| auair | 8 | 32,823 | 131,977 | 3 | 79.8 % | 34.7 % | 8.88 % | 0 | 123 | 0.668 |
+| dronevehicle | 2 | 14,726 | 235,858 | 12 | 65.4 % | 0.4 % | 2.88 % | 0 | 80 | 0.735 |
+| hituav | 4 | 2,579 | 22,298 | 6 | 84.2 % | 44.6 % | 7.76 % | 0 | 125 | 0.698 |
+| uavdt | 3 | 40,735 | 798,795 | 15 | 96.9 % | 56.9 % | 14.68 % | 0 | 97 | 0.711 |
+| asl | 28 | 76,522 | 73,522 | 1 | 0.0 % | 0.0 % | 0.00 % | 0 | 132 | 0.768 |
+| pets | 37 | 6,964 | 6,964 | 1 | 0.0 % | 0.0 % | 0.00 % | 0 | 114 | 0.824 |
+| prewid | 1 | 3,413 | 1,924 | 1 | 38.5 % | 0.4 % | 0.16 % | 0 | 138 | 0.777 |
 <!-- /data_stats:comparatif -->
 
 ## VOC
 
 <!-- data_stats:voc -->
-Révision `214f269`, entrée 416×416 (letterbox), cfg `tiny-yolov3-voc`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset voc --split 2007:trainval,2012:trainval,2007:test --sample 200`.
+Revision `214f269`, input 416×416 (letterbox), cfg `tiny-yolov3-voc`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset voc --split 2007:trainval,2012:trainval,2007:test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| 2007:trainval | 5 011 | 15 662 | 3 054 | 0 | 2 / 42 | 7,7 % | 13x13 3,2 % · 26x26 0,1 % | 0,62 % | 0 / 0 |
-| 2012:trainval | 11 540 | 31 561 | 4 111 | 0 | 2 / 56 | 9,1 % | 13x13 4,7 % · 26x26 0,4 % | 0,73 % | 0 / 0 |
-| 2007:test | 4 952 | 14 976 | 2 944 | 0 | 2 / 41 | 7,3 % | 13x13 3,5 % · 26x26 0,1 % | 0,66 % | 0 / 0 |
-| groupe train | 16 551 | 47 223 | 7 165 | 0 | 2 / 56 | 8,7 % | 13x13 4,2 % · 26x26 0,3 % | 0,69 % | 0 / 0 |
-| ensemble | 21 503 | 62 199 | 10 109 | 0 | 2 / 56 | 8,4 % | 13x13 4,0 % · 26x26 0,3 % | 0,69 % | 0 / 0 |
+| 2007:trainval | 5,011 | 15,662 | 3,054 | 0 | 2 / 42 | 7.7 % | 13x13 3.2 % · 26x26 0.1 % | 0.62 % | 0 / 0 |
+| 2012:trainval | 11,540 | 31,561 | 4,111 | 0 | 2 / 56 | 9.1 % | 13x13 4.7 % · 26x26 0.4 % | 0.73 % | 0 / 0 |
+| 2007:test | 4,952 | 14,976 | 2,944 | 0 | 2 / 41 | 7.3 % | 13x13 3.5 % · 26x26 0.1 % | 0.66 % | 0 / 0 |
+| train group | 16,551 | 47,223 | 7,165 | 0 | 2 / 56 | 8.7 % | 13x13 4.2 % · 26x26 0.3 % | 0.69 % | 0 / 0 |
+| all | 21,503 | 62,199 | 10,109 | 0 | 2 / 56 | 8.4 % | 13x13 4.0 % · 26x26 0.3 % | 0.69 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| 2007:test | 4 952 | 12 032 | 4 952 / 12 032 | ok |
-| 2007:trainval | 5 011 | 12 608 | 5 011 / 12 608 | ok |
-| 2012:trainval | 11 540 | 27 450 | 11 540 / 27 450 | ok |
+| 2007:test | 4,952 | 12,032 | 4,952 / 12,032 | ok |
+| 2007:trainval | 5,011 | 12,608 | 5,011 / 12,608 | ok |
+| 2012:trainval | 11,540 | 27,450 | 11,540 / 27,450 | ok |
 <!-- /data_stats:voc -->
 
 **Question (T13.7, T13.13): are the classes with a low AP (bottle, pottedplant) rare or
@@ -75,18 +75,18 @@ Not run: only the `testing/` images (without annotations) are on the PC,
 ## VisDrone
 
 <!-- data_stats:visdrone -->
-Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-visdrone.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset visdrone --split train,val --sample 200`.
+Revision `214f269`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-visdrone.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset visdrone --split train,val --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 6 471 | 343 204 | 0 | 0 | 42 / 902 | 96,9 % | 13x13 93,8 % · 26x26 75,1 % | 32,33 % | 21 / 0 |
-| val | 548 | 38 759 | 0 | 0 | 65 / 317 | 97,9 % | 13x13 95,2 % · 26x26 77,6 % | 33,04 % | 3 / 0 |
-| ensemble | 7 019 | 381 963 | 0 | 0 | 43 / 902 | 97,0 % | 13x13 93,9 % · 26x26 75,3 % | 32,40 % | 24 / 0 |
+| train | 6,471 | 343,204 | 0 | 0 | 42 / 902 | 96.9 % | 13x13 93.8 % · 26x26 75.1 % | 32.33 % | 21 / 0 |
+| val | 548 | 38,759 | 0 | 0 | 65 / 317 | 97.9 % | 13x13 95.2 % · 26x26 77.6 % | 33.04 % | 3 / 0 |
+| all | 7,019 | 381,963 | 0 | 0 | 43 / 902 | 97.0 % | 13x13 93.9 % · 26x26 75.3 % | 32.40 % | 24 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 6 471 | 343 204 | 6 471 / — | ok |
-| val | 548 | 38 759 | 548 / — | ok |
+| train | 6,471 | 343,204 | 6,471 / — | ok |
+| val | 548 | 38,759 | 548 / — | ok |
 <!-- /data_stats:visdrone -->
 
 **Question (T11.5, T15): share of objects smaller than a 26×26 cell; target collisions.**
@@ -102,18 +102,18 @@ and 1,564 "others"; 32,959 boxes are less than 2 px wide at the input.
 ## FLIR ADAS v2
 
 <!-- data_stats:flir -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset flir --split train,val --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset flir --split train,val --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 10 742 | 175 032 | 0 | 264 | 15 / 93 | 85,6 % | 13x13 77,6 % · 26x26 50,6 % | 18,06 % | 0 / 0 |
-| val | 1 144 | 16 696 | 0 | 16 | 14 / 63 | 86,3 % | 13x13 79,4 % · 26x26 51,2 % | 13,87 % | 0 / 0 |
-| ensemble | 11 886 | 191 728 | 0 | 280 | 15 / 93 | 85,6 % | 13x13 77,8 % · 26x26 50,7 % | 17,70 % | 0 / 0 |
+| train | 10,742 | 175,032 | 0 | 264 | 15 / 93 | 85.6 % | 13x13 77.6 % · 26x26 50.6 % | 18.06 % | 0 / 0 |
+| val | 1,144 | 16,696 | 0 | 16 | 14 / 63 | 86.3 % | 13x13 79.4 % · 26x26 51.2 % | 13.87 % | 0 / 0 |
+| all | 11,886 | 191,728 | 0 | 280 | 15 / 93 | 85.6 % | 13x13 77.8 % · 26x26 50.7 % | 17.70 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 10 742 | 175 032 | 10 742 / — | ok |
-| val | 1 144 | 16 696 | 1 144 / — | ok |
+| train | 10,742 | 175,032 | 10,742 / — | ok |
+| val | 1,144 | 16,696 | 1,144 / — | ok |
 <!-- /data_stats:flir -->
 
 **Question (T11.7): distribution of the thermal levels, and what the INT8 of L00 keeps of
@@ -128,18 +128,18 @@ less than the size of the objects.
 ## ExDark
 
 <!-- data_stats:exdark -->
-Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-exdark.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset exdark --split train,test --sample 200`.
+Revision `214f269`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-exdark.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset exdark --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 3 000 | 10 381 | 0 | 1 | 2 / 33 | 17,8 % | 13x13 10,4 % · 26x26 0,6 % | 0,56 % | 0 / 0 |
-| test | 2 563 | 7 117 | 0 | 0 | 2 / 30 | 18,5 % | 13x13 11,8 % · 26x26 1,7 % | 1,00 % | 0 / 0 |
-| ensemble | 5 563 | 17 498 | 0 | 1 | 2 / 33 | 18,1 % | 13x13 11,0 % · 26x26 1,0 % | 0,74 % | 0 / 0 |
+| train | 3,000 | 10,381 | 0 | 1 | 2 / 33 | 17.8 % | 13x13 10.4 % · 26x26 0.6 % | 0.56 % | 0 / 0 |
+| test | 2,563 | 7,117 | 0 | 0 | 2 / 30 | 18.5 % | 13x13 11.8 % · 26x26 1.7 % | 1.00 % | 0 / 0 |
+| all | 5,563 | 17,498 | 0 | 1 | 2 / 33 | 18.1 % | 13x13 11.0 % · 26x26 1.0 % | 0.74 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 3 000 | 10 381 | 3 000 / — | ok |
-| test | 2 563 | 7 117 | 2 563 / — | ok |
+| train | 3,000 | 10,381 | 3,000 / — | ok |
+| test | 2,563 | 7,117 | 2,563 / — | ok |
 <!-- /data_stats:exdark -->
 
 **Question (T11.3): luminance per lighting type, and gap to the VOC calibration images.**
@@ -155,18 +155,18 @@ small, 0.7 % of targets lost).
 ## CrowdHuman
 
 <!-- data_stats:crowdhuman -->
-Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset crowdhuman --split train,val --sample 200`.
+Revision `214f269`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset crowdhuman --split train,val --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 15 000 | 438 783 | 99 218 | 0 | 20 / 468 | 47,6 % | 13x13 30,4 % · 26x26 10,1 % | 19,91 % | 28 / 0 |
-| val | 4 370 | 127 710 | 28 229 | 0 | 20 / 365 | 47,2 % | 13x13 29,4 % · 26x26 9,8 % | 19,55 % | 4 / 0 |
-| ensemble | 19 370 | 566 493 | 127 447 | 0 | 20 / 468 | 47,5 % | 13x13 30,2 % · 26x26 10,0 % | 19,82 % | 32 / 0 |
+| train | 15,000 | 438,783 | 99,218 | 0 | 20 / 468 | 47.6 % | 13x13 30.4 % · 26x26 10.1 % | 19.91 % | 28 / 0 |
+| val | 4,370 | 127,710 | 28,229 | 0 | 20 / 365 | 47.2 % | 13x13 29.4 % · 26x26 9.8 % | 19.55 % | 4 / 0 |
+| all | 19,370 | 566,493 | 127,447 | 0 | 20 / 468 | 47.5 % | 13x13 30.2 % · 26x26 10.0 % | 19.82 % | 32 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 15 000 | 339 565 | 15 000 / 339 565 | ok |
-| val | 4 370 | 99 481 | 4 370 / 99 481 | ok |
+| train | 15,000 | 339,565 | 15,000 / 339,565 | ok |
+| val | 4,370 | 99,481 | 4,370 / 99,481 | ok |
 <!-- /data_stats:crowdhuman -->
 
 **Question (T11.6): objects per image against the 256 slots; share of occluded objects.**
@@ -180,18 +180,18 @@ and are removed.
 ## Oxford-IIIT Pet
 
 <!-- data_stats:pets -->
-Révision `145dc7c`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-pets.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset pets --split train,test --sample 200`.
+Revision `145dc7c`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-pets.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset pets --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 3 302 | 3 302 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
-| test | 3 662 | 3 662 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
-| ensemble | 6 964 | 6 964 | 0 | 0 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| train | 3,302 | 3,302 | 0 | 0 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| test | 3,662 | 3,662 | 0 | 0 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| all | 6,964 | 6,964 | 0 | 0 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 3 302 | 3 302 | — / — | ok |
-| test | 3 662 | 3 662 | — / — | ok |
+| train | 3,302 | 3,302 | — / — | ok |
+| test | 3,662 | 3,662 | — / — | ok |
 <!-- /data_stats:pets -->
 
 **Question (T32.8): how much larger is the body box than the head box, and how many images
@@ -206,17 +206,17 @@ both. So the body box is the union of the mask, not one box per part (T32.5).
 ## PREWID
 
 <!-- data_stats:prewid -->
-Révision `fba540c`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-prewid.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset prewid --split train,test --sample 200`.
+Revision `fba540c`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-prewid.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset prewid --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 2 821 | 1 581 | 0 | 1 348 | 1 / 3 | 37,5 % | 13x13 5,1 % · 26x26 0,3 % | 0,00 % | 0 / 0 |
-| test | 592 | 343 | 0 | 289 | 1 / 2 | 42,9 % | 13x13 1,7 % · 26x26 0,6 % | 0,87 % | 0 / 0 |
-| ensemble | 3 413 | 1 924 | 0 | 1 637 | 1 / 3 | 38,5 % | 13x13 4,5 % · 26x26 0,4 % | 0,16 % | 0 / 0 |
+| train | 2,821 | 1,581 | 0 | 1,348 | 1 / 3 | 37.5 % | 13x13 5.1 % · 26x26 0.3 % | 0.00 % | 0 / 0 |
+| test | 592 | 343 | 0 | 289 | 1 / 2 | 42.9 % | 13x13 1.7 % · 26x26 0.6 % | 0.87 % | 0 / 0 |
+| all | 3,413 | 1,924 | 0 | 1,637 | 1 / 3 | 38.5 % | 13x13 4.5 % · 26x26 0.4 % | 0.16 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 2 821 | 1 581 | — / — | ok |
+| train | 2,821 | 1,581 | — / — | ok |
 | test | 592 | 343 | — / — | ok |
 <!-- /data_stats:prewid -->
 
@@ -242,91 +242,91 @@ val and test for each camera (empty frames and worker frames are cut separately,
 `test` has 289 empty frames to measure false alarms on.
 
 <!-- data_stats:coco -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `tiny-yolov3-coco`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset coco --split train2017,val2017 --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `tiny-yolov3-coco`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset coco --split train2017,val2017 --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train2017 | 118 287 | 860 001 | 10 052 | 1 021 | 4 / 93 | 44,3 % | 13x13 33,8 % · 26x26 14,6 % | 25,83 % | 0 / 0 |
-| val2017 | 5 000 | 36 781 | 446 | 48 | 4 / 63 | 44,5 % | 13x13 34,1 % · 26x26 14,2 % | 25,61 % | 0 / 0 |
-| ensemble | 123 287 | 896 782 | 10 498 | 1 069 | 4 / 93 | 44,3 % | 13x13 33,8 % · 26x26 14,6 % | 25,82 % | 0 / 0 |
+| train2017 | 118,287 | 860,001 | 10,052 | 1,021 | 4 / 93 | 44.3 % | 13x13 33.8 % · 26x26 14.6 % | 25.83 % | 0 / 0 |
+| val2017 | 5,000 | 36,781 | 446 | 48 | 4 / 63 | 44.5 % | 13x13 34.1 % · 26x26 14.2 % | 25.61 % | 0 / 0 |
+| all | 123,287 | 896,782 | 10,498 | 1,069 | 4 / 93 | 44.3 % | 13x13 33.8 % · 26x26 14.6 % | 25.82 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| val2017 | 5 000 | 36 781 | 5 000 / 36 781 | ok |
-| train2017 | 118 287 | 860 001 | 118 287 / 860 001 | ok |
+| val2017 | 5,000 | 36,781 | 5,000 / 36,781 | ok |
+| train2017 | 118,287 | 860,001 | 118,287 / 860,001 | ok |
 <!-- /data_stats:coco -->
 
 <!-- data_stats:auair -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-auair.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset auair --split train,val --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-auair.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset auair --split train,val --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 27 880 | 114 237 | 0 | 2 | 3 / 52 | 81,7 % | 13x13 70,3 % · 26x26 35,1 % | 8,84 % | 0 / 0 |
-| val | 4 943 | 17 740 | 0 | 1 | 3 / 56 | 67,9 % | 13x13 60,1 % · 26x26 31,5 % | 9,15 % | 0 / 0 |
-| ensemble | 32 823 | 131 977 | 0 | 3 | 3 / 56 | 79,8 % | 13x13 69,0 % · 26x26 34,7 % | 8,88 % | 0 / 0 |
+| train | 27,880 | 114,237 | 0 | 2 | 3 / 52 | 81.7 % | 13x13 70.3 % · 26x26 35.1 % | 8.84 % | 0 / 0 |
+| val | 4,943 | 17,740 | 0 | 1 | 3 / 56 | 67.9 % | 13x13 60.1 % · 26x26 31.5 % | 9.15 % | 0 / 0 |
+| all | 32,823 | 131,977 | 0 | 3 | 3 / 56 | 79.8 % | 13x13 69.0 % · 26x26 34.7 % | 8.88 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 27 880 | 114 237 | 27 880 / — | ok |
-| val | 4 943 | 17 740 | 4 943 / — | ok |
+| train | 27,880 | 114,237 | 27,880 / — | ok |
+| val | 4,943 | 17,740 | 4,943 / — | ok |
 <!-- /data_stats:auair -->
 
 <!-- data_stats:dronevehicle -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-dronevehicle.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset dronevehicle --split train,test --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-dronevehicle.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset dronevehicle --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 12 118 | 193 940 | 0 | 0 | 12 / 206 | 65,4 % | 13x13 23,7 % · 26x26 0,4 % | 2,90 % | 0 / 0 |
-| test | 2 608 | 41 918 | 0 | 0 | 12 / 145 | 65,2 % | 13x13 25,1 % · 26x26 0,5 % | 2,80 % | 0 / 0 |
-| ensemble | 14 726 | 235 858 | 0 | 0 | 12 / 206 | 65,4 % | 13x13 23,9 % · 26x26 0,4 % | 2,88 % | 0 / 0 |
+| train | 12,118 | 193,940 | 0 | 0 | 12 / 206 | 65.4 % | 13x13 23.7 % · 26x26 0.4 % | 2.90 % | 0 / 0 |
+| test | 2,608 | 41,918 | 0 | 0 | 12 / 145 | 65.2 % | 13x13 25.1 % · 26x26 0.5 % | 2.80 % | 0 / 0 |
+| all | 14,726 | 235,858 | 0 | 0 | 12 / 206 | 65.4 % | 13x13 23.9 % · 26x26 0.4 % | 2.88 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 12 118 | 193 940 | 12 118 / 193 940 | ok |
-| test | 2 608 | 41 918 | 2 608 / 41 918 | ok |
+| train | 12,118 | 193,940 | 12,118 / 193,940 | ok |
+| test | 2,608 | 41,918 | 2,608 / 41,918 | ok |
 <!-- /data_stats:dronevehicle -->
 
 <!-- data_stats:hituav -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-hituav-c1.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset hituav --split train,test --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-hituav-c1.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset hituav --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 2 008 | 17 518 | 0 | 0 | 6 / 42 | 83,9 % | 13x13 77,9 % · 26x26 43,7 % | 7,76 % | 0 / 0 |
-| test | 571 | 4 780 | 0 | 0 | 6 / 32 | 85,2 % | 13x13 79,7 % · 26x26 48,2 % | 7,74 % | 0 / 0 |
-| ensemble | 2 579 | 22 298 | 0 | 0 | 6 / 42 | 84,2 % | 13x13 78,3 % · 26x26 44,6 % | 7,76 % | 0 / 0 |
+| train | 2,008 | 17,518 | 0 | 0 | 6 / 42 | 83.9 % | 13x13 77.9 % · 26x26 43.7 % | 7.76 % | 0 / 0 |
+| test | 571 | 4,780 | 0 | 0 | 6 / 32 | 85.2 % | 13x13 79.7 % · 26x26 48.2 % | 7.74 % | 0 / 0 |
+| all | 2,579 | 22,298 | 0 | 0 | 6 / 42 | 84.2 % | 13x13 78.3 % · 26x26 44.6 % | 7.76 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 2 008 | 17 518 | 2 008 / 17 518 | ok |
-| test | 571 | 4 780 | 571 / 4 780 | ok |
+| train | 2,008 | 17,518 | 2,008 / 17,518 | ok |
+| test | 571 | 4,780 | 571 / 4,780 | ok |
 <!-- /data_stats:hituav -->
 
 <!-- data_stats:uavdt -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-uavdt.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset uavdt --split train,test --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-uavdt.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset uavdt --split train,test --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 24 143 | 422 911 | 0 | 314 | 15 / 66 | 97,5 % | 13x13 93,4 % · 26x26 45,6 % | 9,27 % | 0 / 0 |
-| test | 16 592 | 375 884 | 0 | 12 | 15 / 107 | 96,3 % | 13x13 94,0 % · 26x26 69,6 % | 20,77 % | 0 / 0 |
-| ensemble | 40 735 | 798 795 | 0 | 326 | 15 / 107 | 96,9 % | 13x13 93,7 % · 26x26 56,9 % | 14,68 % | 0 / 0 |
+| train | 24,143 | 422,911 | 0 | 314 | 15 / 66 | 97.5 % | 13x13 93.4 % · 26x26 45.6 % | 9.27 % | 0 / 0 |
+| test | 16,592 | 375,884 | 0 | 12 | 15 / 107 | 96.3 % | 13x13 94.0 % · 26x26 69.6 % | 20.77 % | 0 / 0 |
+| all | 40,735 | 798,795 | 0 | 326 | 15 / 107 | 96.9 % | 13x13 93.7 % · 26x26 56.9 % | 14.68 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 24 143 | 422 911 | 24 143 / 422 911 | ok |
-| test | 16 592 | 375 884 | 16 592 / 375 884 | ok |
+| train | 24,143 | 422,911 | 24,143 / 422,911 | ok |
+| test | 16,592 | 375,884 | 16,592 / 375,884 | ok |
 <!-- /data_stats:uavdt -->
 
 <!-- data_stats:asl -->
-Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-asl.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset asl --split train,val --sample 200`.
+Revision `3263136`, input 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-asl.cfg`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset asl --split train,val --sample 200`.
 
-| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
 |---|---|---|---|---|---|---|---|---|---|
-| train | 69 984 | 67 434 | 0 | 2 550 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
-| val | 6 538 | 6 088 | 0 | 450 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
-| ensemble | 76 522 | 73 522 | 0 | 3 000 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| train | 69,984 | 67,434 | 0 | 2,550 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| val | 6,538 | 6,088 | 0 | 450 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| all | 76,522 | 73,522 | 0 | 3,000 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
 
-| split | images | objets | officiel |  |
+| split | images | objects | official |  |
 |---|---|---|---|---|
-| train | 69 984 | 67 434 | — / — | ok |
-| val | 6 538 | 6 088 | — / — | ok |
+| train | 69,984 | 67,434 | — / — | ok |
+| val | 6,538 | 6,088 | — / — | ok |
 <!-- /data_stats:asl -->

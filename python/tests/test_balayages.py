@@ -74,15 +74,15 @@ def _sweep_dir(tmp_path):
              "| b32-sall | 32 | tout | 20 | gpu | 9.00 | 40.00 | 0.03 | 50 |\n"
              "| b8-sall | 8 | tout | 20 | gpu | 12.00 | 25.00 | 0.03 | 50 |\n"
              "| b8-s500 | 8 | 500 | 20 | gpu | 8.00 | 15.00 | 0.03 | 50 |\n")
-    _notebook(tmp_path / "voc" / "m_sweep.ipynb", [train, evals + table])
+    _notebook(tmp_path / "voc" / "tiny-yolov3-m_sweep.ipynb", [train, evals + table])
     _notebook(tmp_path / "voc" / "tiny-yolov3-coco_infer.ipynb",
               [_eval_voc("x", {"cat": 70.0, "dog": 60.0})])
     train = (_train("b8-s500", 8, 500, 500, 100) + _train("b8-sall", 8, 0, 2000, 110)
              + _train("b32-sall", 32, 0, 2000, 380))
     evals = (_eval_coco("b8-s500", 0.3, 1.3) + _eval_coco("b8-sall", 0.7, 2.9)
              + _eval_coco("b32-sall", 0.4, 1.7))
-    _notebook(tmp_path / "flir" / "m_sweep.ipynb", [train, evals])
-    _notebook(tmp_path / "kitti" / "m_sweep.ipynb", [])  # pas encore exécuté
+    _notebook(tmp_path / "flir" / "tiny-yolov3-m_sweep.ipynb", [train, evals])
+    _notebook(tmp_path / "kitti" / "tiny-yolov3-m_sweep.ipynb", [])  # pas encore exécuté
     return tmp_path
 
 
@@ -98,7 +98,7 @@ def test_parse_eval_voc_et_coco():
 
 def test_parse_sweep_runs_journal_table(tmp_path):
     root = _sweep_dir(tmp_path)
-    d = B.parse_sweep(root / "voc" / "m_sweep.ipynb")
+    d = B.parse_sweep(root / "voc" / "tiny-yolov3-m_sweep.ipynb")
     assert [r["run"] for r in d["runs"]] == ["b8-s500", "b8-sall", "b32-sall"]
     assert d["n_train"] == 1000 and d["iters"] == 20 and d["burn_in"] == 10
     r = {r["run"]: r for r in d["runs"]}
@@ -178,10 +178,10 @@ def test_notebooks_versionnes(ds, run, score):
 
 # ------------------------------------------------- collecte en fin de commande (T14.8)
 
-def _run_dir(root, name="b8-sall", iters=60):
+def _run_dir(root, name="b8-sall", iters=60, model="m"):
     from tools.notebooks import runs
 
-    d = root / "build" / "notebooks" / "x" / "m" / "runs" / name
+    d = root / "build" / "notebooks" / "x" / model / "runs" / name
     d.mkdir(parents=True)
     (d / "run.json").write_text(json.dumps({"batch": 8, "subset": 0, "iters": iters}))
     rows = ["it,lr,size,loss,coord,obj,noobj,cls,seconds"]
@@ -239,8 +239,8 @@ def test_autosync_colab_seulement(tmp_path, monkeypatch):
 
 def test_complete_from_build(tmp_path):
     root = _sweep_dir(tmp_path / "nb")
-    _, d = _run_dir(tmp_path)  # build/notebooks/x/m/runs/b8-sall
-    sweep = B.parse_sweep(root / "voc" / "m_sweep.ipynb")
+    _, d = _run_dir(tmp_path, model="tiny-yolov3-m")  # build/notebooks/x/<model>/runs/b8-sall
+    sweep = B.parse_sweep(root / "voc" / "tiny-yolov3-m_sweep.ipynb")
     sweep["dataset"] = "x"
     assert B.complete_from_build(sweep, tmp_path / "build" / "notebooks") == ["b8-sall"]
     r = next(r for r in sweep["runs"] if r["run"] == "b8-sall")
@@ -255,13 +255,13 @@ def test_graines_et_split_complet(tmp_path):
     assert B._name("b32-sall") == (32, 0, 0) and B._name("b8-s500-g2") == (8, 500, 2)
     assert B._name("train") is None
     root = _sweep_dir(tmp_path / "nb")
-    nb = root / "voc" / "m_sweep.ipynb"
+    nb = root / "voc" / "tiny-yolov3-m_sweep.ipynb"
     d = json.loads(nb.read_text())
     d["cells"][-1]["outputs"][0]["text"][0] += (
         _train("b32-sall-g1", 32, 0, 1000, 400) + _eval_voc("b32-sall-g1", {"cat": 40.0, "dog": 30.0}))
     nb.write_text(json.dumps(d))
     build = tmp_path / "build"
-    ev = build / "voc" / "m" / "eval"
+    ev = build / "voc" / "tiny-yolov3-m" / "eval"
     for name, m in (("b32-sall", 30.0), ("b32-sall-g1", 34.0)):
         (ev / name).mkdir(parents=True)
         (ev / name / "summary.json").write_text(json.dumps(
@@ -271,7 +271,7 @@ def test_graines_et_split_complet(tmp_path):
              "| b32-sall | 32 | tout | 0 | 20 | gpu | 9.00 | 99.00 | 0.03 | tout |\n"
              "| b8-sall | 8 | tout | 0 | 20 | gpu | 12.00 | 20.00 | 0.03 | tout |\n"
              "| b8-s500 | 8 | 500 | 0 | 20 | gpu | 8.00 | 10.00 | 0.03 | 50 |\n")
-    _notebook(root / "voc" / "m_infer.ipynb", [table])
+    _notebook(root / "voc" / "tiny-yolov3-m_infer.ipynb", [table])
     data, _ = B.load_all(root, build=build)
     voc = data["voc"]
     assert [r["run"] for r in voc["runs"]] == ["b8-s500", "b8-sall", "b32-sall"]
@@ -285,6 +285,6 @@ def test_graines_et_split_complet(tmp_path):
     assert row["map_full"]["mean"] == pytest.approx(32.0)
     assert row["map_full"]["std"] == pytest.approx(np.std([30, 34], ddof=1))
     assert row["map"]["mean"] == pytest.approx(37.5)  # balayage : 40 (table) et 35
-    assert "b32-sall" in B.full_table(data) and "32,00 ± 2,83" in B.noise_table(data)
+    assert "b32-sall" in B.full_table(data) and "32.00 ± 2.83" in B.noise_table(data)
     assert data["flir"]["noise"] == [] and B.noise_table({"flir": data["flir"]}) == ""
     json.loads(B.to_json(data))

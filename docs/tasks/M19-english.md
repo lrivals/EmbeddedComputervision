@@ -155,7 +155,7 @@ thousands separator (56.30, 132,031).
   - **Tests**: `test_notebooks.py` and `test_colab_data.py` pass (titles, `## Summary`,
     `data` / `weights` keys).
 
-### [ ] T19.6 — Generated markdown and number format
+### [x] T19.6 — Generated markdown and number format
 - **Depends on**: T19.5 · **Size**: M
 - **Deliverables**: `md_*` and `FICHES` of `tools/data_stats.py`, `eval_voc.py`,
   `eval_quant.py`, `m12_report.py`, `tools/notebooks/balayages.py`; a single number
@@ -163,6 +163,27 @@ thousands separator (56.30, 132,031).
   regenerated `stats-jeux.md`, sweep tables and `results/*.md` written by tools.
 - **Acceptance**: each regenerated table has the same values as before; only the
   separators and the words change.
+- **Done** (2026-10-27):
+  - **Formatter**: `yolo.fmt` (`num`, `pct`: decimal point, comma thousands, `—`), used by
+    `data_stats.py`, `balayages.py` and `count_macs.py`; `test_fmt.py`.
+  - **English output**: `md_*`, `markdown`, `report`, `comparatif` and the French `FICHES`
+    of `data_stats.py`; the tables and titles of `eval_voc.py`; the messages of
+    `eval_quant.py`; the tables of `m12_report.py`; the run rows of `runs.py` (`batch`,
+    `final loss`, `eval.` = `all`…); the tables, findings and conclusions of
+    `balayages.py`; the layer table of `count_macs.py`.
+  - **Readers of both languages**: `jeux.py` (French notebooks kept by `--archive`; English
+    tables put in the French number format before parsing), `runs.parse_eval`,
+    `balayages.py`. `figures/resultats.py` and `article.py` read the English
+    `resultats-balayages.md`.
+  - **Regenerated**: `stats-jeux.md` (`--report`, the 14 blocks: every number equal to
+    the French version, checked by parsing both); the hand-pasted tables of
+    `resultats-balayages.md` converted (headers, `tout` → `all`, numbers: same values,
+    checked); `make article`: 0 keys changed.
+  - **Not regenerated here**: the `results/*.md` tables written by `eval_voc.py
+    --markdown` come out English at their next evaluation (rewriting them needs the runs).
+  - **Fixed on the way** (tests already red before): the `test_balayages.py` fixtures
+    still named `m_sweep.ipynb` since M24 (`find_sweeps` wants `tiny-yolov3-*_sweep`), and
+    seven modules missing from the code map of `tools/figures/maths.py`.
 
 ### [ ] T19.7 — Figure labels
 - **Depends on**: T19.6 · **Size**: M

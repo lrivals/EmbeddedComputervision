@@ -886,15 +886,16 @@ def sweeps(root):
     for i, line in enumerate(text):
         if line.startswith("## "):
             section = line[3:].strip() if line[3:].strip() in DATASETS else None
-        elif section and line.startswith("### Balayage"):
-            m = re.search(r"(\d[\d ]*\d) images", line)
-            n_train = num(m.group(1)) if m else None
-        elif (section and section not in out and line.startswith("| run | lot")
+        elif section and line.startswith("### Sweep"):  # English since T19.6
+            m = re.search(r"(\d[\d,]*\d) (?:training )?images", line)
+            n_train = num(m.group(1), en=True) if m else None
+        elif (section and section not in out and line.startswith("| run | batch")
               and i + 2 < len(text)):
             header = [c.strip() for c in line.strip().strip("|").split("|")]
             col = next(j for j, h in enumerate(header) if h.startswith("mAP"))
             r = [c.strip() for c in text[i + 2].strip().strip("|").split("|")]
-            out[section] = (n_train, r[0].replace("*", ""), num(r[1]), r[2], num(r[col]))
+            out[section] = (n_train, r[0].replace("*", ""), num(r[1], en=True), r[2],
+                            num(r[col], en=True))
     if not out:
         raise MissingSource(f"{SWEEPS}: no sweep table")
     return out
@@ -904,7 +905,7 @@ def t_sweeps(root):
     rows = []
     for ds, (n, run, batch, subset, m) in sweeps(root).items():
         metric = "AP@[.5:.95] (COCO)" if ds == "FLIR" else "mAP, 11 points"
-        rows.append([ds, n, f"`{run}`", batch, "all" if subset == "tout" else subset, metric,
+        rows.append([ds, n, f"`{run}`", batch, subset, metric,
                      m, "tier-R"])
     return {"header": ["Dataset", "Training images", "Best run", "Batch", "Training subset",
                        "Metric", "Score (50 images)", "Status"],
