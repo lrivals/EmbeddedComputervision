@@ -360,8 +360,18 @@ files: only the tar is read there, in one go, then it is extracted locally.
   - COCO, KITTI and FLIR are skipped for lack of data;
   - since then, the six datasets executed on Colab (tier R, 50 images), tables in
     [resultats-balayages.md](resultats-balayages.md).
-- **Remaining**: compare the mAPs with `tools/m11.sh hors-domaine` with the same
-  parameters.
+- **Compared** (2026-10-27, VOC, ExDark, VisDrone): with the same parameters, the
+  notebook command (`tools/eval_voc.py`) gives the mAP of `tools/m11.sh hors-domaine`
+  (`tools/eval_quant.py --variants float`) to the hundredth.
+  - `tiny-yolov3-coco` VOC, 50 images: 68.45 = 68.45.
+  - ExDark, 50 images: `tiny-yolov2-voc` 11.84 = 11.84, `tiny-yolov3-coco` 24.61 = 24.61.
+  - VisDrone, full split: `tiny-yolov2-voc` 7.36 = 7.36; `tiny-yolov3-coco` 8.00 = 8.00.
+  - The versioned `visdrone/tiny-yolov3-coco_infer` still shows 7.88: it was executed on
+    2026-10-07, before T15.10 excluded the ignored regions (only `bus` moves, 5.4 → 6.0).
+    It gets re-executed with the notebooks of T19.5.
+  - Runs in `build/m14/t14.5/`.
+- **Remaining**: KITTI, CrowdHuman and FLIR, once their data is on the PC
+  (`HD_SETS=kitti tools/m11.sh hors-domaine`, [long-runs.md](long-runs.md)).
 
 ## C. Training
 
