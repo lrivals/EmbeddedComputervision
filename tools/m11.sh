@@ -210,7 +210,7 @@ coco-v4)  # export model/tiny-yolov4-coco (python tools/export_model.py --net ti
 # ------------------------------------------------------- T11.2 hors domaine, sans affinage
 hors-domaine)
   setup hors-domaine
-  for ds in voc exdark kitti visdrone; do
+  for ds in ${HD_SETS:-voc exdark kitti visdrone}; do  # HD_SETS : sous-ensemble (KITTI absent)
     [[ $ds == voc ]] || need "$ds"
     for net in $V2 $V3; do
       evalq $net "$M11/hors-domaine/${ds}_$net.json" --variants float,int --dataset "$ds"

@@ -96,7 +96,7 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   coco-fpga`), the image-by-image comparison and the calibration study in
   `results/map_coco.md`.
 
-### [ ] T11.2 — Domain shift without retraining
+### [~] T11.2 — Domain shift without retraining
 - **Spec**: §9.2, §11 · **Depends on**: T11.0 · **Size**: S
 - **Deliverables**: `results/hors_domaine.md`
 - **Acceptance**: mAP of the VOC and COCO weights, without fine-tuning, on the shared
@@ -111,6 +111,12 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
 
   Profile `tools/m11.sh hors-domaine` (ExDark, KITTI and VisDrone, VOC and COCO weights,
   float and integer).
+- **Done** (2026-10-27, without KITTI): `HD_SETS="voc exdark visdrone" tools/m11.sh
+  hors-domaine` (`HD_SETS` added to the profile, default unchanged), 30 min.
+  [results/hors_domaine.md](../../results/hors_domaine.md#float--integer-gap-out-of-domain-t112):
+  int − float −0.40 / −0.74 on ExDark, −0.89 / −0.48 on VisDrone (v2 VOC / v3 COCO),
+  against −0.64 / −1.00 on VOC: the gap does not widen out of domain, the VOC calibration
+  stays valid. KITTI rows pending (`image_2` incomplete).
 - **Remaining**: data, measurements, `results/hors_domaine.md`.
 
 ### [x] T11.3 — ExDark (low light)
