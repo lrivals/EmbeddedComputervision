@@ -220,11 +220,11 @@ def palier_of(nb, subset=0, iters=0):
 
 def prerequis(nb):
     """{type: chemin ou commande} : ce que le notebook demande avant de tourner."""
-    req = {"données": DATA_MARKERS[nb.dataset]}
+    req = {"data": DATA_MARKERS[nb.dataset]}
     if nb.role == "stats":  # sans poids ; la cfg du jeu est remplacée si elle manque
         return req
     # Poids affinés : le run choisi (RUN) parmi ceux du notebook _train ou _sweep.
-    req["poids"] = (f"{nb.train_dir}/[runs/<run>/]{Path(nb.weights).name}" if nb.finetuned
+    req["weights"] = (f"{nb.train_dir}/[runs/<run>/]{Path(nb.weights).name}" if nb.finetuned
                     else nb.weights)
     if nb.net.endswith(".cfg"):
         req["cfg"] = nb.net
@@ -233,18 +233,18 @@ def prerequis(nb):
 
 def how_to_get(kind, nb):
     """Commande qui fournit le prérequis `kind` de `nb`."""
-    if kind == "données":
+    if kind == "data":
         if nb.dataset == "voc":
             return "tools/get_voc.sh"
         if nb.dataset in REGISTRATION:
-            return f"tools/get_datasets.sh {nb.dataset} (inscription : source affichée)"
+            return f"tools/get_datasets.sh {nb.dataset} (registration: source printed)"
         return f"tools/get_datasets.sh {nb.dataset}"
-    if kind == "poids":
+    if kind == "weights":
         if nb.finetuned:  # the YOLOv5-recipe networks have no _sweep notebook
             return (f"notebooks/{nb.dataset}/{nb.model}_train.ipynb"
-                    + ("" if nb.arch == V5_ARCH else " ou _sweep.ipynb"))
+                    + ("" if nb.arch == V5_ARCH else " or _sweep.ipynb"))
         return UL_WEIGHTS_HINT if nb.weights.startswith(UL_WEIGHTS) else "tools/get_weights.sh"
-    return f"notebooks/{nb.dataset}/{nb.model}_train.ipynb (préparation)"
+    return f"notebooks/{nb.dataset}/{nb.model}_train.ipynb (preparation)"
 
 
 # Secondes par image d'entraînement à 416 × 416 (M12, paliers de coût) ; GPU : Colab,

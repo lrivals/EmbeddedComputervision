@@ -130,7 +130,7 @@ thousands separator (56.30, 132,031).
 
 ## B. Generators
 
-### [ ] T19.5 — Notebook templates
+### [x] T19.5 — Notebook templates
 - **Depends on**: T19.0 · **Size**: M
 - **Deliverables**: `tools/notebooks/gabarits.py`, `matrice.py` (`how_to_get`, the README
   headers), `env.py` and `colab.py` messages; regenerated notebooks and
@@ -140,6 +140,20 @@ thousands separator (56.30, 132,031).
   `analyse_balayages`) or kept archived until their next run.
 - **Notes**: changing a template drops the outputs of the notebooks it generates, so this
   is the most expensive task: plan the re-executions (Colab for the sweeps).
+- **Done** (2026-10-27):
+  - **Text**: every string that ends up in a notebook is in English: markdown cells,
+    parameter comments, printed and raised messages, `QUESTIONS`, `FAMILY_INTROS`,
+    `ANALYSIS_SECTIONS`, the viewer and analysis notebooks (`gabarits.py`, 167
+    replacements); the prerequisite kinds are `data` / `weights` / `cfg` and their hints
+    (`matrice.py`); the README index (`__main__.py`); the `env.py` and `colab.py` messages.
+    Source comments and docstrings stay for T19.8; the data keys written by
+    `data_stats.py` (`retirées`…) and the figure-family titles (T19.7) are unchanged.
+  - **Notebooks**: the 38 executed ones frozen with `--archive` before the change (the
+    stale-template ones with `--archive --stale`, added the same day), then 124 empty
+    notebooks and `notebooks/README.md` regenerated; `--check` passes with 40 archived.
+    They are re-executed in English at their next run.
+  - **Tests**: `test_notebooks.py` and `test_colab_data.py` pass (titles, `## Summary`,
+    `data` / `weights` keys).
 
 ### [ ] T19.6 — Generated markdown and number format
 - **Depends on**: T19.5 · **Size**: M

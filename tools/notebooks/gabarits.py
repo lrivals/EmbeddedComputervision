@@ -19,8 +19,8 @@ from tools.notebooks.matrice import (SPLIT_IMAGES, V4_ARCH, V4_INIT_NET, V5_ARCH
 REPO_URL = "https://github.com/lrivals/EmbeddedComputervision.git"
 REV = "main"
 COLAB = "https://colab.research.google.com/github/lrivals/EmbeddedComputervision/blob/main"
-ROLE_TITLES = {"infer": "inférence", "train": "entraînement",
-               "sweep": "balayage lot × sous-ensemble", "stats": "statistiques du jeu"}
+ROLE_TITLES = {"infer": "inference", "train": "training",
+               "sweep": "batch × subset sweep", "stats": "dataset statistics"}
 SUBSET_FIRST = 50  # premier passage, palier R (règles de M12)
 # Notebooks de référence, réglés pour le split complet (palier N) : leurs mAP se comparent
 # à results/ (T14.3 : flottant 56,30 ; T14.4 : entier 55,66, results/map_int8.md).
@@ -104,29 +104,29 @@ def _task_links(tasks):
 def header(nb):
     first = palier_of(nb, SUBSET_FIRST, 0)
     if nb.role == "train" and nb.arch == V5_ARCH:
-        cost = ("palier **N** (`EPOCHS` epochs of `tools/train_v5.py`, days on CPU: "
-                "[long runs](../../docs/tasks/long-runs.md)) ; évaluation finale sur `SUBSET` "
+        cost = ("tier **N** (`EPOCHS` epochs of `tools/train_v5.py`, days on CPU: "
+                "[long runs](../../docs/tasks/long-runs.md)); final evaluation on `SUBSET` "
                 "images")
     elif nb.role == "train":
         full = palier_of(nb, 0, M11_TRAIN["iters"])
-        cost = (f"palier **{full}** ({M11_TRAIN['iters']} itérations par défaut, "
-                "plusieurs heures sur CPU) ; évaluation finale sur `SUBSET` images")
+        cost = (f"tier **{full}** ({M11_TRAIN['iters']} iterations by default, "
+                "several hours on CPU); final evaluation on `SUBSET` images")
     elif nb.role == "sweep":
         n = len(SWEEP["batches"]) * len(SWEEP["subsets"])
-        cost = (f"palier **{palier_of(nb, 0, SWEEP['iters'])}** ({n} runs de "
-                f"{SWEEP['iters']} itérations par défaut) ; chaque run est évalué sur "
-                "`SUBSET` images, puis comparé aux autres")
+        cost = (f"tier **{palier_of(nb, 0, SWEEP['iters'])}** ({n} runs of "
+                f"{SWEEP['iters']} iterations by default); each run is evaluated on "
+                "`SUBSET` images, then compared with the others")
     else:
         n = SPLIT_IMAGES.get(nb.dataset)
         full = palier_of(nb)
-        cost = (f"palier **{first}** au premier passage (`SUBSET = {SUBSET_FIRST}`), "
-                f"**{full}** sur le split complet ({n or 'taille non relevée'} images, "
+        cost = (f"tier **{first}** on the first pass (`SUBSET = {SUBSET_FIRST}`), "
+                f"**{full}** on the full split ({n or 'size not recorded'} images, "
                 "`SUBSET = 0`)")
         if nb.path.as_posix() in REFERENCE:
-            cost += (". **Notebook de référence**, réglé sur le split complet (`SUBSET = 0`, "
-                     "`INT8 = True`) : mAP attendues 56,30 en flottant (T14.3) et 55,66 en "
-                     "entier (T14.4), `results/map_int8.md` ; mettre `SUBSET = "
-                     f"{SUBSET_FIRST}` pour un essai rapide")
+            cost += (". **Reference notebook**, set to the full split (`SUBSET = 0`, "
+                     "`INT8 = True`): expected mAP 56.30 in float (T14.3) and 55.66 in "
+                     "integer (T14.4), `results/map_int8.md`; set `SUBSET = "
+                     f"{SUBSET_FIRST}` for a quick try")
     full_run = FULL_RUN.get(nb.path.as_posix())
     if full_run:
         settings = ", ".join(f"`{k} = {v!r}`" for k, v in full_run.items())
@@ -136,27 +136,27 @@ def header(nb):
             cost += (". The `HW` stage compiles the golden model and the C-sim with cmake and "
                      "g++: run it on the PC, not on Colab")
     req = prerequis(nb)
-    reqs = "\n".join(f"- {k} : `{v}` — {how_to_get(k, nb)}" for k, v in req.items()
+    reqs = "\n".join(f"- {k}: `{v}` — {how_to_get(k, nb)}" for k, v in req.items()
                      if not (nb.trains and k == "cfg"))
-    domain = (f" Poids {nb.family.upper()} hors domaine : seules les classes communes sont "
-              "évaluées." if nb.out_of_domain and nb.role == "infer" else "")
+    domain = (f" Out-of-domain {nb.family.upper()} weights: only the shared classes are "
+              "evaluated." if nb.out_of_domain and nb.role == "infer" else "")
     colab = f"{COLAB}/notebooks/{nb.path.as_posix()}"
     return md(textwrap.dedent("""
-        # {model} sur {dataset} — {role}
+        # {model} on {dataset} — {role}
 
         [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({colab})
 
-        Rôle : {role} ; {cost}. Tâches : {tasks} ;
-        notebooks : [M14](../../docs/tasks/M14-notebooks.md).{domain}
+        Role: {role}; {cost}. Tasks: {tasks};
+        notebooks: [M14](../../docs/tasks/M14-notebooks.md).{domain}
 
-        Prérequis :
+        Prerequisites:
         @REQS@
 
-        Chaque étape affiche la commande `python tools/…` qu'elle lance : un résultat se
-        reproduit en ligne de commande. Sorties dans `{out}/`, jamais dans `results/`
-        (une mAP sur `SUBSET` images n'est pas publiable, règles de M12). Notebook généré par
-        `python -m tools.notebooks` (`make notebooks`) : modifier le gabarit
-        `tools/notebooks/gabarits.py`, pas ce fichier.
+        Each step prints the `python tools/…` command it runs: a result can be reproduced
+        from the command line. Outputs in `{out}/`, never in `results/` (an mAP on `SUBSET`
+        images is not publishable, M12 rules). Notebook generated by
+        `python -m tools.notebooks` (`make notebooks`): edit the template
+        `tools/notebooks/gabarits.py`, not this file.
         """).format(model=nb.model, dataset=nb.dataset, role=ROLE_TITLES[nb.role], colab=colab,
                     cost=cost, tasks=_task_links(nb.tasks), domain=domain,
                     out=nb.out_dir).replace("@REQS@", reqs))
@@ -166,20 +166,20 @@ def header(nb):
 
 VISDRONE_NOTE = textwrap.dedent("""
 
-    ### Runs longs VisDrone (M15)
+    ### VisDrone long runs (M15)
 
-    Un run par dossier : régler `OUT` sur `RUNS_DIR/runs/<nom>` pour que le notebook
-    `_infer` le trouve (`RUN = '<nom>'`, `COMPARE`), par exemple :
+    One run per folder: set `OUT` to `RUNS_DIR/runs/<name>` so that the `_infer` notebook
+    finds it (`RUN = '<name>'`, `COMPARE`), for example:
 
-    | run | réglages |
+    | run | settings |
     |---|---|
-    | `long-416` | défauts : `RESIZE_TRAIN = 'stretch'`, `CROP = 0` |
-    | `long-416-crop640` | `CROP = 640` ; à évaluer avec `TILES = 640` dans `_infer` |
-    | `long-608` | `SIZE = '608'` et `NET` = cfg à 608 (`tools/m11.sh visdrone-prep` avec `SIZE=608`) |
+    | `long-416` | defaults: `RESIZE_TRAIN = 'stretch'`, `CROP = 0` |
+    | `long-416-crop640` | `CROP = 640`; evaluate with `TILES = 640` in `_infer` |
+    | `long-608` | `SIZE = '608'` and `NET` = cfg at 608 (`tools/m11.sh visdrone-prep` with `SIZE=608`) |
 
-    `RESIZE_TRAIN = 'stretch'` aligne l'entraînement sur l'éval (`RESIZE`) : en letterbox,
-    les objets sont 1,3 à 1,8 fois moins hauts qu'à l'éval. Les ancres de la cfg restent
-    celles du letterbox : tous les runs s'évaluent avec la même cfg.
+    `RESIZE_TRAIN = 'stretch'` aligns the training on the evaluation (`RESIZE`): with
+    letterbox, objects are 1.3 to 1.8 times shorter than at evaluation. The anchors of the
+    cfg stay those of the letterbox: every run is evaluated with the same cfg.
     """)
 
 
@@ -227,7 +227,7 @@ def _retouch(cells, nb):
         c["source"] = _lines(src)
     missing = [old for old, _ in TRAIN_RETOUCHES if old not in done]
     if missing:
-        raise ValueError(f"retouches sans cible dans {nb.path} : {missing}")
+        raise ValueError(f"retouches with no target in {nb.path}: {missing}")
     return cells
 
 
@@ -266,38 +266,38 @@ def _weights_param(nb):
         return ("WEIGHTS", None, f"None: EMA weights of OUT ({_final(nb)}), evaluated at "
                 "the end; or a path")
     if nb.role == "infer" and nb.finetuned:
-        return ("WEIGHTS", None, "None : final.weights du run RUN ; ou un chemin")
+        return ("WEIGHTS", None, "None: final.weights of run RUN; or a path")
     if nb.role == "infer":
-        return ("WEIGHTS", nb.weights, "poids évalués")
+        return ("WEIGHTS", nb.weights, "weights evaluated")
     if nb.role == "sweep":
-        return ("WEIGHTS", None, "par run : OUT/runs/<run>/final.weights")
-    return ("WEIGHTS", f"{nb.out_dir}/final.weights", "poids produits, évalués à la fin")
+        return ("WEIGHTS", None, "per run: OUT/runs/<run>/final.weights")
+    return ("WEIGHTS", f"{nb.out_dir}/final.weights", "weights produced, evaluated at the end")
 
 
 def params(nb):
-    p = [("NET", nb.net, "nom de CFG_FILES ou cfg (relative à la racine)"),
-         ("DATASET", nb.dataset, "clé de DATASETS"),
-         ("SPLIT", None, "None : split d'évaluation du jeu"),
+    p = [("NET", nb.net, "name in CFG_FILES or cfg (relative to the root)"),
+         ("DATASET", nb.dataset, "key of DATASETS"),
+         ("SPLIT", None, "None: evaluation split of the dataset"),
          _weights_param(nb),
          ("DEVICE", "gpu" if nb.trains else "cpu",
-          "cpu | gpu (entraînement seulement ; le reste sur CPU)"),
-         ("SUBSET", SUBSET_FIRST, "images évaluées ; 0 : split complet (palier N)"),
-         ("SIZE", nb.size, "entrée LxH (ex. '640x192') ; None : celle de la cfg"),
+          "cpu | gpu (training only; the rest on CPU)"),
+         ("SUBSET", SUBSET_FIRST, "images evaluated; 0: full split (tier N)"),
+         ("SIZE", nb.size, "input WxH (e.g. '640x192'); None: the one of the cfg"),
          ("RESIZE", "v5" if _v5(nb) else "stretch",
           "v5 (letterbox and thresholds of YOLOv5, T33.4)" if _v5(nb)
-          else "stretch (référence M12) | letterbox"),
+          else "stretch (M12 reference) | letterbox"),
          *([("PRESET", "v8", "eval_voc preset with RESIZE v5: NMS 0.7 of YOLOv8 (T35.3)")]
            if _v8(nb) else []),
-         ("METRIC", None, "None : celle du jeu (coco pour coco et flir)"),
-         ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)")]
+         ("METRIC", None, "None: the one of the dataset (coco for coco and flir)"),
+         ("DATA_ROOT", None, "dataset root; None: data/<dataset> (Colab: Drive folder)")]
     if nb.role == "infer" and nb.finetuned:
-        p += [("RUNS_DIR", nb.train_dir, "runs des notebooks _train et _sweep"),
-              ("RUN", None, "None : le plus récent ; ex. 'train', 'b16-sall', 'b8-s500'"),
-              ("COMPARE", False, "évalue tous les runs et les compare (T14.11)")]
+        p += [("RUNS_DIR", nb.train_dir, "runs of the _train and _sweep notebooks"),
+              ("RUN", None, "None: the most recent; e.g. 'train', 'b16-sall', 'b8-s500'"),
+              ("COMPARE", False, "evaluates every run and compares them (T14.11)")]
         if _tiled(nb):
-            p += [("TILES", 0, "tuiles N px de l'image d'origine (runs à CROP = N) ; "
-                   "0 : image entière"),
-                  ("OVERLAP", 0.2, "recouvrement des tuiles")]
+            p += [("TILES", 0, "tiles of N px of the original image (runs with CROP = N); "
+                   "0: whole image"),
+                  ("OVERLAP", 0.2, "tile overlap")]
     if nb.role == "train" and nb.arch == V5_ARCH:
         p += [("INIT", "coco", "coco (heads reinitialized) | he"),
               ("EPOCHS", 30, "epochs of the recipe (warmup 3, linear lr)"),
@@ -310,64 +310,64 @@ def params(nb):
     elif nb.role == "infer" and nb.arch == V5_ARCH:
         pass  # float only: the integer model of YOLOv5n is T33.8
     elif nb.role == "infer":
-        p += [("INT8", False, "volet entier : calibration et mAP INT8 (T14.4)"),
-              ("CALIB_IMAGES", 500, "images de calibration (split calib du jeu)"),
-              ("ACT_HIST", False, "histogrammes d'activations L00-L04 (T11.3)"),
-              ("HW", False, "volet matériel (demande INT8) : export, golden C++, C-sim sur "
-               "SUBSET images, mAP aux trois stades (T8.2, T24.5)")]
+        p += [("INT8", False, "integer part: calibration and INT8 mAP (T14.4)"),
+              ("CALIB_IMAGES", 500, "calibration images (calib split of the dataset)"),
+              ("ACT_HIST", False, "activation histograms L00-L04 (T11.3)"),
+              ("HW", False, "hardware part (needs INT8): export, C++ golden, C-sim on "
+               "SUBSET images, mAP at the three stages (T8.2, T24.5)")]
     else:
         v4 = nb.arch == V4_ARCH  # YOLOv4-tiny (T24.6) : base et poids COCO de yolov4-tiny
         base = V4_INIT_NET if v4 else "tiny-yolov3-voc"
-        p += [("BASE", base, "base de make_cfg.py"),
-              ("CHANNELS", nb.channels, "canaux de la cfg (1 : thermique)"),
-              ("ANCHORS_K", 6, "ancres de la cfg (6 : YOLOv4-tiny)" if v4
-               else "ancres de la cfg (6 : Tiny-YOLOv3)"),
-              ("INIT", nb.weights if v4 else "coco", "coco | he | chemin d'un .weights"),
+        p += [("BASE", base, "base of make_cfg.py"),
+              ("CHANNELS", nb.channels, "channels of the cfg (1: thermal)"),
+              ("ANCHORS_K", 6, "anchors of the cfg (6: YOLOv4-tiny)" if v4
+               else "anchors of the cfg (6: Tiny-YOLOv3)"),
+              ("INIT", nb.weights if v4 else "coco", "coco | he | path of a .weights"),
               ("INIT_NET", V4_INIT_NET if v4 else None,
-               "réseau des poids de INIT s'il diffère de NET")]
+               "network of the INIT weights if it differs from NET")]
         if nb.role == "sweep":
-            p += [("BATCHES", SWEEP["batches"], "tailles de lot essayées"),
+            p += [("BATCHES", SWEEP["batches"], "batch sizes tried"),
                   ("TRAIN_SUBSETS", SWEEP["subsets"],
-                   "images d'entraînement (n premières) ; 0 : tout le split"),
-                  ("SEEDS", SWEEP["seeds"], "graines (train.py --seed) ; T15.2 : [1, 2]"),
-                  ("ITERS", SWEEP["iters"], "itérations par run (palier N dès 600)"),
-                  ("SKIP_DONE", True, "saute les runs qui ont déjà final.weights")]
+                   "training images (first n); 0: the whole split"),
+                  ("SEEDS", SWEEP["seeds"], "seeds (train.py --seed); T15.2: [1, 2]"),
+                  ("ITERS", SWEEP["iters"], "iterations per run (tier N from 600)"),
+                  ("SKIP_DONE", True, "skips the runs that already have final.weights")]
         else:
-            p += [("ITERS", M11_TRAIN["iters"], "itérations (palier N au-delà de 600)"),
+            p += [("ITERS", M11_TRAIN["iters"], "iterations (tier N above 600)"),
                   ("BATCH", M11_TRAIN["batch"], None)]
         if nb.role == "train" and _tiled(nb):
-            p += [("RESIZE_TRAIN", "letterbox", "letterbox | stretch : géométrie à "
-                   "l'entraînement (stretch : celle de l'éval, RESIZE)"),
-                  ("CROP", 0, "découpes N×N px de l'image d'origine (tuiles) ; 0 : image "
-                   "entière"),
-                  ("STEPS", "", "itérations où le LR baisse (ex. '4800,5400')"),
-                  ("SCALES", "", "facteurs du LR à STEPS (ex. '0.1,0.1')")]
+            p += [("RESIZE_TRAIN", "letterbox", "letterbox | stretch: geometry at "
+                   "training (stretch: the one of the evaluation, RESIZE)"),
+                  ("CROP", 0, "N×N px crops of the original image (tiles); 0: whole "
+                   "image"),
+                  ("STEPS", "", "iterations where the LR drops (e.g. '4800,5400')"),
+                  ("SCALES", "", "LR factors at STEPS (e.g. '0.1,0.1')")]
         p += [("LR", M11_TRAIN["lr"], None),
               ("BURN_IN", M11_TRAIN["burn_in"], None),
-              ("MULTISCALE", M11_TRAIN["multiscale"], "320-608 tous les 10 lots"),
-              ("SAVE_EVERY", M11_TRAIN["save_every"], "None : défaut de train.py (200)"),
+              ("MULTISCALE", M11_TRAIN["multiscale"], "320-608 every 10 batches"),
+              ("SAVE_EVERY", M11_TRAIN["save_every"], "None: default of train.py (200)"),
               ("WORKERS", M11_TRAIN["workers"], None)]
         if nb.role == "train":
-            p += [("QAT", "", "schéma wXaY (ex. 'w4a4') : QAT (T9.3, T12.5)"),
-              ("QAT_STEPS", None, "steps.json de quant_lowbit.py (PTQ)"),
-              ("ADMM", None, "plan JSON de poids ({} : mixed6 partout, T9.2, T12.6)"),
+            p += [("QAT", "", "wXaY scheme (e.g. 'w4a4'): QAT (T9.3, T12.5)"),
+              ("QAT_STEPS", None, "steps.json of quant_lowbit.py (PTQ)"),
+              ("ADMM", None, "JSON weight plan ({}: mixed6 everywhere, T9.2, T12.6)"),
               ("ADMM_RHO", 1e-3, None),
               ("ADMM_GROWTH", 1.3, None),
               ("ADMM_EVERY", 100, None)]
-    p += [("DRIVE_DIR", DRIVE_DIR, "Colab : archives data/<jeu>.tar"
-           + (", sorties et reprise dans runs/" if nb.trains else "")
-           + " ; None : pas de Drive"),
-          ("JOBS", None, "processus des évaluations ; None : un par cœur CPU, plafonné "
-           "par la mémoire (runtime TPU de Colab : des dizaines)"),
-          ("SHOW", 6, "images affichées"),
-          ("OUT", nb.out_dir, "sorties du notebook"),
-          ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
-          ("REV", REV, "Colab : révision")]
+    p += [("DRIVE_DIR", DRIVE_DIR, "Colab: archives data/<dataset>.tar"
+           + (", outputs and resume in runs/" if nb.trains else "")
+           + "; None: no Drive"),
+          ("JOBS", None, "evaluation processes; None: one per CPU core, capped "
+           "by the memory (Colab TPU runtime: dozens)"),
+          ("SHOW", 6, "images shown"),
+          ("OUT", nb.out_dir, "notebook outputs"),
+          ("REPO_URL", REPO_URL, "Colab: cloned repository"),
+          ("REV", REV, "Colab: revision")]
     ref = {**REFERENCE.get(nb.path.as_posix(), {}), **FULL_RUN.get(nb.path.as_posix(), {})}
     if nb.role == "train" and _tiled(nb):
         ref = {**VISDRONE_TRAIN, **ref}
     p = [(k, ref.get(k, v), c) for k, v, c in p]
-    return [md("## Paramètres"), code(_assign(p), tags=("parameters",))]
+    return [md("## Parameters"), code(_assign(p), tags=("parameters",))]
 
 
 # --------------------------------------------------------------------- environnement
@@ -375,21 +375,21 @@ def params(nb):
 def environment(nb):
     pre = ""
     if nb.role == "infer":
-        needs = ("WEIGHTS", "NET", repr(how_to_get("poids", nb)))
+        needs = ("WEIGHTS", "NET", repr(how_to_get("weights", nb)))
         if nb.finetuned:  # T14.11 : poids d'un run de _train ou _sweep
             pre = f"""
         from tools.notebooks import colab, runs
 
-        if COLAB and DRIVE_DIR:  # runs entraînés sur Colab : copiés dans <DRIVE_DIR>/runs/
+        if COLAB and DRIVE_DIR:  # runs trained on Colab: copied to <DRIVE_DIR>/runs/
             env.mount_drive(DRIVE_DIR)
             colab.restore_outputs(RUNS_DIR, DRIVE_DIR)
         RUNS = runs.find_runs(RUNS_DIR)
-        print(f"runs de {{RUNS_DIR}} :\\n{{runs.listing(RUNS)}}")
+        print(f"runs of {{RUNS_DIR}}:\\n{{runs.listing(RUNS)}}")
         CHOSEN = None
         if WEIGHTS is None:
             CHOSEN = runs.pick(RUNS_DIR, RUN, hint={needs[2]})
             WEIGHTS, OUT = CHOSEN.weights, f"{{OUT}}/{{CHOSEN.name}}"
-            print(f"run choisi : {{CHOSEN.name}} ({{WEIGHTS}})")"""
+            print(f"chosen run: {{CHOSEN.name}} ({{WEIGHTS}})")"""
             if nb.arch == V5_ARCH and nb.net.endswith(".cfg"):  # Darknet cfg of train_v5.py
                 pre += """
             NET = f"{CHOSEN.dir}/net.cfg\""""
@@ -404,17 +404,17 @@ def environment(nb):
     if nb.role == "stats":
         post = """
         if str(NET).endswith(".cfg") and not env.restore_cfg(NET):
-            print(f"cfg {NET} absente (tools/m11.sh {DATASET}-prep) : ancres et grilles de "
-                  "tiny-yolov3-coco pour les collisions")
+            print(f"cfg {NET} missing (tools/m11.sh {DATASET}-prep): anchors and grids of "
+                  "tiny-yolov3-coco for the collisions")
             NET = "tiny-yolov3-coco\"""".rstrip()
     return [md("""
-        ## Environnement
+        ## Environment
 
-        Local : rien n'est installé ni téléchargé, la cellule vérifie les prérequis et
-        s'arrête avec la commande à lancer. Colab : clone du dépôt, installation, CuPy si
-        `DEVICE = "gpu"`, poids, puis données par `colab.prepare_data` (archive
-        `<DRIVE_DIR>/data/<jeu>.tar` ou téléchargement direct ; ExDark et FLIR : archive
-        seulement, faite sur le PC par `tools/get_datasets.sh pack <jeu>`).
+        Local: nothing is installed or downloaded, the cell checks the prerequisites and
+        stops with the command to run. Colab: clone of the repository, installation, CuPy if
+        `DEVICE = "gpu"`, weights, then data by `colab.prepare_data` (archive
+        `<DRIVE_DIR>/data/<dataset>.tar` or direct download; ExDark and FLIR: archive only,
+        made on the PC by `tools/get_datasets.sh pack <dataset>`).
         """), code(f"""
         import os
         import subprocess
@@ -437,28 +437,28 @@ def environment(nb):
                 ROOT = Path("/content/EmbeddedComputervision")
                 if not ROOT.exists():
                     subprocess.run(["git", "clone", REPO_URL, str(ROOT)], check=True)
-            # Clone d'une session précédente : remis à REV (notebook et code du même commit).
+            # Clone of an earlier session: reset to REV (notebook and code of the same commit).
             subprocess.run(["git", "-C", str(ROOT), "fetch", "-q", "origin", REV], check=True)
             subprocess.run(["git", "-C", str(ROOT), "checkout", "-q", "FETCH_HEAD"], check=True)
             for m in [m for m in sys.modules if m.split(".")[0] in ("tools", "yolo")]:
-                del sys.modules[m]  # modules importés avant la mise à jour
+                del sys.modules[m]  # modules imported before the update
             subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e",
                             f"{{ROOT}}/python[data,plots]"], check=True)
             if DEVICE == "gpu":
-                # Runtime CPU : pas de pilote, CuPy dirait « cudaErrorInsufficientDriver ».
+                # CPU runtime: no driver, CuPy would say "cudaErrorInsufficientDriver".
                 try:
                     smi = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
                 except FileNotFoundError:
                     smi = None
                 if smi is None or smi.returncode != 0:
-                    raise RuntimeError("runtime Colab sans GPU : créer un nouveau serveur Colab "
-                                       "de type GPU (T4, L4 ou A100), ou DEVICE = 'cpu'")
-                cuda = smi.stdout.split("CUDA Version:")[-1].split()[0]  # version du pilote
+                    raise RuntimeError("Colab runtime without a GPU: create a new Colab server "
+                                       "of GPU type (T4, L4 or A100), or DEVICE = 'cpu'")
+                cuda = smi.stdout.split("CUDA Version:")[-1].split()[0]  # driver version
                 cupy_pkg = "cupy-cuda13x" if int(cuda.split(".")[0]) >= 13 else "cupy-cuda12x"
                 subprocess.run([sys.executable, "-m", "pip", "install", "-q", cupy_pkg],
                                check=True)
         elif ROOT is None:
-            raise RuntimeError("racine du dépôt introuvable : ouvrir le notebook depuis notebooks/")
+            raise RuntimeError("repository root not found: open the notebook from notebooks/")
         os.chdir(ROOT)
         for p in (ROOT, ROOT / "python"):
             if str(p) not in sys.path:
@@ -502,9 +502,9 @@ def infer_body(nb):
 
 def _infer_cells(nb):
     cells = [md("""
-        ## Réseau et poids
+        ## Network and weights
 
-        `yolo.models.tiny_yolo.build` et `yolo.io.darknet_weights.load_darknet_weights`.
+        `yolo.models.tiny_yolo.build` and `yolo.io.darknet_weights.load_darknet_weights`.
         """), code("""
         import json
 
@@ -524,12 +524,12 @@ def _infer_cells(nb):
         size = input_size(net.net, parse_size(SIZE) if SIZE else None)
         channels = net.net["input"][0]
         family, names = datasets.model_family(DATASET, net.net["classes"])
-        print(f"{NET} : {net.net['classes']} classes ({family}), entrée {size_label(size)}, "
-              f"{channels} canal(aux) ; poids {WEIGHTS}")
+        print(f"{NET}: {net.net['classes']} classes ({family}), input {size_label(size)}, "
+              f"{channels} channel(s); weights {WEIGHTS}")
         """), md("""
-        ## Détections sur quelques images
+        ## Detections on a few images
 
-        `yolo.infer.pipeline.preprocess` et `detect` (seuil de la démo), boîtes de
+        `yolo.infer.pipeline.preprocess` and `detect` (demo threshold), boxes by
         `tools/detect.py:draw`.
         """), code("""
         for s in datasets.load(DATASET, DATA_ROOT, SPLIT)[:SHOW]:
@@ -538,25 +538,25 @@ def _infer_cells(nb):
                 boxes, scores, labels = detect(net, x[None], [wh], RESIZE)[0]
                 shown = draw(img, boxes, scores, labels, names)
             shown.thumbnail((640, 640))
-            print(f"{s['id']} : {len(labels)} détections")
+            print(f"{s['id']}: {len(labels)} detections")
             display(shown)
         """)]
     if nb.out_of_domain:
         cells += [md("""
-            ## Correspondance des classes (hors domaine, T11.2)
+            ## Class mapping (out of domain, T11.2)
 
-            `MAPPINGS` de `yolo.data.datasets`, telle quelle ; les classes du jeu sans
-            équivalent sont retirées des vérités, les détections des autres classes du
-            modèle sont ignorées (`eval_view`).
+            `MAPPINGS` of `yolo.data.datasets`, as it is; the classes of the dataset with no
+            equivalent are removed from the ground truth, the detections of the other classes
+            of the model are ignored (`eval_view`).
             """), code("""
             view = datasets.eval_view(DATASET, net.net["classes"])
             mapping = datasets.MAPPINGS[(DATASET, family)]
-            rows = ["| classe du jeu | classe du modèle |", "|---|---|"]
-            rows += [f"| {c} | {mapping.get(c, '— (sans équivalent, ignorée)')} |"
+            rows = ["| dataset class | model class |", "|---|---|"]
+            rows += [f"| {c} | {mapping.get(c, '— (no equivalent, ignored)')} |"
                      for c in datasets.DATASETS[DATASET].classes]
             display(Markdown("\\n".join(rows)))
-            print(f"classes évaluées ({len(view.names)}) : {', '.join(view.names)}")
-            print(f"classes du modèle ignorées : {len(names) - len(view.names)}")
+            print(f"classes evaluated ({len(view.names)}): {', '.join(view.names)}")
+            print(f"model classes ignored: {len(names) - len(view.names)}")
             """)]
     evaluate = """
         map_float = Path(OUT) / "map_float.md"
@@ -591,17 +591,17 @@ def _infer_cells(nb):
             dets = Path(OUT, "dets")"""
         pr = 'Path(dets, "figures")'
     cells += [md("""
-        ## mAP flottante (T14.3)
+        ## Float mAP (T14.3)
 
-        `tools/eval_voc.py`, métrique du jeu (`Dataset.metric` ; COCO et FLIR : AP@[.5:.95]
-        et AP50). Courbes PR du mode automatique de M13 (métrique VOC).
+        `tools/eval_voc.py`, metric of the dataset (`Dataset.metric`; COCO and FLIR: AP@[.5:.95]
+        and AP50). PR curves of the automatic mode of M13 (VOC metric).
         """ + ("""
-        Le run choisi est évalué dans `RUNS_DIR/eval/<run>/`, comme par la comparaison
-        plus bas, qui réutilise ce résultat : une mAP déjà calculée pour ce `SUBSET` n'est
-        pas recalculée.
+        The chosen run is evaluated in `RUNS_DIR/eval/<run>/`, as by the comparison
+        below, which reuses this result: an mAP already computed for this `SUBSET` is not
+        computed again.
         """ if nb.finetuned else "")), code("""
-        print(f"{SUBSET or 'toutes les'} images : palier "
-              f"{palier(SUBSET or SPLIT_IMAGES.get(DATASET))} (règles de M12)")"""
+        print(f"{SUBSET or 'all'} images: tier "
+              f"{palier(SUBSET or SPLIT_IMAGES.get(DATASET))} (M12 rules)")"""
         + evaluate + """
         display(Markdown(map_float.read_text()))
         for png in sorted(""" + pr + """.glob("pr*.png")):
@@ -609,12 +609,11 @@ def _infer_cells(nb):
         """)]
     if nb.finetuned:
         cells += [md("""
-            ## Comparaison des runs (T14.11)
+            ## Comparison of the runs (T14.11)
 
-            Avec `COMPARE = True`, chaque run trouvé dans `RUNS_DIR` (notebook `_train` et
-            balayage `_sweep`) est évalué sur les mêmes `SUBSET` images ; une mAP déjà
-            calculée pour ce `SUBSET` est réutilisée. Le run évalué plus haut se choisit par
-            `RUN`.
+            With `COMPARE = True`, each run found in `RUNS_DIR` (`_train` notebook and
+            `_sweep` sweep) is evaluated on the same `SUBSET` images; an mAP already computed
+            for this `SUBSET` is reused. The run evaluated above is chosen by `RUN`.
             """), code(_tiles_args(nb, """
             if COMPARE:
                 rows = [runs.evaluate(r, NET, DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
@@ -622,7 +621,7 @@ def _infer_cells(nb):
                         for r in RUNS]
                 display(Markdown(runs.table(rows)))
             else:
-                print("COMPARE = False : comparaison sautée ; runs trouvés :")
+                print("COMPARE = False: comparison skipped; runs found:")
                 print(runs.listing(RUNS))
             """))]
     if nb.arch == V5_ARCH and nb.finetuned:  # T37.4: against the COCO weights (T37.2)
@@ -645,30 +644,30 @@ def _infer_cells(nb):
             display(Markdown("\\n".join(rows)))
             """)]
     if nb.arch == V5_ARCH:  # float only (integer sections: T37.5)
-        return cells + [md("## Résumé"), code("""
+        return cells + [md("## Summary"), code("""
             print(map_float.read_text())
-            print(f"sorties : {OUT}/ ; révision {TRACE['rev']}")
-            print("commandes équivalentes :")
+            print(f"outputs: {OUT}/; revision {TRACE['rev']}")
+            print("equivalent commands:")
             for c in C.HISTORY:
                 print("  " + c)
             """)]
     cells += [md("""
-        ## Volet entier (T14.4)
+        ## Integer part (T14.4)
 
-        Activé par `INT8 = True`. Calibration par `tools/calibrate.py` sur le split `calib`
-        du jeu (échelles et rapport dans `OUT`, pas dans `results/`), puis
-        `tools/eval_quant.py --variants float,int`. Sur le split complet (`SUBSET = 0`),
-        palier **N** : compter 12 à 25 min pour VOC2007 test en plus de la calibration.
+        Enabled by `INT8 = True`. Calibration by `tools/calibrate.py` on the `calib` split
+        of the dataset (scales and report in `OUT`, not in `results/`), then
+        `tools/eval_quant.py --variants float,int`. On the full split (`SUBSET = 0`),
+        tier **N**: count 12 to 25 min for VOC2007 test on top of the calibration.
         """), code("""
         map_int = None
         if INT8:
             if not SUBSET:
-                print("SUBSET = 0 : split complet, palier N (plusieurs dizaines de minutes)")
+                print("SUBSET = 0: full split, tier N (several tens of minutes)")
             calib = Path(OUT) / "calib.json"
             C.run(C.cmd_calibrate(NET, WEIGHTS, DATASET, calib, Path(OUT) / "calibration.md",
                                   CALIB_IMAGES, data_root=DATA_ROOT))
             map_int = Path(OUT) / f"map_{RESIZE}_{SUBSET or 'complet'}.json"
-            HW_DIR = Path(OUT) / "hw"  # détections entières par image, pour le volet matériel
+            HW_DIR = Path(OUT) / "hw"  # integer detections per image, for the hardware part
             HW_DIR.mkdir(parents=True, exist_ok=True)
             C.run(C.cmd_eval_quant(NET, map_int, "float,int", SUBSET, JOBS, DATASET,
                                    weights=WEIGHTS, calib=calib, metric=METRIC, split=SPLIT,
@@ -676,7 +675,7 @@ def _infer_cells(nb):
                                    save_dets=HW_DIR / "int.jsonl" if HW else None))
             d = json.loads(map_int.read_text())
             fl, it = d["results"]["float"], d["results"]["int"]
-            rows = ["| classe | flottant | entier | écart |", "|---|---|---|---|"]
+            rows = ["| class | float | integer | gap |", "|---|---|---|---|"]
             rows += [f"| {c} | {100 * a:.2f} | {100 * b:.2f} | {100 * (b - a):+.2f} |"
                      for c, a, b in zip(d["classes"], fl["aps"], it["aps"])]
             rows.append(f"| **mAP** | **{100 * fl['map']:.2f}** | **{100 * it['map']:.2f}** | "
@@ -689,25 +688,25 @@ def _infer_cells(nb):
                 C.run(C.cmd_act_hist(NET, WEIGHTS, others, calib, Path(OUT) / "act_hist"))
                 display(Image.open(Path(OUT) / "act_hist" / "act_hist.png"))
         else:
-            print("INT8 = False : volet entier sauté")
+            print("INT8 = False: integer part skipped")
         """), md("""
-        ## Volet matériel (T8.2, T24.5)
+        ## Hardware part (T8.2, T24.5)
 
-        Activé par `HW = True` (avec `INT8 = True` : même calibration, détections entières
-        de la cellule précédente). Chaîne du profil `coco-v4` de `tools/m11.sh` :
+        Enabled by `HW = True` (with `INT8 = True`: same calibration, integer detections of
+        the previous cell). Chain of the `coco-v4` profile of `tools/m11.sh`:
 
-        1. `tools/export_model.py` : modèle entier (manifest, blobs) et dumps de 3 images du
-           jeu dans `OUT/model` ;
-        2. golden C++ (`golden_run`) == dumps Python à l'octet, couche par couche et
-           détections (`tools/compare_dumps.py`, comme `make golden-check`) ;
-        3. stade FPGA en C-sim : le noyau HLS compilé sans `ap_int` derrière le driver ARM
-           (`yolo_bench`, `tools/bench_sim.sh`), sur les entrées int8 du modèle entier
-           (`tools/make_inputs.py`), pour les `SUBSET` premières images ;
-        4. `tools/map_stades.py` : mAP aux trois stades et égalité image par image entier ==
-           C-sim ; `tools/perf_model.py` : cycles et ms du noyau actuel (projection).
+        1. `tools/export_model.py`: integer model (manifest, blobs) and dumps of 3 images of
+           the dataset in `OUT/model`;
+        2. C++ golden (`golden_run`) == Python dumps to the byte, layer by layer and
+           detections (`tools/compare_dumps.py`, as `make golden-check`);
+        3. FPGA stage in C-sim: the HLS kernel compiled without `ap_int` behind the ARM
+           driver (`yolo_bench`, `tools/bench_sim.sh`), on the int8 inputs of the integer
+           model (`tools/make_inputs.py`), for the first `SUBSET` images;
+        4. `tools/map_stades.py`: mAP at the three stages and integer == C-sim equality image
+           by image; `tools/perf_model.py`: cycles and ms of the current kernel (projection).
 
-        Compter ≈ 1 s de C-sim par image et par cœur (C-sim interrompu : relancer la
-        cellule, les paquets finis sont gardés tant que le modèle exporté ne change pas).
+        Count ≈ 1 s of C-sim per image and per core (C-sim interrupted: run the cell again,
+        the finished batches are kept as long as the exported model does not change).
         """), code("""
         import hashlib
         import shutil
@@ -715,8 +714,8 @@ def _infer_cells(nb):
         map_hw = None
         if HW:
             if not INT8:
-                raise ValueError("HW = True demande INT8 = True (calibration et détections "
-                                 "entières)")
+                raise ValueError("HW = True needs INT8 = True (calibration and integer "
+                                 "detections)")
             model = Path(OUT) / "model"
             C.run(C.cmd_export(NET, WEIGHTS, calib, model, DATASET, DATA_ROOT))
             for c in C.cmd_cmake("cpp/golden", "build/golden", "golden_run"):
@@ -725,7 +724,7 @@ def _infer_cells(nb):
                 got = HW_DIR / "golden" / dump.name
                 C.run(C.cmd_golden_run(model, dump / "input.npy", got))
                 C.run(C.cmd_compare_dumps(dump, got))
-            # Détections C-sim d'un autre modèle exporté : effacées (sinon reprise).
+            # C-sim detections of another exported model: erased (otherwise resumed).
             blobs = hashlib.sha256(b"".join((model / f).read_bytes() for f in
                                             ("weights.bin", "bias.bin", "requant.bin")))
             stamp = HW_DIR / "model.sha256"
@@ -743,8 +742,8 @@ def _infer_cells(nb):
             display(Markdown(map_hw.read_text()))
             C.run(C.cmd_perf_model(model / "manifest.json"))
         else:
-            print("HW = False : volet matériel sauté")
-        """), md("## Résumé"), code("""
+            print("HW = False: hardware part skipped")
+        """), md("## Summary"), code("""
         print(map_float.read_text())
         if map_int:
             d = json.loads(map_int.read_text())
@@ -752,8 +751,8 @@ def _infer_cells(nb):
                 print(f"{v:6s} mAP {100 * r['map']:.2f} ({d['images']} images)")
         if map_hw:
             print(map_hw.read_text().split("## AP")[0])
-        print(f"sorties : {OUT}/ ; révision {TRACE['rev']}")
-        print("commandes équivalentes :")
+        print(f"outputs: {OUT}/; revision {TRACE['rev']}")
+        print("equivalent commands:")
         for c in C.HISTORY:
             print("  " + c)
         """)]
@@ -765,11 +764,11 @@ def _infer_cells(nb):
 def _prep_preview_cells():
     """Préparation (ancres, cfg) et aperçu des cibles, communs à `train` et `sweep`."""
     return [md("""
-        ## Préparation (jeux hors VOC)
+        ## Preparation (datasets other than VOC)
 
-        Ancres k-means sur le split d'entraînement (`tools/kmeans_anchors.py`, table dans
-        `OUT`), puis cfg à N classes (`tools/make_cfg.py`), comme `tools/m11.sh <jeu>-prep`.
-        Sautée si la cfg existe déjà.
+        k-means anchors on the training split (`tools/kmeans_anchors.py`, table in `OUT`),
+        then a cfg with N classes (`tools/make_cfg.py`), as `tools/m11.sh <dataset>-prep`.
+        Skipped if the cfg already exists.
         """), code("""
         import csv
         import json
@@ -785,26 +784,26 @@ def _prep_preview_cells():
         from yolo.models.tiny_yolo import load_cfg
 
         if not str(NET).endswith(".cfg"):
-            print(f"{NET} : cfg du dépôt, pas de préparation")
+            print(f"{NET}: cfg of the repository, no preparation")
         elif Path(NET).exists():
-            print(f"{NET} existe : préparation sautée")
+            print(f"{NET} exists: preparation skipped")
         else:
             anchors = Path(OUT) / f"anchors_{DATASET}{'_' + str(SIZE) if SIZE else ''}.md"
             C.run(C.cmd_anchors(DATASET, SIZE, anchors, DATA_ROOT))
             C.run(C.cmd_make_cfg(BASE, DATASET, C.anchors_k(anchors, ANCHORS_K), NET, SIZE,
                                  CHANNELS))
         """), md("""
-        ## Aperçu des cibles
+        ## Preview of the targets
 
-        Quelques images augmentées (`yolo.data.loader.VOCDataset`, donc `yolo.data.augment`)
-        avec leurs boîtes : contrôle des annotations avant des heures de calcul.
+        A few augmented images (`yolo.data.loader.VOCDataset`, hence `yolo.data.augment`)
+        with their boxes: a check of the annotations before hours of computation.
         """), code("""
         cfg = load_cfg(NET)
         size = input_size(cfg, parse_size(SIZE) if SIZE else None)
         channels = cfg["input"][0]
         names = datasets.DATASETS[DATASET].classes
         samples = datasets.load(DATASET, DATA_ROOT, role="train")
-        print(f"{len(samples)} images d'entraînement, entrée {size_label(size)}, {channels} canal(aux)")
+        print(f"{len(samples)} training images, input {size_label(size)}, {channels} channel(s)")
         from yolo.data.loader import VOCDataset
 
         preview = VOCDataset(samples[:SHOW], train=True, channels=channels)
@@ -875,11 +874,11 @@ def train_v5_body(nb):
         C.run(C.cmd_eval_voc(@NET_EVAL@, WEIGHTS or RUN / "@FINAL@", DATASET, RESIZE, SUBSET, METRIC, SPLIT, SIZE,
                              DATA_ROOT, out=RUN / "dets", markdown=result, jobs=JOBS))
         display(Markdown(result.read_text()))
-        """.replace("@NET_EVAL@", net_eval).replace("@FINAL@", _final(nb))), md("## Résumé"), code("""
+        """.replace("@NET_EVAL@", net_eval).replace("@FINAL@", _final(nb))), md("## Summary"), code("""
         if (RUN / "optimizer.txt").exists():
             print((RUN / "optimizer.txt").read_text().strip())
-        print(f"outputs: {RUN}/ (checkpoint.npz, loss.csv, final weights) ; révision {TRACE['rev']}")
-        print("commandes équivalentes :")
+        print(f"outputs: {RUN}/ (checkpoint.npz, loss.csv, final weights); revision {TRACE['rev']}")
+        print("equivalent commands:")
         for c in C.HISTORY:
             print("  " + c)
         """)])
@@ -894,35 +893,35 @@ def train_body(nb):
     if nb.dataset == "voc" and nb.arch != V4_ARCH:  # profils M12 : Tiny-YOLOv2 / v3
         variants = textwrap.dedent("""
 
-        ### Variantes QAT et ADMM (T14.7)
+        ### QAT and ADMM variants (T14.7)
 
-        Paramètres du profil `tools/m12.sh qat ref` (T12.5) ; `QAT_STEPS` vient de la PTQ
-        `tools/quant_lowbit.py --scheme w4a4` (T12.4) :
+        Parameters of the `tools/m12.sh qat ref` profile (T12.5); `QAT_STEPS` comes from the
+        PTQ `tools/quant_lowbit.py --scheme w4a4` (T12.4):
 
         ```python
         @QAT@
         ```
 
-        Paramètres du profil `tools/m12.sh admm ref` (T12.6) ; le plan `{}` (mixed6
-        partout) est écrit s'il manque :
+        Parameters of the `tools/m12.sh admm ref` profile (T12.6); the plan `{}` (mixed6
+        everywhere) is written if it is missing:
 
         ```python
         @ADMM@
         ```
 
-        L'évaluation passe alors par `tools/quant_lowbit.py` puis
-        `tools/eval_quant.py --variants int --model-dir`, pas par la mAP flottante.
+        The evaluation then goes through `tools/quant_lowbit.py` and
+        `tools/eval_quant.py --variants int --model-dir`, not through the float mAP.
         """).replace("@QAT@", qat).replace("@ADMM@", admm)
     affinage = textwrap.dedent("""
-        ## Affinage
+        ## Fine-tuning
 
-        `tools/train.py` dans un sous-processus dont la sortie est relayée ligne à ligne ; une
-        interruption du noyau laisse le dernier `checkpoint.npz` (tous les `SAVE_EVERY`), et
-        relancer la cellule reprend (`--resume`). Sur Colab avec `DRIVE_DIR`, `OUT` est copié
-        dans `<DRIVE_DIR>/runs/` toutes les 10 min et en fin de cellule
-        (`colab.sync_outputs`), puis restauré en début de session (`colab.restore_outputs`) :
-        une session coupée reprend au dernier checkpoint copié, sur le même backend
-        (T12.11, T14.8).
+        `tools/train.py` in a subprocess whose output is relayed line by line; an
+        interruption of the kernel leaves the last `checkpoint.npz` (every `SAVE_EVERY`), and
+        running the cell again resumes (`--resume`). On Colab with `DRIVE_DIR`, `OUT` is
+        copied to `<DRIVE_DIR>/runs/` every 10 min and at the end of the cell
+        (`colab.sync_outputs`), then restored at the start of a session
+        (`colab.restore_outputs`): a cut session resumes from the last copied checkpoint, on
+        the same backend (T12.11, T14.8).
         """) + variants + (VISDRONE_NOTE if _tiled(nb) else "")
     return _retouch([*_prep_preview_cells(), md(affinage), code("""
         import threading
@@ -931,24 +930,24 @@ def train_body(nb):
 
         RUN = Path(OUT)
         SYNC = COLAB and bool(DRIVE_DIR)
-        if SYNC:  # reprise après coupure de session : sorties de la session précédente
+        if SYNC:  # resume after a session cut: outputs of the previous session
             env.mount_drive(DRIVE_DIR)
             colab.restore_outputs(OUT, DRIVE_DIR)
         RUN.mkdir(parents=True, exist_ok=True)
         if ADMM and not Path(ADMM).exists():
             Path(ADMM).parent.mkdir(parents=True, exist_ok=True)
-            Path(ADMM).write_text("{}\\n")  # mixed6 partout, comme tools/m12.sh admm
+            Path(ADMM).write_text("{}\\n")  # mixed6 everywhere, as tools/m12.sh admm
         seconds = estimate(ITERS, BATCH, DEVICE, RUN / "loss.csv")
-        print(f"{ITERS} itérations × {BATCH} images : "
-              + (f"≈ {seconds / 3600:.1f} h sur {DEVICE}" if seconds else
-                 f"durée non mesurée sur {DEVICE} (T12.11-e)"))
+        print(f"{ITERS} iterations × {BATCH} images: "
+              + (f"≈ {seconds / 3600:.1f} h on {DEVICE}" if seconds else
+                 f"duration not measured on {DEVICE} (T12.11-e)"))
         resume = (RUN / "checkpoint.npz").exists()
         runs.write_meta(RUN, batch=BATCH, subset=0, iters=ITERS, lr=LR, device=DEVICE,
                         net=NET, dataset=DATASET, qat=QAT, admm=bool(ADMM), rev=TRACE["rev"])
         stop = threading.Event()
 
 
-        def sync_loop(every=600):  # copie sur Drive toutes les 10 min, checkpoint compris
+        def sync_loop(every=600):  # copy to Drive every 10 min, checkpoint included
             while not stop.wait(every):
                 colab.sync_outputs(OUT, DRIVE_DIR)
 
@@ -965,19 +964,19 @@ def train_body(nb):
             if SYNC:
                 colab.sync_outputs(OUT, DRIVE_DIR)
         """), md("""
-        ## Courbes
+        ## Curves
 
-        Perte et taux d'apprentissage de `loss.csv` (mode automatique de M13) ; relancer la
-        cellule pendant un entraînement long redessine jusqu'au dernier point écrit.
+        Loss and learning rate of `loss.csv` (automatic mode of M13); running the cell again
+        during a long training redraws up to the last point written.
         """), code("""
         C.run(C.cmd_figures("train", RUN))
         for png in sorted((RUN / "figures").glob("*.png")):
             display(Image.open(png))
         """), md("""
-        ## Évaluation
+        ## Evaluation
 
-        `final.weights` par `tools/eval_voc.py` (gabarit `infer`, T14.3) ; en QAT ou ADMM,
-        modèle basse précision par `tools/quant_lowbit.py` puis `tools/eval_quant.py`.
+        `final.weights` by `tools/eval_voc.py` (`infer` template, T14.3); with QAT or ADMM,
+        the low-precision model by `tools/quant_lowbit.py`, then `tools/eval_quant.py`.
         """), code("""
         if QAT or ADMM:
             C.run(C.cmd_quant_lowbit(NET, RUN / "checkpoint.npz", RUN / "model", QAT, bool(ADMM)))
@@ -986,7 +985,7 @@ def train_body(nb):
                                    model_dir=RUN / "model", metric=METRIC, split=SPLIT,
                                    size=SIZE, data_root=DATA_ROOT))
             d = json.loads(result.read_text())
-            print(f"mAP entière {100 * d['results']['int']['map']:.2f} ({d['images']} images)")
+            print(f"integer mAP {100 * d['results']['int']['map']:.2f} ({d['images']} images)")
         else:
             result = RUN / "map_float.md"
             result.unlink(missing_ok=True)
@@ -995,22 +994,22 @@ def train_body(nb):
                                  jobs=JOBS))
             display(Markdown(result.read_text()))
         """), md("""
-        ## Vitesse du backend (T12.11-e)
+        ## Backend speed (T12.11-e)
 
-        Secondes par image des dernières itérations (`loss.csv`) ; le lot maximal qui tient
-        en mémoire GPU se trouve en relançant avec `BATCH` croissant. Un chiffre issu de
-        poids entraînés sur GPU indique le backend.
+        Seconds per image of the last iterations (`loss.csv`); the largest batch that fits
+        in GPU memory is found by running again with a growing `BATCH`. A number that comes
+        from weights trained on GPU names the backend.
         """), code("""
         rows = list(csv.DictReader((RUN / "loss.csv").open())) if (RUN / "loss.csv").exists() else []
         if rows:
             last = rows[-50:]
             s = sum(float(r["seconds"]) for r in last) / len(last) / BATCH
-            print(f"{s:.3f} s/image sur {DEVICE}, lot {BATCH}, {len(rows)} itérations journalisées")
-        """), md("## Résumé"), code("""
-        print(f"sorties : {RUN}/ (checkpoint.npz, loss.csv, final.weights, figures/) ; "
-              f"backend {DEVICE} ; révision {TRACE['rev']}")
-        print(f"évaluation : {result}")
-        print("commandes équivalentes :")
+            print(f"{s:.3f} s/image on {DEVICE}, batch {BATCH}, {len(rows)} iterations logged")
+        """), md("## Summary"), code("""
+        print(f"outputs: {RUN}/ (checkpoint.npz, loss.csv, final.weights, figures/); "
+              f"backend {DEVICE}; revision {TRACE['rev']}")
+        print(f"evaluation: {result}")
+        print("equivalent commands:")
         for c in C.HISTORY:
             print("  " + c)
         """)], nb)
@@ -1018,16 +1017,16 @@ def train_body(nb):
 
 def sweep_body(nb):
     return [*_prep_preview_cells(), md("""
-        ## Plan du balayage (T14.10)
+        ## Sweep plan (T14.10)
 
-        Un run par case de la grille `BATCHES × TRAIN_SUBSETS × SEEDS`, tous les autres
-        paramètres égaux (ceux de `tools/m11.sh <jeu>-train`, `ITERS` à part).
-        `TRAIN_SUBSETS` prend les n premières images du split d'entraînement
-        (`train.py --subset`), 0 tout le split. Une graine non nulle (`train.py --seed` :
-        têtes, tirage des lots, multiscale) suffixe le run (`b32-sall-g1`) ; la graine 0
-        garde le nom court.
-        À itérations égales, un lot plus grand voit plus d'images : la colonne « époques »
-        le montre. Le taux d'apprentissage n'est pas ajusté au lot.
+        One run per cell of the `BATCHES × TRAIN_SUBSETS × SEEDS` grid, every other
+        parameter equal (those of `tools/m11.sh <dataset>-train`, except `ITERS`).
+        `TRAIN_SUBSETS` takes the first n images of the training split
+        (`train.py --subset`), 0 the whole split. A non-zero seed (`train.py --seed`:
+        heads, batch draw, multiscale) suffixes the run (`b32-sall-g1`); seed 0 keeps the
+        short name.
+        At equal iterations, a larger batch sees more images: the "epochs" column shows it.
+        The learning rate is not scaled with the batch.
         """), code("""
         import threading
 
@@ -1035,26 +1034,26 @@ def sweep_body(nb):
 
         PLAN = [(b, s, g, runs.run_name(b, s, g)) for b in BATCHES for s in TRAIN_SUBSETS
                 for g in SEEDS]
-        rows = ["| run | lot | images | époques | durée estimée |", "|---|---|---|---|---|"]
+        rows = ["| run | batch | images | epochs | estimated duration |", "|---|---|---|---|---|"]
         total = 0
         for b, s, g, name in PLAN:
             n = min(s, len(samples)) if s else len(samples)
             sec = estimate(ITERS, b, DEVICE)
             total += sec or 0
             done = (Path(OUT) / "runs" / name / "final.weights").exists()
-            rows.append(f"| {name}{' (fait)' if done else ''} | {b} | {n} | "
+            rows.append(f"| {name}{' (done)' if done else ''} | {b} | {n} | "
                         f"{ITERS * b / n:.2f} | "
-                        + (f"{sec / 3600:.1f} h |" if sec else "non mesurée |"))
+                        + (f"{sec / 3600:.1f} h |" if sec else "not measured |"))
         display(Markdown("\\n".join(rows)))
-        print(f"{len(PLAN)} runs de {ITERS} itérations"
-              + (f", ≈ {total / 3600:.1f} h sur {DEVICE} au total" if total else ""))
+        print(f"{len(PLAN)} runs of {ITERS} iterations"
+              + (f", ≈ {total / 3600:.1f} h on {DEVICE} in total" if total else ""))
         """), md("""
-        ## Entraînements
+        ## Trainings
 
-        Chaque run va dans `OUT/runs/<run>/` (`b16-sall`, `b8-s500`…), avec son `run.json`.
-        Relancer la cellule reprend le run interrompu (`--resume`) et saute ceux qui sont
-        finis (`SKIP_DONE`). Sur Colab avec `DRIVE_DIR`, `OUT` est copié dans
-        `<DRIVE_DIR>/runs/` toutes les 10 min et en fin de cellule (T14.8).
+        Each run goes to `OUT/runs/<run>/` (`b16-sall`, `b8-s500`…), with its `run.json`.
+        Running the cell again resumes the interrupted run (`--resume`) and skips the
+        finished ones (`SKIP_DONE`). On Colab with `DRIVE_DIR`, `OUT` is copied to
+        `<DRIVE_DIR>/runs/` every 10 min and at the end of the cell (T14.8).
         """), code("""
         SYNC = COLAB and bool(DRIVE_DIR)
         if SYNC:
@@ -1074,7 +1073,7 @@ def sweep_body(nb):
             for b, s, g, name in PLAN:
                 run_dir = Path(OUT) / "runs" / name
                 if SKIP_DONE and (run_dir / "final.weights").exists():
-                    print(f"{name} : déjà entraîné, sauté")
+                    print(f"{name}: already trained, skipped")
                     continue
                 resume = (run_dir / "checkpoint.npz").exists()
                 runs.write_meta(run_dir, batch=b, subset=s, seed=g, iters=ITERS, lr=LR,
@@ -1089,13 +1088,13 @@ def sweep_body(nb):
             if SYNC:
                 colab.sync_outputs(OUT, DRIVE_DIR)
         """), md("""
-        ## Comparaison
+        ## Comparison
 
-        mAP flottante de chaque run sur les mêmes `SUBSET` images (`tools/eval_voc.py`,
-        dans `OUT/eval/<run>/`, cache partagé avec la comparaison des notebooks `_infer` :
-        réutilisée si déjà calculée), perte finale et vitesse ; courbes de perte superposées
-        (`tools.figures.resultats.plot_training`, M13). Les notebooks d'inférence
-        `<modèle>_infer` lisent ces runs (`RUN`, `COMPARE`).
+        Float mAP of each run on the same `SUBSET` images (`tools/eval_voc.py`, in
+        `OUT/eval/<run>/`, a cache shared with the comparison of the `_infer` notebooks:
+        reused if already computed), final loss and speed; loss curves overlaid
+        (`tools.figures.resultats.plot_training`, M13). The inference notebooks
+        `<model>_infer` read these runs (`RUN`, `COMPARE`).
         """), code("""
         from tools.figures import MissingSource
         from tools.figures import resultats as FR
@@ -1114,14 +1113,14 @@ def sweep_body(nb):
             for png in FR.plot_training(curves, Path(OUT) / "figures", "balayage"):
                 if str(png).endswith(".png"):
                     display(Image.open(png))
-        """), md("## Résumé"), code("""
-        print(f"runs : {OUT}/runs/ ; backend {DEVICE} ; révision {TRACE['rev']}")
+        """), md("## Summary"), code("""
+        print(f"runs: {OUT}/runs/; backend {DEVICE}; revision {TRACE['rev']}")
         best = max((r for r in RESULTS if r["mAP"] is not None), key=lambda r: r["mAP"],
                    default=None)
         if best:
-            print(f"meilleur run sur {SUBSET or 'toutes les'} images : {best['run']} "
-                  f"(mAP {best['mAP']:.2f}) ; inférence : RUN = {best['run']!r}")
-        print("commandes équivalentes :")
+            print(f"best run on {SUBSET or 'all'} images: {best['run']} "
+                  f"(mAP {best['mAP']:.2f}); inference: RUN = {best['run']!r}")
+        print("equivalent commands:")
         for c in C.HISTORY:
             print("  " + c)
         """)]
@@ -1135,109 +1134,109 @@ STATS_GALLERY = 8    # images de la galerie par split
 # Question propre à chaque jeu (docs/tasks/M16-presentation-jeux.md#questions-par-jeu) :
 # (question, renvoi, cellule de code). Les cellules n'appellent que tools/data_stats.py.
 QUESTIONS = {
-    "voc": ("Les classes à faible AP (bottle, pottedplant) sont-elles rares ou petites ?",
+    "voc": ("Are the low-AP classes (bottle, pottedplant) rare or small?",
             "T13.7, T13.13", """
         ap = DS.voc_ap()
         if ap:
-            print(f"AP flottante par classe : {ap['source']} (Tiny-YOLOv2 VOC, VOC2007 test)")
+            print(f"float AP per class: {ap['source']} (Tiny-YOLOv2 VOC, VOC2007 test)")
         display(Markdown(DS.md_par_classe(STATS, ap.get("ap") if ap else None)))
         """),
-    "coco": ("Quelle part des objets est petite (< 32²) une fois réduite à 416 ?", "T11.1", """
+    "coco": ("What share of the objects is small (< 32²) once resized to 416?", "T11.1", """
         g = DS.whole(STATS)["geometrie"]
         for mode in ("orig", "letterbox", "stretch"):
             c = g[mode]["coco"]
-            print(f"{mode:9s} : petits {100 * c[0] / max(sum(c), 1):.1f} %, moyens "
-                  f"{100 * c[1] / max(sum(c), 1):.1f} %, grands {100 * c[2] / max(sum(c), 1):.1f} %")
+            print(f"{mode:9s}: small {100 * c[0] / max(sum(c), 1):.1f} %, medium "
+                  f"{100 * c[1] / max(sum(c), 1):.1f} %, large {100 * c[2] / max(sum(c), 1):.1f} %")
         if DS.group(STATS, "test").get("comptes"):
-            print(f"iscrowd (test) : {DS.group(STATS, 'test')['comptes']['crowd']}")
+            print(f"iscrowd (test): {DS.group(STATS, 'test')['comptes']['crowd']}")
         """),
-    "kitti": ("`letterbox` ou `stretch` : combien d'objets passent sous 8 px de haut ?",
+    "kitti": ("`letterbox` or `stretch`: how many objects fall under 8 px of height?",
               "T11.4, T15", """
         g = DS.whole(STATS)["geometrie"]
         for mode in ("letterbox", "stretch"):
-            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]} : hauteur < 8 px "
+            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]}: height < 8 px "
                   f"{100 * g[mode]['h_under']['8']:.1f} %, < 16 px {100 * g[mode]['h_under']['16']:.1f} %")
-        # Entrée non carrée de T11.4 : géométrie seule, sans pixels.
+        # Non-square input of T11.4: geometry only, no pixels.
         out_nc = f"{OUT}/640x192"
         C.run(C.cmd_data_stats(DATASET, out_nc, SPLITS, "640x192", "letterbox", NET,
                                only=["geometrie"], data_root=DATA_ROOT, figures=False))
         display(Markdown(DS.md_geometrie(json.loads(Path(out_nc, "stats.json").read_text()))))
         """),
-    "visdrone": ("Part des objets plus petits qu'une cellule 26×26 ; collisions de cibles.",
+    "visdrone": ("Share of the objects smaller than a 26×26 cell; target collisions.",
                  "T11.5, T15", """
         g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
-        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+        print("smaller than a cell: " + ", ".join(f"{k} {100 * v:.1f} %"
                                                            for k, v in g["fit_cell"].items()))
         display(Markdown(DS.md_par_classe(STATS)))
         """),
-    "flir": ("Distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00.", "T11.7", """
+    "flir": ("Distribution of the thermal levels, and what the INT8 of L00 keeps of it.", "T11.7", """
         px = DS.whole(STATS).get("images", {}).get("pixels")
         if px:
             lv = px["levels"]
-            print(f"{px['images']} images, {px['channels']} canal(aux) ; niveaux 8 bits occupés "
-                  f"{lv['8bit']} (99 % des pixels sur {lv['8bit_99']}) → {lv['int8']} niveaux "
-                  f"INT8 à l'échelle d'entrée {lv['input_scale']:.5f} (1/127, yolo.quant)")
+            print(f"{px['images']} images, {px['channels']} channel(s); 8-bit levels used "
+                  f"{lv['8bit']} (99 % of the pixels on {lv['8bit_99']}) → {lv['int8']} INT8 "
+                  f"levels at the input scale {lv['input_scale']:.5f} (1/127, yolo.quant)")
         else:
-            print("SAMPLE = 0 : pas de lecture de pixels")
+            print("SAMPLE = 0: no pixel read")
         """),
-    "exdark": ("Luminosité par type d'éclairage, et écart aux images de calibration VOC.",
+    "exdark": ("Brightness per lighting type, and gap to the VOC calibration images.",
                "T11.3", """
         light = STATS.get("exdark_light")
         if light:
-            rows = ["| éclairage | images | luminance moy. |", "|---|---|---|"]
+            rows = ["| lighting | images | mean luminance |", "|---|---|---|"]
             rows += [f"| {k} | {v['images']} | {v['lum_mean']:.1f} |" for k, v in light.items()]
             display(Markdown("\\n".join(rows)))
         ref = STATS.get("voc_ref")
         if ref:
-            print(f"VOC2007 test ({ref['images']} images) : luminance moyenne {ref['lum_mean']:.1f}")
+            print(f"VOC2007 test ({ref['images']} images): mean luminance {ref['lum_mean']:.1f}")
         show("eclairage")
         """),
-    "crowdhuman": ("Objets par image face aux 256 emplacements ; part d'objets occultés.",
+    "crowdhuman": ("Objects per image against the 256 slots; share of occluded objects.",
                    "T11.6", """
         for name, a in DS._parts(STATS):
             d, c = a.get("densite"), a.get("comptes")
             if d and c:
-                print(f"{name:12s} : {c['images']} images, > 256 objets {d['over']['256']} "
-                      f"({100 * d['over']['256'] / max(c['images'], 1):.2f} %), > 1 024 "
-                      f"{d['over']['1024']} ; difficult (mask, ignore) "
-                      f"{100 * c['difficult'] / max(c['objects'], 1):.1f} % des boîtes")
+                print(f"{name:12s}: {c['images']} images, > 256 objects {d['over']['256']} "
+                      f"({100 * d['over']['256'] / max(c['images'], 1):.2f} %), > 1,024 "
+                      f"{d['over']['1024']}; difficult (mask, ignore) "
+                      f"{100 * c['difficult'] / max(c['objects'], 1):.1f} % of the boxes")
         """),
-    # Jeux drone et thermiques de M18 (docs/tasks/M18-jeux-drone.md#questions-par-jeu).
-    "auair": ("Que reste-t-il des objets d'une trame 1920×1080 réduite à 416, classe par "
-              "classe ?", "T18.1", """
+    # Drone and thermal datasets of M18 (docs/tasks/M18-jeux-drone.md#questions-par-jeu).
+    "auair": ("What is left of the objects of a 1920×1080 frame resized to 416, class by "
+              "class?", "T18.1", """
         g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
-        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+        print("smaller than a cell: " + ", ".join(f"{k} {100 * v:.1f} %"
                                                            for k, v in g["fit_cell"].items()))
-        print(f"hauteur < 8 px : {100 * g['h_under']['8']:.1f} %")
+        print(f"height < 8 px: {100 * g['h_under']['8']:.1f} %")
         display(Markdown(DS.md_par_classe(STATS)))
         """),
-    "dronevehicle": ("Véhicules par image face aux 256 emplacements, et leur taille à 416.",
+    "dronevehicle": ("Vehicles per image against the 256 slots, and their size at 416.",
                      "T18.2", """
         g = DS.whole(STATS)["geometrie"][STATS["params"]["resize"]]
-        print("plus petits qu'une cellule : " + ", ".join(f"{k} {100 * v:.1f} %"
+        print("smaller than a cell: " + ", ".join(f"{k} {100 * v:.1f} %"
                                                            for k, v in g["fit_cell"].items()))
         for name, a in DS._parts(STATS):
             d, c = a.get("densite"), a.get("comptes")
             if d and c:
-                print(f"{name:12s} : {c['images']} images, > 256 objets {d['over']['256']}")
+                print(f"{name:12s}: {c['images']} images, > 256 objects {d['over']['256']}")
         """),
-    "hituav": ("Distribution des niveaux thermiques, et ce qu'en garde l'INT8 de L00.",
+    "hituav": ("Distribution of the thermal levels, and what the INT8 of L00 keeps of it.",
                "T18.3", """
         px = DS.whole(STATS).get("images", {}).get("pixels")
         if px:
             lv = px["levels"]
-            print(f"{px['images']} images, {px['channels']} canal(aux) ; niveaux 8 bits occupés "
-                  f"{lv['8bit']} (99 % des pixels sur {lv['8bit_99']}) → {lv['int8']} niveaux "
-                  f"INT8 à l'échelle d'entrée {lv['input_scale']:.5f} (1/127, yolo.quant)")
+            print(f"{px['images']} images, {px['channels']} channel(s); 8-bit levels used "
+                  f"{lv['8bit']} (99 % of the pixels on {lv['8bit_99']}) → {lv['int8']} INT8 "
+                  f"levels at the input scale {lv['input_scale']:.5f} (1/127, yolo.quant)")
         else:
-            print("SAMPLE = 0 : pas de lecture de pixels")
+            print("SAMPLE = 0: no pixel read")
         display(Markdown(DS.md_par_classe(STATS)))
         """),
-    "uavdt": ("`letterbox` ou `stretch` pour du 1024×540 : combien d'objets passent sous 8 px "
-              "de haut ?", "T18.4", """
+    "uavdt": ("`letterbox` or `stretch` for 1024×540: how many objects fall under 8 px of "
+              "height?", "T18.4", """
         g = DS.whole(STATS)["geometrie"]
         for mode in ("letterbox", "stretch"):
-            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]} : hauteur < 8 px "
+            print(f"{mode:9s} {g['size'][1]}×{g['size'][0]}: height < 8 px "
                   f"{100 * g[mode]['h_under']['8']:.1f} %, < 16 px {100 * g[mode]['h_under']['16']:.1f} %")
         display(Markdown(DS.md_par_classe(STATS)))
         """),
@@ -1335,12 +1334,12 @@ def _fiche_md(dataset):
 
     f = data_stats.FICHES.get(dataset)
     if not f:
-        return "Fiche absente de `FICHES` (tools/data_stats.py)."
+        return "Datasheet missing from `FICHES` (tools/data_stats.py)."
     rows = [("source", f["source"]), ("version", f["version"]), ("licence", f["license"]),
-            ("capteur", f["sensor"]), ("résolution typique", f["resolution"])]
-    rows += [(f"officiel `{sp}`", f"{i or '—'} images, {o or '—'} objets")
+            ("sensor", f["sensor"]), ("typical resolution", f["resolution"])]
+    rows += [(f"official `{sp}`", f"{i or '—'} images, {o or '—'} objects")
              for sp, (i, o) in f["official"].items()]
-    rows += [("chargeur", n) for n in f.get("notes", [])]
+    rows += [("loader", n) for n in f.get("notes", [])]
     return "\n".join(["| | |", "|---|---|"] + [f"| {k} | {v} |" for k, v in rows])
 
 
@@ -1348,54 +1347,55 @@ def stats_header(nb):
     from tools.notebooks.matrice import NOTEBOOKS, READS_HEADERS, palier
 
     others = [o for o in NOTEBOOKS.values() if o.dataset == nb.dataset and o.role != "stats"]
-    links = ", ".join(f"[{o.name}]({o.path.name})" for o in others) or "aucun"
+    links = ", ".join(f"[{o.name}]({o.path.name})" for o in others) or "none"
     colab = f"{COLAB}/notebooks/{nb.path.as_posix()}"
-    ann = "M (en-têtes d'image lus)" if nb.dataset in READS_HEADERS else "R"
+    ann = "M (image headers read)" if nb.dataset in READS_HEADERS else "R"
     q, ref, _ = QUESTIONS.get(nb.dataset, ("—", "—", ""))
     return md(textwrap.dedent("""
-        # Statistiques de {dataset}
+        # Statistics of {dataset}
 
         [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({colab})
 
-        Présentation et analyse statistique du jeu, lues du point de vue de Tiny-YOLO et de la
-        cible embarquée (entrée 416, grilles 13×13 et 26×26, 256 emplacements de `yolo_post`,
-        INT8). Tâches : {tasks} ; jalon : [M16](../../docs/tasks/M16-presentation-jeux.md) ;
-        synthèse : [stats-jeux.md](../../docs/tasks/stats-jeux.md). Autres notebooks du jeu :
+        Presentation and statistical analysis of the dataset, read from the point of view of
+        Tiny-YOLO and the embedded target (input 416, 13×13 and 26×26 grids, 256 slots of
+        `yolo_post`, INT8). Tasks: {tasks}; milestone:
+        [M16](../../docs/tasks/M16-presentation-jeux.md); synthesis:
+        [stats-jeux.md](../../docs/tasks/stats-jeux.md). Other notebooks of the dataset:
         {links}.
 
-        Palier : annotations **{ann}** (split entier), pixels **{px}** (`SAMPLE = {sample}`
-        images par partie). Prérequis : données `{marker}` — {how}. Ni poids ni GPU.
+        Tier: annotations **{ann}** (whole split), pixels **{px}** (`SAMPLE = {sample}`
+        images per part). Prerequisites: data `{marker}` — {how}. No weights, no GPU.
 
-        Question propre : {q} (renvoi : {ref}).
+        Own question: {q} (see: {ref}).
 
         @FICHE@
 
-        Aucun calcul ici : `tools/data_stats.py` calcule (`stats.json`, `stats.md`, galerie),
-        `tools/figures/donnees.py` trace ; chaque étape affiche la commande. Sorties dans
-        `{out}/`, jamais dans `results/`. Notebook généré par `python -m tools.notebooks`
-        (`make notebooks`) : modifier `tools/notebooks/gabarits.py`, pas ce fichier.
+        No computation here: `tools/data_stats.py` computes (`stats.json`, `stats.md`,
+        gallery), `tools/figures/donnees.py` plots; each step prints the command. Outputs in
+        `{out}/`, never in `results/`. Notebook generated by `python -m tools.notebooks`
+        (`make notebooks`): edit `tools/notebooks/gabarits.py`, not this file.
         """).format(dataset=nb.dataset, colab=colab, tasks=_task_links(nb.tasks), links=links,
                     ann=ann, px=palier(STATS_SAMPLE), sample=STATS_SAMPLE,
-                    marker=prerequis(nb)["données"], how=how_to_get("données", nb), q=q,
+                    marker=prerequis(nb)["data"], how=how_to_get("data", nb), q=q,
                     ref=ref, out=nb.out_dir).replace("@FICHE@", _fiche_md(nb.dataset)))
 
 
 def stats_params(nb):
-    p = [("DATASET", nb.dataset, "clé de DATASETS"),
-         ("SPLITS", None, "liste de splits ; None : splits train puis test du jeu"),
-         ("SIZE", None, "S ou 'LxH' ; None : entrée de la cfg du jeu (416 sinon)"),
-         ("RESIZE", "letterbox", "letterbox | stretch (grandeurs vues par le réseau)"),
-         ("SAMPLE", STATS_SAMPLE, "images lues pour les pixels, par partie ; 0 : aucune"),
-         ("GALLERY", STATS_GALLERY, "images de la galerie par split"),
-         ("SEED", 0, "tirage des images (pixels, galerie, nuages)"),
-         ("NET", nb.net, "cfg dont les ancres et grilles servent aux collisions"),
-         ("DEVICE", "cpu", "noyau CPU : rien ne tourne sur GPU"),
-         ("DATA_ROOT", None, "racine du jeu ; None : data/<jeu> (Colab : dossier Drive)"),
-         ("DRIVE_DIR", DRIVE_DIR, "Colab : archives data/<jeu>.tar ; None : pas de Drive"),
-         ("OUT", nb.out_dir, "sorties du notebook"),
-         ("REPO_URL", REPO_URL, "Colab : dépôt cloné"),
-         ("REV", REV, "Colab : révision")]
-    return [md("## Paramètres"), code(_assign(p), tags=("parameters",))]
+    p = [("DATASET", nb.dataset, "key of DATASETS"),
+         ("SPLITS", None, "list of splits; None: train then test splits of the dataset"),
+         ("SIZE", None, "S or 'WxH'; None: input of the cfg of the dataset (416 otherwise)"),
+         ("RESIZE", "letterbox", "letterbox | stretch (quantities seen by the network)"),
+         ("SAMPLE", STATS_SAMPLE, "images read for the pixels, per part; 0: none"),
+         ("GALLERY", STATS_GALLERY, "gallery images per split"),
+         ("SEED", 0, "draw of the images (pixels, gallery, scatter plots)"),
+         ("NET", nb.net, "cfg whose anchors and grids are used for the collisions"),
+         ("DEVICE", "cpu", "CPU kernel: nothing runs on GPU"),
+         ("DATA_ROOT", None, "dataset root; None: data/<dataset> (Colab: Drive folder)"),
+         ("DRIVE_DIR", DRIVE_DIR, "Colab: archives data/<dataset>.tar; None: no Drive"),
+         ("OUT", nb.out_dir, "notebook outputs"),
+         ("REPO_URL", REPO_URL, "Colab: cloned repository"),
+         ("REV", REV, "Colab: revision")]
+    return [md("## Parameters"), code(_assign(p), tags=("parameters",))]
 
 
 def _section(title, text, body):
@@ -1403,11 +1403,11 @@ def _section(title, text, body):
 
 
 def stats_body(nb):
-    q, ref, qcode = QUESTIONS.get(nb.dataset, ("—", "—", "print('pas de question propre')"))
-    cells = _section("Calcul (T16.0)", """
-        `tools/data_stats.py` lit les annotations de chaque split (en entier), lit les pixels
-        de `SAMPLE` images par partie (tirées avec `SEED`), dessine la galerie et trace les
-        figures. Les grandeurs « vues par le réseau » sont calculées après `RESIZE` à `SIZE`.
+    q, ref, qcode = QUESTIONS.get(nb.dataset, ("—", "—", "print('no own question')"))
+    cells = _section("Computation (T16.0)", """
+        `tools/data_stats.py` reads the annotations of each split (whole), reads the pixels
+        of `SAMPLE` images per part (drawn with `SEED`), draws the gallery and plots the
+        figures. The quantities "seen by the network" are computed after `RESIZE` to `SIZE`.
         """, """
         import json
 
@@ -1421,8 +1421,8 @@ def stats_body(nb):
             _, h, w = load_cfg(NET)["input"]
             SIZE = h if h == w else f"{w}x{h}"
         ann, px = palier_stats(DATASET, SAMPLE)
-        print(f"palier : annotations {ann}, pixels {px} ({SAMPLE} images par partie) ; "
-              f"entrée {SIZE} ({RESIZE}) ; cfg {NET}")
+        print(f"tier: annotations {ann}, pixels {px} ({SAMPLE} images per part); "
+              f"input {SIZE} ({RESIZE}); cfg {NET}")
         C.run(C.cmd_data_stats(DATASET, OUT, SPLITS, SIZE, RESIZE, NET, SAMPLE, GALLERY, SEED,
                                data_root=DATA_ROOT))
         STATS = json.loads(Path(OUT, "stats.json").read_text())
@@ -1440,14 +1440,14 @@ def stats_body(nb):
             if text:
                 display(Markdown(text))
         """)
-    cells += _section("Présentation et galerie (T16.4)", """
-        Classes du jeu et leur correspondance VOC et COCO (`MAPPINGS`), puis `GALLERY` images
-        par split, une image par classe ; vérités terrain dessinées par `tools/detect.py:draw`.
-        À `SEED` fixé, la galerie ne change pas.
+    cells += _section("Presentation and gallery (T16.4)", """
+        Classes of the dataset and their VOC and COCO mapping (`MAPPINGS`), then `GALLERY`
+        images per split, one image per class; ground truth drawn by `tools/detect.py:draw`.
+        At a fixed `SEED`, the gallery does not change.
         """, """
         from yolo.data import datasets as D
 
-        rows = ["| classe | VOC | COCO |", "|---|---|---|"]
+        rows = ["| class | VOC | COCO |", "|---|---|---|"]
         for c in D.DATASETS[DATASET].classes:
             m = [c if DATASET == f else D.MAPPINGS.get((DATASET, f), {}).get(c, "—")
                  for f in ("voc", "coco")]
@@ -1455,82 +1455,82 @@ def stats_body(nb):
         display(Markdown("\\n".join(rows)))
         for g, sheet in STATS.get("galerie", {}).get("planches", {}).items():
             if g != "suspectes":
-                print(f"galerie : {g}")
+                print(f"gallery: {g}")
                 display(Img(filename=str(Path(OUT, sheet))))
         """)
-    cells += _section("Comptes et classes (T16.5)", """
-        Comptes par split (annotations, split entier), face aux effectifs officiels de la
-        fiche ; objets par classe et co-occurrence.
+    cells += _section("Counts and classes (T16.5)", """
+        Counts per split (annotations, whole split), against the official counts of the
+        datasheet; objects per class and co-occurrence.
         """, """
         table(DS.md_synthese)
         chk = DS.check_official(STATS)
         for sp, i, o, (a, b), ok in chk:
-            print(f"{sp} : {i} images, {o} objets ; officiel {a or '—'} / {b or '—'} : "
-                  f"{'ok' if ok else 'écart (voir les notes de la fiche)'}")
+            print(f"{sp}: {i} images, {o} objects; official {a or '—'} / {b or '—'}: "
+                  f"{'ok' if ok else 'gap (see the notes of the datasheet)'}")
         table(DS.md_classes)
         show("classes")
         show("cooccurrence")
         """)
-    cells += _section("Géométrie des boîtes (T16.6)", """
-        Tailles en pixels d'origine et d'entrée (letterbox et stretch à `SIZE`), catégories
-        COCO avant et après redimensionnement, part des objets plus petits qu'une cellule de
-        chaque tête, centres des boîtes.
+    cells += _section("Box geometry (T16.6)", """
+        Sizes in original and input pixels (letterbox and stretch at `SIZE`), COCO
+        categories before and after resizing, share of the objects smaller than a cell of
+        each head, box centres.
         """, """
         table(DS.md_geometrie)
         show("tailles")
         show("letterbox_stretch")
         show("centres")
         """)
-    cells += _section("Densité et collisions (T16.7)", """
-        Objets par image face aux 256 emplacements de `yolo_post` ; cibles perdues quand deux
-        objets tombent sur la même cellule et la même ancre (`build_targets`, ancres de `NET`).
+    cells += _section("Density and collisions (T16.7)", """
+        Objects per image against the 256 slots of `yolo_post`; targets lost when two
+        objects fall on the same cell and the same anchor (`build_targets`, anchors of `NET`).
         """, """
         table(DS.md_densite)
         show("densite")
         show("collisions")
         """)
     cells += _section("Images (T16.8)", """
-        Résolutions sur le split entier (annotations) ; canaux, intensités et luminance sur
-        `SAMPLE` images par partie, face à VOC2007 test (échelles INT8 de M4).
+        Resolutions on the whole split (annotations); channels, intensities and luminance on
+        `SAMPLE` images per part, against VOC2007 test (INT8 scales of M4).
         """, """
         table(DS.md_images)
         show("resolutions")
         show("intensites")
         """)
-    cells += _section("Ancres (T16.9)", """
-        Boîtes du groupe train en pixels d'entrée letterbox, ancres de la cfg, de VOC, de
-        COCO et du k-means (`tools/kmeans_anchors.py`, mêmes `--size` et `--seed`).
+    cells += _section("Anchors (T16.9)", """
+        Boxes of the train group in letterbox input pixels, anchors of the cfg, of VOC, of
+        COCO and of the k-means (`tools/kmeans_anchors.py`, same `--size` and `--seed`).
         """, """
         table(DS.md_ancres)
         show("ancres")
         show("ancres_k")
         """)
-    cells += _section("Qualité des annotations (T16.10)", """
-        Boîtes retirées ou rognées par le chargeur, dégénérées, doublons, régions retirées ;
-        l'analyse signale, elle ne corrige pas (une correction passe par M11).
+    cells += _section("Annotation quality (T16.10)", """
+        Boxes removed or clipped by the loader, degenerate, duplicates, regions removed;
+        the analysis reports, it does not correct (a correction goes through M11).
         """, """
         table(DS.md_qualite)
         sus = DS.whole(STATS).get("qualite", {}).get("suspects", [])
         for d in sus:
-            print(f"{d['id']} : score {d['score']} (retirées {d['retirées']}, rognées "
-                  f"{d['rognées']}, dégénérées {d['dégénérées']}, doublons {d['doublons']})")
+            print(f"{d['id']}: score {d['score']} (removed {d['retirées']}, clipped "
+                  f"{d['rognées']}, degenerate {d['dégénérées']}, duplicates {d['doublons']})")
         sheet = STATS.get("galerie", {}).get("planches", {}).get("suspectes")
         if sheet:
             display(Img(filename=str(Path(OUT, sheet))))
         """)
-    cells += _section("Écart entre splits et couverture hors domaine (T16.11)", """
-        Distance en variation totale entre train et test, par grandeur ; part des objets qui
-        ont une classe VOC ou COCO (ce qu'évaluent les notebooks hors domaine de T14.5).
+    cells += _section("Gap between splits and out-of-domain coverage (T16.11)", """
+        Total variation distance between train and test, per quantity; share of the objects
+        that have a VOC or COCO class (what the out-of-domain notebooks of T14.5 evaluate).
         """, """
         table(DS.md_ecart)
         show("ecart")
         """)
-    cells += [md(f"## Question propre au jeu\n\n{q} (renvoi : {ref})"), code(qcode)]
-    cells += [md("## Résumé"), code("""
+    cells += [md(f"## Own question of the dataset\n\n{q} (see: {ref})"), code(qcode)]
+    cells += [md("## Summary"), code("""
         table(DS.md_synthese)
-        print(f"sorties : {OUT}/ (stats.json, stats.md, figures/, galerie/) ; "
-              f"révision {TRACE['rev']}")
-        print("commandes équivalentes :")
+        print(f"outputs: {OUT}/ (stats.json, stats.md, figures/, galerie/); "
+              f"revision {TRACE['rev']}")
+        print("equivalent commands:")
         for c in C.HISTORY:
             print("  " + c)
         """)]
@@ -1556,27 +1556,27 @@ VIEWER_DIRS = ["build/figures", "build/notebooks"]
 
 # Contexte d'une famille du registre tools/figures (titres : FAMILY_TITLES), en tête de section.
 FAMILY_INTROS = {
-    "resultats": "Ce que donne le projet, mesuré : la précision (mAP) aux stades flottant, "
-                 "entier et C-sim, l'effet du format des poids et de la quantification, le "
-                 "coût en cycles et en ressources de l'accélérateur, et sa place face aux "
-                 "travaux publiés. Les chiffres viennent des sorties de `build/` et de "
-                 "`results/*.md` ; aucun n'est recopié à la main.",
-    "modeles": "Les deux réseaux du projet, Tiny-YOLOv2 VOC et Tiny-YOLOv3 COCO, vus d'en "
-               "haut : graphe des couches, coût par couche (MACs, paramètres, activations), "
-               "empreinte mémoire face au budget de la carte, ancres, lecture d'une sortie "
-               "YOLO, et les données VOC qui servent à l'entraînement et à l'évaluation.",
-    "materiel": "L'accélérateur sur le SoC Zynq : la répartition ARM / logique programmable, "
-                "le moteur unique de MACs et son tuilage, l'alternative streaming, et la "
-                "chaîne qui vérifie bit à bit chaque passage, du NumPy flottant à la carte.",
-    "maths": "Toute la chaîne est réécrite à la main en NumPy pur, sans PyTorch, OpenCV, "
-             "scikit-learn ni devkit (ADR 0001). Chaque figure reprend une brique, de la "
-             "convolution à la quantification, par ses fonctions mathématiques.",
-    "reseaux": "Le niveau en dessous de « Modèles » : chaque couche et chaque tenseur de "
-               "Tiny-YOLOv2 VOC et Tiny-YOLOv3 COCO, tirés de `python/yolo/models/specs.py`, "
-               "jusqu'au suivi d'une couche du flottant au noyau HLS.",
-    "projet": "Comment le projet s'est construit : jalons et chronologie (depuis les "
-              "commits), avancement des tâches, volume de code, tests et dépendances "
-              "entre jalons.",
+    "resultats": "What the project gives, measured: the accuracy (mAP) at the float, "
+                 "integer and C-sim stages, the effect of the weight format and of the "
+                 "quantization, the cost in cycles and resources of the accelerator, and its "
+                 "place among published work. The numbers come from the outputs of `build/` "
+                 "and `results/*.md`; none is copied by hand.",
+    "modeles": "The two networks of the project, Tiny-YOLOv2 VOC and Tiny-YOLOv3 COCO, seen "
+               "from above: layer graph, cost per layer (MACs, parameters, activations), "
+               "memory footprint against the budget of the board, anchors, reading of a YOLO "
+               "output, and the VOC data used for training and evaluation.",
+    "materiel": "The accelerator on the Zynq SoC: the ARM / programmable logic split, the "
+                "single MAC engine and its tiling, the streaming alternative, and the chain "
+                "that checks each hand-over bit for bit, from float NumPy to the board.",
+    "maths": "The whole chain is rewritten by hand in pure NumPy, without PyTorch, OpenCV, "
+             "scikit-learn or devkit (ADR 0001). Each figure takes one building block, from "
+             "the convolution to the quantization, through its mathematical functions.",
+    "reseaux": "The level below \"Models\": each layer and each tensor of Tiny-YOLOv2 VOC and "
+               "Tiny-YOLOv3 COCO, taken from `python/yolo/models/specs.py`, up to following "
+               "one layer from float to the HLS kernel.",
+    "projet": "How the project was built: milestones and timeline (from the commits), "
+              "progress of the tasks, code volume, tests and dependencies between "
+              "milestones.",
 }
 
 
@@ -1617,14 +1617,14 @@ def _figure_cells():
         cells.append(md("\n".join([f"## {title}", "", FAMILY_INTROS.get(fam, ""), "", *toc])))
         for f, imgs in figs:
             lines = [f"### {f.task} — `{f.name}`", "", f.caption, "",
-                     f"- Source : `{f.source}`", f"- Régénérer : `{f.command}`", ""]
+                     f"- Source: `{f.source}`", f"- Regenerate: `{f.command}`", ""]
             for p in imgs:
                 lines += ([f"**{p.stem}**", ""] if len(imgs) > 1 else []) + [link(p), ""]
             cells.append(md("\n".join(lines)))
     orphans = [p for p in pngs if p not in owner]
     if orphans:
-        lines = ["## Autres figures", "",
-                 "PNG versionnés qu'aucune figure du registre `tools/figures/` ne produit.", ""]
+        lines = ["## Other figures", "",
+                 "Versioned PNG files that no figure of the `tools/figures/` registry produces.", ""]
         for p in orphans:
             lines += [f"**{p.relative_to(ROOT).as_posix()}**", "", link(p), ""]
         cells.append(md("\n".join(lines)))
@@ -1639,61 +1639,62 @@ def viewer():
         md("""\
         # Figures
 
-        Le projet expliqué en images (jalon M13) : l'architecture des réseaux et de
-        l'accélérateur, les résultats mesurés, la réimplémentation NumPy et l'histoire du
-        projet. Chaque figure est tracée par `tools/figures/` à partir de données du dépôt ;
-        aucun chiffre n'est saisi à la main.
+        The project explained in pictures (milestone M13): the architecture of the networks
+        and of the accelerator, the measured results, the NumPy reimplementation and the
+        history of the project. Each figure is plotted by `tools/figures/` from data of the
+        repository; no number is typed by hand.
 
-        **Lecture.** Une section par famille, ouverte par un paragraphe de contexte et la
-        liste de ses figures. Chaque figure donne sa tâche (`T13.x`, détaillée dans
-        [M13-figures.md](../docs/tasks/M13-figures.md)), ce qu'elle montre, la donnée
-        qu'elle lit et la commande qui la retrace. La même galerie existe en Markdown :
+        **Reading.** One section per family, opened by a paragraph of context and the list
+        of its figures. Each figure gives its task (`T13.x`, detailed in
+        [M13-figures.md](../docs/tasks/M13-figures.md)), what it shows, the data it reads
+        and the command that plots it again. The same gallery exists in Markdown:
         [results/figures.md](../results/figures.md).
 
-        **Affichage seul.** Les PNG versionnés (`results/figures/`, `docs/tasks/figures/`)
-        sont dans des cellules Markdown : rien à exécuter, dans VS Code comme sur GitHub.
-        Seule la dernière section, pour `build/`, demande un noyau local.
+        **Display only.** The versioned PNG files (`results/figures/`, `docs/tasks/figures/`)
+        are in Markdown cells: nothing to run, in VS Code as on GitHub. Only the last
+        section, for `build/`, needs a local kernel.
 
-        **Mise à jour.** `make figures` retrace les PNG, puis `make notebooks` régénère ce
-        notebook depuis le disque. Il est généré par `python -m tools.notebooks` : modifier
-        `tools/notebooks/gabarits.py:viewer`, pas ce fichier.
+        **Update.** `make figures` plots the PNG files again, then `make notebooks`
+        regenerates this notebook from the disk. It is generated by
+        `python -m tools.notebooks`: edit `tools/notebooks/gabarits.py:viewer`, not this
+        file.
         """),
         *_figure_cells(),
         md("""\
-        ## Figures non versionnées (`build/`, noyau local)
+        ## Unversioned figures (`build/`, local kernel)
 
-        Certaines figures ne sont pas publiées : celles calculées sur un sous-ensemble
-        d'images (règle M12, par exemple la sensibilité par couche) et les sorties des
-        notebooks d'entraînement et d'inférence. Elles restent dans `build/`, sur le PC qui
-        les a produites ; la cellule ci-dessous les affiche, avec un noyau local (pas Colab).
+        Some figures are not published: those computed on a subset of images (M12 rule, for
+        example the per-layer sensitivity) and the outputs of the training and inference
+        notebooks. They stay in `build/`, on the PC that produced them; the cell below shows
+        them, with a local kernel (not Colab).
 
-        - `DIRS` : dossiers parcourus, relatifs à la racine du dépôt ;
-        - `FILTER` : sous-chaîne du chemin pour ne garder que certaines images ;
-        - `WIDTH` : largeur d'affichage en pixels.
+        - `DIRS`: folders walked, relative to the repository root;
+        - `FILTER`: substring of the path to keep only some images;
+        - `WIDTH`: display width in pixels.
 
-        Les images s'affichent de la plus récente à la plus ancienne.
+        The images are shown from the most recent to the oldest.
         """),
         code(f"""\
-        DIRS   = {VIEWER_DIRS!r}  # relatifs à la racine du dépôt
-        FILTER = ''  # sous-chaîne du chemin (ex. 'balayage') ; '' : tout
-        WIDTH  = 900  # largeur d'affichage (px)
+        DIRS   = {VIEWER_DIRS!r}  # relative to the repository root
+        FILTER = ''  # substring of the path (e.g. 'balayage'); '': everything
+        WIDTH  = 900  # display width (px)
         """, tags=("parameters",)),
         code("""\
         from pathlib import Path
 
         from IPython.display import Image, Markdown, display
 
-        # Racine du dépôt : dossier courant ou un parent ; sur Colab, le clone des notebooks.
+        # Repository root: current folder or a parent; on Colab, the clone of the notebooks.
         CANDIDATES = (Path.cwd(), *Path.cwd().parents, Path("/content/EmbeddedComputervision"))
         ROOT = next((d for d in CANDIDATES if (d / "tools" / "figures").is_dir()), None)
         if ROOT is None:
-            raise SystemExit(f"dépôt introuvable depuis {Path.cwd()} : ouvrir le notebook avec "
-                             "un noyau local (les PNG sont sur le PC, pas sur Colab)")
-        print(f"dépôt : {ROOT}")
+            raise SystemExit(f"repository not found from {Path.cwd()}: open the notebook with "
+                             "a local kernel (the PNG files are on the PC, not on Colab)")
+        print(f"repository: {ROOT}")
         for d in DIRS:
             pngs = sorted((p for p in (ROOT / d).rglob("*.png") if FILTER in str(p)),
                           key=lambda p: -p.stat().st_mtime)
-            print(f"{d} : {len(pngs)} image(s)")
+            print(f"{d}: {len(pngs)} image(s)")
             if pngs:
                 display(Markdown(f"## `{d}` ({len(pngs)})"))
             for p in pngs:
@@ -1709,64 +1710,66 @@ ANALYSIS = "analyse_balayages.ipynb"  # hors registre modèle × jeu × rôle, c
 
 # (clé de tools.figures.balayages.PLOTS, titre, ce que montre la figure et comment la lire)
 ANALYSIS_SECTIONS = [
-    ("grilles", "1. Grille lot × sous-ensemble, jeu par jeu",
-     "Chaque case est un run : son score, puis ce score en pourcentage du meilleur run du "
-     "jeu (★). La couleur suit ce pourcentage, sur la même échelle pour tous les jeux : on "
-     "compare la *forme* des grilles malgré des mAP qui vont de 2 à 36. Une colonne « tout » "
-     "plus foncée que la colonne « 500 im. » veut dire que voir tout le split paie ; une "
-     "ligne « lot 32 » plus foncée, qu'un grand lot paie."),
-    ("classements", "2. Les jeux classent-ils les runs de la même façon ?",
-     "À gauche, le rang de chaque run dans chaque jeu (1 en haut) : une ligne plate en haut "
-     "est un run toujours bon. Couleur : le lot (clair 8, foncé 32) ; trait plein : tout le "
-     "split, tirets : 500 images. À droite, la corrélation de rangs de Spearman entre les "
-     "classements de deux jeux : 1, même ordre ; 0, aucun lien. Avec 6 runs, il faut "
-     "|ρ| ≥ 0,83 pour conclure à 5 % ; les mAP sur 50 images sont bruitées (règle M12)."),
-    ("effets", "3. Effets principaux : sous-ensemble et lot",
-     "À gauche, chaque flèche va du run à 500 images (creux) au run sur tout le split "
-     "(plein), à lot égal : une flèche vers la droite est un gain. À droite, le score "
-     "relatif par lot, un point par jeu, et la moyenne sur les jeux (losanges). À 600 "
-     "itérations, le lot fixe aussi le nombre d'images vues : lot et volume de données ne "
-     "se séparent pas dans cette grille."),
-    ("epoques", "4. Époques vues : voir plus d'images ou revoir les mêmes ?",
-     "L'axe horizontal compte les passages sur les données d'entraînement "
-     "(lot × itérations / images, échelle log). Les runs sur tout le split (pleins) restent "
-     "sous quelques époques ; ceux à 500 images (creux, zone grisée) revoient 10 à 38 fois "
-     "les mêmes images. Si le score montait avec les époques seules, les deux nuages "
-     "se prolongeraient ; un décrochage dans la zone grisée signe le surapprentissage."),
-    ("perte", "5. Perte finale face au score",
-     "Un panneau par jeu (échelles propres). ρ est la corrélation de rangs entre perte "
-     "finale et score : négative, la perte basse va avec le bon score ; proche de zéro ou "
-     "positive, la perte ne prédit pas la mAP. Les runs à 500 images (creux) ont souvent "
-     "les pertes les plus basses : ils ajustent un petit jeu, sans généraliser."),
-    ("courbes", "6. Courbes de perte",
-     "Perte d'entraînement lissée, une ligne par jeu (rangées) et par sous-ensemble "
-     "(colonnes), une couleur par lot. La zone grisée est le burn-in : le taux "
-     "d'apprentissage y monte de 0 à sa valeur, sur 500 des 600 itérations. Un run "
-     "entraîné lors d'une session précédente n'a pas de journal dans le notebook : il est "
-     "relu dans `build/notebooks/<jeu>/<modèle>/runs/<run>/loss.csv` après `make harvest` "
-     "(récolte du Drive), sinon marqué « sans journal »."),
-    ("composantes", "7. De quoi est faite la perte finale ?",
-     "Part de chaque terme de la perte YOLO dans les 50 dernières itérations journalisées : "
-     "coord (position et taille des boîtes), obj (confiance sur les objets), noobj "
-     "(confiance sur le fond), cls (classes). Le chiffre à droite est la perte totale. Une "
-     "part obj dominante dit que le réseau sait mal où sont les objets ; une part cls, "
-     "qu'il les trouve mais les nomme mal."),
-    ("classes", "8. AP par classe",
-     "AP@0,5 de chaque classe pour chaque run (runs triés du meilleur au moins bon). Les "
-     "cases grises sont des classes sans instance dans les 50 images évaluées : leur AP "
-     "n'existe pas, ce n'est pas un zéro. L'échelle de couleur est en racine carrée, pour "
-     "distinguer les AP de 1 à 10. Une ligne pâle sur toute sa longueur est une classe "
-     "qu'aucune configuration n'apprend en 600 itérations."),
-    ("publies", "9. Affinage face aux poids publiés",
-     "Meilleur run affiné, et les poids Darknet publiés (Tiny-YOLOv3 COCO, Tiny-YOLOv2 VOC) "
-     "lancés hors domaine sur les mêmes 50 images, chaque jeu à son échelle. Les poids "
-     "publiés ne sont évalués que sur les classes qui ont un équivalent dans leurs classes "
-     "(« n cl. », `MAPPINGS`) : leur score ne se compare au run affiné qu'à titre "
-     "indicatif. Un run affiné sous les poids publiés dit qu'il manque des itérations."),
-    ("cout", "10. Coût d'un run",
-     "Durée d'un run de 600 itérations sur le GPU Colab face à son score relatif. La durée "
-     "suit le lot (images traitées), pas le sous-ensemble. Durée : celle de la cellule, ou "
-     "la somme de la colonne `seconds` de `loss.csv` pour un run complété depuis `build/`."),
+    ("grilles", "1. Batch × subset grid, dataset by dataset",
+     "Each cell is a run: its score, then that score as a percentage of the best run of the "
+     "dataset (★). The colour follows that percentage, on the same scale for every dataset: "
+     "the *shape* of the grids compares despite mAP values from 2 to 36. An \"all\" column "
+     "darker than the \"500 im.\" column means that seeing the whole split pays; a darker "
+     "\"batch 32\" row, that a large batch pays."),
+    ("classements", "2. Do the datasets rank the runs the same way?",
+     "Left, the rank of each run in each dataset (1 at the top): a flat line at the top is "
+     "a run that is always good. Colour: the batch (light 8, dark 32); solid line: whole "
+     "split, dashes: 500 images. Right, the Spearman rank correlation between the rankings "
+     "of two datasets: 1, same order; 0, no link. With 6 runs, |ρ| ≥ 0.83 is needed to "
+     "conclude at 5 %; the mAP on 50 images are noisy (M12 rule)."),
+    ("effets", "3. Main effects: subset and batch",
+     "Left, each arrow goes from the run on 500 images (hollow) to the run on the whole "
+     "split (filled), at equal batch: an arrow to the right is a gain. Right, the relative "
+     "score per batch, one point per dataset, and the mean over the datasets (diamonds). At "
+     "600 iterations, the batch also sets the number of images seen: batch and data volume "
+     "do not separate in this grid."),
+    ("epoques", "4. Epochs seen: more images, or the same ones again?",
+     "The horizontal axis counts the passes over the training data "
+     "(batch × iterations / images, log scale). The runs on the whole split (filled) stay "
+     "under a few epochs; those on 500 images (hollow, grey area) see the same images 10 to "
+     "38 times. If the score rose with the epochs alone, the two clouds would continue each "
+     "other; a drop in the grey area is the sign of overfitting."),
+    ("perte", "5. Final loss against the score",
+     "One panel per dataset (own scales). ρ is the rank correlation between final loss and "
+     "score: negative, a low loss goes with a good score; close to zero or positive, the "
+     "loss does not predict the mAP. The runs on 500 images (hollow) often have the lowest "
+     "losses: they fit a small set, without generalizing."),
+    ("courbes", "6. Loss curves",
+     "Smoothed training loss, one line per dataset (rows) and per subset (columns), one "
+     "colour per batch. The grey area is the burn-in: the learning rate rises there from 0 "
+     "to its value, over 500 of the 600 iterations. A run trained in an earlier session has "
+     "no log in the notebook: it is read from "
+     "`build/notebooks/<dataset>/<model>/runs/<run>/loss.csv` after `make harvest` (harvest "
+     "from the Drive), otherwise marked \"no log\"."),
+    ("composantes", "7. What is the final loss made of?",
+     "Share of each term of the YOLO loss over the last 50 logged iterations: coord "
+     "(position and size of the boxes), obj (confidence on the objects), noobj (confidence "
+     "on the background), cls (classes). The number on the right is the total loss. A "
+     "dominant obj share says that the network hardly knows where the objects are; a cls "
+     "share, that it finds them but names them badly."),
+    ("classes", "8. AP per class",
+     "AP@0.5 of each class for each run (runs sorted from best to worst). The grey cells "
+     "are classes with no instance in the 50 evaluated images: their AP does not exist, it "
+     "is not a zero. The colour scale is a square root, to tell apart the AP from 1 to 10. A "
+     "pale line over its whole length is a class that no configuration learns in 600 "
+     "iterations."),
+    ("publies", "9. Fine-tuning against the published weights",
+     "Best fine-tuned run, and the published Darknet weights (Tiny-YOLOv3 COCO, Tiny-YOLOv2 "
+     "VOC) run out of domain on the same 50 images, each dataset at its scale. The published "
+     "weights are only evaluated on the classes that have an equivalent in their classes "
+     "(\"n cl.\", `MAPPINGS`): their score compares with the fine-tuned run as an "
+     "indication only. A fine-tuned run below the published weights says that iterations "
+     "are missing."),
+    ("cout", "10. Cost of a run",
+     "Duration of a 600-iteration run on the Colab GPU against its relative score. The "
+     "duration follows the batch (images processed), not the subset. Duration: the one of "
+     "the cell, or the sum of the `seconds` column of `loss.csv` for a run completed from "
+     "`build/`."),
 ]
 
 
@@ -1780,38 +1783,38 @@ def analysis():
     links = ", ".join(f"[{nb.dataset}]({nb.path.as_posix()})" for nb in sweeps)
     cells = [
         md(f"""\
-        # Analyse des balayages lot × sous-ensemble, tous jeux
+        # Analysis of the batch × subset sweeps, all datasets
 
-        Les notebooks `<modèle>_sweep` entraînent six runs par jeu (lots 8, 16 et 32 ×
-        500 premières images ou tout le split, 600 itérations, init COCO) et les comparent
-        jeu par jeu. Ce notebook les compare **entre jeux** : quelle configuration gagne,
-        de façon constante ou non, et pourquoi (images vues, surapprentissage, dynamique et
-        composantes de la perte, classes apprises), puis l'écart aux poids publiés.
+        The `<model>_sweep` notebooks train six runs per dataset (batches 8, 16 and 32 ×
+        first 500 images or the whole split, 600 iterations, COCO init) and compare them
+        dataset by dataset. This notebook compares them **across datasets**: which
+        configuration wins, consistently or not, and why (images seen, overfitting, dynamics
+        and components of the loss, classes learnt), then the gap to the published weights.
 
-        **Source.** Les sorties versionnées des balayages ({links}) et des inférences des
-        poids publiés (`tiny-yolov3-coco_infer`, `tiny-yolov2-voc_infer`), relues par
-        `tools/notebooks/balayages.py` ; les figures viennent de
-        `tools/figures/balayages.py`. Rien n'est recalculé ni saisi à la main : un
-        balayage relancé et versionné se retrouve ici après `Run All`. Ni GPU ni données.
-        Les runs sans journal dans leur notebook (session Colab précédente) sont complétés
-        par leur `loss.csv` sous `build/notebooks/`, rapatrié du Drive par `make harvest`.
+        **Source.** The versioned outputs of the sweeps ({links}) and of the inferences of
+        the published weights (`tiny-yolov3-coco_infer`, `tiny-yolov2-voc_infer`), read by
+        `tools/notebooks/balayages.py`; the figures come from `tools/figures/balayages.py`.
+        Nothing is recomputed or typed by hand: a sweep run again and committed shows up
+        here after `Run All`. No GPU, no data. The runs with no log in their notebook
+        (earlier Colab session) are completed by their `loss.csv` under `build/notebooks/`,
+        brought back from the Drive by `make harvest`.
 
-        **Prudence.** Palier R : scores sur les **50 premières images** d'évaluation, non
-        publiables (règles de M12) ; une classe à une ou deux instances y saute de 0 à
-        100. **Score** = mAP@0,5 du jeu : mAP 11 points, sauf FLIR (métrique COCO) dont on
-        prend l'AP50 ; **score relatif** = score / meilleur run du jeu. Contexte et tables :
-        [resultats-balayages.md](../docs/tasks/resultats-balayages.md).
+        **Caution.** Tier R: scores on the **first 50 evaluation images**, not publishable
+        (M12 rules); a class with one or two instances jumps there from 0 to 100.
+        **Score** = mAP@0.5 of the dataset: 11-point mAP, except FLIR (COCO metric), whose
+        AP50 is taken; **relative score** = score / best run of the dataset. Context and
+        tables: [resultats-balayages.md](../docs/tasks/resultats-balayages.md).
 
-        Généré par `python -m tools.notebooks` : modifier
-        `tools/notebooks/gabarits.py:analysis`, pas ce fichier.
+        Generated by `python -m tools.notebooks`: edit
+        `tools/notebooks/gabarits.py:analysis`, not this file.
         """),
-        md("## Paramètres"),
+        md("## Parameters"),
         code("""\
-        DATASETS = None  # jeux analysés (ex. ['voc', 'kitti']) ; None : tous les balayages exécutés
-        OUT      = 'build/notebooks/balayages'  # PNG et données (relatif à la racine du dépôt)
-        SMOOTH   = 25  # lissage des courbes de perte (itérations)
+        DATASETS = None  # datasets analysed (e.g. ['voc', 'kitti']); None: every executed sweep
+        OUT      = 'build/notebooks/balayages'  # PNG files and data (relative to the repository root)
+        SMOOTH   = 25  # smoothing of the loss curves (iterations)
         """, tags=("parameters",)),
-        md("## Environnement"),
+        md("## Environment"),
         code("""\
         import os
         import sys
@@ -1822,7 +1825,7 @@ def analysis():
         CANDIDATES = (Path.cwd(), *Path.cwd().parents, Path("/content/EmbeddedComputervision"))
         ROOT = next((d for d in CANDIDATES if (d / "tools" / "notebooks").is_dir()), None)
         if ROOT is None:
-            raise SystemExit(f"dépôt introuvable depuis {Path.cwd()}")
+            raise SystemExit(f"repository not found from {Path.cwd()}")
         os.chdir(ROOT)
         sys.path[:0] = [str(ROOT), str(ROOT / "python")]
 
@@ -1831,7 +1834,7 @@ def analysis():
 
         data, pending = B.load_all(datasets=DATASETS)
         if not data:
-            raise SystemExit("aucun balayage exécuté dans notebooks/*/*_sweep.ipynb")
+            raise SystemExit("no executed sweep in notebooks/*/*_sweep.ipynb")
         OBS = B.observations(data)
 
 
@@ -1840,19 +1843,19 @@ def analysis():
                 display(Image(data=Path(p).read_bytes(), format="png"))
 
 
-        print(f"dépôt : {ROOT}")
+        print(f"repository: {ROOT}")
         for d in data.values():
-            print(f"  {d['label']:10s} {len(d['runs'])} runs, {d['metric']}, révision {d['rev']}, "
+            print(f"  {d['label']:10s} {len(d['runs'])} runs, {d['metric']}, revision {d['rev']}, "
                   f"{d['notebook']}")
         for ds, p in pending.items():
-            print(f"  {ds:10s} pas encore exécuté ({p})")
+            print(f"  {ds:10s} not executed yet ({p})")
         """),
         md("""\
-        ## Vue d'ensemble
+        ## Overview
 
-        Un jeu par ligne : meilleur et pire run, rapport entre les deux, plage des pertes
-        finales et meilleur poids publié. Puis tous les runs, du meilleur au moins bon
-        dans chaque jeu.
+        One dataset per row: best and worst run, ratio between the two, range of the final
+        losses and best published weights. Then every run, from best to worst in each
+        dataset.
         """),
         code("""\
         display(Markdown(B.summary_table(data)))
@@ -1865,19 +1868,19 @@ def analysis():
         cells += [md(f"## {title}\n\n{text}"),
                   code(f"""\
                   show({call})
-                  display(Markdown("**Constat.** " + OBS[{key!r}]))
+                  display(Markdown("**Finding.** " + OBS[{key!r}]))
                   """)]
     cells += [
         md("""\
         ## Conclusions
 
-        Calculées sur les balayages chargés ; elles se mettent à jour avec eux.
+        Computed on the loaded sweeps; they update with them.
         """),
         code("""\
         display(Markdown(B.conclusions(data, pending)))
-        print("commande équivalente :")
+        print("equivalent command:")
         print(f"  python -m tools.notebooks.balayages --runs --json {OUT}/balayages.json")
-        print(f"  python -m tools.figures balayages  # PNG dans docs/tasks/figures/resultats/")
+        print(f"  python -m tools.figures balayages  # PNG files in docs/tasks/figures/resultats/")
         """),
     ]
     return notebook(cells)

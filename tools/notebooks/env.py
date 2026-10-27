@@ -90,21 +90,21 @@ def prepare(dataset, weights=(), cfg=None, data_root=None, in_colab=False, hint=
         where = data_root or DATA_MARKERS[dataset]
         cmd = "tools/get_voc.sh" if dataset == "voc" else f"tools/get_datasets.sh {dataset}"
         if dataset in REGISTRATION:
-            cmd += " (inscription)"
-        cmd += (f", ou tools/get_datasets.sh pull {dataset} (archive sur Drive, "
+            cmd += " (registration)"
+        cmd += (f", or tools/get_datasets.sh pull {dataset} (archive on the Drive, "
                 "docs/tasks/donnees-drive.md)")
-        missing.append(f"données {dataset} absentes ({where}) : {cmd}")
+        missing.append(f"data of {dataset} missing ({where}): {cmd}")
     for w in weights:
         if not (ROOT / w).exists():
             how = (UL_WEIGHTS_HINT if w.startswith(UL_WEIGHTS)
                    else "tools/get_weights.sh" if w.startswith("weights/") else hint)
-            missing.append(f"poids {w} absents : {how}")
+            missing.append(f"weights {w} missing: {how}")
     if cfg and str(cfg).endswith(".cfg") and not restore_cfg(cfg):
-        missing.append(f"cfg {cfg} absente : {hint}")
+        missing.append(f"cfg {cfg} missing: {hint}")
     if missing:
-        raise Prerequis("à lancer avant ce notebook :\n  " + "\n  ".join(missing))
-    print(f"données {dataset} : {data_root or DATA_MARKERS[dataset]} ; "
-          f"poids : {', '.join(weights) or '—'}")
+        raise Prerequis("to run before this notebook:\n  " + "\n  ".join(missing))
+    print(f"data of {dataset}: {data_root or DATA_MARKERS[dataset]}; "
+          f"weights: {', '.join(weights) or '—'}")
 
 
 def check_device(device):
@@ -116,7 +116,7 @@ def check_device(device):
     if device == "gpu":
         import cupy
 
-        print(f"GPU : {cupy.cuda.runtime.getDeviceCount()} visible(s), CuPy {cupy.__version__}")
+        print(f"GPU: {cupy.cuda.runtime.getDeviceCount()} visible, CuPy {cupy.__version__}")
         backend.use("cpu")
 
 
@@ -128,7 +128,7 @@ def trace(device):
                          capture_output=True, text=True).stdout.strip() or "?"
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
                            capture_output=True, text=True).stdout.strip()
-    print(f"dépôt {ROOT} @ {rev}{' (modifié)' if dirty else ''} ; Python "
-          f"{platform.python_version()} ; NumPy {np.__version__} ; backend {device}")
+    print(f"repository {ROOT} @ {rev}{' (modified)' if dirty else ''}; Python "
+          f"{platform.python_version()}; NumPy {np.__version__}; backend {device}")
     return {"rev": rev, "dirty": bool(dirty), "python": sys.version.split()[0],
             "numpy": np.__version__, "device": device}

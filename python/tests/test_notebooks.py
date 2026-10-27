@@ -71,12 +71,12 @@ def test_generation_idempotente_sans_sorties(tmp_path):
 def test_structure_fixe():
     for nb in NOTEBOOKS.values():
         cells = render(nb)["cells"]
-        title = (f"# Statistiques de {nb.dataset}" if nb.role == "stats"
-                 else f"# {nb.model} sur {nb.dataset}")
+        title = (f"# Statistics of {nb.dataset}" if nb.role == "stats"
+                 else f"# {nb.model} on {nb.dataset}")
         assert cells[0]["source"][0].startswith(title)
         assert cells[2]["metadata"] == {"tags": ["parameters"]}
         assert "env.prepare(" in "".join(cells[4]["source"])
-        assert cells[-2]["source"] == ["## Résumé"]
+        assert cells[-2]["source"] == ["## Summary"]
         p = _params(render(nb))
         if nb.role == "stats":  # M16 : sans modèle ni poids
             for k in ("DATASET", "SPLITS", "SIZE", "RESIZE", "SAMPLE", "GALLERY", "SEED"):
@@ -276,7 +276,7 @@ def test_un_notebook_stats_par_jeu():
         assert stats == [f"{ds}/{ds}_stats"], ds
         first = next(k for k in keys if NOTEBOOKS[k].dataset == ds)
         assert first == stats[0]
-        assert prerequis(NOTEBOOKS[stats[0]]) == {"données": DATA_MARKERS[ds]}
+        assert prerequis(NOTEBOOKS[stats[0]]) == {"data": DATA_MARKERS[ds]}
 
 
 def test_stats_appelle_data_stats_option_par_option():
@@ -627,7 +627,7 @@ def _missing(nb):
     if nb.trains:
         req.pop("cfg", None)
     if nb.finetuned:  # poids : un run de _train ou _sweep (runs.find_runs)
-        w = req.pop("poids")
+        w = req.pop("weights")
         if not runs.find_runs(nb.train_dir):
             return [w]
     return [v for v in req.values() if not (ROOT / v).exists()]

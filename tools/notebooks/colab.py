@@ -84,8 +84,8 @@ def kaggle_credentials(drive_dir=DRIVE_DIR):
             for k in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
                 os.environ[k] = userdata.get(k)
     except Exception as e:  # pas sur Colab, secret absent / non partagé, ou noyau sous VS Code
-        print(f"jeton Kaggle indisponible ({e.__class__.__name__}) : mettre le jeton KGAT_… "
-              f"(kaggle.com, Settings, API Tokens) dans {drive or home}/access_token")
+        print(f"Kaggle token unavailable ({e.__class__.__name__}): put the KGAT_… token "
+              f"(kaggle.com, Settings, API Tokens) in {drive or home}/access_token")
         return False
     return True
 
@@ -111,7 +111,7 @@ def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True,
     Lève RuntimeError avec la marche à suivre si aucune voie n'aboutit.
     """
     if _check(dataset, data_dir):
-        print(f"{dataset} : prêt")
+        print(f"{dataset}: ready")
         return "ready"
     archives = Path(drive_dir) / "data" if drive_dir else None
     if archives and (archives / f"{dataset}.tar").is_file():
@@ -128,8 +128,8 @@ def prepare_data(dataset, drive_dir=DRIVE_DIR, data_dir=None, download=True,
         if _sh(DOWNLOAD[dataset], data_dir) == 0 and _check(dataset, data_dir):
             return "download"
     raise RuntimeError(
-        f"{dataset} introuvable. Sur le PC qui l'a : tools/get_datasets.sh push {dataset} "
-        f"(pack {dataset}, puis rclone vers {remote or DRIVE_REMOTE}) ; voir "
+        f"{dataset} not found. On the PC that has it: tools/get_datasets.sh push {dataset} "
+        f"(pack {dataset}, then rclone to {remote or DRIVE_REMOTE}); see "
         f"docs/tasks/donnees-drive.md.")
 
 
