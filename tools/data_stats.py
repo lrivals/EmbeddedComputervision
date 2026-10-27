@@ -57,6 +57,9 @@ CENTER_BINS = 32
 K_RANGE = tuple(range(1, 13))
 BATCH = 64                 # images par appel de build_targets
 SUSPECTS = 10
+# Splits lus sur les annotations seules : leurs images ne sont pas téléchargées (COCO
+# train2017, 18 Go ; T16.13). `images` et la galerie ne tirent que des images présentes.
+ANNOTATIONS_ONLY = {"coco": {"train2017"}}
 
 # Bacs fixes des histogrammes de stats.json (les figures les relisent tels quels).
 BINS = {
@@ -643,6 +646,13 @@ def pixel_stats(samples, sample, seed):
                        "input_scale": INPUT_SCALE}}
 
 
+def with_pixels(samples, dataset, splits):
+    """`samples` sans les images absentes si un des `splits` est lu sur les annotations seules."""
+    if not set(splits) & ANNOTATIONS_ONLY.get(dataset, set()):
+        return samples
+    return [s for s in samples if Path(s["image"]).exists()]
+
+
 def images(samples, ctx):
     wh = np.array([(s["width"], s["height"]) for s in samples], np.int64).reshape(-1, 2)
     res = Counter(map(tuple, wh.tolist()))
@@ -653,8 +663,9 @@ def images(samples, ctx):
                                           int(wh[:, 1].max())] if len(wh) else [],
            "aspect": _hist(np.log2(wh[:, 0] / wh[:, 1]), BINS["image_aspect"]) if len(wh) else [],
            "square": _frac(wh[:, 0] == wh[:, 1]) if len(wh) else 0.0}
-    if ctx.sample:
-        out["pixels"] = pixel_stats(samples, ctx.sample, ctx.seed)
+    pool = with_pixels(samples, ctx.dataset, ctx.splits) if ctx.sample else []
+    if pool:
+        out["pixels"] = pixel_stats(pool, ctx.sample, ctx.seed)
     return out
 
 
@@ -1012,6 +1023,7 @@ def gallery(stats, parts, out, n, seed):
     classes = D.DATASETS[stats["dataset"]].classes
     out = Path(out)
     index = {}
+    parts = {sp: with_pixels(v, stats["dataset"], [sp]) for sp, v in parts.items()}
     for sp, samples in parts.items():
         tag = sp.replace(":", "-").replace(",", "+")
         index[sp] = [_save_drawn(samples[i], classes, out / "galerie" / tag

@@ -459,10 +459,13 @@ def test_archive_garde_une_execution_apres_changement_de_gabarit(tmp_path, capsy
     p.write_text(archived)
     assert main(["--check", "--out", str(tmp_path)]) == 1  # empreinte changée : refusé
     assert main(["voc/tiny-yolov2-voc_infer", "--archive", "--out", str(tmp_path)]) == 1
+    # --stale: a complete execution of the older template is frozen as it is
+    assert main(["voc/tiny-yolov2-voc_infer", "--archive", "--stale",
+                 "--out", str(tmp_path)]) == 0
     capsys.readouterr()
     from tools.notebooks.__main__ import digest
-    (tmp_path / "archives.json").write_text(json.dumps(
-        {"voc/tiny-yolov2-voc_infer.ipynb": digest(archived)}))
+    assert json.loads((tmp_path / "archives.json").read_text()) == {
+        "voc/tiny-yolov2-voc_infer.ipynb": digest(archived)}
     assert main(["--check", "--out", str(tmp_path)]) == 0
     assert "1 archivés" in capsys.readouterr().out
     main(["all", "--out", str(tmp_path)])

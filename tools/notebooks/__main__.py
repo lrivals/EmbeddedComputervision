@@ -1,5 +1,6 @@
 """python -m tools.notebooks <nom|jeu|rôle|all> … ; --list ; --check (make ci) ;
---archive <cibles> (fige des exécutions avant un changement de gabarit) ; --force."""
+--archive <cibles> (fige des exécutions avant un changement de gabarit ; --stale : après) ;
+--force."""
 
 import argparse
 import hashlib
@@ -190,6 +191,10 @@ def main(argv=None):
     ap.add_argument("--archive", action="store_true",
                     help="fige les cibles exécutées sans erreur (archives.json) : gardées et "
                     "admises par --check après un changement de gabarit")
+    ap.add_argument("--stale", action="store_true",
+                    help="avec --archive : fige aussi une exécution complète et sans erreur "
+                    "d'un gabarit antérieur (oubliée avant le changement de gabarit ; vérifier "
+                    "qu'elle n'a pas été retouchée à la main)")
     ap.add_argument("--force", action="store_true",
                     help="réécrit les cibles même exécutées ou archivées (archive retirée)")
     ap.add_argument("--out", type=Path, default=NB_DIR, help="dossier des notebooks")
@@ -226,14 +231,20 @@ def main(argv=None):
         return 0
     if not args.targets:
         ap.error("préciser un notebook, un jeu, un rôle ou all (voir --list)")
-    nbs = select(args.targets)
+    # Notebooks hors registre (VIEWER, ANALYSIS…), désignés par leur nom de fichier : --archive.
+    extras = [t for t in args.targets if t in (VIEWER, ANALYSIS, STATS_ANALYSIS, EXPLAIN)
+              or f"{t}.ipynb" in (VIEWER, ANALYSIS, STATS_ANALYSIS, EXPLAIN)]
+    nbs = select([t for t in args.targets if t not in extras]) if len(extras) < len(
+        args.targets) else []
     if args.archive:
         files = generate(nbs, args.out)
         bad = 0
-        for nb in nbs:
-            p = Path(args.out) / nb.path
+        for p in [Path(args.out) / nb.path for nb in nbs] + [
+                Path(args.out) / (t if t.endswith(".ipynb") else f"{t}.ipynb") for t in extras]:
             st = state(p, files[p], archives, rel(p))
-            if st in ("exécuté", "archivé"):
+            stale = (args.stale and st == "diffère du générateur"
+                     and executed_ok(p.read_text()) is None)
+            if st in ("exécuté", "archivé") or stale:
                 archives[rel(p)] = digest(p.read_text())
                 print(f"  archivé  {_rel(p)}")
             else:
