@@ -269,3 +269,24 @@ tiny-yolov4-coco integer on prewid `lab`, operating point 0.1 FPPI (threshold 0.
 
 Monitor rows pending: T29.1 (`tools/ood_monitor.py compare`), T39.1 (`tools/failure_prediction.py`) and M40, at the same alarm rate; pass their per-image alarms with `--flags`.
 <!-- /m27:unflagged-prewid-lab-tiny-yolov4-coco -->
+
+<!-- m27:events-mot17-train -->
+## Dreaded event on video: mot17 train (T27.4)
+
+tiny-yolov4-coco on mot17 `train`, track mode, persons ≥ 30 px, operating point 0.1 FPPI per stage. Frame rate **14, 25, 30 frames/s by sequence** (seqinfo.ini): 5316 frames = 3.6 min of video in 7 runs of consecutive frames (a gap in the frame numbers ends a run); presence 100 % of the frames. Per-frame miss rate over the person-frames: float 78.72 %, integer 80.48 %.
+
+| Stage | N | Events (miss runs ≥ N) | Episodes ≥ N frames | Events / h | Independent / h | Measured / independent |
+|---|---|---|---|---|---|---|
+| float | 1 | 2677 | 552 | 4.5e+04 | 3.2e+05 | 0.141 |
+| float | 2 | 1938 | 546 | 3.26e+04 | 2.5e+05 | 0.13 |
+| float | 3 | 1608 | 544 | 2.7e+04 | 1.96e+05 | 0.138 |
+| float | 5 | 1242 | 531 | 2.09e+04 | 1.2e+05 | 0.174 |
+| float | 10 | 868 | 511 | 1.46e+04 | 3.55e+04 | 0.411 |
+| integer | 1 | 2847 | 552 | 4.79e+04 | 3e+05 | 0.159 |
+| integer | 2 | 2038 | 546 | 3.43e+04 | 2.41e+05 | 0.142 |
+| integer | 3 | 1648 | 544 | 2.77e+04 | 1.93e+05 | 0.144 |
+| integer | 5 | 1266 | 531 | 2.13e+04 | 1.24e+05 | 0.172 |
+| integer | 10 | 869 | 511 | 1.46e+04 | 4.07e+04 | 0.359 |
+
+Runs used: MOT17-02 1-600, MOT17-04 1-1050, MOT17-05 1-837, MOT17-09 1-525, MOT17-10 1-654, MOT17-11 1-900, MOT17-13 1-750 (runs of at least 10 frames).
+<!-- /m27:events-mot17-train -->

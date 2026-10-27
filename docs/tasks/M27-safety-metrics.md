@@ -150,7 +150,7 @@ $P unflagged --dataset prewid --split lab --net tiny-yolov4-coco \
   (`infer --dataset exdark --split test --net tiny-yolov4-coco`, then `report`; the
   `People` class maps to `person`).
 
-### [ ] T27.4 — Dreaded event on video
+### [x] T27.4 — Dreaded event on video
 - **Spec**: §8.3 · **Depends on**: T27.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/dreaded_event.py`; a video set with persons (MOT17 or MOT20 train
   sequences, loader in `python/yolo/data/datasets.py`); `results/person_safety.md` section
@@ -168,9 +168,17 @@ $P unflagged --dataset prewid --split lab --net tiny-yolov4-coco \
   (one 3,000-frame run, 10 frames/s **assumed**, PREWID publishes no rate): per-frame miss
   9.1 % (integer); runs of ≥ 5 missed frames 132 per hour of video, 1,240 times the
   independent prediction; `test` gives the same pattern on its short runs.
-- **Pending**: MOT17 train (not downloaded, 5.5 GB): `tools/get_datasets.sh mot17`, then
-  `person_safety.py infer --dataset mot17 --split train` and `dreaded_event.py --dataset
-  mot17 --write` (fps from the data).
+- **Done** (2026-10-27, MOT17 train): `tools/get_datasets.sh mot17` (5.5 GB, 3 min),
+  `person_safety.py infer --dataset mot17 --split train --jobs 12` (5,316 frames, ≈ 12
+  min), `dreaded_event.py --dataset mot17 --write` (59 s); section `events-mot17-train` of
+  [results/person_safety.md](../../results/person_safety.md). The seven sequences run at
+  14, 25 or 30 frames/s: `dreaded_event.py` now sums each frame's own duration (it wanted a
+  single rate). YOLOv4-tiny at 0.1 FPPI misses 78.7 % (float) / 80.5 % (integer) of the
+  person-frames of these crowded street scenes (track mode, persons ≥ 30 px, 3.6 min of
+  video). With misses that frequent, the measured runs of ≥ N missed frames are 0.13-0.41
+  times the independent prediction (N = 1…10, rising with N): the misses merge into fewer,
+  longer runs. PREWID showed the other side (rare misses, 1,240 times more ≥ 5-frame runs
+  than predicted); both say the per-frame rate alone does not give the event rate.
 
 ### [x] T27.5 — From per-image errors to failures per hour
 - **Spec**: — · **Depends on**: T27.2, T27.4 · **Runs on**: PC · **Size**: S

@@ -67,7 +67,6 @@ GPU (T12.11-e).
 | [T25.8](M25-dependability.md) | faults injected on video, temporal coherence | video | unmeasured | — | T25.6, T29.3 |
 | [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py infer --dataset crowdhuman --split val` for tiny-yolov3-crowdhuman, v3-coco, v4-coco, then `report --write` | CrowdHuman val 4,370 | ≈ 25 min *(est.)* | float + int 0.11 s/image with 20 jobs (measured on PREWID, 2026-10-26): 3 × 4,370 × 0.11 s | T15.14, CrowdHuman data |
 | [T27.3](M27-safety-metrics.md) | `tools/person_safety.py infer --degrade all`, then `degrade-report --write`; ExDark `--dataset exdark` | CrowdHuman val, ExDark test | ≈ 2.5 h *(est.)* | 18 × 4,370 × 0.11 s (float + int, 20 jobs, measured on PREWID) | T27.1, CrowdHuman data |
-| [T27.4](M27-safety-metrics.md) | `tools/get_datasets.sh mot17`, `person_safety.py infer --dataset mot17 --split train`, `dreaded_event.py --dataset mot17 --write` | ≈ 5,300 frames (MOT17 train) | ≈ 10 min *(est.)* | 5,300 × 0.11 s (float + int, 20 jobs) | MOT17 download |
 | [T38.8-T38.10](M38-prewid.md) float, int | the M27 commands with `--net <T38.7 cfg> --weights <ckpt>` (`person_safety.py infer`, `--degrade all`, grayscale variant, `dreaded_event.py`) | PREWID test 592, lab 3,000 | ≈ 30 min *(est.)* | measured 2026-10-26 with v4-tiny: test 592 + lab 3,000 + 18 degradations × 592 in ≈ 25 min (float + int, 0.11 s/image, 20 jobs) | T38.7 |
 | [T39.0, T39.1](M39-failure-prediction.md) | `tools/failure_labels.py label --net <crowdhuman cfg> --weights … --calib … --set crowdhuman:val --conf <T27.2>`; same for `prewid:test` and `coco:val2017` (all persons, no `--n`) at the T27.2 point; then `tools/failure_labels.py report`, `tools/failure_prediction.py fit` and `eval --write`, `tools/ood_monitor.py compare --labels … --failure … --write` | CrowdHuman val 4,370, PREWID test 592, COCO val2017 ≈ 2,700 person images | ≈ 15-20 min *(est.)* | labels measured 2026-10-26: 0.11 s/image (500 COCO in 55 s, 592 PREWID in 70 s, 12 jobs); head fit ≈ 10 s | T27.2, CrowdHuman data and weights (T15.14) |
 | [T39.4](M39-failure-prediction.md) | `tools/failure_prediction.py calib --labels … --smoothed <labels of the smoothed detector> --write` | same sets | ≈ 5 min *(est.)* | one labelling pass of the smoothed detector | T39.0 at T27.2, label-smoothing fine-tune (Colab row) |
@@ -143,7 +142,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T11.6](M11-jeux-de-donnees.md), T25.6, T27 | CrowdHuman to the PC (`tools/get_datasets.sh pull crowdhuman`) | 11 GB | unmeasured | — |
 | [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
 | [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | T32.1 for trashnet |
-| [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 | to check | unmeasured | — |
 
 ## Totals and order
 

@@ -153,7 +153,8 @@ def analyse(samples, dets, det_class, thr, fps, min_height=MIN_HEIGHT, max_n=MAX
     eps = episodes(runs, reported, min_height, track_mode)
     events, dangerous, (k, u) = count_events(eps, max_n)
     p = k / u if u else 0.0
-    hours = len(samples) / fps / 3600.0
+    # Each frame lasts 1 / its own rate (MOT17: 14, 25 or 30 frames/s per sequence).
+    hours = sum(1.0 / s.get("fps", fps) for s in samples) / 3600.0
     present = sum(1 for s in samples if eligible(s, min_height).any())
     return {
         "mode": "track" if track_mode else "frame", "thr": thr, "fps": fps,
@@ -191,13 +192,14 @@ def main(argv=None):
 
     split = args.split or datasets.info(args.dataset).test
     samples = datasets.load(args.dataset, args.data_root, split)
-    fps, fps_source = args.fps, "argument (assumption)"
+    fps, fps_source, given = args.fps, "argument (assumption)", []
     if fps is None:
-        given = {s["fps"] for s in samples if "fps" in s}
-        if len(given) != 1:
+        given = sorted({float(s["fps"]) for s in samples if "fps" in s})
+        if not samples or any("fps" not in s for s in samples):
             raise SystemExit(f"{args.dataset}: no frame rate in the data, pass --fps "
                              "(written as an assumption)")
-        fps, fps_source = float(given.pop()), "seqinfo.ini"
+        # One rate per sequence (seqinfo.ini): `analyse` sums the frame durations.
+        fps, fps_source = (given[0] if len(given) == 1 else None), "seqinfo.ini"
     rows, fn_rate = [], {}
     for st in args.stages.split(","):
         path = P.dets_path(args.dataset, split, args.net, st, None, args.out)
@@ -234,7 +236,10 @@ def main(argv=None):
     body = [f"{args.net} on {args.dataset} `{split}`, {last['mode']} mode, persons ≥ "
             f"{args.min_height:g} px, operating point "
             + (f"{args.fppi} FPPI per stage" if args.thr is None else f"threshold {args.thr}")
-            + f". Frame rate **{fps:g} frames/s** ({fps_source}): {last['frames']} frames = "
+            + ". Frame rate **"
+            + (f"{fps:g} frames/s" if fps else f"{', '.join(f'{v:g}' for v in given)} frames/s "
+               "by sequence")
+            + f"** ({fps_source}): {last['frames']} frames = "
             f"{last['hours'] * 60:.1f} min of video in {len(last['runs'])} runs of consecutive "
             "frames (a gap in the frame numbers ends a run); "
             f"presence {100 * last['presence']:.0f} % of the "
