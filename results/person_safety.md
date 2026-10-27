@@ -290,3 +290,118 @@ tiny-yolov4-coco on mot17 `train`, track mode, persons ≥ 30 px, operating poin
 
 Runs used: MOT17-02 1-600, MOT17-04 1-1050, MOT17-05 1-837, MOT17-09 1-525, MOT17-10 1-654, MOT17-11 1-900, MOT17-13 1-750 (runs of at least 10 frames).
 <!-- /m27:events-mot17-train -->
+
+<!-- m27:conformal-prewid-test-tiny-yolov4-coco -->
+## Conformal person threshold: tiny-yolov4-coco, prewid test (T29.2)
+
+tiny-yolov4-coco on prewid `test` (592 images): person score threshold calibrated on one half for a target miss rate α, checked on the other half, over 20 random splits; halves made of blocks of 25 consecutive frames sent to one side at random, so neighbouring frames do not leak across. A person is missed when the greedy VOC matching gives it no detection above the threshold (the miss of R@0.1). **Per person**: split conformal, bound k / (n + 1) with k = ⌊α (n + 1)⌋ and in brackets the 5-95 % range of Beta(k, n + 1 − k), the spread a calibration set of n persons should give; it assumes the persons exchangeable, which the persons of one frame are not. **Per image**: conformal risk control (Angelopoulos 2022) on the share of each image's persons missed, exchangeable images only. Values: mean [min, max] over the splits; miss in %. **Box margin**: conformal (1 − α) quantile of the relative enlargement that makes the matched detection contain the person, and its coverage on the test half.
+
+| Stage | α | Method | Splits with a threshold | Threshold | Test miss % | Bound (Beta 5-95 %) | Splits with miss ≤ α | Test FPPI | Box margin | Box coverage % |
+|---|---|---|---|---|---|---|---|---|---|---|
+| float | 5.0 | per person (split conformal) | 11 / 20 | 0.0293 [0.002494, 0.03938] | 8.3 [1.8, 10.7] | 4.6 (2.3-7.5) | 1 / 11 | 1.018 [0.290, 6.480] | 0.208 [0.174, 0.249] | 96.0 [91.5, 98.9] |
+| float | 5.0 | per image (risk control) | 20 | 0.1095 [0.02461, 0.2419] | 6.5 [0.7, 14.2] | ≤ 5.0 | 10 / 20 | 0.155 [0.003, 0.660] | – | – |
+| float | 10.0 | per person (split conformal) | 20 | 0.07789 [0.02802, 0.1341] | 10.5 [2.7, 16.8] | 9.8 (6.4-13.8) | 9 / 20 | 0.138 [0.020, 0.549] | 0.134 [0.103, 0.163] | 89.3 [80.1, 96.4] |
+| float | 10.0 | per image (risk control) | 20 | 0.2937 [0.1269, 0.6071] | 13.2 [3.0, 32.9] | ≤ 10.0 | 9 / 20 | 0.008 [0.000, 0.033] | – | – |
+| integer | 5.0 | per person (split conformal) | 11 / 20 | 0.02276 [0.001638, 0.04671] | 8.1 [3.5, 10.2] | 4.6 (2.3-7.5) | 1 / 11 | 1.819 [0.297, 9.070] | 0.197 [0.161, 0.228] | 95.4 [90.5, 98.9] |
+| integer | 5.0 | per image (risk control) | 20 | 0.105 [0.01879, 0.2226] | 6.3 [0.8, 15.0] | ≤ 5.0 | 10 / 20 | 0.202 [0.010, 1.353] | – | – |
+| integer | 10.0 | per person (split conformal) | 20 | 0.08437 [0.02631, 0.1865] | 10.4 [2.7, 20.8] | 9.8 (6.4-13.8) | 8 / 20 | 0.175 [0.017, 0.822] | 0.138 [0.120, 0.159] | 89.1 [80.7, 95.8] |
+| integer | 10.0 | per image (risk control) | 20 | 0.2857 [0.1216, 0.5925] | 12.5 [2.8, 30.1] | ≤ 10.0 | 10 / 20 | 0.012 [0.000, 0.047] | – | – |
+
+**Under the degradations of T27.3** (per-person threshold calibrated on all the clean images; the degraded images are no longer exchangeable with them, so nothing bounds their miss rate):
+
+| Stage | α | Condition | Threshold | Miss % | FPPI |
+|---|---|---|---|---|---|
+| float | 5.0 | clean (calibration) | 0.0184 | 4.7 | 1.079 |
+| float | 5.0 | low_light:1 | 0.0184 | 20.7 **> α** | 2.542 |
+| float | 5.0 | low_light:2 | 0.0184 | 34.7 **> α** | 2.811 |
+| float | 5.0 | low_light:3 | 0.0184 | 82.8 **> α** | 1.971 |
+| float | 5.0 | fog:1 | 0.0184 | 10.2 **> α** | 0.426 |
+| float | 5.0 | fog:2 | 0.0184 | 16.3 **> α** | 0.196 |
+| float | 5.0 | fog:3 | 0.0184 | 39.7 **> α** | 0.091 |
+| float | 5.0 | motion_blur:1 | 0.0184 | 10.8 **> α** | 0.922 |
+| float | 5.0 | motion_blur:2 | 0.0184 | 46.9 **> α** | 0.826 |
+| float | 5.0 | motion_blur:3 | 0.0184 | 88.9 **> α** | 1.042 |
+| float | 5.0 | sensor_noise:1 | 0.0184 | 7.6 **> α** | 1.456 |
+| float | 5.0 | sensor_noise:2 | 0.0184 | 23.6 **> α** | 1.436 |
+| float | 5.0 | sensor_noise:3 | 0.0184 | 47.2 **> α** | 1.992 |
+| float | 5.0 | jpeg:1 | 0.0184 | 9.6 **> α** | 1.211 |
+| float | 5.0 | jpeg:2 | 0.0184 | 28.6 **> α** | 1.532 |
+| float | 5.0 | jpeg:3 | 0.0184 | 90.7 **> α** | 0.409 |
+| float | 5.0 | occlusion:1 | 0.0184 | 21.3 **> α** | 0.978 |
+| float | 5.0 | occlusion:2 | 0.0184 | 58.3 **> α** | 0.990 |
+| float | 5.0 | occlusion:3 | 0.0184 | 92.7 **> α** | 0.855 |
+| float | 10.0 | clean (calibration) | 0.06993 | 9.6 | 0.083 |
+| float | 10.0 | low_light:1 | 0.06993 | 26.5 **> α** | 0.473 |
+| float | 10.0 | low_light:2 | 0.06993 | 45.8 **> α** | 0.508 |
+| float | 10.0 | low_light:3 | 0.06993 | 88.3 **> α** | 0.203 |
+| float | 10.0 | fog:1 | 0.06993 | 15.2 **> α** | 0.046 |
+| float | 10.0 | fog:2 | 0.06993 | 27.7 **> α** | 0.029 |
+| float | 10.0 | fog:3 | 0.06993 | 51.0 **> α** | 0.012 |
+| float | 10.0 | motion_blur:1 | 0.06993 | 17.2 **> α** | 0.091 |
+| float | 10.0 | motion_blur:2 | 0.06993 | 57.1 **> α** | 0.081 |
+| float | 10.0 | motion_blur:3 | 0.06993 | 95.6 **> α** | 0.074 |
+| float | 10.0 | sensor_noise:1 | 0.06993 | 13.7 **> α** | 0.184 |
+| float | 10.0 | sensor_noise:2 | 0.06993 | 30.3 **> α** | 0.188 |
+| float | 10.0 | sensor_noise:3 | 0.06993 | 62.7 **> α** | 0.139 |
+| float | 10.0 | jpeg:1 | 0.06993 | 17.5 **> α** | 0.140 |
+| float | 10.0 | jpeg:2 | 0.06993 | 41.4 **> α** | 0.250 |
+| float | 10.0 | jpeg:3 | 0.06993 | 96.5 **> α** | 0.022 |
+| float | 10.0 | occlusion:1 | 0.06993 | 32.9 **> α** | 0.076 |
+| float | 10.0 | occlusion:2 | 0.06993 | 72.9 **> α** | 0.147 |
+| float | 10.0 | occlusion:3 | 0.06993 | 96.2 **> α** | 0.071 |
+| integer | 5.0 | clean (calibration) | 0.005653 | 4.7 | 3.731 |
+| integer | 5.0 | low_light:1 | 0.005653 | 15.5 **> α** | 7.745 |
+| integer | 5.0 | low_light:2 | 0.005653 | 30.3 **> α** | 6.578 |
+| integer | 5.0 | low_light:3 | 0.005653 | 79.9 **> α** | 4.338 |
+| integer | 5.0 | fog:1 | 0.005653 | 7.3 **> α** | 2.243 |
+| integer | 5.0 | fog:2 | 0.005653 | 10.8 **> α** | 1.507 |
+| integer | 5.0 | fog:3 | 0.005653 | 28.0 **> α** | 0.703 |
+| integer | 5.0 | motion_blur:1 | 0.005653 | 7.6 **> α** | 3.649 |
+| integer | 5.0 | motion_blur:2 | 0.005653 | 36.2 **> α** | 4.500 |
+| integer | 5.0 | motion_blur:3 | 0.005653 | 80.5 **> α** | 3.647 |
+| integer | 5.0 | sensor_noise:1 | 0.005653 | 6.4 **> α** | 4.785 |
+| integer | 5.0 | sensor_noise:2 | 0.005653 | 16.9 **> α** | 5.285 |
+| integer | 5.0 | sensor_noise:3 | 0.005653 | 34.4 **> α** | 7.539 |
+| integer | 5.0 | jpeg:1 | 0.005653 | 7.6 **> α** | 4.508 |
+| integer | 5.0 | jpeg:2 | 0.005653 | 20.4 **> α** | 5.537 |
+| integer | 5.0 | jpeg:3 | 0.005653 | 85.4 **> α** | 2.551 |
+| integer | 5.0 | occlusion:1 | 0.005653 | 14.9 **> α** | 3.422 |
+| integer | 5.0 | occlusion:2 | 0.005653 | 46.9 **> α** | 3.238 |
+| integer | 5.0 | occlusion:3 | 0.005653 | 81.9 **> α** | 2.823 |
+| integer | 10.0 | clean (calibration) | 0.06949 | 9.6 | 0.105 |
+| integer | 10.0 | low_light:1 | 0.06949 | 29.4 **> α** | 0.556 |
+| integer | 10.0 | low_light:2 | 0.06949 | 48.7 **> α** | 0.645 |
+| integer | 10.0 | low_light:3 | 0.06949 | 91.3 **> α** | 0.280 |
+| integer | 10.0 | fog:1 | 0.06949 | 15.2 **> α** | 0.061 |
+| integer | 10.0 | fog:2 | 0.06949 | 26.8 **> α** | 0.034 |
+| integer | 10.0 | fog:3 | 0.06949 | 47.2 **> α** | 0.014 |
+| integer | 10.0 | motion_blur:1 | 0.06949 | 15.5 **> α** | 0.132 |
+| integer | 10.0 | motion_blur:2 | 0.06949 | 55.4 **> α** | 0.135 |
+| integer | 10.0 | motion_blur:3 | 0.06949 | 95.6 **> α** | 0.182 |
+| integer | 10.0 | sensor_noise:1 | 0.06949 | 14.6 **> α** | 0.199 |
+| integer | 10.0 | sensor_noise:2 | 0.06949 | 30.3 **> α** | 0.198 |
+| integer | 10.0 | sensor_noise:3 | 0.06949 | 63.0 **> α** | 0.164 |
+| integer | 10.0 | jpeg:1 | 0.06949 | 17.8 **> α** | 0.169 |
+| integer | 10.0 | jpeg:2 | 0.06949 | 41.1 **> α** | 0.282 |
+| integer | 10.0 | jpeg:3 | 0.06949 | 96.5 **> α** | 0.027 |
+| integer | 10.0 | occlusion:1 | 0.06949 | 32.1 **> α** | 0.086 |
+| integer | 10.0 | occlusion:2 | 0.06949 | 69.1 **> α** | 0.159 |
+| integer | 10.0 | occlusion:3 | 0.06949 | 96.8 **> α** | 0.074 |
+<!-- /m27:conformal-prewid-test-tiny-yolov4-coco -->
+
+<!-- m27:conformal-prewid-lab-tiny-yolov4-coco -->
+## Conformal person threshold: tiny-yolov4-coco, prewid lab (T29.2)
+
+tiny-yolov4-coco on prewid `lab` (3000 images): person score threshold calibrated on one half for a target miss rate α, checked on the other half, over 20 random splits; halves made of blocks of 100 consecutive frames sent to one side at random, so neighbouring frames do not leak across. A person is missed when the greedy VOC matching gives it no detection above the threshold (the miss of R@0.1). **Per person**: split conformal, bound k / (n + 1) with k = ⌊α (n + 1)⌋ and in brackets the 5-95 % range of Beta(k, n + 1 − k), the spread a calibration set of n persons should give; it assumes the persons exchangeable, which the persons of one frame are not. **Per image**: conformal risk control (Angelopoulos 2022) on the share of each image's persons missed, exchangeable images only. Values: mean [min, max] over the splits; miss in %. **Box margin**: conformal (1 − α) quantile of the relative enlargement that makes the matched detection contain the person, and its coverage on the test half.
+
+| Stage | α | Method | Splits with a threshold | Threshold | Test miss % | Bound (Beta 5-95 %) | Splits with miss ≤ α | Test FPPI | Box margin | Box coverage % |
+|---|---|---|---|---|---|---|---|---|---|---|
+| float | 5.0 | per person (split conformal) | 9 / 20 | 0.04843 [0.005033, 0.1606] | 14.1 [8.8, 22.6] | 4.9 (3.7-6.3) | 0 / 9 | 1.253 [0.051, 3.727] | 0.252 [0.181, 0.290] | 91.1 [80.1, 97.0] |
+| float | 5.0 | per image (risk control) | 14 / 20 | 0.169 [0.001683, 0.5251] | 9.8 [2.3, 26.8] | ≤ 5.0 | 3 / 14 | 2.479 [0.005, 12.379] | – | – |
+| float | 10.0 | per person (split conformal) | 14 / 20 | 0.1602 [0.001395, 0.4457] | 16.7 [3.3, 36.7] | 9.9 (8.2-11.7) | 4 / 14 | 2.248 [0.005, 13.401] | 0.186 [0.097, 0.256] | 84.3 [48.6, 96.3] |
+| float | 10.0 | per image (risk control) | 20 | 0.3512 [0.06528, 0.7799] | 13.1 [1.3, 45.1] | ≤ 10.0 | 7 / 20 | 0.023 [0.001, 0.240] | – | – |
+| integer | 5.0 | per person (split conformal) | 14 / 20 | 0.03685 [0.001123, 0.2001] | 8.8 [3.3, 20.9] | 4.9 (3.7-6.3) | 5 / 14 | 5.526 [0.035, 14.307] | 0.254 [0.176, 0.304] | 91.7 [76.6, 97.7] |
+| integer | 5.0 | per image (risk control) | 20 | 0.1441 [0.003133, 0.526] | 7.4 [1.0, 28.8] | ≤ 5.0 | 7 / 20 | 0.713 [0.007, 5.040] | – | – |
+| integer | 10.0 | per person (split conformal) | 20 | 0.1332 [0.002835, 0.4349] | 12.7 [2.2, 39.9] | 9.9 (8.2-11.7) | 9 / 20 | 0.722 [0.007, 6.595] | 0.194 [0.108, 0.237] | 86.3 [52.3, 96.3] |
+| integer | 10.0 | per image (risk control) | 20 | 0.3487 [0.1442, 0.777] | 13.4 [1.5, 46.8] | ≤ 10.0 | 7 / 20 | 0.013 [0.001, 0.025] | – | – |
+<!-- /m27:conformal-prewid-lab-tiny-yolov4-coco -->

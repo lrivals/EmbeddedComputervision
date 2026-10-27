@@ -446,20 +446,21 @@ def cmd_csim(args):
 def block_halves(samples, block):
     """Calibration / check halves: blocks of `block` consecutive frames of a sequence
     (camera, sequence, or id order), alternating, so neighbouring frames stay together."""
+    cal, chk = [], []
+    for k, b in enumerate(frame_blocks(samples, block)):
+        (cal if k % 2 == 0 else chk).extend(b)
+    return cal, chk
+
+
+def frame_blocks(samples, block):
+    """Blocks of at most `block` consecutive frames, per camera or sequence (id order)."""
     def key(s):
         return (str(s.get("camera", s.get("sequence", ""))), s.get("frame", 0), s["id"])
 
-    order = sorted(samples, key=key)
-    cal, chk = [], []
     groups = {}
-    for s in order:
+    for s in sorted(samples, key=key):
         groups.setdefault(key(s)[0], []).append(s)
-    k = 0
-    for g in groups.values():
-        for i in range(0, len(g), block):
-            (cal if k % 2 == 0 else chk).extend(g[i:i + block])
-            k += 1
-    return cal, chk
+    return [g[i:i + block] for g in groups.values() for i in range(0, len(g), block)]
 
 
 def cmd_oppoint(args):
@@ -691,6 +692,178 @@ def cmd_unflagged(args):
                       "\n".join(body))
 
 
+# --------------------------------------------------------------------- conformal (T29.2)
+def matched_run(dataset, split, net, stage, samples, spec=None, out=BUILD):
+    """Greedy VOC matching of a stored run, image by image (it does not depend on the other
+    images, so any subset is cut from it): {id: {"gt": person scores (NaN = difficult),
+    "gt_boxes", "det": (scores, boxes) of the person class, "fp": (scores of the false
+    positives)}}. None without the run."""
+    path = dets_path(dataset, split, net, stage, spec, out)
+    if not path.exists():
+        return None
+    dets = read_dets(path)
+    ev, det_class = eval_samples(dataset, [s for s in samples if s["id"] in dets],
+                                 load_cfg(net)["classes"])
+    ids, scores, boxes = person_dets(dets, ev, det_class)
+    order, _, fp, gt_score = M.match_class(ids, scores, boxes, M.class_gts(ev, 0), 0.5,
+                                           M.ignore_regions(ev))
+    fp_by = {}
+    for d, k in enumerate(order):
+        if fp[d]:
+            fp_by.setdefault(ids[k], []).append(scores[k])
+    run = {}
+    for s in ev:
+        b, sc, lab = dets[s["id"]]
+        m = lab == det_class
+        run[s["id"]] = {"gt": gt_score[s["id"]], "gt_boxes": s["xyxy"][s["labels"] == 0],
+                        "det": (sc[m], b[m]), "fp": np.asarray(fp_by.get(s["id"], []))}
+    return run
+
+
+def conformal_cut(run, ids):
+    """(per-person scores, per-image score lists, number of images) of the images `ids`,
+    difficult persons left out."""
+    per_image = [run[i]["gt"][~np.isnan(run[i]["gt"])] for i in ids]
+    flat = np.concatenate(per_image) if per_image else np.zeros(0)
+    return flat, per_image, len(ids)
+
+
+def fppi_at(run, ids, t):
+    return sum(int((run[i]["fp"] >= t).sum()) for i in ids) / max(len(ids), 1)
+
+
+def margins_at(run, ids, t):
+    """Box margins (`conformal.box_margins`) of the persons found at `t` in `ids`."""
+    from yolo.infer import conformal as CF
+
+    out = []
+    for i in ids:
+        r = run[i]
+        gs = np.where(r["gt"] >= t, r["gt"], -np.inf)
+        idx, boxes = CF.matched_boxes(gs, r["gt_boxes"], *r["det"])
+        out.append(CF.box_margins(boxes, r["gt_boxes"][idx]))
+    return np.concatenate(out) if out else np.zeros(0)
+
+
+def random_halves(samples, block, seed):
+    """Calibration / test halves: blocks of `block` consecutive frames (as `block_halves`),
+    each block sent to one half at random."""
+    blocks = [[s["id"] for s in b] for b in frame_blocks(samples, block)]
+    rng = np.random.default_rng(seed)
+    pick = rng.permutation(len(blocks))
+    a = [i for j in pick[:len(blocks) // 2] for i in blocks[j]]
+    b = [i for j in pick[len(blocks) // 2:] for i in blocks[j]]
+    return a, b
+
+
+def spread(v, fmt="{:.2f}", scale=1.0):
+    v = np.asarray([x for x in v if x is not None and np.isfinite(x)], np.float64) * scale
+    if not len(v):
+        return "–"
+    return f"{fmt.format(v.mean())} [{fmt.format(v.min())}, {fmt.format(v.max())}]"
+
+
+def cmd_conformal(args):
+    from yolo.infer import conformal as CF
+
+    split = args.split or datasets.info(args.dataset).test
+    samples = datasets.load(args.dataset, args.data_root, split)
+    alphas = [float(a) for a in args.alphas.split(",")]
+    rows, deg_rows = [], []
+    for st in args.stages.split(","):
+        run = matched_run(args.dataset, split, args.net, st, samples, out=args.out)
+        if run is None:
+            print(f"{st}: no run")
+            continue
+        ids_all = [s["id"] for s in samples if s["id"] in run]
+        for a in alphas:
+            res = {k: [] for k in ("t_p", "m_p", "f_p", "in_p", "t_i", "m_i", "f_i", "in_i",
+                                   "q", "cov")}
+            n_cal = []
+            for seed in range(args.splits):
+                cal, test = random_halves([s for s in samples if s["id"] in run], args.block,
+                                          seed)
+                s_cal, i_cal, _ = conformal_cut(run, cal)
+                s_test, i_test, _ = conformal_cut(run, test)
+                n_cal.append(len(s_cal))
+                t = CF.person_threshold(s_cal, a)
+                ti = CF.image_threshold(i_cal, a)
+                for key, thr in (("p", t), ("i", ti)):
+                    if thr is None:
+                        continue
+                    miss = float((s_test < thr).mean())
+                    res[f"t_{key}"].append(thr)
+                    res[f"m_{key}"].append(miss if key == "p" else
+                                           float(CF.image_losses(i_test, thr).mean()))
+                    res[f"f_{key}"].append(fppi_at(run, test, thr))
+                    res[f"in_{key}"].append(res[f"m_{key}"][-1] <= a)
+                if t is not None:
+                    q = CF.margin_quantile(margins_at(run, cal, t), a)
+                    m_test = margins_at(run, test, t)
+                    res["q"].append(q)
+                    res["cov"].append(float((m_test <= q).mean()) if len(m_test) else np.nan)
+            bound, (lo, hi) = CF.miss_beta(int(np.mean(n_cal)), a)
+            for key, name in (("p", "per person (split conformal)"),
+                              ("i", "per image (risk control)")):
+                ok = len(res[f"t_{key}"])
+                rows.append([STAGE_NAMES[st], pct(a), name,
+                             f"{ok} / {args.splits}" if ok < args.splits else str(ok),
+                             spread(res[f"t_{key}"], "{:.4g}"),
+                             spread(res[f"m_{key}"], "{:.1f}", 100),
+                             (f"{pct(bound)} ({pct(lo)}-{pct(hi)})" if key == "p" else
+                              f"≤ {pct(a)}"),
+                             f"{sum(res[f'in_{key}'])} / {ok}" if ok else "–",
+                             spread(res[f"f_{key}"], "{:.3f}"),
+                             spread(res["q"], "{:.3f}") if key == "p" else "–",
+                             spread(res["cov"], "{:.1f}", 100) if key == "p" else "–"])
+            # Degradations: calibrated on all the clean images, applied to each degraded set.
+            if args.degrade:
+                s_all, _, _ = conformal_cut(run, ids_all)
+                t = CF.person_threshold(s_all, a)
+                if t is None:
+                    continue
+                specs = D.all_specs() if args.degrade == "all" else args.degrade.split(",")
+                deg_rows.append([STAGE_NAMES[st], pct(a), "clean (calibration)", f"{t:.4g}",
+                                 pct(float((s_all < t).mean())), f"{fppi_at(run, ids_all, t):.3f}"])
+                for spec in specs:
+                    r = matched_run(args.dataset, split, args.net, st, samples, spec, args.out)
+                    if r is None:
+                        continue
+                    ids = [i for i in ids_all if i in r]
+                    s_d, _, _ = conformal_cut(r, ids)
+                    miss = float((s_d < t).mean())
+                    deg_rows.append([STAGE_NAMES[st], pct(a), spec, f"{t:.4g}",
+                                     pct(miss) + (" **> α**" if miss > a else ""),
+                                     f"{fppi_at(r, ids, t):.3f}"])
+    body = [f"{args.net} on {args.dataset} `{split}` ({len(samples)} images): person score "
+            f"threshold calibrated on one half for a target miss rate α, checked on the other "
+            f"half, over {args.splits} random splits; halves made of blocks of {args.block} "
+            "consecutive frames sent to one side at random, so neighbouring frames do not "
+            "leak across. A person is missed when the greedy VOC matching gives it no "
+            "detection above the threshold (the miss of R@0.1). **Per person**: split "
+            "conformal, bound k / (n + 1) with k = ⌊α (n + 1)⌋ and in brackets the 5-95 % "
+            "range of Beta(k, n + 1 − k), the spread a calibration set of n persons should "
+            "give; it assumes the persons exchangeable, which the persons of one frame are "
+            "not. **Per image**: conformal risk control (Angelopoulos 2022) on the share of "
+            "each image's persons missed, exchangeable images only. Values: mean [min, "
+            "max] over the splits; miss in %. **Box margin**: conformal (1 − α) quantile of "
+            "the relative enlargement that makes the matched detection contain the person, "
+            "and its coverage on the test half.", "",
+            table(["Stage", "α", "Method", "Splits with a threshold", "Threshold",
+                   "Test miss %", "Bound (Beta 5-95 %)", "Splits with miss ≤ α", "Test FPPI",
+                   "Box margin", "Box coverage %"], rows)]
+    if deg_rows:
+        body += ["", "**Under the degradations of T27.3** (per-person threshold calibrated "
+                 "on all the clean images; the degraded images are no longer exchangeable "
+                 "with them, so nothing bounds their miss rate):", "",
+                 table(["Stage", "α", "Condition", "Threshold", "Miss %", "FPPI"], deg_rows)]
+    print("\n".join(body))
+    if args.write:
+        write_section(f"conformal-{section_tag(args.dataset, split)}-{Path(args.net).stem}",
+                      f"Conformal person threshold: {args.net}, {args.dataset} {split} (T29.2)",
+                      "\n".join(body))
+
+
 # ---------------------------------------------------------------------------------- CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -761,10 +934,18 @@ def main(argv=None):
     p.add_argument("--deadline", type=int, default=1, help="frames of an event a flag may come in")
     p.add_argument("--write", action="store_true")
 
+    p = common(sub.add_parser("conformal", help="conformal person threshold (T29.2)"))
+    p.add_argument("--stages", default="float,int")
+    p.add_argument("--alphas", default="0.05,0.1", help="target miss rates")
+    p.add_argument("--splits", type=int, default=20)
+    p.add_argument("--block", type=int, default=25)
+    p.add_argument("--degrade", default="all", help="`all`, kind:sev[,…] or empty")
+    p.add_argument("--write", action="store_true")
+
     args = ap.parse_args(argv)
     {"infer": cmd_infer, "csim": cmd_csim, "report": cmd_report, "oppoint": cmd_oppoint,
      "degrade-report": cmd_degrade_report, "deel": cmd_deel,
-     "unflagged": cmd_unflagged}[args.cmd](args)
+     "unflagged": cmd_unflagged, "conformal": cmd_conformal}[args.cmd](args)
 
 
 if __name__ == "__main__":

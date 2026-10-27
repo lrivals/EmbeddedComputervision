@@ -156,6 +156,29 @@ def test_unflagged_with_flags(runs, tmp_path):
     assert "| monitor | person | 0 / 11 |" in text  # the miss of 004 is flagged
 
 
+def test_conformal_section(runs):
+    data, out, md = runs
+    P.main(["conformal", *_args(data, out, "--net", NET, "--block", "2", "--splits", "3",
+                                "--alphas", "0.3", "--degrade", "fog:2", "--write")])
+    text = md.read_text()
+    assert f"<!-- m27:conformal-industrial-test-{NET} -->" in text
+    assert "| fog:2 |" in text  # the misses added by fog are above α
+    run = P.matched_run("industrial", "test", NET, "int", P.datasets.load(
+        "industrial", data, "test"), out=out)
+    s, per_image, n = P.conformal_cut(run, sorted(run))
+    assert n == 10 and len(s) == 11 and np.isinf(s).sum() == 1  # the person of 004
+    assert P.fppi_at(run, sorted(run), 0.0) == 1.0  # one false alarm per image
+    assert (P.margins_at(run, sorted(run), 0.5) == 0).all()  # boxes are the ground truth
+
+
+def test_random_halves():
+    s = [{"id": f"{c}{i}", "camera": c, "frame": i} for c in "AB" for i in range(5)]
+    a, b = P.random_halves(s, 2, seed=0)
+    assert sorted(a + b) == sorted(x["id"] for x in s) and not set(a) & set(b)
+    blocks = [["A0", "A1"], ["A2", "A3"], ["A4"], ["B0", "B1"], ["B2", "B3"], ["B4"]]
+    assert all(set(k) <= set(a) or set(k) <= set(b) for k in blocks)  # blocks stay whole
+
+
 def test_block_halves():
     s = [{"id": f"{c}{i}", "camera": c, "frame": i} for c in "AB" for i in range(5)]
     cal, chk = P.block_halves(s, 2)

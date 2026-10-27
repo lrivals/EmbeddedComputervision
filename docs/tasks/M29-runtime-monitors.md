@@ -19,10 +19,11 @@ features, OOD sets ExDark and FLIR, `results/ood_monitor.md`). This milestone co
 monitors on the question that matters for safety — "is a person being missed?" — and puts
 the best one in the integer chain and the HLS kernel.
 
-**State** (2026-10-20): T29.0 done ([results/ood_monitor.md](../../results/ood_monitor.md)).
+**State** (2026-10-27): T29.0 done ([results/ood_monitor.md](../../results/ood_monitor.md)).
 No monitor wins on both shifts: the detector's max score is the best on ExDark (AUROC 0.81),
-the activation patterns on FLIR (AUROC 0.93). T29.1 to T29.3 and T29.5 run on the PC; T29.1
-to T29.3 wait for the person metrics of M27.
+the activation patterns on FLIR (AUROC 0.93). T29.2 done on PREWID: the conformal threshold
+does not hold its bound across CCTV blocks, and loses it under every degradation. T29.1 and
+T29.3 run on the PC at the T27.2 point of PREWID; CrowdHuman waits for its data.
 
 ### [x] T29.0 — Monitor comparison
 - **Spec**: §4, §8 · **Depends on**: T25.5 · **Runs on**: PC · **Size**: M
@@ -67,7 +68,7 @@ to T29.3 wait for the person metrics of M27.
     are blind to in-domain misses, as the note expected.
   - **Not run**: CrowdHuman val, the T27.3 sets, ExDark, at the T27.2 point.
 
-### [ ] T29.2 — Conformal threshold for persons
+### [x] T29.2 — Conformal threshold for persons
 - **Spec**: §8.1 · **Depends on**: T27.2 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/infer/conformal.py`; `results/person_safety.md` section
 - **Acceptance**: split-conformal calibration of the person score threshold (and of a box
@@ -76,6 +77,24 @@ to T29.3 wait for the person metrics of M27.
   degradations of T27.3 (coverage lost when the data is not exchangeable)
 - **Notes**: Andéol 2023 covers the boxes, not the misses; here the risk controlled is the
   false negative.
+- **Done** (2026-10-27, PREWID; CrowdHuman val to add when its data is on the PC):
+  - **Code**: `python/yolo/infer/conformal.py` (per-person split conformal with its
+    Beta(k, n + 1 − k) spread, per-image conformal risk control after Angelopoulos 2022,
+    box margin quantile); `person_safety.py conformal` (20 random splits of blocks of
+    consecutive frames, the T27.3 degradations at the clean threshold); tests in
+    `python/tests/test_conformal.py` and `test_person_safety.py`.
+  - **Results** (YOLOv4-tiny integer, [results/person_safety.md](../../results/person_safety.md)):
+    on PREWID `test` the per-person threshold for α = 5 % misses 8.1 % of the test persons
+    on average (bound 4.6 %, Beta 5-95 % range 2.3-7.5 %); only 1 of the 11 splits with a
+    threshold stays under α. Exchangeability does not hold between blocks of 4 CCTV
+    cameras. The per-image risk control is closer (6.3 % for 5 %, 12.5 % for 10 %) but
+    spreads from 1 to 15 %. On `lab` (one 3,000-frame sequence) the spread is wider still
+    (2-40 % at α = 10 %).
+  - **FPPI paid**: 1.8 FPPI on average for α = 5 % per person, 0.18 for α = 10 %.
+  - **Box margin**: 0.14 to 0.25 of the box size for a 90-96 % box coverage.
+  - **Under degradation** (clean calibration, α = 10 %, integer): the miss rate climbs to
+    15-97 %, above α under every degradation. Even severity 1 doubles it (fog 15 %, low light
+    29 %): the guarantee is lost as soon as the data shifts, as the task expected.
 
 ### [ ] T29.3 — Temporal vote
 - **Spec**: §8 · **Depends on**: T27.4 · **Runs on**: PC · **Size**: M
