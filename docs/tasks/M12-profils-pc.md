@@ -82,7 +82,30 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   is not green.
 
 - **Done (code)**: `tools/m12.sh fumee | bitexact | avant-carte` (log and durations in
-  `build/m12/regress/log.txt`). To run.
+  `build/m12/regress/log.txt`).
+- **Run** (2026-10-27):
+
+  | Profile | Step | Result | Time |
+  |---|---|---|---|
+  | *Smoke* | `make test-py` | **6 failed**, 1,114 passed | 6 min |
+  | | `make test-cpp` | passed | 1 min |
+  | *Bit-exact* | `make golden-check` | 12 × "0 écart", identical detections | 30 s |
+  | | `make csim-gcc` | 12 / 12 | 7 min |
+  | | `make sw-sim` | 13 / 13 | 5 min |
+  | *Before board* | `make test-slow` | **1 failed** (`test_fumee[coco/coco_stats]`, T16.13), 110 passed | 44 min |
+  | | `make perf-model` | passed | 45 s |
+  | | `make check-regmap` | skipped (no Vitis header) | 0 s |
+
+  *Bit-exact* is green: no byte difference. The failures are outside the integer chain:
+  - `test_balayages.py` (3): no sweep scores found (`voc`, `flir`) on this PC;
+  - `test_data_stats.py::test_split_images_releves`: `KeyError: 'trashnet'` (TrashNet
+    labelling unfinished, T32.1);
+  - `test_figures.py::test_map_covers_every_module`: `data/tal`, `infer/confidence`,
+    `infer/failure`, `quant/int_failure`, `train/failure`, `train/loss_v8` have no figure
+    entry;
+  - `test_notebooks.py::test_notebooks_versionnes_a_jour`: generated notebooks out of date
+    (`make notebooks`).
+- **Remaining**: fix these 6 tests, then *Smoke* again.
 
 ### [ ] T12.2 — Float and integer mAP (M3, M4)
 - **Spec**: §8.3, §9.2 · **Depends on**: T4.5, T8.2 · **Size**: M · **Tier**: M then N
@@ -145,7 +168,7 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   - e) tests `--head-scale` 1/16, 1/8 (default) and 1/4.
   - Summary: `python tools/m12_report.py map build/m12/map/<pattern>*.json`. To run.
 
-### [ ] T12.3 — Per-layer sensitivity
+### [x] T12.3 — Per-layer sensitivity
 - **Spec**: §9.2, §10.5 step 2 · **Depends on**: T12.2-c · **Size**: M · **Tier**: M
 - **Deliverables**: `build/m12/sens/`; ranking of the layers (layer × scheme table)
 - **Acceptance**: for each conv (0, 2, 4, 6, 8, 10, 12, 13, 14) and each scheme, the mAP
@@ -164,8 +187,17 @@ Each profile is written like the ADMM diagnosis (T12.6), in this order:
   than 1 point of loss: L00 (all three schemes), L02 and L04 in 4 bits. The fake-quant
   complement remains to be done.
 
-- **Done (code)**: `tools/m12.sh fq` (fake-quant complement, `build/m12/sens/fq.json`). To
-  run.
+- **Done (code)**: `tools/m12.sh fq` (fake-quant complement, `build/m12/sens/fq.json`).
+- **Done (run, 2026-10-27, 4 min)**: VOC07 test, 500 images, stretch, Tiny-YOLOv2. Float
+  58.75; `fq:all` 57.42 (−1.33); one layer in fake-quant at a time:
+
+  | Layer | 0 | 2 | 4 | 6 | 8 | 10 | 12 | 13 | 14 |
+  |---|---|---|---|---|---|---|---|---|---|
+  | mAP | 58.34 | 58.50 | 58.37 | 58.28 | 58.79 | 58.69 | 58.65 | 58.61 | 58.25 |
+  | Δ | −0.41 | −0.25 | −0.38 | −0.47 | +0.04 | −0.06 | −0.10 | −0.14 | −0.50 |
+
+  No layer loses more than 0.5 point in INT8 alone; the most sensitive are L14 (head),
+  L06 and L00. Figures in `build/m12/sens/figures/`.
 
 ### [ ] T12.4 — Low-precision PTQ (M9.2, M9.3)
 - **Spec**: §9.2, §9.3 · **Depends on**: T12.3 · **Size**: M · **Tier**: M then N

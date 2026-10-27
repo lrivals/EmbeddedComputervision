@@ -29,7 +29,7 @@ execution of the `_train` notebooks ("Remaining" of each task):
 | T14.5 | out-of-domain mAP of the notebooks against `tools/m11.sh hors-domaine`, same parameters |
 | T14.6 | run at least one `_train` notebook end to end (kitti first) |
 | T14.8 | resume of a kitti fine-tuning after a Colab disconnect; GPU gain (s/image, max batch) to T12.11-e |
-| T14.9 | smoke run of the `_train` notebooks (`make notebooks-smoke`) |
+| T14.9 | `coco_stats` fails in the smoke run (train2017 pixels read, T16.13); the 25 `_train` notebooks pass (2026-10-27) |
 
 ## Shared conventions
 
@@ -509,8 +509,13 @@ files: only the tar is read there, in one go, then it is extracted locally.
   - `test_fumee` (`slow`) and `make notebooks-smoke`;
   - parameters rewritten in a copy, under `build/notebooks/smoke/`;
   - 8 inference notebooks pass (1 min 44 s), 9 are skipped with a message.
-- **Remaining**: the smoke run of the `train` notebooks (voc, visdrone), not started, since
-  no training was allowed during the implementation.
+- **Run** (2026-10-27, `make notebooks-smoke`, 35 min): 105 passed, 54 skipped, 1 failed.
+  The 25 `_train` notebooks whose data is present pass (voc v3, v4, v7-tiny, v5n, v8n;
+  visdrone, flir, exdark, prewid, pets, asl, auair, dronevehicle, hituav, uavdt in v3 and
+  v4). The failure is `coco/coco_stats`: `tools/data_stats.py --dataset coco` reads
+  `data/coco/train2017/*.jpg`, which is not on the PC (annotations only), see
+  [T16.13](M16-presentation-jeux.md).
+- **Remaining**: the `coco_stats` failure (T16.13).
 
 ---
 

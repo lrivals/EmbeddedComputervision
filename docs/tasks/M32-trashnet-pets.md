@@ -253,11 +253,21 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 - **Notes**: the `multi` images that touch go through the M22 labeller only if they are
   more than about 1 %; otherwise leave them out.
 
-### [ ] T32.6 — Loader and mappings
-- **In progress** (2026-10-20): `PETS_CLASSES` (`list.txt` order), `PETS_CATS`, `load_pets`,
-  `DATASETS["pets"]`, `MAPPINGS[("pets", "voc")]` and `("pets", "coco")`, `test_pets`;
-  `test_mappings_valid` passes. The out-of-domain run of `tools/eval_voc.py --dataset pets`
-  (VOC and COCO weights) is underway, writing to `build/m32/pets_ood.md`.
+### [x] T32.6 — Loader and mappings
+- **Done** (2026-10-20, recorded 2026-10-27): `PETS_CLASSES` (`list.txt` order), `PETS_CATS`,
+  `load_pets`, `DATASETS["pets"]`, `MAPPINGS[("pets", "voc")]` and `("pets", "coco")`,
+  `test_pets`; `test_mappings_valid` passes. Out-of-domain run of
+  `tools/eval_voc.py --dataset pets` (Pet test 3,662, letterbox 416, conf 0.005, NMS 0.45,
+  AP 11 points) in `build/m32/pets_ood.md`:
+
+  | Weights | cat | dog | mAP |
+  |---|---|---|---|
+  | tiny-yolov2-voc | 80.2 | 86.6 | 83.37 |
+  | tiny-yolov3-coco | 72.2 | 85.0 | 78.62 |
+  | tiny-yolov4-coco | 79.3 | 87.0 | 83.12 |
+
+  One centred animal per photo: an easy setting, far above the VOC test mAP of the same
+  weights.
 - **Depends on**: T32.5 · **Size**: S
 - **Deliverables**: `PETS_CLASSES`, `load_pets`, `DATASETS["pets"]` (evaluation on
   `test`), `MAPPINGS[("pets", "voc")]` and `("pets", "coco")` (each breed → `cat` or
@@ -265,15 +275,19 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 - **Acceptance**: `python tools/eval_voc.py --dataset pets` runs with the VOC weights
   (out-of-domain cat / dog mAP).
 
-### [ ] T32.7 — M22 labeller against the mask boxes
+### [x] T32.7 — M22 labeller against the mask boxes
 - **In progress** (2026-10-20): `tools/autolabel_eval.py` gains:
   - `--map voc|coco` (the ground truth goes through `eval_view` / `remap`; the prompts
     are the family classes reached, `cat` and `dog` for Pet);
   - mAP@0.75;
   - the IoU of the matched boxes (median, q10-q90, boxes scored ≥ 0.3).
 
-  Not run yet: `python tools/autolabel_eval.py --dataset pets --n 200 --models
-  grounding-dino-tiny --map voc`.
+- **Done** (2026-10-27, 17 min, 5.2 s/image): `python tools/autolabel_eval.py --dataset pets
+  --n 200 --models grounding-dino-tiny --map voc` → `results/autolabel_pets-test-voc.md`;
+  row in the T22.10 table of [M22](M22-autolabel.md). Pet test, 200 images (63 cats, 137
+  dogs): mAP@0.5 0.906 (cat 0.818, dog 0.994), mAP@0.75 0.864; IoU of the matched boxes
+  median 0.942 (q10-q90 0.89-0.98, n 193); P / R 0.97 / 0.90 at 0.55. Against boxes from
+  a human-made mask, the M22 boxes are tight: 90 % of the matches are above IoU 0.89.
 - **Depends on**: T32.5, T22.10 · **Size**: S
 - **Deliverables**: `python tools/autolabel_eval.py --dataset pets --n 200` with the
   prompts `cat, dog` (breeds mapped to their species); mAP@0.5, mAP@0.75 and the IoU

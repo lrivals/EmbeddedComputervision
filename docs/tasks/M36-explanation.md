@@ -41,7 +41,7 @@ goes in a new package `python/yolo/explain/` (NumPy only, never matplotlib or cv
 stays in `tools/`, as in M13 and M20), the CLI is `tools/explain.py`, and the results go to
 `results/explain.md`.
 
-**State** (2026-10-23): T36.0 and T36.3 done. The code of T36.1 to T36.9 is written and
+**State** (2026-10-27): T36.0, T36.3 and T36.6 done; T36.5 run on VOC. The code of T36.1 to T36.9 is written and
 tested; their reduced runs are open ([long-runs.md](long-runs.md)). The exact integer split
 holds on every neuron checked, and z⁺ LRP conserves the relevance through the integer chain
 ([results/explain.md](../../results/explain.md)). It builds on the backward pass of the
@@ -192,11 +192,14 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **Tests**: each cause is reached by a constructed case.
   - **Command**: `tools/explain.py misses` (VOC test persons, float and integer). `report`
     draws one Grad-CAM strip per cause (`results/explain/misses_<cause>.png`).
-  - **Not run**:
-    - VOC: ≈ 10 min.
-    - CrowdHuman, T27.3 and ExDark wait for T27.0, and CrowdHuman is not in `data/`.
+  - **VOC run** (2026-10-27, 3 min, `--jobs 12`): 1,085 persons, shares in
+    [results/explain.md](../../results/explain.md#t365-causes-of-the-missed-persons) and
+    the strips `results/explain/misses_<cause>.png`. Missed at conf 0.25: v2 39 %, v3
+    39 %, v4 18 %. Low objectness dominates (69-89 %); mislocalized is 11-12 % for v2 only;
+    quantization adds 5-11 % of the integer misses.
+  - **Not run**: CrowdHuman, T27.3 and ExDark (CrowdHuman is not in `data/`).
 
-### [ ] T36.6 — Concepts and channels
+### [x] T36.6 — Concepts and channels
 - **Spec**: §4 · **Depends on**: T36.1 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/concepts.py`: Network Dissection-lite (Bau 2017)
   on L13 and the layers before the heads (IoU of each thresholded channel map with the boxes
@@ -216,7 +219,12 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **Command**: `tools/explain.py concepts` (v2 L13, 200 images, 20 random sets of 30,
     concepts dark, fog, small, occluded). The VOC `truncated` flag stands for "occluded":
     CrowdHuman is absent.
-  - **Not run yet.**
+  - **Done** (2026-10-27, 18 min, `--jobs 12`): tables in
+    [results/explain.md](../../results/explain.md#t366-concepts-and-channels). 39 % of the
+    1,024 L13 channels match no class. The best channels per class reach IoU 0.07-0.22,
+    but person stays under 0.03: person is spread over many channels. TCAV for person:
+    dark 0.95, fog 0.96, occluded 0.94 (p < 1e-5); small 0.67 (p 0.053, not significant).
+    `dark` and `fog` are synthetic until T27.3, and occluded is the VOC `truncated` flag.
 
 ### [ ] T36.7 — Training recorder
 - **Spec**: §7 · **Depends on**: T2.7 · **Runs on**: PC, Colab · **Size**: M

@@ -193,6 +193,10 @@ only the fine-tuned ones. `notebooks/asl/` holds `asl_stats`, `tiny-yolov3-asl_i
   traded 3.6 points of kept images for boxes that sit on the hand: on the second
   preview, all 56 letter boxes cover the hand; a few are loose or shifted (D, L, M, P,
   the raised finger sometimes cut).
+- **Rerun** (2026-10-27, 8.5 min): `detections.json` deleted and rebuilt. The output is
+  byte-identical (detections, annotations, rejects): 87.5 % kept, N 67.5 %. MediaPipe is
+  deterministic, so a rerun without new settings changes nothing; preview in
+  `build/asl_preview.png` (58 images).
 - **Notes**: to raise N, B, M, E and A (closed fists, the hardest hands for MediaPipe),
   try `ASL_CONF` below 0.1 or a third try at ×3 with padding; check the preview again.
 

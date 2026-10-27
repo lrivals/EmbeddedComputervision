@@ -23,12 +23,13 @@ the PC, Colab sessions. State on 2026-10-27.
 | Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59; 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
 | Colab T4, 6,000 iterations at batch 32 | ≈ 1 h 45; ×2.1 per iteration at 608, ×4 at 832 | [M15](M15-campagne-entrainement.md) T15.4, T15.9 |
 | PC evaluation, VOC2007 test (4,952) | float ≈ 170 ms/image (≈ 15 min), int ≈ 120 ms/image (≈ 10 min), float + int 150-300 ms/image (12-25 min), 66 ms/image with 16 jobs | [M12](M12-profils-pc.md), [M14](M14-notebooks.md), `build/eval/*.log` |
+| PC evaluation, ExDark test (2,563) | float + int 94-106 ms/image with 16 jobs (≈ 4.5 min per network) | `build/longruns/T11.3-base.log`, 2026-10-27 |
 | PC evaluation, COCO val2017 (5,000) | v3-tiny float 60 ms/image, v4-tiny float 42-51 ms/image, v4-tiny float + int 124 ms/image; `--preset v5`, 5 jobs: v7-tiny 113 ms/image at 416, 192 at 640, v5n 58 at 416 (one process: 453 ms/image at 640) | `build/m24/coco*/*.log`, `build/eval/logs/*-v5-*.log` |
 | PC CPU training, YOLOv5 recipe, 640, batch 16 | YOLOv5n 16.9 s/batch, YOLOv7-tiny (OTA) 29.0 s/batch | `tools/train_v5.py --iters 6`, 2026-10-22 |
 | Colab CPU evaluation | ≈ 0.27 s/image: VOC test ≈ 22 min, VisDrone val ≈ 2.5 min, KITTI val ≈ 7 min | [M15](M15-campagne-entrainement.md) |
 | Calibration, 500 images | 1-2.5 min | `build/quant/calib*.log` |
 | C-sim `yolo_bench` | VOC 4,952 images ≈ 40 min (22 threads), i.e. ≈ 0.5 s/image; COCO 5,000 with v4-tiny ≈ 1.5 h (18 cores) | [M12](M12-profils-pc.md), [M24](M24-yolov4-tiny.md) |
-| Grounding DINO tiny, PC CPU | ≈ 5 s/image with 1-2 prompts; 3 processes × 6 threads: 8-15 s/image per process, 4-5 s/image of throughput | [M22](M22-autolabel.md), [M32](M32-trashnet-pets.md) |
+| Grounding DINO tiny, PC CPU | ≈ 5 s/image with 1-2 prompts (5.2 s on Pet, 2026-10-27); 3 processes × 6 threads: 8-15 s/image per process, 4-5 s/image of throughput | [M22](M22-autolabel.md), [M32](M32-trashnet-pets.md) |
 | Fault campaign, 500 images, 16 jobs | ≈ 50 s per run | `build/m25/faults/log.txt` |
 | Drive transfers | sizes in [donnees-drive.md](donnees-drive.md); no speed measured; > 10 GB is slow and sometimes freezes | [donnees-drive.md](donnees-drive.md) |
 
@@ -41,9 +42,7 @@ GPU (T12.11-e).
 
 | Task | Run | Data | Estimate | Basis | Waits for |
 |---|---|---|---|---|---|
-| [T12.1](M12-profils-pc.md) | `tools/m12.sh fumee \| bitexact \| avant-carte` | — | R + `make test-slow` | tier R; `test-slow` not timed alone | — |
 | [T12.2](M12-profils-pc.md) a-e | `tools/m12.sh map-c` first, then `map-a`, `map-b`, `map-d`, `map-e` | VOC07 test, subsets 100 / 500 / 1,000 / all | ≈ 1.5-2 h *(est.)* | map-c: 6,552 images × 2 models × 0.12 s ≈ 26 min; map-b full split ≈ 25 min; map-d 9 × (calib 2 min + eval 500 1-2 min) ≈ 30 min; a, e ≈ 10 min each | — |
-| [T12.3](M12-profils-pc.md) | `tools/m12.sh fq` | VOC 500 | ≈ 20 min *(est.)* | tier M, a few evals of 500 at 0.2 s | — |
 | [T12.4](M12-profils-pc.md) | `tools/m12.sh ptq`, then `tools/m12.sh ptq-full <v1> <v2>` | VOC 500, then 4,952 | ≈ 30 min + ≈ 20 min *(est.)* | 8 × (calib 1.5 min + 500 × 0.15 s); 2 × 4,952 × 0.12 s | — |
 | [T12.5](M12-profils-pc.md) | `tools/m12.sh qat ref \| lr3e-4 \| lr1e-3 \| it300 \| it2000 \| b16 \| nosteps` | VOC | ≈ 8-10 h *(est.)*, two nights | 5 runs × 600 it × 5.8 s ≈ 4.8 h; it300 ≈ 30 min; it2000 ≈ 3.2 h; b16 ≈ 2× a 600 run ≈ 1.9 h | — |
 | [T12.6](M12-profils-pc.md), [T9.2.3](M9.2-req-yolo.md) | `tools/m12.sh admm ref \| A \| B \| C \| D \| E` | VOC | ≈ 4 h | stated in M12 (≈ 50 min per 600 it, measured 5.7 s/it) | — |
@@ -52,22 +51,18 @@ GPU (T12.11-e).
 | [T12.10](M12-profils-pc.md) | `tools/m12.sh repetition` (`COUNT=100`) | — | M | stated | — |
 | [T12.11](M12-profils-pc.md) | `make test-py`, `make test-slow-gpu`, speed on the RTX 1000 Ada | — | unmeasured | — | NVIDIA driver, `pip install cupy-cuda12x` |
 | [T13.30](M13-figures.md) | `make test-durations` (whole suite, slow tests included) | — | N | stated | — |
-| [T14.9](M14-notebooks.md) | `make notebooks-smoke` for the `_train` notebooks (voc, visdrone; `SUBSET=4`, `ITERS=2`) | — | ≈ 5 min *(est.)* | inference smoke 1 min 44 s; CPU 2 s/it | — |
 | [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-int`, `coco-calib` | COCO val2017 5,000 + calib2017 500 | ≈ 30 min *(est.)* | 5,000 × 0.12-0.3 s + calibration | — |
 | [T11.2](M11-jeux-de-donnees.md), [T14.5](M14-notebooks.md) | `tools/m11.sh hors-domaine` | ExDark, KITTI val 1,496, VisDrone val 548; VOC and COCO weights; float and int | ≈ 1-1.5 h *(est.)* | ≈ 4,500 images × 4 passes × 0.2-0.3 s | `data/kitti` link or tree |
-| [T11.3](M11-jeux-de-donnees.md) | `tools/m11.sh exdark` (calibration, `act_hist`) | ExDark | ≈ 15 min *(est.)* | calibration + one eval | — |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman` (`int`, `int-hwpp`, capacities 256 and 1,024) | CrowdHuman val 4,370 | ≈ 35-45 min *(est.)* | 4 × 4,370 × 0.12-0.15 s | `data/crowdhuman` (missing on the PC, pull 11 GB) |
 | [T36.1](M36-explanation.md) | `tools/explain.py sanity --jobs 12` | VOC07 test, 20 images × 3 networks | ≈ 40 min *(est.)* | per image 5 methods × 4 networks (original + 3 randomizations); IG 2 × 130 passes, SmoothGrad 50, at ≈ 0.3 s/pass | — |
 | [T36.2](M36-explanation.md) | `tools/explain.py stages --jobs 12` | VOC07 test, 20 images × 3 networks; golden on 5 | ≈ 1 h *(est.)* | per image D-RISE 300 + occlusion 145 inferences, float 0.28 s and int 0.6 s each (measured 2026-10-22, one thread); golden 100 masks × 2.7 s on 5 images | `build/golden/golden_run`, `model/<net>/` |
 | [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | ≈ 2 h *(est.)*, full ≈ 20 h | 14 method × stage pairs ≈ 600 s per image | — |
-| [T36.5](M36-explanation.md) | `tools/explain.py misses --jobs 12` | VOC07 test, 500 person images × 3 networks | ≈ 10 min *(est.)* | one float + one int pass per image | CrowdHuman / ExDark / T27.3 sets: T27.0 |
-| [T36.6](M36-explanation.md) | `tools/explain.py concepts --jobs 12` | VOC07 test 200 + trainval ≈ 700 images, v2 L13 | ≈ 15 min *(est.)* | ≈ 900 forward passes, 50 forward + backward | — |
+| [T36.5](M36-explanation.md) | `tools/explain.py misses` on CrowdHuman val, the T27.3 sets and ExDark (VOC done 2026-10-27) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | CrowdHuman data, T27.3 |
 | [T36.7](M36-explanation.md) | `tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --subset 200 --batch 8 --iters 250 --lr 1e-4 --burn-in 20 --record --record-every 10 --snap-every 50 [--corrupt 0.05] --out build/explain/record/{clean,corrupt5}`, then `tools/explain.py record --runs …` | VOC trainval, 200 images | ≈ 1 h per run alone *(est.)*; 2 runs side by side ≈ 2 h | 15-30 s/iteration measured with the other runs sharing the CPU | — |
 | [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
-| [T16.13](M16-presentation-jeux.md) | `notebooks/coco/coco_stats.ipynb`, then `stats-jeux.md` | COCO 5,000 images, 36,781 objects | unmeasured, R-M | — | — |
+| [T16.13](M16-presentation-jeux.md) | `notebooks/coco/coco_stats.ipynb`, then `stats-jeux.md` | COCO 5,000 images, 36,781 objects | unmeasured, R-M | failed in 45 s on 2026-10-27 | fix: `data_stats.py` reads `train2017` pixels, not on the PC |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T18.8](M18-jeux-drone.md) | `tools/m11.sh <ds>-prep`, then the four `_stats` notebooks, `tools/data_stats.py --report` | auair, dronevehicle, hituav, uavdt (1.2 M objects) | unmeasured, M *(est.)* | prep ≈ 20 s each (DroneVehicle) | — |
-| [T21.3](M21-asl-alphabet.md) (optional) | `rm data/asl/detections.json; python tools/prep_datasets.py asl --preview build/asl_preview.png` | ASL ≈ 87k images | ≈ 10 min | stated (18 cores, MediaPipe) | — |
 | [T21.7](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `asl_stats` notebook | 69,984 + 6,538 | unmeasured, M | — | — |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
 | [T25.1](M25-dependability.md) | `tools/fault_campaign.py run --net tiny-yolov2-voc --subset 500 --jobs 16 --seeds 0,1,2 --grid ber \| layer \| bit` (`tools/m25.sh`) | VOC 500 | ≈ 5.4 h (ber 1.0 h, layer 3.0 h, bit 1.4 h) | `plan` output in `build/m25/faults/log.txt`; the ber run of 14:11 left 0 results | — |
@@ -82,8 +77,6 @@ GPU (T12.11-e).
 | [T39.5](M39-failure-prediction.md) | `tools/failure_prediction.py stages --labels … --check --write` | same sets | ≈ 1 min | g++ build + scoring, measured | T39.0 at T27.2 |
 | [T29.1, T29.2](M29-runtime-monitors.md) | monitors on CrowdHuman val, T27.3 sets, ExDark; conformal threshold over 20 splits | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
 | [T32.1](M32-trashnet-pets.md) | `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png --handcheck build/trashnet_handcheck` (resumes from `data/trashnet/autolabel.json`) | TrashNet, 2,427 of 2,527 images left | ≈ 1.5-2 h with 3 processes, ≈ 3.5 h with one | stated; measured 8 s/image per process × 2,427 / 3 ≈ 1.8 h | — |
-| [T32.6](M32-trashnet-pets.md) | `python tools/eval_voc.py --dataset pets`, VOC and COCO weights → `build/m32/pets_ood.md` | Pet test 3,662 | ≈ 20 min *(est.)* | 2 × 3,662 × 0.17 s | — |
-| [T32.7](M32-trashnet-pets.md) | `python tools/autolabel_eval.py --dataset pets --n 200 --models grounding-dino-tiny --map voc` | Pet 200 | ≈ 20 min *(est.)* | 200 × 5-7 s | — |
 | [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | T32.1 |
 | [T41.2](M41-safe-unsafe-behaviours.md) | `python tools/autolabel_eval.py --dataset prewid --n 100` on `test` and `lab`, `grounding-dino-tiny` and `owlv2-base` | PREWID 200 frames | ≈ 40 min *(est.)* | 2 labellers × 200 × 5-7 s | — |
 | [T41.1](M41-safe-unsafe-behaviours.md) calibration | labeller on every frame of 20 clips (dense reference), then the sampling settings | 20 clips at 24 fps | unmeasured, ≈ 3-6 h *(est.)* | clip length unknown; at 10 s per clip: 20 × 240 frames × 4-5 s of throughput ≈ 6 h | T41.0 |
@@ -94,7 +87,7 @@ GPU (T12.11-e).
 | [T35.3](M35-yolov8n.md) | `python tools/eval_voc.py --net yolov8n-coco --dataset coco --preset v8 --size 640` (then `--size 416`), row in `results/map_coco.md` | COCO val2017 5,000 | ≈ 45 min per size *(est.)* | measured 27 s for the first 50 images at 640 on 22 cores (43.4 AP on them); 416 ≈ ×0.42 | — |
 | [T35.6](M35-yolov8n.md) | `tools/train_v5.py --net yolov8n-voc --init coco --epochs 30 --out build/train/yolov8n-voc` (AdamW of `optimizer=auto`, mosaic off for the last 10 epochs), then `tools/eval_voc.py --net yolov8n-voc --weights build/train/yolov8n-voc/final.npz --preset v8 --dataset voc` | VOC07+12 trainval 16,551 | ≈ 9.5 h per epoch, ≈ 12 days for 30 epochs *(est.)* | the T33.7 measure (16.9 s per batch of 16 at 640) × 4.37 / 2.23 GMAC; the TAL and DFL loss not measured; `--size 416` ≈ ×0.42 | — |
 | [T33.6](M33-yolov5n.md), [T34.3](M34-yolov7-tiny.md), [T35.4, T35.5](M35-yolov8n.md) | **done** 2026-10-22: throwaway script (not in the repo) in a scratchpad venv (CPU torch 2.14, ultralytics 8.4.184, yolov5 clone for `ComputeLoss`) → `weights/m33/yolov5n_loss.npz`, `yolov8n_heads.npz`, `yolov8n_loss.npz` (2 COCO images at 320, 21 boxes) | 3 + 2 images | ≈ 1 min | measured | — |
-| [T26.0](M26-recent-models.md), [T26.3, T26.4](M26-recent-models.md) float, int | calibration, float and integer COCO mAP (v5n, v8n at letterbox 640 and 416) | COCO val2017 5,000 | ≈ 15 min per model and size *(est.)* | v4-tiny float + int 621 s for 5,000; scaled by MACs | T26.1 (weights, AGPL licence), T26.2 |
+| [T26.0](M26-recent-models.md), [T26.3, T26.4](M26-recent-models.md) float, int | calibration, float and integer COCO mAP (v5n, v8n at letterbox 640 and 416) | COCO val2017 5,000 | ≈ 15 min per model and size *(est.)* | v4-tiny float + int 621 s for 5,000; scaled by MACs | float done (T33.4, T35.3); integer: code still open (s_mid calibration of the SiLU tables, integer C3, SPPF, DFL; T26.3) |
 
 ## PC, C-sim (gcc)
 
@@ -162,7 +155,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 
 | Machine | Total | Largest items |
 |---|---|---|
-| PC CPU | ≈ 45 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
+| PC CPU | ≈ 43 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
 | PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
 | Colab | ≈ 125-135 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h, T39.2 + T39.4 fine-tunes ≈ 5-6 h |
 

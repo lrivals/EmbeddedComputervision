@@ -113,7 +113,7 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   float and integer).
 - **Remaining**: data, measurements, `results/hors_domaine.md`.
 
-### [ ] T11.3 — ExDark (low light)
+### [x] T11.3 — ExDark (low light)
 - **Spec**: §9.2 · **Depends on**: T11.2 · **Size**: S
 - **Deliverables**: section in `results/hors_domaine.md`, calibration reports
   `results/calibration_*-exdark.md`
@@ -130,8 +130,26 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   - profile `tools/m11.sh exdark`;
   - optional fine-tuning: profiles `exdark-prep` and `exdark-train` (`train` split of
     `imageclasslist.txt`), notebooks `tiny-yolov3-exdark_{train,sweep,infer}` (T15.14).
-- **Remaining**: the measurements (`tools/m11.sh exdark`); ExDark is in `data/exdark`
-  (images, `ExDark_Annno/`, `imageclasslist.txt`).
+- **Done** (2026-10-27): ExDark test 2,563 images, stretch 416, conf 0.005, NMS 0.45. The
+  VOC-calibration baseline is the ExDark part of `tools/m11.sh hors-domaine` (8.5 min,
+  100 ms/image float + int, 16 jobs), then `tools/m11.sh exdark` (16 min). Section in
+  [hors_domaine.md](../../results/hors_domaine.md), calibration reports
+  `results/calibration_{tiny-yolov2-voc,tiny-yolov3-coco}-exdark.md`, histograms in
+  `build/m11/exdark/act_calib{voc,exdark}_<net>/`.
+
+  | Network | float | int, VOC calibration | int, ExDark calibration |
+  |---|---|---|---|
+  | tiny-yolov2-voc | 27.41 | 27.01 | 27.17 |
+  | tiny-yolov3-coco | 31.97 | 31.23 | 30.76 |
+
+  - The ExDark calibration does not help: +0.16 for v2, −0.47 for v3. The INT8 loss on
+    ExDark (0.4-0.7 point) is close to the VOC one.
+  - The hypothesis of the notes holds only weakly: on ExDark the p99 of |x| at L00 drops
+    from 9.9 to 5.6 (v2) and from 8.7 to 5.2 (v3), but the max stays (65, 56), so the
+    scale set by the max does not move much. With the VOC scales L00 still uses 122 / 128
+    (v2) and 121 / 128 (v3) positive levels on ExDark; the ExDark scales bring it back to
+    127. L02 and L04 use 127-128 levels in every case.
+  - The 4-bit measurement waits for T9.3.5.
 
 ### [ ] T11.4 — KITTI 2D (automotive, non-square input)
 - **Spec**: §5.2, §10.2 · **Depends on**: T11.0, T2.8 · **Size**: L

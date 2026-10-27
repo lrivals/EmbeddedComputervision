@@ -279,6 +279,11 @@ dataset ([Questions per dataset](#questions-per-dataset)).
 - **Remaining**: val2017, the 2017 annotations and the 500 `calib2017` images are on the PC
   since 2026-10-19 (M24); run the notebook `notebooks/coco/coco_stats.ipynb` and fill its
   section of [stats-jeux.md](stats-jeux.md).
+- **Run** (2026-10-27): fails in 45 s. `tools/data_stats.py --dataset coco` (splits
+  `train2017`, `val2017`) opens `data/coco/train2017/000000001563.jpg`, which is not on
+  the PC: the image sample reads pixels of every split, against the note above. To fix in
+  `data_stats.py` (annotations only for `train2017`) or with `SPLITS` limited to `val2017`
+  and `calib2017`; same failure in the smoke run of T14.9.
 
 ### [ ] T16.14 — KITTI
 - **Depends on**: T16.4 to T16.11 · **Size**: S

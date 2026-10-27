@@ -115,6 +115,14 @@ ExDark wait for the person metrics of T27.0, and CrowdHuman is not in `data/`. O
 Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float: `results/explain/misses_<cause>.png`.
 
 <!-- explain:misses:begin -->
+| net | stage | persons | missed | quantization | no_anchor | low_objectness | class_confusion | below_threshold | nms_suppressed | mislocalized |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v2 | float | 1085 | 424 (39%) | 0% | 3% | 72% | 4% | 3% | 7% | 12% |
+| v2 | int | 1085 | 427 (39%) | 7% | 3% | 69% | 3% | 1% | 6% | 11% |
+| v3 | float | 1085 | 419 (39%) | 0% | 1% | 89% | 2% | 4% | 3% | 1% |
+| v3 | int | 1085 | 416 (38%) | 5% | 1% | 86% | 2% | 3% | 2% | 1% |
+| v4 | float | 1085 | 191 (18%) | 0% | 2% | 79% | 4% | 4% | 8% | 3% |
+| v4 | int | 1085 | 190 (18%) | 11% | 2% | 72% | 4% | 4% | 7% | 2% |
 <!-- explain:misses:end -->
 
 ## T36.6: concepts and channels
@@ -122,6 +130,39 @@ Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float: `results/explain/misses_<
 Network Dissection-lite and TCAV, on the layer read by the head.
 
 <!-- explain:concepts:begin -->
+tiny-yolov2-voc, L13, 200 VOC test images. Share of the channels matching no class (best IoU < 0.04): **39%**.
+
+| class | channel 1 (IoU) | channel 2 | channel 3 |
+|---|---|---|---|
+| aeroplane | 310 (0.167) | 806 (0.118) | 584 (0.117) |
+| bicycle | 559 (0.180) | 732 (0.170) | 371 (0.165) |
+| bird | 425 (0.114) | 137 (0.096) | 373 (0.091) |
+| boat | 624 (0.119) | 714 (0.112) | 105 (0.112) |
+| bottle | 217 (0.116) | 579 (0.111) | 91 (0.108) |
+| bus | 801 (0.116) | 947 (0.107) | 115 (0.105) |
+| car | 63 (0.085) | 163 (0.084) | 735 (0.078) |
+| cat | 706 (0.075) | 350 (0.073) | 701 (0.069) |
+| chair | 922 (0.067) | 807 (0.067) | 556 (0.058) |
+| cow | 118 (0.168) | 616 (0.145) | 209 (0.122) |
+| diningtable | 715 (0.145) | 390 (0.098) | 240 (0.095) |
+| dog | 834 (0.083) | 363 (0.082) | 649 (0.074) |
+| horse | 437 (0.121) | 479 (0.114) | 329 (0.098) |
+| motorbike | 389 (0.087) | 553 (0.084) | 416 (0.083) |
+| person | 696 (0.029) | 788 (0.028) | 27 (0.026) |
+| pottedplant | 630 (0.219) | 355 (0.153) | 419 (0.138) |
+| sheep | 657 (0.137) | 222 (0.124) | 728 (0.113) |
+| sofa | 723 (0.067) | 930 (0.061) | 917 (0.057) |
+| train | 183 (0.150) | 228 (0.135) | 821 (0.124) |
+| tvmonitor | 589 (0.155) | 675 (0.139) | 102 (0.127) |
+
+TCAV for the class person (20 random sets of 30 images):
+
+| concept | images | TCAV score | random-random mean | t | p | significant (p < 0.05) |
+|---|---|---|---|---|---|---|
+| dark | 30 | 0.95 | 0.46 | 6.09 | 3.41e-06 | yes |
+| fog | 30 | 0.96 | 0.46 | 6.49 | 2.72e-06 | yes |
+| small | 30 | 0.67 | 0.46 | 2.00 | 0.0525 | no |
+| occluded | 30 | 0.94 | 0.46 | 5.95 | 4.72e-06 | yes |
 <!-- explain:concepts:end -->
 
 ## T36.7: training recorder
