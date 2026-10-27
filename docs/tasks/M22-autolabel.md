@@ -357,6 +357,8 @@ P / R at the default thresholds of T22.7 (0.55 for Grounding DINO, 0.4 for OWLv2
 | HIT-UAV test | aerial thermal | 827 (639) | 0.159 | 0.172 | 0.88 / 0.03 | 0.231 | 0.184 | 0.89 / 0.05 |
 | AU-AIR val | aerial RGB, low altitude | 334 (36) | 0.094 | 0.005 | 0.31 / 0.07 | 0.115 | 0.337 | 0.28 / 0.32 |
 | Oxford-IIIT Pet test (T32.7, 200 images, species `cat` / `dog`) | pet photos, mask boxes | 200 (0) | 0.906 | — | 0.97 / 0.90 | — | — | — |
+| PREWID test (T41.2, `person`) | industrial CCTV | 53 (2) | 0.989 | 0.545 | 0.95 / 0.98 | 0.990 | 1.000 | 0.00 / 0.00 |
+| PREWID lab (T41.2, `person`) | industrial CCTV, new camera | 53 (0) | 0.964 | — | 1.00 / 0.83 | 0.898 | — | 0.00 / 0.00 |
 
 - **Result, by domain** (GD = `grounding-dino-tiny`, OWL = `owlv2-base`):
   - **Ground-level RGB, including low light: usable.** ExDark loses only 0.1 mAP to VOC.

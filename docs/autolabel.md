@@ -135,10 +135,12 @@ by the size of the image **after** the EXIF transpose (the size a viewer shows).
 Labeller errors become training targets: review at least the "needs review" images, and
 keep a hand-checked val split to measure what a model trained on auto-labels is worth.
 
-**Industrial footage.** For factory CCTV (`person` only), the labeller and threshold come
-from T41.2 ([tasks/M41-safe-unsafe-behaviours.md](tasks/M41-safe-unsafe-behaviours.md)),
-measured on PREWID, whose boxes are hand-made; until then use the ground-level default
-(`grounding-dino-tiny`, 0.55). Video clips are cut into frames first, with the sampling
+**Industrial footage.** For factory CCTV (`person` only), use `grounding-dino-tiny` at
+**0.5** (T41.2, [tasks/M41-safe-unsafe-behaviours.md](tasks/M41-safe-unsafe-behaviours.md)).
+On PREWID, whose boxes are hand-made, it gives P / R 0.95 / 0.98 on `test` and 0.94 / 0.91 on
+`lab`, a camera of its own (AP50 0.989 and 0.964). OWLv2 ranks as well (AP50 0.990 / 0.898)
+but its person scores stay under about 0.3, so no fixed threshold works: at 0.4 it keeps no
+box. Count about 20 to 30 s / image on the CPU. Video clips are cut into frames first, with the sampling
 rules of T41.1.
 
 ## 7. Troubleshooting

@@ -23,7 +23,8 @@ fixed camera sees in a day.
 | out-of-domain baseline | `person` maps to VOC / COCO / CrowdHuman `person`: every pre-trained network gets a score with no training |
 
 **State**: T41.0 in progress (2026-10-27): `get_datasets.sh` entries written, Summary
-filled from the dataset pages; the data is not on the PC yet (manual download). Comes out of a dataset search for industrial
+filled from the dataset pages; the data is not on the PC yet (manual download). T41.2 done
+(2026-10-27): `grounding-dino-tiny` at 0.5 for the labels. Comes out of a dataset search for industrial
 footage next to PREWID (2026-10-26); [M42](M42-soda.md) and
 [M43](M43-construction-ppe.md) come from the same search. All tasks run on the PC (Colab
 for the GPU runs).
@@ -52,7 +53,7 @@ behaviour class) are filled in by T41.1 and T41.3.
 tools/get_datasets.sh safe_unsafe                       # checks the hand-copied folder
 python tools/prep_datasets.py safe_unsafe --extract     # clips → frames (T41.1)
 python tools/autolabel.py --folder data/safe_unsafe/frames --classes person \
-    --model <T41.2 choice> --conf <T41.2 threshold> --out data/safe_unsafe/autolabel --resume
+    --model grounding-dino-tiny --conf 0.5 --out data/safe_unsafe/autolabel --resume
 python tools/prep_datasets.py safe_unsafe               # labels + split → annotations_*.json
 tools/get_datasets.sh check                             # "safe_unsafe : prêt"
 ```
@@ -152,12 +153,12 @@ Those of M11, M14, M16, M22, M32 and M38 apply. Files to touch:
 - **Acceptance**: the chosen setting misses no person-present interval of 0.5 s or more on
   the calibration clips; frames kept per clip and duplicate share are reported; every clip
   gives at least its first and last frame
-- **Notes**: the dense reference uses the labeller of T41.2 at its threshold; run T41.2
-  first, or calibrate with the default `grounding-dino-tiny` at 0.55 and re-check.
+- **Notes**: the dense reference uses the labeller of T41.2 at its threshold
+  (`grounding-dino-tiny`, 0.5).
 
 ## B. Labels
 
-### [ ] T41.2 — Labeller check on industrial footage (PREWID)
+### [x] T41.2 — Labeller check on industrial footage (PREWID)
 - **Spec**: §8.3 · **Depends on**: T22.10, T38.2 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/autolabel_eval.py --dataset prewid` (`grounding-dino-tiny`,
   `owlv2-base`; 100 frames of `test`, fixed seed; also `lab`) →
@@ -168,12 +169,29 @@ Those of M11, M14, M16, M22, M32 and M38 apply. Files to touch:
 - **Notes**: PREWID boxes are hand-made, so this is the labeller's score on the domain,
   as the Pet trimaps of T32.7. Empty frames count: false boxes on them are the labeller's
   false alarms.
+- **Done** (2026-10-27, `results/autolabel_prewid-test.md`, `results/autolabel_prewid-lab.md`,
+  100 frames each, seed 0, CPU):
+
+  | labeller | split | AP50 | AP75 | P / R @ 0.5 | P / R @ 0.55 | s / image |
+  |---|---|---|---|---|---|---|
+  | `grounding-dino-tiny` | test | 0.989 | 0.989 | 0.95 / 0.98 | 0.95 / 0.98 | 30.6 |
+  | `grounding-dino-tiny` | lab | 0.964 | 0.961 | 0.94 / 0.91 | 1.00 / 0.83 | 22.5 |
+  | `owlv2-base` | test | 0.990 | 0.902 | 1.00 / 0.57 @ 0.2 | 0.00 / 0.00 | 23.0 |
+  | `owlv2-base` | lab | 0.898 | 0.884 | 1.00 / 0.06 @ 0.2 | 0.00 / 0.00 | 19.1 |
+
+  - **Advised**: `grounding-dino-tiny` at **0.5**: the domain is fit, better than VOC
+    (0.832). At 0.55 the new `lab` camera loses 17 % of the persons, at 0.4 the precision
+    falls to 0.64 on `lab`.
+  - **OWLv2** ranks the persons as well (AP50 0.990 on `test`) but its scores stay under
+    about 0.3: no fixed threshold gives both P and R, so it is not advised.
+  - Row "industrial CCTV" in the T22.10 table of [M22](M22-autolabel.md), threshold in
+    [docs/autolabel.md](../autolabel.md).
 
 ### [ ] T41.3 — Batch labelling
 - **Spec**: — · **Depends on**: T41.1, T41.2 · **Runs on**: PC (CUDA if present) ·
   **Size**: M
 - **Deliverables**: `tools/autolabel.py --folder data/safe_unsafe/frames --classes person
-  --model <T41.2> --conf <T41.2> --out data/safe_unsafe/autolabel --resume`; counts (frames,
+  --model grounding-dino-tiny --conf 0.5 --out data/safe_unsafe/autolabel --resume`; counts (frames,
   boxes, frames with no box) per behaviour class in the Summary
 - **Acceptance**: every extracted frame has a label file; `autolabel.json` holds the model,
   version, prompt and threshold
