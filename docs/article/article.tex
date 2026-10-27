@@ -546,7 +546,13 @@ by an injected fault. This section is engineering outside the \gls{base}.
 \gls{int8} activations and the int32 accumulator of a chosen layer, either one given bit or at random
 with a bit error rate, or holds them stuck at a value; every run is seeded, and with no fault the
 output equals the integer model exactly. A campaign tool sweeps the error rate, the layer and the
-bit position against the \gls{map}. Only a \gls{smokerun} has been made so far; the full grids are to run.
+bit position against the \gls{map} (Tiny-YOLOv2 \gls{voc}, 500 images, 3 seeds,
+\repo{results/faults.md}). Up to an error rate of $10^{-6}$ no site moves the \gls{map} beyond the
+seed spread; at $10^{-4}$ accumulator faults take it from \chiffre{faults.map.free} to \chiffre{faults.map.acc}, while \gls{int8} weight
+flips cost nothing measurable. One flip at bit 16 or higher of an int32 bias removes every
+detection, and the first layers are the most sensitive. The \gls{abft} check flags every weight,
+bias and accumulator fault that changes a result, and no activation fault: the checksum is
+computed on the corrupted input.
 
 \paragraph{Exact checksum (ABFT).} The sum of the output channels of a convolution equals the
 convolution of its input by the sum of its filters. Before \gls{requant} everything is an
@@ -677,9 +683,8 @@ weights; the datasets beyond \gls{voc} have only been explored at \gls{tier} R
 (Section~\ref{sec:beyond}). YOLOv4-tiny still needs its full C-simulation pass on \gls{coco} and
 quantization-aware training to come within one point. YOLOv7-tiny, YOLOv5n and YOLOv8n
 have their float \gls{coco} accuracy (\repo{results/map\_coco.md}) and their training recipes
-in NumPy, but no integer model yet (\ms{M26}, \ms{M33} to \ms{M35}). The fault campaign has
-only run as a \glslink{smokerun}{smoke test}, and the \gls{abft} lane of the kernel is not
-synthesized. The equivalence evidence and the
+in NumPy, but no integer model yet (\ms{M26}, \ms{M33} to \ms{M35}). The fault campaign covers
+Tiny-YOLOv2 only, and the \gls{abft} lane of the kernel is not synthesized. The equivalence evidence and the
 latency bound of Section~\ref{sec:safety} stop at the \gls{csim}: the \gls{cosim} and
 board rows, the measured \gls{burst} latency and the latency distribution on the board are
 pending. The person-detection safety metrics (\ms{M27}) are measured on the industrial
@@ -792,6 +797,8 @@ v5 & 2026-10-27 & Full proofreading (\ms{T17.17}): every chunk citation checked 
   state-of-the-art figure called out. \\
 v6 & 2026-10-27 & First update after a milestone moved (\ms{T17.18}): conformal person
   threshold and temporal vote of \ms{M29} in the limitations; no number changed. \\
+v7 & 2026-10-27 & Fault campaign of \ms{T25.1} in the fault-injection paragraph and the
+  limitations. \\
 \bottomrule
 \end{tabularx}
 \end{center}

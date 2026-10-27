@@ -30,7 +30,7 @@ the PC, Colab sessions. State on 2026-10-27.
 | Calibration, 500 images | 1-2.5 min | `build/quant/calib*.log` |
 | C-sim `yolo_bench` | VOC 4,952 images ≈ 40 min (22 threads), i.e. ≈ 0.5 s/image; COCO 5,000 with v4-tiny ≈ 1.5 h (18 cores) | [M12](M12-profils-pc.md), [M24](M24-yolov4-tiny.md) |
 | Grounding DINO tiny, PC CPU | ≈ 5 s/image with 1-2 prompts (5.2 s on Pet, 2026-10-27); 3 processes × 6 threads: 8-15 s/image per process, 4-5 s/image of throughput | [M22](M22-autolabel.md), [M32](M32-trashnet-pets.md) |
-| Fault campaign, 500 images, 16 jobs | ≈ 50 s per run | `build/m25/faults/log.txt` |
+| Fault campaign, 500 images, 16 jobs (10 jobs on a shared CPU: 60-130 s, 9.1 h for the 393 runs of T25.1) | ≈ 50 s per run | `build/m25/faults/log.txt` |
 | Drive transfers | sizes in [donnees-drive.md](donnees-drive.md); no speed measured; > 10 GB is slow and sometimes freezes | [donnees-drive.md](donnees-drive.md) |
 
 Unmeasured: training and evaluation speed of YOLOv8n; training speed of YOLOv5n and
@@ -62,7 +62,6 @@ GPU (T12.11-e).
 | [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
-| [T25.1](M25-dependability.md) | `tools/fault_campaign.py run --net tiny-yolov2-voc --subset 500 --jobs 16 --seeds 0,1,2 --grid ber \| layer \| bit` (`tools/m25.sh`) | VOC 500 | ≈ 5.4 h (ber 1.0 h, layer 3.0 h, bit 1.4 h) | `plan` output in `build/m25/faults/log.txt`; the ber run of 14:11 left 0 results | — |
 | [T25.6](M25-dependability.md) | `tools/fault_campaign.py --criterion person` | CrowdHuman | ≈ 5 h *(est.)* | same grids as T25.1 | T25.1, T27.0, CrowdHuman data |
 | [T25.8](M25-dependability.md) | faults injected on video, temporal coherence | video | unmeasured | — | T25.6, T29.3 |
 | [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py infer --dataset crowdhuman --split val` for tiny-yolov3-crowdhuman, v3-coco, v4-coco, then `report --write` | CrowdHuman val 4,370 | ≈ 25 min *(est.)* | float + int 0.11 s/image with 20 jobs (measured on PREWID, 2026-10-26): 3 × 4,370 × 0.11 s | T15.14, CrowdHuman data |

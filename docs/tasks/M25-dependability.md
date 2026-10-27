@@ -16,13 +16,13 @@ The bit-exact integer model (`IntNetwork`, M4) is the fault-free reference: any 
 caused by the injected fault. This is outside the base of the spec: the method is
 engineering, to be cited from the dependability literature when written up.
 
-**State** (2026-10-20):
+**State** (2026-10-27):
 
 - **Done**:
   - T25.0 injector, T25.2 ABFT in Python and the golden, T25.5 OOD monitor (commit ceefca3).
+  - T25.1 sensitivity campaign (2026-10-27, [results/faults.md](../../results/faults.md)).
   - T25.3 ABFT lane in the HLS kernel and T25.7 faults in the HLS buffers, in C-sim
     ([results/faults.md](../../results/faults.md)).
-- **Tooling ready, campaign to run**: T25.1 (`tools/m25.sh`).
 - **Remaining**: T25.4, T25.6, T25.8, T25.9 and T25.10; the synthesis costs are deferred.
 
 ### [x] T25.0 — Fault model and injector
@@ -35,7 +35,7 @@ engineering, to be cited from the dependability literature when written up.
   - seeded, reproducible; with no fault, the output equals `IntNetwork` exactly;
   - a hook in `IntNetwork` that does not slow the fault-free path.
 
-### [ ] T25.1 — Sensitivity campaign
+### [x] T25.1 — Sensitivity campaign
 - **Spec**: §8.3 · **Depends on**: T25.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `tools/fault_campaign.py`; `results/faults.md`; a figure in
   `tools/figures/resultats.py` (M13 style)
@@ -44,6 +44,17 @@ engineering, to be cited from the dependability literature when written up.
   layers by sensitivity; several seeds, spread given
 - **Notes**: 1,000s of evaluations: use the PC profiles of [M12](M12-profils-pc.md) to size
   the campaign before running it.
+- **Done** (2026-10-27, [results/faults.md](../../results/faults.md), figure `faults`
+  T13.58): Tiny-YOLOv2 VOC integer, 500 images, 3 seeds, 393 runs, fault-free mAP 57.73.
+  - **BER**: no loss beyond the seed spread up to 1e-6; at 1e-4, accumulators 21.3,
+    activations 51.0, biases 50.8 ± 6.5, weights 57.6 (int8 weight flips are harmless).
+  - **Bits**: one flip at bit ≥ 16 of an int32 bias kills the model (−55 to −58 points);
+    an accumulator flip costs ≤ 1.4 points per image, the int8 activation sign 1.3.
+  - **Layers**: L00 > L02 > L04 ≈ L06, then below the seed spread from L08 on.
+  - **ABFT**: weight, bias and accumulator faults that change a result are all flagged;
+    activation faults never are (71 % of the images changed silently), so the activation
+    buffers need their own protection (T25.7). Input for T25.4 (biases and the first
+    layers first).
 
 ### [x] T25.2 — ABFT checksum in the reference models
 - **Spec**: §4.1, §9.3 · **Depends on**: T25.0 · **Runs on**: PC (golden C++) · **Size**: M

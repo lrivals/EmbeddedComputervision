@@ -1,6 +1,6 @@
 {
  "_rev": {
-  "rev": "6d62f34-dirty",
+  "rev": "5b51c01-dirty",
   "date": "2026-10-27"
  },
  "abft.hls.layers": {
@@ -439,6 +439,24 @@
   "command": "python tools/equivalence.py run",
   "rev": "9fd9562-dirty",
   "date": "2026-10-22"
+ },
+ "faults.map.acc": {
+  "value": 21.25,
+  "status": "measured",
+  "source": "results/faults.md",
+  "command": "tools/m25.sh report",
+  "nd": 1,
+  "rev": "5b51c01-dirty",
+  "date": "2026-10-27"
+ },
+ "faults.map.free": {
+  "value": 57.73,
+  "status": "measured",
+  "source": "results/faults.md",
+  "command": "tools/m25.sh report",
+  "nd": 1,
+  "rev": "5b51c01-dirty",
+  "date": "2026-10-27"
  },
  "map.coco.table": {
   "value": {

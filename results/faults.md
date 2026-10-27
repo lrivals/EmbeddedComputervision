@@ -1,9 +1,84 @@
 # Faults and their detection (M25)
 
-The sections below come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20. The
-sensitivity campaign on the integer model (T25.1, `tools/fault_campaign.py`, mAP against
-the BER on 500 VOC images) has only been smoke-run; its tables go here when it is run
-(`tools/m25.sh`).
+The first section is the sensitivity campaign on the integer model (T25.1), 2026-10-27.
+The others come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20.
+
+## T25.1: sensitivity of the integer model
+
+`tools/m25.sh ber`, `layer`, `bit`, then `report` (`tools/fault_campaign.py`, faults of
+`yolo.quant.faults`, T25.0): Tiny-YOLOv2 VOC integer, 500 images of VOC2007 test (tier M,
+ranking only), seeds 0, 1, 2 (mean ± std), 393 runs (73 + 217 + 103), 9.1 h on 10
+processes (CPU shared with other runs). `weight` / `bias` faults are flipped once in the stored model; `act` (int8
+layer inputs) and `acc` (int32 accumulators) are drawn again for each image. Figure:
+`build/figures/resultats/faults.png` (T13.58).
+
+Fault-free mAP: **57.73** (500 images).
+
+| Site | BER 1e-09 | BER 1e-08 | BER 1e-07 | BER 1e-06 | BER 1e-05 | BER 1e-04 |
+|---|---|---|---|---|---|---|
+| weight | 57.73 ± 0.00 | 57.82 ± 0.17 | 57.51 ± 0.19 | 57.41 ± 0.22 | 57.54 ± 0.46 | 57.60 ± 1.16 |
+| bias | 57.73 ± 0.00 | 57.73 ± 0.00 | 57.73 ± 0.00 | 57.73 ± 0.00 | 56.57 ± 2.01 | 50.77 ± 6.50 |
+| act | 57.73 ± 0.00 | 57.69 ± 0.09 | 57.50 ± 0.20 | 57.88 ± 0.12 | 57.02 ± 0.74 | 51.04 ± 0.20 |
+| acc | 57.75 ± 0.03 | 57.67 ± 0.12 | 57.74 ± 0.31 | 57.49 ± 0.30 | 50.32 ± 2.00 | 21.25 ± 0.72 |
+
+| Conv | weight 1e-07 | weight 1e-05 | bias 1e-07 | bias 1e-05 | act 1e-07 | act 1e-05 | acc 1e-07 | acc 1e-05 |
+|---|---|---|---|---|---|---|---|---|
+| L00 | +0.00 | +0.00 | +0.00 | +0.00 | -0.14 | +0.08 | +0.25 | -4.83 |
+| L02 | +0.00 | +0.00 | +0.00 | +0.00 | -0.04 | -0.04 | -0.13 | -1.19 |
+| L04 | +0.00 | -0.18 | +0.00 | +0.00 | +0.04 | -0.12 | +0.04 | -0.89 |
+| L06 | +0.00 | -0.28 | +0.00 | +0.00 | -0.01 | -0.38 | -0.04 | -0.39 |
+| L08 | +0.00 | -0.15 | +0.00 | +0.00 | -0.02 | -0.15 | -0.03 | -0.17 |
+| L10 | -0.03 | -0.08 | +0.00 | +0.00 | -0.00 | -0.01 | +0.02 | +0.15 |
+| L12 | +0.01 | -0.08 | +0.00 | +0.00 | +0.01 | +0.11 | +0.01 | -0.28 |
+| L13 | +0.01 | +0.06 | +0.00 | +0.00 | +0.00 | +0.01 | +0.03 | +0.24 |
+| L14 | +0.00 | +0.02 | +0.00 | +0.00 | -0.00 | -0.22 | -0.00 | -0.35 |
+
+mAP change in points (negative: loss). Ranking (mean loss): L00 (0.58), L02 (0.18), L04 (0.14), L06 (0.14), L14 (0.07), L08 (0.06), L12 (0.03), L10 (-0.01), L13 (-0.04)
+
+| Bit | weight | bias | act | acc |
+|---|---|---|---|---|
+| 0 | -0.11 | -0.04 | -0.20 | +0.00 |
+| 1 | -0.20 |  | -0.11 |  |
+| 2 | -0.04 |  | -0.18 |  |
+| 3 | -0.22 |  | -0.03 |  |
+| 4 | -0.16 | +0.06 | -0.23 | -0.12 |
+| 5 | -0.12 |  | -0.03 |  |
+| 6 | -0.14 |  | -0.05 |  |
+| 7 | +0.03 |  | -1.31 |  |
+| 8 |  | -0.03 |  | -0.00 |
+| 12 |  | -2.79 |  | +0.06 |
+| 16 |  | -54.66 |  | -0.36 |
+| 20 |  | -57.73 |  | -0.50 |
+| 24 |  | -57.73 |  | -0.56 |
+| 28 |  | -57.73 |  | -0.56 |
+| 31 |  | -57.69 |  | -1.42 |
+
+mAP change in points for one flip at that bit (per image for act / acc, per model for weight / bias).
+
+| Site | Images changed | Flagged by ABFT | Changed and flagged | Silent (changed, not flagged) |
+|---|---|---|---|---|
+| weight | 69.2 % | 69.8 % | 100.0 % | 0.0 % |
+| bias | 31.8 % | 32.3 % | 100.0 % | 0.0 % |
+| act | 71.0 % | 0.0 % | 0.0 % | 71.0 % |
+| acc | 74.2 % | 85.1 % | 100.0 % | 0.0 % |
+
+- **BER**: up to 1e-6, no site moves the mAP by more than 0.35 points, which is the seed
+  spread. At 1e-4, accumulator faults take the mAP from 57.7 to 21.3; activation and bias
+  faults cost about 7 points (bias ± 6.5: it depends on which bits are hit). Weight faults
+  cost nothing measurable even at 1e-4: an int8 weight flip moves one product of a sum of
+  thousands.
+- **Bit position**: the bias is the weak point. A single flip at bit 16 or higher of an
+  int32 bias kills the model (−54.7 to −57.7 points, no detections left); bit 12 costs 2.8.
+  One accumulator flip per image costs at most 1.4 points, even on the sign (bit 31),
+  because it hits one pixel of one image. For an int8 activation, the sign bit (7) costs
+  1.3 points and the low bits stay in the noise.
+- **Layers**: the first convs are the most sensitive (L00 −4.8 points for accumulator
+  faults at 1e-5, then L02 and L04); from L08 on, the losses are below the seed spread.
+- **ABFT** (T25.2): every weight, bias or accumulator fault that changes a result is
+  flagged (0 % silent). Activation faults are never flagged (71 % of the images changed
+  silently): the checksum is computed on the corrupted input, so it checks the
+  computation, not its data. Activation buffers need their own protection (parity or ECC,
+  T25.7).
 
 ## T25.3: ABFT in the HLS kernel (C-sim)
 

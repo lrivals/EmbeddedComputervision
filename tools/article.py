@@ -1024,6 +1024,21 @@ def abft_hls(bench):
     return read
 
 
+def fault_map(site=None):
+    """Fault-free mAP of the T25.1 campaign (site None), or the mAP of `site` at the highest
+    BER of the BER table of faults.md."""
+    def read(root):
+        text = need(_results("faults.md", root)).read_text()
+        if site is None:
+            m = re.search(r"Fault-free mAP: \*\*([\d.]+)\*\*", text)
+        else:
+            m = re.search(rf"^\| {site} \|.*\| ([\d.]+) ± [\d.]+ \|$", text, re.M)
+        if not m:
+            raise MissingSource(f"faults.md: no T25.1 mAP for {site or 'fault-free'}")
+        return num(m.group(1), True)
+    return read
+
+
 def wcet_section(net, root):
     """Text of the `### <net>` section of latency_bound.md (per-network bounds)."""
     text = need(_results("latency_bound.md", root)).read_text()
@@ -1210,6 +1225,9 @@ CLES: dict[str, Key] = {
                                "tools/m25.sh ood", "measured", 2),
     "abft.hls.layers": Key(abft_hls("tb_conv"), R + "faults.md", "make csim-gcc", "csim", 0),
     "abft.hls.outputs": Key(abft_hls("tb_net"), R + "faults.md", "make csim-gcc", "csim", 0),
+    "faults.map.free": Key(fault_map(), R + "faults.md", "tools/m25.sh report", "measured", 1),
+    "faults.map.acc": Key(fault_map("acc"), R + "faults.md", "tools/m25.sh report", "measured",
+                          1),
     # safety evidence (M28, M30)
     "equiv.table": Key(t_equiv, R + "equivalence.md", "python tools/equivalence.py run",
                        "csim"),
