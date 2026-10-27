@@ -88,12 +88,13 @@ def checkpoint_fused(net, path, dtype):
 
 
 def person_index(spec, dataset):
-    """(person class of the model, dataset → model class table)."""
+    """(person class of the model, dataset → model class table). The person class comes
+    from `eval_view`, so a dataset whose class maps to `person` (ExDark `People`) works."""
     from yolo.data import datasets
 
     lut = datasets.class_lut(dataset, spec["classes"])
-    src = datasets.DATASETS[dataset].classes
-    return int(lut[list(src).index("person")]), lut
+    view = datasets.eval_view(dataset, spec["classes"])
+    return int(np.nonzero(view.det_lut == view.names.index("person"))[0][0]), lut
 
 
 def set_samples(spec, name, n=None, seed=0):
