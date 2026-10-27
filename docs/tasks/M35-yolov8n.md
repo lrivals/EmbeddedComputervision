@@ -239,6 +239,7 @@ M33 (BN $\varepsilon = 10^{-3}$, SiLU). All downsampling by 3×3 / 2 convs.
   - Head bias init: box branch bias 1.0; class branch $\log(5 / C / (640/s)^2)$.
   - EMA as in T33.7.
 - **Done so far** (code and tests; the VOC run is open, [long-runs.md](long-runs.md)):
+  - **Out-of-domain baseline**: the VOC2007 test mAP of the COCO weights through `MAPPINGS`, `voc/yolov8n-coco_infer` (T37.2, 2026-10-27): **79.64**, the value the VOC fine-tuning must beat (Tiny-YOLOv3 68.45, Tiny-YOLOv4 74.54 in the same notebooks).
   - **Loop**: `TrainerV5` takes the v8 loss and levels from `head: "dfl"`
     (`HYP_V8` by default) and logs box / cls / dfl.
   - **Bias prior**: `init_head_biases` has the v8 path: box convs 1.0, class convs

@@ -193,6 +193,7 @@ conv + BN + leaky 0.1, except the three head convs (1×1, bias, `activation=logi
 - **Notes**: the Darknet trainer of M2 (burn-in, steps) stays for the v2 / v3 / v4 networks;
   the v7-tiny path uses the M33 schedule because its weights come from the PyTorch recipe.
 - **Done so far** (code; the VOC run is open, [long-runs.md](long-runs.md)):
+  - **Out-of-domain baseline**: the VOC2007 test mAP of the COCO weights through `MAPPINGS`, `voc/tiny-yolov7-coco_infer` (T37.2, 2026-10-27): **79.74**, the value the VOC fine-tuning must beat (Tiny-YOLOv3 68.45, Tiny-YOLOv4 74.54 in the same notebooks).
   - **Trainer**: `TrainerV5` of T33.7 trains the Darknet graph unchanged (`v5_levels`,
     OTA loss by default). `Trainer` (M2) now refuses `new_coords` heads with a pointer to
     it.

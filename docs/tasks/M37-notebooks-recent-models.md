@@ -38,8 +38,7 @@ T14.11 run choice), [T33.4](M33-yolov5n.md) / [T34.2](M34-yolov7-tiny.md) /
 - **Checked**: smoke run (T14.9) of the 12 notebooks, the three fine-tuned `_infer` ones
   on throwaway 2-iteration runs (deleted); exact resume of `TrainerV5` with the v8 loss and
   AdamW (`test_recipe_v5.py::test_trainer_resume_is_exact`).
-- **Open**: T37.1 / T37.2 notebooks to execute (versioned empty for now), YOLOv7-tiny
-  COCO and the three VOC out-of-domain values on the full split (runs stopped); T37.3 full
+- **Open**: T37.1 notebooks to execute (T37.2 done 2026-10-27), YOLOv7-tiny COCO; T37.3 full
   runs and YOLOv8n training speed; T37.4 after them; T37.5 blocked by T33.8, T34.5, T35.7.
 - **Known**: `--check` fails for reasons outside M37 (stale notebooks of other datasets,
   `tiny-yolov7-coco_infer` of the non-VOC datasets never generated); generating any target
@@ -47,17 +46,16 @@ T14.11 run choice), [T33.4](M33-yolov5n.md) / [T34.2](M34-yolov7-tiny.md) /
 
 ## Notebook matrix
 
-Target state. "exists" = versioned today; "registry" = produced by the generator, not yet
-written; "new" = a registry entry to add.
+The 12 notebooks are in the registry and versioned (T37.0).
 
 | Dataset | YOLOv5n | YOLOv7-tiny | YOLOv8n |
 |---|---|---|---|
-| coco | `yolov5n-coco_infer` (exists) | `tiny-yolov7-coco_infer` (exists) | `yolov8n-coco_infer` (new) |
-| voc, out-of-domain | `yolov5n-coco_infer` (new) | `tiny-yolov7-coco_infer` (registry) | `yolov8n-coco_infer` (new) |
-| voc, training | `yolov5n-voc_train` (exists) | `tiny-yolov7-voc_train` (exists) | `yolov8n-voc_train` (new) |
-| voc, fine-tuned | `yolov5n-voc_infer` (new) | `tiny-yolov7-voc_infer` (new) | `yolov8n-voc_infer` (new) |
+| coco | `yolov5n-coco_infer` | `tiny-yolov7-coco_infer` | `yolov8n-coco_infer` |
+| voc, out-of-domain | `yolov5n-coco_infer` | `tiny-yolov7-coco_infer` | `yolov8n-coco_infer` |
+| voc, training | `yolov5n-voc_train` | `tiny-yolov7-voc_train` | `yolov8n-voc_train` |
+| voc, fine-tuned | `yolov5n-voc_infer` | `tiny-yolov7-voc_infer` | `yolov8n-voc_infer` |
 
-12 notebooks, 7 of them new. Paths: `notebooks/<dataset>/<model>_<role>.ipynb`; run
+12 notebooks. Paths: `notebooks/<dataset>/<model>_<role>.ipynb`; run
 outputs in `build/notebooks/<dataset>/<model>/` (M14 layout).
 
 Weights per notebook:
@@ -116,7 +114,7 @@ Weights per notebook:
     (v7-tiny) ([long-runs.md](long-runs.md#reference-speeds)); YOLOv8n is unmeasured.
     Ship with a tier R `SUBSET` and run the full split once for the acceptance.
 
-### [ ] T37.2 — VOC out-of-domain inference
+### [x] T37.2 — VOC out-of-domain inference
 - **Spec**: §8 · **Depends on**: T37.0 · **Size**: S
 - **Deliverables**: `notebooks/voc/yolov5n-coco_infer.ipynb`,
   `notebooks/voc/tiny-yolov7-coco_infer.ipynb` and `notebooks/voc/yolov8n-coco_infer.ipynb`,
@@ -128,6 +126,12 @@ Weights per notebook:
     VOC fine-tuning must beat.
 - **Notes**: the Tiny-YOLOv3 / v4 rows of the same notebooks (`voc/tiny-yolov3-coco_infer`,
   `voc/tiny-yolov4-coco_infer`) give the comparison.
+- **Done** (2026-10-27, executed on the PC, VOC2007 test 4952 images): YOLOv5n **69.48**,
+  YOLOv7-tiny **79.74**, YOLOv8n **79.64** mAP (Tiny-YOLOv3 68.45, Tiny-YOLOv4 74.54).
+  Written in the Done of [T33.7](M33-yolov5n.md), [T34.4](M34-yolov7-tiny.md) and
+  [T35.6](M35-yolov8n.md). About 1 h 10 per notebook on 3 cores; a notebook holds about
+  4 GB per evaluation job, so it runs in a memory-capped unit
+  ([long-runs.md](long-runs.md)).
 - **Progress** (2026-10-27): the three notebooks set to the full split by default
   (`FULL_RUN` of `gabarits.py`, `SUBSET = 0`) and regenerated, versioned empty. Their
   execution (`jupyter nbconvert --execute --inplace`, ≈ 30-45 min for the three) was

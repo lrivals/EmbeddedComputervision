@@ -347,6 +347,7 @@ Repeats $n' = \max(\mathrm{round}(n·0.33), 1)$, channels $c' = \lceil c·0.25 /
   - Time: the conv cost is the bottleneck; record the time of an epoch on the PC in
     [long-runs.md](long-runs.md).
 - **Done so far** (code and overfit; the VOC run is open, [long-runs.md](long-runs.md)):
+  - **Out-of-domain baseline**: the VOC2007 test mAP of the COCO weights through `MAPPINGS`, `voc/yolov5n-coco_infer` (T37.2, 2026-10-27): **69.48**, the value the VOC fine-tuning must beat (Tiny-YOLOv3 68.45, Tiny-YOLOv4 74.54 in the same notebooks).
   - **Optimizer**: `SGDGroups` in `optim.py` (torch `SGD(nesterov=True)` formula; groups
     conv W with decay, BN γ, biases + BN β as the torch `bias`).
   - **Schedule**: `V5Schedule` in `schedule.py` (linear or one-cycle lf; warmup
