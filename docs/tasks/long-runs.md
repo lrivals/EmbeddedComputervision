@@ -60,10 +60,7 @@ GPU (T12.11-e).
 | [T36.5](M36-explanation.md) | `tools/explain.py misses` on CrowdHuman val, the T27.3 sets and ExDark (VOC done 2026-10-27) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | CrowdHuman data, T27.3 |
 | [T36.7](M36-explanation.md) | `tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --subset 200 --batch 8 --iters 250 --lr 1e-4 --burn-in 20 --record --record-every 10 --snap-every 50 [--corrupt 0.05] --out build/explain/record/{clean,corrupt5}`, then `tools/explain.py record --runs …` | VOC trainval, 200 images | ≈ 1 h per run alone *(est.)*; 2 runs side by side ≈ 2 h | 15-30 s/iteration measured with the other runs sharing the CPU | — |
 | [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
-| [T16.13](M16-presentation-jeux.md) | `notebooks/coco/coco_stats.ipynb`, then `stats-jeux.md` | COCO 5,000 images, 36,781 objects | unmeasured, R-M | failed in 45 s on 2026-10-27 | fix: `data_stats.py` reads `train2017` pixels, not on the PC |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
-| [T18.8](M18-jeux-drone.md) | `tools/m11.sh <ds>-prep`, then the four `_stats` notebooks, `tools/data_stats.py --report` | auair, dronevehicle, hituav, uavdt (1.2 M objects) | unmeasured, M *(est.)* | prep ≈ 20 s each (DroneVehicle) | — |
-| [T21.7](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `asl_stats` notebook | 69,984 + 6,538 | unmeasured, M | — | — |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
 | [T25.1](M25-dependability.md) | `tools/fault_campaign.py run --net tiny-yolov2-voc --subset 500 --jobs 16 --seeds 0,1,2 --grid ber \| layer \| bit` (`tools/m25.sh`) | VOC 500 | ≈ 5.4 h (ber 1.0 h, layer 3.0 h, bit 1.4 h) | `plan` output in `build/m25/faults/log.txt`; the ber run of 14:11 left 0 results | — |
 | [T25.6](M25-dependability.md) | `tools/fault_campaign.py --criterion person` | CrowdHuman | ≈ 5 h *(est.)* | same grids as T25.1 | T25.1, T27.0, CrowdHuman data |
@@ -126,8 +123,8 @@ These share the CPU with the table above: one at a time, at night.
 | [T9.3.6](M9.3-quant-4bits.md) | long 4-bit QAT: several epochs at 4 bits, 8→6→4 ramp, float baseline; full VOC07 test mAP | VOC07+12 | ≈ 5 h *(est.)* | ≈ 10 min per epoch (16,551 × 0.033 s) × 3 variants × 10 epochs; QAT speed on GPU unmeasured | T15.1 |
 | [T10.10](M10-ameliorations.md) | per-layer QAT (mixed precision) | VOC | unmeasured, ≈ 1-2 h *(est.)* | — | — |
 | [T10.11, T10.15](M10-ameliorations.md) | long fine-tune of the r30, r50, r70 exports (`tools/prune_study.sh`), full VOC07 mAP | VOC | ≈ 5 h + ≈ 1 h *(est.)* | 3 × 6,000 it × 1 s; 3 × 22 min | T15.1 |
-| [T18.10](M18-jeux-drone.md) | `_infer` with VOC and COCO weights, `_sweep`, `_train` | auair, dronevehicle, hituav, uavdt (subsample frames) | ≈ 14 h *(est.)* | per dataset: sweep 1 h + long run 1 h 45 + evals ≤ 45 min | T18.8 |
-| [T21.9](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `_sweep` and `_train`; mAP on val 6,538 and the 28 test images | ASL | ≈ 3.5 h *(est.)* | sweep 1 h + long 1 h 45 + 6,538 × 0.27 s | T21.7, T21.8 |
+| [T18.10](M18-jeux-drone.md) | `_infer` with VOC and COCO weights, `_sweep`, `_train` | auair, dronevehicle, hituav, uavdt (subsample frames) | ≈ 14 h *(est.)* | per dataset: sweep 1 h + long run 1 h 45 + evals ≤ 45 min | — |
+| [T21.9](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `_sweep` and `_train`; mAP on val 6,538 and the 28 test images | ASL | ≈ 3.5 h *(est.)* | sweep 1 h + long 1 h 45 + 6,538 × 0.27 s | — |
 | [T21.11](M21-asl-alphabet.md) | `SIZE=224x224 tools/m11.sh asl-prep`, `asl-train` | ASL | ≈ 1 h *(est.)* | 3.4× fewer MACs than 416 + eval | T21.9 |
 | [T24.6](M24-yolov4-tiny.md) | `notebooks/<ds>/tiny-yolov4-<ds>_{sweep,train,infer}.ipynb` with `INT8` and `HW` stages | the 11 `TRAINABLE` datasets | ≈ 30-35 h *(est.)* | per dataset ≈ 3 h (sweep, long run, evals); C-sim stage on the PC | — |
 | [M24](M24-yolov4-tiny.md) QAT | QAT of v4-tiny (integer model loses 1.3 AP50) | COCO | unmeasured | — | — |
@@ -145,7 +142,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T16.14](M16-presentation-jeux.md), T11.2, T11.4 | finish KITTI `training/image_2` (`data/kitti/data_object_image_2.zip.part` incomplete) | ≈ 12 GB | unmeasured | — |
 | [T11.6](M11-jeux-de-donnees.md), T25.6, T27 | CrowdHuman to the PC (`tools/get_datasets.sh pull crowdhuman`) | 11 GB | unmeasured | — |
 | [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
-| [T21.8](M21-asl-alphabet.md) | `tools/get_datasets.sh push asl` | 1.2 GB | unmeasured | — |
 | [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | T32.1 for trashnet |
 | [T27.4](M27-safety-metrics.md) | MOT17 or MOT20 | to check | unmeasured | — |
 
@@ -172,8 +168,7 @@ graph LR
   T152[T15.2] --> T151["T15.1 VOC"] --> T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
   T151 --> T936[T9.3.6] & T1011["T10.11, T10.15"]
   T158[T15.8] --> T159["T15.9, T15.10, T15.15, T15.16"]
-  T188[T18.8] --> T1810[T18.10]
-  T217[T21.7] --> T219[T21.9] --> T2111[T21.11]
+  T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
   T271 --> T388
   T271 --> T272[T27.2] --> T39["T39.0, T39.1, T39.5"] --> T392["T39.2, T39.4 (Colab)"]

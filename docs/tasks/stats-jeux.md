@@ -19,10 +19,16 @@ anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0
 | jeu | classes | images | objets | objets/image (méd.) | petits à l'entrée | plus petits qu'une cellule fine | cibles perdues | images > 256 | luminance moy. | IoU ancres de la cfg |
 |---|---|---|---|---|---|---|---|---|---|---|
 | voc | 20 | 21 503 | 62 199 | 2 | 8,4 % | 0,3 % | 0,69 % | 0 | 112 | 0,603 |
+| coco | 80 | 123 287 | 896 782 | 4 | 44,3 % | 14,6 % | 25,82 % | 0 | 111 | 0,550 |
 | visdrone | 10 | 7 019 | 381 963 | 43 | 97,0 % | 75,3 % | 32,40 % | 24 | 97 | 0,601 |
 | crowdhuman | 1 | 19 370 | 566 493 | 20 | 47,5 % | 10,0 % | 19,82 % | 32 | 113 | 0,679 |
 | exdark | 12 | 5 563 | 17 498 | 2 | 18,1 % | 1,0 % | 0,74 % | 0 | 33 | 0,615 |
 | flir | 15 | 11 886 | 191 728 | 15 | 85,6 % | 50,7 % | 17,70 % | 0 | 133 | 0,564 |
+| auair | 8 | 32 823 | 131 977 | 3 | 79,8 % | 34,7 % | 8,88 % | 0 | 123 | 0,668 |
+| dronevehicle | 2 | 14 726 | 235 858 | 12 | 65,4 % | 0,4 % | 2,88 % | 0 | 80 | 0,735 |
+| hituav | 4 | 2 579 | 22 298 | 6 | 84,2 % | 44,6 % | 7,76 % | 0 | 125 | 0,698 |
+| uavdt | 3 | 40 735 | 798 795 | 15 | 96,9 % | 56,9 % | 14,68 % | 0 | 97 | 0,711 |
+| asl | 28 | 76 522 | 73 522 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 132 | 0,768 |
 | pets | 37 | 6 964 | 6 964 | 1 | 0,0 % | 0,0 % | 0,00 % | 0 | 114 | 0,824 |
 | prewid | 1 | 3 413 | 1 924 | 1 | 38,5 % | 0,4 % | 0,16 % | 0 | 138 | 0,777 |
 <!-- /data_stats:comparatif -->
@@ -96,7 +102,7 @@ and 1,564 "others"; 32,959 boxes are less than 2 px wide at the input.
 ## FLIR ADAS v2
 
 <!-- data_stats:flir -->
-Révision `214f269`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset flir --split train,val --sample 200`.
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-flir-c1.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset flir --split train,val --sample 200`.
 
 | partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -234,3 +240,93 @@ narrow; k-means anchors 15×37 to 82×88, `results/anchors_prewid.md`). **Empty 
 45 % of the plant frames and 48 % of the lab ones**; the split keeps the same share in train,
 val and test for each camera (empty frames and worker frames are cut separately, T38.1), so
 `test` has 289 empty frames to measure false alarms on.
+
+<!-- data_stats:coco -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `tiny-yolov3-coco`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset coco --split train2017,val2017 --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train2017 | 118 287 | 860 001 | 10 052 | 1 021 | 4 / 93 | 44,3 % | 13x13 33,8 % · 26x26 14,6 % | 25,83 % | 0 / 0 |
+| val2017 | 5 000 | 36 781 | 446 | 48 | 4 / 63 | 44,5 % | 13x13 34,1 % · 26x26 14,2 % | 25,61 % | 0 / 0 |
+| ensemble | 123 287 | 896 782 | 10 498 | 1 069 | 4 / 93 | 44,3 % | 13x13 33,8 % · 26x26 14,6 % | 25,82 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| val2017 | 5 000 | 36 781 | 5 000 / 36 781 | ok |
+| train2017 | 118 287 | 860 001 | 118 287 / 860 001 | ok |
+<!-- /data_stats:coco -->
+
+<!-- data_stats:auair -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-auair.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset auair --split train,val --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 27 880 | 114 237 | 0 | 2 | 3 / 52 | 81,7 % | 13x13 70,3 % · 26x26 35,1 % | 8,84 % | 0 / 0 |
+| val | 4 943 | 17 740 | 0 | 1 | 3 / 56 | 67,9 % | 13x13 60,1 % · 26x26 31,5 % | 9,15 % | 0 / 0 |
+| ensemble | 32 823 | 131 977 | 0 | 3 | 3 / 56 | 79,8 % | 13x13 69,0 % · 26x26 34,7 % | 8,88 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 27 880 | 114 237 | 27 880 / — | ok |
+| val | 4 943 | 17 740 | 4 943 / — | ok |
+<!-- /data_stats:auair -->
+
+<!-- data_stats:dronevehicle -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-dronevehicle.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset dronevehicle --split train,test --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 12 118 | 193 940 | 0 | 0 | 12 / 206 | 65,4 % | 13x13 23,7 % · 26x26 0,4 % | 2,90 % | 0 / 0 |
+| test | 2 608 | 41 918 | 0 | 0 | 12 / 145 | 65,2 % | 13x13 25,1 % · 26x26 0,5 % | 2,80 % | 0 / 0 |
+| ensemble | 14 726 | 235 858 | 0 | 0 | 12 / 206 | 65,4 % | 13x13 23,9 % · 26x26 0,4 % | 2,88 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 12 118 | 193 940 | 12 118 / 193 940 | ok |
+| test | 2 608 | 41 918 | 2 608 / 41 918 | ok |
+<!-- /data_stats:dronevehicle -->
+
+<!-- data_stats:hituav -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-hituav-c1.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset hituav --split train,test --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 2 008 | 17 518 | 0 | 0 | 6 / 42 | 83,9 % | 13x13 77,9 % · 26x26 43,7 % | 7,76 % | 0 / 0 |
+| test | 571 | 4 780 | 0 | 0 | 6 / 32 | 85,2 % | 13x13 79,7 % · 26x26 48,2 % | 7,74 % | 0 / 0 |
+| ensemble | 2 579 | 22 298 | 0 | 0 | 6 / 42 | 84,2 % | 13x13 78,3 % · 26x26 44,6 % | 7,76 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 2 008 | 17 518 | 2 008 / 17 518 | ok |
+| test | 571 | 4 780 | 571 / 4 780 | ok |
+<!-- /data_stats:hituav -->
+
+<!-- data_stats:uavdt -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-uavdt.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset uavdt --split train,test --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 24 143 | 422 911 | 0 | 314 | 15 / 66 | 97,5 % | 13x13 93,4 % · 26x26 45,6 % | 9,27 % | 0 / 0 |
+| test | 16 592 | 375 884 | 0 | 12 | 15 / 107 | 96,3 % | 13x13 94,0 % · 26x26 69,6 % | 20,77 % | 0 / 0 |
+| ensemble | 40 735 | 798 795 | 0 | 326 | 15 / 107 | 96,9 % | 13x13 93,7 % · 26x26 56,9 % | 14,68 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 24 143 | 422 911 | 24 143 / 422 911 | ok |
+| test | 16 592 | 375 884 | 16 592 / 375 884 | ok |
+<!-- /data_stats:uavdt -->
+
+<!-- data_stats:asl -->
+Révision `3263136`, entrée 416×416 (letterbox), cfg `build/m11/cfg/tiny-yolov3-asl.cfg`, pixels sur 200 images (graine 0). Commande : `python tools/data_stats.py --dataset asl --split train,val --sample 200`.
+
+| partie | images | objets | difficult | images vides | objets/image (méd. / max) | petits < 32² à 416×416 | plus petits qu'une cellule | cibles perdues | images > 256 / > 1 024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 69 984 | 67 434 | 0 | 2 550 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| val | 6 538 | 6 088 | 0 | 450 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+| ensemble | 76 522 | 73 522 | 0 | 3 000 | 1 / 1 | 0,0 % | 13x13 0,0 % · 26x26 0,0 % | 0,00 % | 0 / 0 |
+
+| split | images | objets | officiel |  |
+|---|---|---|---|---|
+| train | 69 984 | 67 434 | — / — | ok |
+| val | 6 538 | 6 088 | — / — | ok |
+<!-- /data_stats:asl -->

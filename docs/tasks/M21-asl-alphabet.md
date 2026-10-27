@@ -243,12 +243,16 @@ only the fine-tuned ones. `notebooks/asl/` holds `asl_stats`, `tiny-yolov3-asl_i
 
 ## C. Runs
 
-### [ ] T21.7 — `stats` notebook run
+### [x] T21.7 — `stats` notebook run
 - **Depends on**: T21.6 · **Size**: S
 - **Deliverables**: `notebooks/asl/asl_stats.ipynb` run and versioned with its outputs;
   section in [stats-jeux.md](stats-jeux.md) (`tools/data_stats.py --report`).
 - **Notes**: run again after `tools/m11.sh asl-prep`, so that collisions use the dataset's
   anchors.
+- **Done** (2026-10-27): regenerated and executed in 47 s with `tiny-yolov3-asl.cfg`, on
+  the annotations kept by T21.3; section in [stats-jeux.md](stats-jeux.md): train 69,984
+  images (67,434 boxes, 2,550 `nothing`), val 6,538 (6,088 boxes); one box per image, no
+  small box and no collision.
 
 ### [x] T21.8 — Drive upload
 - **Depends on**: T21.1 · **Size**: S

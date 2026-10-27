@@ -239,12 +239,18 @@ then `python -m tools.notebooks <dataset>` (or `make notebooks`).
 
 ## C. Running
 
-### [ ] T18.8 — `stats` notebooks executed
+### [x] T18.8 — `stats` notebooks executed
 - **Depends on**: T18.7 · **Size**: S
 - **Deliverables**: the four `<dataset>_stats.ipynb` executed and versioned with their
   outputs; sections in [stats-jeux.md](stats-jeux.md) (`tools/data_stats.py --report`).
 - **Notes**: redo after `tools/m11.sh <dataset>-prep`, so that the collisions use the
   anchors of the dataset and not those of COCO.
+- **Done** (2026-10-27): the four notebooks regenerated (their template was stale since
+  M26) and executed with the cfgs of `<dataset>-prep` (`build/m11/cfg/`): auair 69 s,
+  dronevehicle 60 s, hituav 13 s, uavdt 151 s. Sections in [stats-jeux.md](stats-jeux.md);
+  the split counts equal the official ones. Small boxes at 416: auair 79.8 %, dronevehicle
+  65.4 %, hituav 84.2 %, uavdt 96.9 %; lost targets (collisions) 8.9 %, 2.9 %, 7.8 %,
+  14.7 % (uavdt test 20.8 %).
 
 ### [x] T18.9 — Upload to the Drive
 - **Depends on**: T18.0 · **Size**: S

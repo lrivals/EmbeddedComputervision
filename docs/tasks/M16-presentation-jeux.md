@@ -270,7 +270,7 @@ dataset ([Questions per dataset](#questions-per-dataset)).
   the devkit figures (`OFFICIAL`); AP per class of T13.13 set against the number and the
   size of the objects.
 
-### [ ] T16.13 — COCO val2017
+### [x] T16.13 — COCO val2017
 - **Depends on**: T16.4 to T16.11 · **Size**: S
 - **Acceptance**: 5,000 images, 36,781 objects (including `iscrowd`); small, medium and
   large shares before and after reduction to 416.
@@ -284,6 +284,26 @@ dataset ([Questions per dataset](#questions-per-dataset)).
   the PC: the image sample reads pixels of every split, against the note above. To fix in
   `data_stats.py` (annotations only for `train2017`) or with `SPLITS` limited to `val2017`
   and `calib2017`; same failure in the smoke run of T14.9.
+- **Done** (2026-10-27):
+  - **Fix**: `ANNOTATIONS_ONLY = {"coco": {"train2017"}}` in `tools/data_stats.py`; the pixel
+    sample and the gallery only draw images that are on disk for those splits, the
+    annotation analyses still cover all of train2017. The same fix removes the T14.9 smoke
+    failure.
+  - **Run**: `coco_stats.ipynb` regenerated (its template was stale) and executed in 846 s;
+    section in [stats-jeux.md](stats-jeux.md).
+  - **Counts**: val2017 5,000 images, 36,781 objects (446 `iscrowd`), train2017 118,287 /
+    860,001: both equal to the official counts.
+  - **Sizes** (non-crowd boxes, COCO categories small < 32², medium < 96², large):
+
+    | Split | Boxes | Original image | Letterbox 416 | Stretch 416 |
+    |---|---|---|---|---|
+    | val2017 | 36,335 | 31.5 / 35.2 / 33.3 % | 44.5 / 33.2 / 22.3 % | 38.6 / 34.6 / 26.8 % |
+    | train2017 | 849,949 | 31.5 / 35.2 / 33.4 % | 44.3 / 33.4 / 22.3 % | — |
+    | calib2017 (500 images, 3,757 objects) | 3,706 | 35.0 / 32.5 / 32.5 % | 47.6 / 30.9 / 21.4 % | — |
+
+    At 416, 13 points of the boxes become small; `calib2017` has 3 points more small
+    boxes than val2017 (a random draw of 500 train2017 images), close enough for the
+    calibration of T11.1.
 
 ### [ ] T16.14 — KITTI
 - **Depends on**: T16.4 to T16.11 · **Size**: S
