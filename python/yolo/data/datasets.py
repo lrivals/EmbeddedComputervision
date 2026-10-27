@@ -81,6 +81,11 @@ PETS_CATS = tuple(c for c in PETS_CLASSES if c[0].isupper())
 # PREWID (M38, docs/tasks/M38-prewid.md): workers seen by fixed cameras in legacy plants;
 # empty frames are kept (no box), they are where false alarms are counted.
 PREWID_CLASSES = ("person",)
+# Construction-PPE (M43, docs/tasks/M43-construction-ppe.md, AGPL-3.0): ids of the
+# Ultralytics YAML. The person loader keeps `Person` only; the PPE classes serve T43.6.
+CONSTRUCTION_PPE_CLASSES = ("helmet", "gloves", "vest", "boots", "goggles", "none", "Person",
+                            "no_helmet", "no_goggle", "no_gloves", "no_boots")
+CONSTRUCTION_PPE_PERSON_CLASSES = ("person",)
 
 # Objets per-objet d'un échantillon (filtrés ensemble par `select`).
 # `visible` (visible fraction of the full box, CrowdHuman, MOT17) and `track` (identity,
@@ -488,6 +493,12 @@ def load_prewid(root, split):
                             meta=("camera", "frame"))
 
 
+def load_construction_ppe(root, split):
+    """Output of `tools/prep_datasets.py construction_ppe`: `Person` boxes of the official
+    split (images with no person kept, with no box)."""
+    return _load_json_split(root, split, CONSTRUCTION_PPE_PERSON_CLASSES)
+
+
 # MOT17 (T27.4): ground-level pedestrian videos. gt.txt classes: 1 pedestrian (kept), 2
 # person on vehicle, 7 static person, 8 distractor, 12 reflection (kept as `difficult`);
 # vehicles and occluders are dropped. Every sequence comes three times (DPM, FRCNN, SDP
@@ -624,6 +635,9 @@ EVAL_ONLY = {
     "mot17": Dataset(MOT_CLASSES, _splits(load_mot17), "mot17", "train", "train", "train"),
     "industrial": Dataset(INDUSTRIAL_CLASSES, _splits(load_industrial), "industrial", "test",
                           "calib", "train"),
+    # M43: here until its datasheet and notebooks exist (T43.3), then moved to DATASETS.
+    "construction_ppe": Dataset(CONSTRUCTION_PPE_PERSON_CLASSES, _splits(load_construction_ppe),
+                                "construction_ppe", "test", "train", "train"),
 }
 
 
@@ -690,6 +704,8 @@ MAPPINGS = {
     ("mot17", "coco"): {"person": "person"},
     ("industrial", "voc"): {"person": "person"},
     ("industrial", "coco"): {"person": "person"},
+    ("construction_ppe", "voc"): {"person": "person"},
+    ("construction_ppe", "coco"): {"person": "person"},
 }
 
 FAMILIES = {"voc": VOC_CLASSES, "coco": COCO_CLASSES}

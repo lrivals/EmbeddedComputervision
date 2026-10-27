@@ -10,6 +10,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools import prep_datasets as P  # noqa: E402
+from yolo.data.datasets import CONSTRUCTION_PPE_CLASSES as D_CPPE  # noqa: E402
 
 
 def test_obb_to_yolo_border():
@@ -342,3 +343,30 @@ def test_prep_prewid(tmp_path):
     assert len(D.load("prewid", out, "lab")) == 4
     P.prewid_preview(out, tmp_path / "preview.png")
     assert (tmp_path / "preview.png").exists()
+
+
+def test_prep_construction_ppe(tmp_path):
+    from PIL import Image
+
+    src = tmp_path / "construction-ppe"
+    person = D_CPPE.index("Person")
+    for sp, rows in (("train", [f"{person} 0.5 0.5 0.25 0.5", "0 0.5 0.2 0.1 0.1"]),
+                     ("val", ["7 0.5 0.2 0.1 0.1"]), ("test", [])):
+        (src / "images" / sp).mkdir(parents=True)
+        (src / "labels" / sp).mkdir(parents=True)
+        Image.new("RGB", (64, 48)).save(src / "images" / sp / f"{sp}_1.jpg")
+        (src / "labels" / sp / f"{sp}_1.txt").write_text("".join(r + "\n" for r in rows))
+    out = tmp_path / "construction_ppe"
+    ppe = P.prep_construction_ppe(src, out)
+    assert ppe["train"][0]["labels"] == ["Person", "helmet"]
+    (tr,) = json.loads((out / "annotations_train.json").read_text())
+    assert tr["boxes"] == [[24, 12, 40, 36]] and tr["labels"] == ["person"]
+    (val,) = json.loads((out / "annotations_val.json").read_text())
+    assert val["boxes"] == [] and val["labels"] == []  # no_helmet only: no person
+    assert json.loads((out / "annotations_ppe_val.json").read_text())[0]["labels"] == [
+        "no_helmet"]
+    assert (out / tr["image"]).stat().st_nlink == 2
+    from yolo.data import datasets as D
+
+    (s,) = D.load("construction_ppe", out, "train")
+    assert s["labels"].tolist() == [0]

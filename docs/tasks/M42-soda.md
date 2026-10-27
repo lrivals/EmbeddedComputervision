@@ -16,8 +16,9 @@ M16 notebooks, Drive, fine-tuning).
 | annotation completeness | the M22 labeller looks for unboxed workers before the boxes are trusted as ground truth |
 | out-of-domain baseline | `person` maps to VOC / COCO / CrowdHuman `person` |
 
-**State**: not started (2026-10-26). T42.0 holds a licence check: nothing goes into the
-Drive archive before it. Same dataset search as [M41](M41-safe-unsafe-behaviours.md) and
+**State**: T42.0 in progress (2026-10-27): no licence found (authors' page, arXiv paper);
+the milestone waits for an answer from the authors. Nothing goes into the Drive archive
+before it. Same dataset search as [M41](M41-safe-unsafe-behaviours.md) and
 [M43](M43-construction-ppe.md). All tasks run on the PC (Colab for the GPU runs).
 
 ## Summary
@@ -27,8 +28,8 @@ From the paper and the authors' page (2026-10-26), to check on the local copy in
 | Property | Value |
 |---|---|
 | Name | SODA, Site Object Detection dAtaset |
-| Source | arXiv:2202.09554; data access from the authors' page <https://linjiarui.net/en/portfolio/2022-02-22-SODA-site-object-detection-dataset-for-deep-learning-in-construction> |
-| Licence | **not confirmed** (T42.0, blocking) |
+| Source | Duan, Deng, Tian, Deng, Lin (2022), arXiv:2202.09554; data from the authors' page <https://linjiarui.net/en/portfolio/2022-02-22-SODA-site-object-detection-dataset-for-deep-learning-in-construction> (HKUST OneDrive link, password-protected Baidu copy, no form) |
+| Licence | **none stated** (authors' page and paper, checked 2026-10-27; the paper says the images and VOC files are "publicly provided"). Without a licence, default copyright applies: ask the authors (T42.0, blocking) |
 | Images | 19,846 |
 | Objects | 286,201 boxes, 15 classes (workers, materials, machines, site elements); exact names in T42.0 |
 | Camera | several sites and conditions; fixed cameras or not, and sequences or not, to check |
@@ -96,6 +97,12 @@ profiles `soda-prep`, `soda-train`; `test_prep_soda`, `test_soda`).
   lists `soda`
 - **Notes**: if the licence forbids keeping a copy or derived files, stop the milestone
   here and say so in the State.
+- **Progress** (2026-10-27): `MARKER`, `HOWTO` (source, "no licence stated, ask the
+  authors"), `soda` command (image and xml counts of `data/SODA/`) and `check` entry.
+  Licence search: neither the authors' page nor arXiv:2202.09554 states one.
+- **Remaining**: a written permission (or licence) from the authors, recorded in the
+  Summary; then the download and the Summary checked on the local copy. Until then the
+  milestone is stopped here.
 
 ### [ ] T42.1 — Boxes and split
 - **Spec**: §5.1 · **Depends on**: T42.0 · **Runs on**: PC · **Size**: M

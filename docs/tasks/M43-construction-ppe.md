@@ -15,7 +15,8 @@ chain is the one of the other datasets.
 | cross-domain transfer | Construction-PPE-trained → PREWID test |
 | out-of-domain baseline | `Person` maps to VOC / COCO / CrowdHuman `person` |
 
-**State**: not started (2026-10-26). Same dataset search as
+**State**: T43.0 and T43.1 code written (2026-10-27), tested on a synthetic fixture; the
+data is not on the PC yet (`tools/get_datasets.sh construction_ppe` downloads it). Same dataset search as
 [M41](M41-safe-unsafe-behaviours.md) and [M42](M42-soda.md). All tasks run on the PC
 (Colab for the GPU runs).
 
@@ -26,12 +27,12 @@ From the Ultralytics page (2026-10-26), to check on the local copy in T43.0.
 | Property | Value |
 |---|---|
 | Name | Construction-PPE |
-| Source | <https://docs.ultralytics.com/datasets/detect/construction-ppe/> (YAML with the download link) |
+| Source | <https://docs.ultralytics.com/datasets/detect/construction-ppe/>; archive <https://github.com/ultralytics/assets/releases/download/v0.0.0/construction-ppe.zip> (link of the YAML) |
 | Licence | **AGPL-3.0** (Ultralytics page): the images stay out of the repository; the Drive archive stays private; the datasheet carries the licence |
 | Images | 1,416 |
-| Classes | 11, among them `Person`, PPE worn and PPE missing; exact names and ids in T43.0 |
+| Classes | 11 (ids of the YAML): 0 helmet, 1 gloves, 2 vest, 3 boots, 4 goggles, 5 none, 6 Person, 7 no_helmet, 8 no_goggle, 9 no_gloves, 10 no_boots |
 | Annotations | YOLO txt, one per image |
-| Official split | train / val (/ test) of the YAML, to check |
+| Official split | train 1,132 / val 143 / test 141 images (Ultralytics page), to check on the local copy |
 | Pre-trained mapping | `Person` → VOC / COCO / CrowdHuman `person` |
 
 ## Preprocessing
@@ -78,12 +79,25 @@ in place of `prewid` (`CONSTRUCTION_PPE_PERSON_CLASSES`, `CONSTRUCTION_PPE_CLASS
 - **Deliverables**: `MARKER`, `HOWTO` (source, AGPL-3.0), `construction_ppe` command; the
   Summary checked on the local copy (class names and ids, split, image sizes)
 - **Acceptance**: `tools/get_datasets.sh check` lists `construction_ppe`
+- **Progress** (2026-10-27): `MARKER`, `HOWTO` (source, AGPL-3.0), `construction_ppe`
+  command (download of the YAML's zip into `data/construction-ppe/`, then the prep) and
+  `check` entry; `check` lists it (absent). Classes, ids and split filled from the
+  Ultralytics page.
+- **Remaining**: the download, not run in this session; the Summary checked on the local copy
+  (folder name of the zip, image sizes).
 
 ### [ ] T43.1 — Remap, split and loader
 - **Spec**: §5.1, §8.3 · **Depends on**: T43.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/prep_datasets.py construction_ppe` (person and PPE files,
   preview); loaders, `DATASETS`, `MAPPINGS`; tests
 - **Acceptance**: `load("construction_ppe")` gives the test counts of the Summary
+- **Progress** (2026-10-27): `prep_construction_ppe` (YOLO txt → corners, official split,
+  `annotations_{split}.json` with `Person` only and `annotations_ppe_{split}.json` with the 11
+  classes, hard links, `--preview`), `CONSTRUCTION_PPE_CLASSES`, `load_construction_ppe`,
+  `MAPPINGS` to VOC and COCO `person`; `test_prep_construction_ppe`, `test_construction_ppe`.
+  The entry sits in `EVAL_ONLY`, not `DATASETS`: `DATASETS` requires a datasheet, notebooks
+  and `SPLIT_IMAGES`, which come with T43.3 (then the entry moves).
+- **Remaining**: the run on the real data and the test counts.
 
 ### [ ] T43.2 — Annotation completeness
 - **Spec**: §8.3 · **Depends on**: T43.1, T41.2 · **Runs on**: PC · **Size**: S

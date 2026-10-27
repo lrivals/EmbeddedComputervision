@@ -22,7 +22,8 @@ fixed camera sees in a day.
 | workers in unsafe situations | per behaviour class: a worker at a machine, behind an open panel, near a loaded forklift, is the case a safety function must not miss |
 | out-of-domain baseline | `person` maps to VOC / COCO / CrowdHuman `person`: every pre-trained network gets a score with no training |
 
-**State**: not started (2026-10-26). Comes out of a dataset search for industrial
+**State**: T41.0 in progress (2026-10-27): `get_datasets.sh` entries written, Summary
+filled from the dataset pages; the data is not on the PC yet (manual download). Comes out of a dataset search for industrial
 footage next to PREWID (2026-10-26); [M42](M42-soda.md) and
 [M43](M43-construction-ppe.md) come from the same search. All tasks run on the PC (Colab
 for the GPU runs).
@@ -34,12 +35,12 @@ From the dataset pages (2026-10-26), to check on the local copy in T41.0.
 | Property | Value |
 |---|---|
 | Name | Video Dataset for Safe and Unsafe Behaviours |
-| Source | Mendeley Data, <https://data.mendeley.com/datasets/xjmtb22pff/1>; card and FiftyOne copy on Hugging Face `Voxel51/Safe_and_Unsafe_Behaviours` |
-| Licence | CC BY 4.0 (attribution required in the datasheet, the notebooks and the article) |
+| Source | Mendeley Data, <https://data.mendeley.com/datasets/xjmtb22pff/1> (V1, 2024-06-11, doi:10.17632/xjmtb22pff.1); card and FiftyOne copy on Hugging Face `Voxel51/Safe_and_Unsafe_Behaviours` |
+| Licence | CC BY 4.0 (attribution required in the datasheet, the notebooks and the article). Cite: Önal, O., Dandıl, E. (2024), *Video dataset for the detection of safe and unsafe behaviours in workplaces*, Data in Brief 56, 110756, doi:10.1016/j.dib.2024.110756 |
 | Clips | 691, CCTV of production facilities, 1920 × 1080 at 24 fps |
-| Classes | 8 behaviour classes, safe and unsafe (among them work on a machine, open panel, forklift overload): the exact list goes in T41.0 |
+| Classes | 8 behaviour classes (Hugging Face card, to check on the local copy). Unsafe: Safe Walkway Violation, Unauthorized Intervention, Opened Panel Cover, Carrying Overload with Forklift. Safe: Safe Walkway, Authorized Intervention, Closed Panel Cover, Safe Carrying |
 | Annotations | one behaviour class per clip; **no box**, no frame-level label |
-| Official split | to check in T41.0 (train / test folders on the Mendeley page) |
+| Official split | train 566 / test 125 clips (tags of the Hugging Face copy; the Mendeley page does not list files): folder layout to check on the local copy |
 | Pre-trained mapping | after T41.3: `person` → VOC / COCO / CrowdHuman `person` |
 
 Counts after extraction and labelling (frames, empty frames, boxes, per split and per
@@ -136,6 +137,12 @@ Those of M11, M14, M16, M22, M32 and M38 apply. Files to touch:
 - **Acceptance**: `tools/get_datasets.sh check` lists `safe_unsafe`; the Summary has no
   "to check" left
 - **Notes**: manual download, as PREWID; the folder name keeps the archive's name.
+- **Progress** (2026-10-27): `MARKER`, `HOWTO` (source, DOI, licence, citation),
+  `safe_unsafe` command (clip count and folder tree of
+  `data/Video Dataset for Safe and Unsafe Behaviours/`, the expected archive name) and
+  `check` entry. Classes, clip counts and split filled from the Hugging Face card.
+- **Remaining**: the download (by hand); the Summary checked on the local copy (resolution,
+  frame rate, folder layout, the archive's folder name in `SAFE_UNSAFE_RAW`).
 
 ### [ ] T41.1 — Clips to image sequences
 - **Spec**: — · **Depends on**: T41.0 · **Runs on**: PC · **Size**: M

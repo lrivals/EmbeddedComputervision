@@ -6,6 +6,8 @@
 #                                    | trashnet | pets (M32: download + tools/prep_datasets.py)
 #                                    | prewid (M38: hand-copied folder + tools/prep_datasets.py)
 #                                    | mot17 (M27, T27.4: MOT17 train videos, 5.5 GB)
+#                                    | safe_unsafe | soda (M41, M42: hand-copied, checked here)
+#                                    | construction_ppe (M43: download + tools/prep_datasets.py)
 #   tools/get_datasets.sh check      état de chaque jeu (rien n'est téléchargé)
 #   tools/get_datasets.sh kaggle     relie les versions Kaggle (CrowdHuman, VisDrone, ExDark, FLIR)
 #                                    et les dossiers bruts de M18, puis lance leurs prétraitements
@@ -33,6 +35,10 @@
 # "python[autolabel]"`, ≈ 1 h on CPU; Pet: trimaps, seconds).
 # PREWID (M38, docs/tasks/M38-prewid.md): downloaded by hand from Mendeley Data (the folder
 # keeps the truncated archive name), then split by tools/prep_datasets.py (seconds).
+# Industrial sets of M41-M43: Safe and Unsafe Behaviours (Mendeley, CC BY 4.0) and SODA
+# (authors' OneDrive, no licence stated) are copied by hand, their prep comes with T41.1 and
+# T42.1; Construction-PPE (Ultralytics, AGPL-3.0: never in the repository, private Drive
+# archive) is downloaded here and remapped by tools/prep_datasets.py (seconds).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -64,6 +70,10 @@ fetch() {  # dossier url témoin : télécharge et décompresse si le témoin ma
 
 # Témoin de chaque jeu (relatif à data/), source et arborescence attendue.
 PREWID_RAW="PREWID PRE-industry Worker Image Dataset for Indus/PREWID"  # name of the archive
+SAFE_UNSAFE_RAW="Video Dataset for Safe and Unsafe Behaviours"  # folder of the Mendeley zip
+SODA_RAW="SODA"
+CPPE_RAW="construction-ppe"  # folder of the Ultralytics zip (tools/prep_datasets.py CPPE_RAW)
+CPPE_URL=https://github.com/ultralytics/assets/releases/download/v0.0.0/construction-ppe.zip
 declare -A MARKER=(
   [voc]=VOCdevkit/VOC2007/ImageSets/Main/test.txt
   [coco]=coco/annotations/instances_val2017.json
@@ -81,6 +91,9 @@ declare -A MARKER=(
   [pets]=pets/annotations_val.json
   [prewid]=prewid/annotations_val.json
   [mot17]=mot17/train/MOT17-02-FRCNN/gt/gt.txt
+  [safe_unsafe]=safe_unsafe/annotations_val.json
+  [soda]=soda/annotations_val.json
+  [construction_ppe]=construction_ppe/annotations_val.json
 )
 declare -A HOWTO=(
   [visdrone]="https://github.com/VisDrone/VisDrone-Dataset (Task 1, DET) : VisDrone2019-DET-train.zip et -val.zip
@@ -125,6 +138,20 @@ declare -A HOWTO=(
     CC BY 4.0: cite Silvestre-Blanes, Albero-Albero, Zafrilla-Muñoz, Perez Llorens (2026), PREWID,
     Mendeley Data V1), unzipped as data/$PREWID_RAW/{01_Images,02_GroundTruth}/, then: $0 prewid
     data/prewid/annotations_{train,val,test,lab}.json, data/prewid/images/{train,val,test,lab}/"
+  [safe_unsafe]="https://data.mendeley.com/datasets/xjmtb22pff/1 (Download All, doi:10.17632/xjmtb22pff.1,
+    CC BY 4.0: cite Önal, Dandıl (2024), Video dataset for the detection of safe and unsafe
+    behaviours in workplaces, Data in Brief 56, 110756, doi:10.1016/j.dib.2024.110756;
+    also Hugging Face Voxel51/Safe_and_Unsafe_Behaviours), unzipped as data/$SAFE_UNSAFE_RAW/,
+    then: $0 safe_unsafe; frames and boxes: T41.1-T41.3 (docs/tasks/M41-safe-unsafe-behaviours.md)
+    data/safe_unsafe/annotations_{train,val,test}.json"
+  [soda]="https://linjiarui.net/en/portfolio/2022-02-22-SODA-site-object-detection-dataset-for-deep-learning-in-construction
+    (HKUST OneDrive link, Baidu copy; arXiv:2202.09554, VOC xml). No licence stated: ask the
+    authors before any copy (T42.0, docs/tasks/M42-soda.md); unzipped as data/$SODA_RAW/,
+    then: $0 soda; boxes and split: T42.1
+    data/soda/annotations_{train,val,test}.json"
+  [construction_ppe]="https://docs.ultralytics.com/datasets/detect/construction-ppe/ (AGPL-3.0): $0 construction_ppe
+    downloads $CPPE_URL into data/, then tools/prep_datasets.py construction_ppe
+    data/construction_ppe/annotations{,_ppe}_{train,val,test}.json, data/construction_ppe/images/{train,val,test}/"
 )
 
 # Dossier de chaque jeu dans data/ (Dataset.root de python/yolo/data/datasets.py) : contenu
@@ -320,6 +347,32 @@ prewid() {
   [[ -e "$DATA_DIR/${MARKER[prewid]}" ]] || python "$ROOT/tools/prep_datasets.py" prewid
 }
 
+# Safe and Unsafe Behaviours (M41) and SODA (M42): no automatic download; file counts of the
+# hand-copied folder (to check the Summary of T41.0 / T42.0). Their prep comes with T41.1 /
+# T42.1.
+safe_unsafe() {
+  local d="$DATA_DIR/$SAFE_UNSAFE_RAW"
+  [[ -d "$d" ]] || { echo "safe_unsafe : $d absent"; return 1; }
+  echo "safe_unsafe : $(find "$d" -iname '*.mp4' -o -iname '*.avi' | wc -l) clips"
+  find "$d" -mindepth 1 -maxdepth 2 -type d | sed "s|$d/|  |"
+}
+
+soda() {
+  local d="$DATA_DIR/$SODA_RAW"
+  [[ -d "$d" ]] || { echo "soda : $d absent"; return 1; }
+  echo "soda : $(find "$d" -iname '*.jpg' | wc -l) images, $(find "$d" -iname '*.xml' | wc -l) xml"
+}
+
+# Construction-PPE (M43): download, extract, then the remap (marker written last).
+construction_ppe() {
+  if [[ ! -d "$DATA_DIR/$CPPE_RAW/images" ]]; then
+    download "$CPPE_URL" "$DATA_DIR/construction-ppe.zip"
+    unzip -q -o "$DATA_DIR/construction-ppe.zip" -d "$DATA_DIR"
+  fi
+  [[ -e "$DATA_DIR/${MARKER[construction_ppe]}" ]] \
+    || python "$ROOT/tools/prep_datasets.py" construction_ppe
+}
+
 check() {
   local ds=$1
   if [[ -e "$DATA_DIR/${MARKER[$ds]}" ]]; then
@@ -330,7 +383,7 @@ check() {
   fi
 }
 
-[[ $# -gt 0 ]] || { sed -n '2,34p' "$0"; exit 1; }
+[[ $# -gt 0 ]] || { sed -n '2,41p' "$0"; exit 1; }
 case "$1" in
 ready)
   shift
@@ -377,7 +430,7 @@ for ds in "$@"; do
     ;&
   check)
     for d in coco kitti visdrone crowdhuman exdark flir auair dronevehicle hituav uavdt asl \
-      trashnet pets prewid mot17; do
+      trashnet pets prewid mot17 safe_unsafe soda construction_ppe; do
       check "$d" || true
     done
     [[ -e "$DATA_DIR/coco/annotations/instances_calib2017.json" ]] \
@@ -394,13 +447,13 @@ for ds in "$@"; do
     fetch kitti $base/data_object_label_2.zip training/label_2
     fetch kitti $base/data_object_image_2.zip training/image_2
     ;;
-  trashnet|pets|mot17)
+  trashnet|pets|mot17|construction_ppe)
     "$ds"
     check "$ds" || status=1
     ;;
-  prewid)
-    prewid || echo "  téléchargement manuel : ${HOWTO[prewid]}"
-    check prewid || status=1
+  prewid|safe_unsafe|soda)
+    "$ds" || echo "  téléchargement manuel : ${HOWTO[$ds]}"
+    check "$ds" || status=1
     ;;
   visdrone|crowdhuman|exdark|flir|auair|dronevehicle|hituav|uavdt|asl)
     if ! check "$ds"; then

@@ -6,6 +6,7 @@
     python tools/prep_datasets.py pets [--preview build/pets_preview.png]          # M32
     python tools/prep_datasets.py trashnet [--preview build/trashnet_preview.png]  # M32
     python tools/prep_datasets.py prewid [--preview build/prewid_preview.png]      # M38
+    python tools/prep_datasets.py construction_ppe [--preview build/construction_ppe_preview.png]  # M43
 
 - **dronevehicle** (version Roboflow YOLO-OBB, `data/DroneVehicle Dataset/`) : le cadre
   blanc de 100 px autour de l'image 640×512 est recadré ; chaque boîte orientée (4 coins)
@@ -53,6 +54,12 @@
   hold one plant camera out (train / val: the other three, test: all its frames). Output
   `data/prewid/annotations_{train,val,test,lab}.json` and `data/prewid/images/<split>/`
   (hard links). See docs/tasks/M38-prewid.md.
+- **construction_ppe** (Construction-PPE of Ultralytics, `data/construction-ppe/
+  {images,labels}/{train,val,test}/`, M43, AGPL-3.0): YOLO txt with 11 classes. Official
+  split kept. `annotations_<split>.json` hold the `Person` boxes only (as `person`; an image
+  with no person is kept with no box), `annotations_ppe_<split>.json` all 11 classes.
+  Images hard-linked to `data/construction_ppe/images/<split>/`. See
+  docs/tasks/M43-construction-ppe.md.
 
 Idempotent : un fichier de sortie présent n'est pas refait. AU-AIR et HIT-UAV n'ont pas de
 prétraitement sur disque (liens de `tools/get_datasets.sh local`).
@@ -72,8 +79,8 @@ sys.path.insert(0, str(ROOT / "python"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from yolo.data.datasets import (  # noqa: E402
-    ASL_CLASSES, ASL_VAL_FROM, DRONEVEHICLE_CLASSES, PETS_CATS, PETS_CLASSES, PREWID_CLASSES,
-    TRASHNET_CLASSES, UAVDT_CLASSES)
+    ASL_CLASSES, ASL_VAL_FROM, CONSTRUCTION_PPE_CLASSES, DRONEVEHICLE_CLASSES, PETS_CATS,
+    PETS_CLASSES, PREWID_CLASSES, TRASHNET_CLASSES, UAVDT_CLASSES)
 
 DATA = ROOT / "data"
 BORDER = 100  # px de cadre blanc de DroneVehicle de chaque côté (840×712 → 640×512)
@@ -1094,14 +1101,69 @@ def prewid_preview(out, dest):
     print(f"prewid preview : {len(picks)} frames → {dest}")
 
 
+# ----------------------------------------------------------------------- Construction-PPE
+
+CPPE_RAW = "construction-ppe"  # folder of construction-ppe.zip (Ultralytics assets)
+CPPE_URL = "https://github.com/ultralytics/assets/releases/download/v0.0.0/construction-ppe.zip"
+CPPE_PERSON = "Person"
+
+
+def prep_construction_ppe(src, out):
+    """YOLO txt → corners, official split; person files and all-class (PPE) files. Returns
+    {split: entries} of the PPE files."""
+    from PIL import Image
+
+    classes = CONSTRUCTION_PPE_CLASSES
+    records = {}
+    for sp in ("train", "val", "test"):
+        records[sp] = []
+        img_dir, lab_dir = src / "images" / sp, src / "labels" / sp
+        if not img_dir.is_dir():
+            raise FileNotFoundError(f"Construction-PPE: {img_dir} missing")
+        (out / "images" / sp).mkdir(parents=True, exist_ok=True)
+        for path in sorted(p for p in img_dir.iterdir() if p.suffix.lower() in (".jpg", ".png")):
+            with Image.open(path) as img:
+                width, height = img.size
+            txt = lab_dir / f"{path.stem}.txt"
+            rows = prewid_rows(txt.read_text().splitlines()) if txt.exists() else []
+            if any(not 0 <= r[0] < len(classes) for r in rows):
+                raise ValueError(f"Construction-PPE {txt}: class id out of 0-{len(classes) - 1}")
+            _link(path, out / "images" / sp / path.name)
+            records[sp].append({"image": f"images/{sp}/{path.name}", "width": width,
+                                "height": height,
+                                "boxes": [yolo_corners(r, width, height) for r in rows],
+                                "labels": [classes[r[0]] for r in rows]})
+    for sp, es in records.items():
+        (out / f"annotations_ppe_{sp}.json").write_text(json.dumps(es, separators=(",", ":")))
+    person = {sp: [e | {"boxes": [b for b, c in zip(e["boxes"], e["labels"]) if c == CPPE_PERSON],
+                        "labels": ["person"] * e["labels"].count(CPPE_PERSON)} for e in es]
+              for sp, es in records.items()}
+    write_split_files(out, person, [], ("person",))  # val last: the marker
+    for sp, es in person.items():
+        print(f"construction_ppe {sp} : {len(es)} images, {sum(not e['boxes'] for e in es)} "
+              f"without a person, {sum(len(e['boxes']) for e in es)} person boxes, "
+              f"{sum(len(e['boxes']) for e in records[sp])} boxes of all classes")
+    return records
+
+
+def construction_ppe_preview(out, dest, n=16, split="val"):
+    """The `n` val images with the most persons, all classes drawn (red) with their names."""
+    es = json.loads((out / f"annotations_ppe_{split}.json").read_text())
+    picks = sorted(es, key=lambda e: -e["labels"].count(CPPE_PERSON))[:n]
+    grid_preview(out, dest, picks, lambda e: " ".join(sorted(set(e["labels"])))[:40])
+    print(f"construction_ppe preview : {len(picks)} images → {dest}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("datasets", nargs="+",
-                    choices=("dronevehicle", "uavdt", "asl", "trashnet", "pets", "prewid"))
+                    choices=("dronevehicle", "uavdt", "asl", "trashnet", "pets", "prewid",
+                             "construction_ppe"))
     ap.add_argument("--src", type=Path, default=None,
                     help="dossier brut (défaut : data/DroneVehicle Dataset/"
                          "DroneVehiclesDatasetYOLO, data/UAVDT Dataset, data/ASL Alphabet, "
-                         "data/TrashNet, data/Oxford-IIIT Pet, data/PREWID…/PREWID)")
+                         "data/TrashNet, data/Oxford-IIIT Pet, data/PREWID…/PREWID, "
+                         "data/construction-ppe)")
     ap.add_argument("--out", type=Path, default=None,
                     help="sortie (défaut : data/<dataset>)")
     ap.add_argument("--keep-border", action="store_true",
@@ -1110,7 +1172,8 @@ def main():
                     help="processes (TrashNet: labeller processes of "
                          f"{TRASHNET_THREADS} threads, default 3)")
     ap.add_argument("--preview", type=Path, default=None,
-                    help="ASL, TrashNet, Pet, PREWID: also write a grid of boxes")
+                    help="ASL, TrashNet, Pet, PREWID, Construction-PPE: also write a grid "
+                         "of boxes")
     ap.add_argument("--handcheck", type=Path, default=None,
                     help="TrashNet: copy 100 val images there for a hand check in the M22 "
                          "editor (T32.3)")
@@ -1141,6 +1204,11 @@ def main():
             prep_prewid(args.src or DATA / PREWID_RAW, out)
             if args.preview:
                 prewid_preview(out, args.preview)
+        elif ds == "construction_ppe":
+            out = args.out or DATA / "construction_ppe"
+            prep_construction_ppe(args.src or DATA / CPPE_RAW, out)
+            if args.preview:
+                construction_ppe_preview(out, args.preview)
         else:
             out = args.out or DATA / "trashnet"
             prep_trashnet(args.src or DATA / TRASHNET_RAW, out, jobs=args.jobs)

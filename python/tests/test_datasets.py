@@ -455,3 +455,16 @@ def test_industrial(tmp_path):
     _check(a)
     np.testing.assert_allclose(a["xyxy"][0], [11, 6, 30, 25])
     assert len(b["labels"]) == 0
+
+
+def test_construction_ppe(tmp_path):
+    rec = [{"image": "images/test/site_1.jpg", "width": 640, "height": 480,
+            "boxes": [[10, 20, 60, 200]], "labels": ["person"]}]
+    (tmp_path / "annotations_test.json").write_text(json.dumps(rec))
+    (s,) = D.load("construction_ppe", tmp_path)
+    _check(s)
+    assert s["labels"].tolist() == [0]
+    assert len(D.CONSTRUCTION_PPE_CLASSES) == 11
+    for n in (20, 80):
+        view = D.eval_view("construction_ppe", n)
+        assert view.names == ("person",) and view.gt_lut.tolist() == [0]
