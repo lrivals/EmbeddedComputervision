@@ -112,8 +112,8 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
 
 
 # Mémoire d'un processus d'évaluation (réseau, lot de 8 images en float32, im2col), large;
-# 2.5 GB covers the 640 networks of M33-M35.
-JOB_MEMORY = 2.5e9
+# 3.5 GB: measured 2026-10-27, 6.9 GB peak for 2 processes of yolov5n at 640 (`--preset v5`).
+JOB_MEMORY = 3.5e9
 
 
 def auto_jobs(jobs=None):
