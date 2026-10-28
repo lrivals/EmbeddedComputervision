@@ -260,10 +260,10 @@ progress per milestone here.
 | M12 | 11 | 1 |
 | M11 | 8 (+ pointer T11.8) | 2 (T11.0 generic adapter, T11.3 ExDark; T11.2 partial: KITTI rows pending) |
 | M13 | 62 | 62 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
-| M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain, training, Colab GPU, smoke run) |
+| M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain (VOC, ExDark, VisDrone equal the CLI; KITTI pending), training, Colab GPU, smoke run) |
 | M15 | 16 | 1 (T15.3; T15.1: VisDrone done, KITTI and VOC ready for Colab; T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.15, T15.16: tooling ready) |
 | M16 | 20 | 19 (T16.14 KITTI: data missing) |
-| M17 | 21 | 18 (T17.0-T17.17: tools, CI, draft in English, citations checked with pdb and full proofreading; v0 procedure, board switch and frozen version remain) |
+| M17 | 21 | 19 (T17.0-T17.18: tools, CI, draft in English, citations checked with pdb and full proofreading, update procedure applied (v6, v7); v0 procedure, board switch and frozen version remain) |
 | M18 | 11 | 10 (data ready, loaders, notebooks generated and stats executed, uploaded to the Drive; fine-tunings remain) |
 | M19 | 12 | 8 (T19.0-T19.7: rules, specification, docs, milestones, hand-written results, notebook templates, generated markdown and figure labels in English; code text, tests and the CI check remain) |
 | M20 | 10 | 9 (`make webcam` live on the PC, 4 models measured; T20.9 board plan projected, waiting for M8) |
@@ -271,11 +271,11 @@ progress per milestone here.
 | M22 | 12 | 11 (`make autolabel`: Grounding DINO / OWLv2 / Tiny-YOLO labellers, Image and Folder tabs, headless batch, VOC and per-domain measurement: usable at ground level and in low light, not on aerial images; datasets to label ranked; T22.9 closing the loop remains) |
 | M23 | 6 | 6 (C-sim == golden; projections; synthesis and board pending) |
 | M24 | 7 | 5 (float / integer COCO AP, golden and C-sim == dumps, notebooks; full C-sim pass and VOC fine-tuning to run from the notebooks; integer −1.3 AP50, QAT open) |
-| M25 | 11 | 5 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign to run) |
+| M25 | 11 | 6 (T25.0 injector, T25.2 ABFT Python and golden, T25.5 OOD monitor; T25.3 ABFT lane in the HLS kernel (C-sim == golden, +24 DSP projected) and T25.7 HLS buffer faults (2,200 flips; requantized tile and single-`to` input tiles are the blind spots); T25.1 campaign: accumulators and high bias bits are the weak points, ABFT flags every weight / bias / accumulator fault and no activation fault) |
 | M26 | 6 | 2 (T26.1 offline converter: YOLOv5n / v8n NumPy == torch to 2·10⁻⁷; T26.2 integer SiLU table, Python == golden == HLS; T26.0 YOLOv7-tiny in progress: float mAP and INT8 calibration done; float COCO mAP of v5n / v8n measured by M33 / M35, their integer and hardware stages open) |
-| M27 | 8 | 4 (T27.0 metrics checked by hand and against a brute-force LAMR; T27.2 operating point; T27.5 DEEL per hour; code of all 8 done and PREWID measured: YOLOv4-tiny R@0.1 FPPI 90.7 / 90.1 % float / integer, C-sim == integer, misses in bursts, 6-8 orders above SIL 1-3; CrowdHuman, MOT17, ExDark runs, ARCYS images and monitor rows pending) |
+| M27 | 8 | 5 (T27.0 metrics checked by hand and against a brute-force LAMR; T27.2 operating point; T27.5 DEEL per hour; T27.7 unflagged misses with monitor rows: monitors fitted on PREWID test flag 7 of 148 lab misses at 5 % alarms; code of all 8 done and PREWID measured: YOLOv4-tiny R@0.1 FPPI 90.7 / 90.1 % float / integer, C-sim == integer, misses in bursts, 6-8 orders above SIL 1-3; CrowdHuman, MOT17, ExDark runs and ARCYS images pending) |
 | M28 | 7 | 6 (T28.0 matrix: per layer, fake-quant → integer ≤ 1 LSB, integer == golden == C-sim byte for byte on 20 images × 3 nets, co-sim and board rows pending; T28.1 Python == golden == HLS on 105.6 M swept accumulators, int32 leaky overflow found and fixed; T28.2 95 SMT obligations proved with z3; T28.3 traceability in `make ci`; T28.4 tool-chain risks and tool qualification; T28.6 NMS == golden, capacity and overflow properties hold, the unsorted NMS depends on the order of the cells) |
-| M29 | 6 | 1 (T29.0 six monitors on integer features: max score best on ExDark, activation patterns on FLIR; T29.1-T29.3 wait for M27) |
+| M29 | 6 | 2 (T29.0 six monitors on integer features: max score best on ExDark, activation patterns on FLIR; T29.2 conformal person threshold: bound lost across CCTV blocks and under degradation; T29.1 run on PREWID / COCO / ExDark (OOD scores blind to misses, CrowdHuman pending); T29.3 vote run (a hold helps on short gaps only, T25.8 part pending)) |
 | M30 | 5 | 1 (T30.0 static bound: v2 frame 92 ms, watchdog 116 ms; the uncapped NMS of sigmoid heads dominates v3 / v4; T30.1 C-sim adversarial post-processing ≤ bound; co-sim and board pending) |
 | M31 | 6 | 6 (ODD, SR-01..13, objectives → evidence map with standards "to read", failure budget 22.6 /h = +7.4 orders above SIL 2 with provisional inputs, GSN argument checked in `make ci`) |
 | M32 | 14 | 5 (T32.4, T32.5: Oxford-IIIT Pet downloaded, whole-body boxes from the trimaps; T32.8 datasheets; TrashNet labelling, loaders, notebooks and fine-tuning open) |
@@ -283,10 +283,10 @@ progress per milestone here.
 | M34 | 6 | 2 (T34.0 layer table and weights, T34.1 route / stride-1 pool backward; T34.2 COCO 34.3 AP at 416 against the published 35.2, gap open; T34.3 OTA loss and T34.4 training written, waiting for a torch OTA reference and the VOC run (≈ 10 CPU days); T34.5 open) |
 | M35 | 8 | 5 (T35.0-T35.2, T35.4, T35.5: `yolov8n.pt` described from its YAML (8.74 GFLOPs), C2f and DFL head with gradchecks, network == torch to 1.7·10⁻¹³, decoded boxes == torch, TAL and BCE + CIoU + DFL loss == Ultralytics (5·10⁻⁷); T35.3 COCO mAP and T35.6 VOC run waiting on CPU runs; T35.7 waits for T33.8) |
 | M36 | 12 | 3 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |
-| M37 | 7 | 1 |
+| M37 | 7 | 2 (T37.0 notebooks; T37.2 VOC out-of-domain mAP: YOLOv5n 69.48, YOLOv7-tiny 79.74, YOLOv8n 79.64; T37.6 smoke passes, `make ci` waits for the TrashNet count) |
 | M38 | 12 | 7 (T38.0-T38.6: data chain with empty and worker frames cut apart, 7,003 frames, 0 CSV disagreement; loader with per-camera splits; notebooks, stats, Drive; out-of-domain person AP50 on test: v4-tiny 89.9, v7-tiny 89.7, v3-tiny 63.7, v2-tiny 25.5, CAM2 worst; T38.7 GPU open; the M27 tools exist, T38.8-T38.10 wait for the T38.7 checkpoint) |
-| M39 | 7 | 0 |
+| M39 | 7 | 0 (T39.0 labels and T39.1 heads at the T27.2 point on PREWID, COCO, ExDark: miss AUROC 0.84-0.97 against ≈ 0.6 for the max score; CrowdHuman pending) |
 | M40 | 4 | 0 |
-| M41 | 10 | 0 |
+| M41 | 10 | 1 (T41.2 labeller check: `grounding-dino-tiny` at 0.5 for factory CCTV) |
 | M42 | 8 | 0 |
 | M43 | 7 | 0 |
