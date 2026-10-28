@@ -39,7 +39,8 @@ test (4,952 images), ≈ 2.5 min for VisDrone val (548 images) and ≈ 7 min for
 (1,496 images).
 
 **State**: 1 task done out of 16 (T15.3); T15.1 and T15.2 ready to run on Colab;
-VisDrone (T15.8, T15.10, T15.15, T15.16): tooling ready, runs to start.
+VisDrone (T15.8, T15.10, T15.16): tooling ready, runs to start. T15.15 done: letterbox
+evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
 
 ## Shared conventions
 
@@ -224,7 +225,7 @@ VisDrone (T15.8, T15.10, T15.15, T15.16): tooling ready, runs to start.
 - **Acceptance**: AP per object size of Tiny-YOLOv2 (13×13) against Tiny-YOLOv3 (13×13
   and 26×26), same number of iterations
 
-### [ ] T15.15 — Same geometry in training and in evaluation
+### [x] T15.15 — Same geometry in training and in evaluation
 - **Spec**: §1, §7.1 · **Depends on**: — · **Size**: S
 - **Deliverables**: `train.py --resize stretch`; mAP of `b32-sall` in letterbox
 - **Acceptance**: mAP of `b16-sall` and `b32-sall` (trained in letterbox) on the full val
@@ -242,6 +243,15 @@ VisDrone (T15.8, T15.10, T15.15, T15.16): tooling ready, runs to start.
   (same cfg for all the runs).
 - **Colab procedure**: `visdrone/tiny-yolov3-visdrone_infer` with `SUBSET = 0`,
   `RESIZE = 'letterbox'`, `COMPARE = True` (the 6 runs, ≈ 15 min CPU).
+- **Done** (2026-10-28, PC, `runs.evaluate` on the 6 runs pulled from the Drive, full val of
+  548 images, ignored regions excluded; table in
+  [resultats-balayages](resultats-balayages.md#full-split-t151-548-images-colab-on-2026-10-06-rev-17b4a47)):
+  - stretch gives back the T15.1 values (b16-sall 2.62, b32-sall 1.38);
+  - letterbox is ahead on 5 of the 6 runs: `b32-sall` 1.38 → **3.24**, `b32-s500` 1.13 → 2.52,
+    mean 1.48 → 2.09; only `b16-sall` drops (2.62 → 2.27);
+  - the T15.1 ranking was partly an artefact of the geometry: in letterbox `b32-sall` is
+    first again, as on 50 images. The long run (T15.8) trains and evaluates in letterbox
+    (`RESIZE_TRAIN`, `RESIZE`).
 
 ### [ ] T15.16 — Tiles at 416
 - **Spec**: §3 · **Depends on**: T15.8 · **Size**: M

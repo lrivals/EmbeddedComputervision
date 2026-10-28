@@ -112,7 +112,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T15.9](M15-campagne-entrainement.md) | `tools/m11.sh visdrone-size` first; long runs at 608 and 832 | VisDrone | ≈ 10 min, then ≈ 3.7 h and ≈ 7 h | stated (×2.1, ×4) | T15.8 |
 | [T15.10](M15-campagne-entrainement.md) | mAP with and without `--no-ignore` | VisDrone val | ≈ 5 min *(est.)* | 2 × 2.5 min | T15.8 |
 | [T15.11](M15-campagne-entrainement.md) | `NET=tiny-yolov2 tools/m11.sh visdrone-prep \| visdrone-train`, same iterations | VisDrone | ≈ 1 h 45 GPU | stated | — |
-| [T15.15](M15-campagne-entrainement.md) | `_infer`, `SUBSET=0`, `RESIZE='letterbox'`, `COMPARE=True` | VisDrone val | ≈ 15 min CPU | stated | T15.8 |
 | [T15.16](M15-campagne-entrainement.md) | `_train`, `CROP=640` → `long-416-crop640`, then `_infer` with `TILES=640` | VisDrone | ≈ 1 h 45 + ≈ 20 min *(est.)* | ≈ 7 passes × 548 × 0.27 s | T15.8 |
 | [T15.12](M15-campagne-entrainement.md), [T11.4](M11-jeux-de-donnees.md), [T14.6](M14-notebooks.md), [T14.8](M14-notebooks.md) | long runs at 416 letterbox and 640×192 (kill and resume once for T14.8); sweep `SIZE='640x192'`; rerun the 416 sweep with Run All | KITTI 5,985 / 1,496 | ≈ 3 h long runs + 2 × 1 h sweeps + 7 min per eval *(est.)* | 6,000 it ≈ 1 h 45 at 416, ≈ 0.7× at 640×192; sweep 6 × 10 min stated | — |
 | [T15.13](M15-campagne-entrainement.md), [T11.7](M11-jeux-de-donnees.md) | 3-channel sweep, `COMPARE` of `b8-sall`, `b16-sall`; long runs `CH=1` and 3 channels; full-split AP | FLIR 10,742 / 1,144 | ≈ 1 h + 10 min + 3.5 h + 10 min *(est.)* | sweep 6 runs, 2 × 1 h 45, 1,144 × 0.27 s | FLIR on Drive (`kaggle-download flir` on Colab, then `tools/get_datasets.sh push flir`) |
@@ -163,7 +162,7 @@ graph LR
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
   T152[T15.2] --> T151["T15.1 VOC"] --> T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
   T151 --> T936[T9.3.6] & T1011["T10.11, T10.15"]
-  T158[T15.8] --> T159["T15.9, T15.10, T15.15, T15.16"]
+  T158[T15.8] --> T159["T15.9, T15.10, T15.16"]
   T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
   T271 --> T388

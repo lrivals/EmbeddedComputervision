@@ -115,14 +115,18 @@ under 0.5. Losses from 186 to 252: no run converged.
 
 ### Full split (T15.1, 548 images, Colab on 2026-10-06, rev. `17b4a47`)
 
-| run | mAP (50 images) | mAP (full split) |
-|---|---|---|
-| **b16-sall** | 1.15 | **2.61** |
-| b8-sall | 1.24 | 1.70 |
-| b16-s500 | 1.35 | 1.46 |
-| b32-sall | 2.24 | 1.37 |
-| b32-s500 | 0.78 | 1.12 |
-| b8-s500 | 0.56 | 0.59 |
+| run | mAP (50 images) | mAP (full split) | full split, letterbox (T15.15) |
+|---|---|---|---|
+| **b16-sall** | 1.15 | **2.61** | 2.27 |
+| b8-sall | 1.24 | 1.70 | 1.87 |
+| b16-s500 | 1.35 | 1.46 | 1.62 |
+| b32-sall | 2.24 | 1.37 | **3.24** |
+| b32-s500 | 0.78 | 1.12 | 2.52 |
+| b8-s500 | 0.56 | 0.59 | 0.99 |
+
+Last column (T15.15, PC, 2026-10-28, ignored regions excluded): the evaluation in the
+training geometry. Recomputed in stretch with the same code, the runs give back the second
+column within 0.01.
 
 The 50-image ranking does not hold: `b32-sall` drops from 1st to 4th, `b16-sall` rises
 from 4th to 1st. All the gaps stay under 1.5 points, at the noise level expected for runs
