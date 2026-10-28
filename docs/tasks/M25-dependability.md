@@ -23,7 +23,8 @@ engineering, to be cited from the dependability literature when written up.
   - T25.1 sensitivity campaign (2026-10-27, [results/faults.md](../../results/faults.md)).
   - T25.3 ABFT lane in the HLS kernel and T25.7 faults in the HLS buffers, in C-sim
     ([results/faults.md](../../results/faults.md)).
-- **Remaining**: T25.4, T25.6, T25.8 and T25.10; the synthesis costs are deferred. T25.9
+- **Remaining**: T25.4, T25.6 (run on VOC; CrowdHuman left), T25.8 and T25.10; the
+  synthesis costs are deferred. T25.9
   done: one output-bias flip silences the failure monitor, ABFT sees it, hidden activations stay blind.
 
 ### [x] T25.0 — Fault model and injector
@@ -134,6 +135,22 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
   CrowdHuman (tier M), and compared with the mAP ranking
 - **Notes**: the person-level criterion is the input of the budget of
   [T31.3](M31-assurance-case.md).
+- **Progress** (2026-10-28):
+  - **Code**: `--criterion person` (`person_match`, critical / lost / moved / extra
+    per run, person tables in the report), with tests in `test_fault_campaign.py`.
+    Profile: `tools/m25.sh person`.
+  - **Run** on the VOC person class (Tiny-YOLOv2 VOC, 500 images of the T25.1 subset,
+    198 of them with a person; T25.1 grids, about 6 h). Results are in
+    [results/faults.md](../../results/faults.md). The mAP hides the critical faults:
+    - a high accumulator bit costs < 0.6 mAP points but loses a person on 10-12 % of
+      the images;
+    - `act` on L00 at BER 1e-5 raises the mAP and still gives 7.3 % critical images.
+
+    The layer ranking is the mAP one (L00 > L02 > L04 > L06), except L14, the output
+    conv, which never loses a person. The bias gives 3-6 % critical at bits ≤ 8, 30 % at
+    bit 12, and 100 % at bits ≥ 16.
+  - **Left for the acceptance**: the same run on CrowdHuman (images not on the PC).
+    T25.8 can already start from the VOC critical faults.
 
 ### [x] T25.7 — Faults in the HLS buffers
 - **Spec**: §10.2 · **Depends on**: T25.0, T6.3 · **Runs on**: PC (C-sim gcc) · **Size**: M

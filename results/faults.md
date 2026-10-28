@@ -2,7 +2,7 @@
 
 The first section is the sensitivity campaign on the integer model (T25.1), 2026-10-27.
 The others come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20.
-T25.9 (faults in the failure monitor) was added on 2026-10-28.
+T25.6 (person criterion) and T25.9 (faults in the failure monitor) were added on 2026-10-28.
 
 ## T25.1: sensitivity of the integer model
 
@@ -214,6 +214,129 @@ Per flip, a buffer fault does at most 1 % to 7 % of the damage of the same fault
 
 Configuration-memory upsets are out of reach in C-sim:
 [deferred/M25](../docs/tasks/deferred/M25-dependability.md).
+
+## T25.6: critical errors for a person detector
+
+`tools/m25.sh person` (`tools/fault_campaign.py run --criterion person`), 2026-10-28.
+
+**Setup:**
+- integer Tiny-YOLOv2 VOC on the 500-image T25.1 subset of VOC2007 test, with the same
+  grids as T25.1 (layer grid with seeds 0-1, bit grid with seeds 0-2);
+- 198 of the 500 images hold a person at score ≥ 0.25 without fault (the operating
+  threshold);
+- fault-free mAP 57.73.
+
+CrowdHuman, the set of the acceptance, is not on the PC, so this run uses the VOC person
+class.
+
+**Matching:** the fault-free person boxes (score ≥ 0.25) are matched one to one, by
+decreasing IoU, to the faulty person boxes:
+- a fault-free person with no faulty box at IoU ≥ 0.5 is **lost**, and the image is
+  **critical**;
+- a pair matched below IoU 0.9 is **moved**;
+- an unmatched faulty box is an **extra**.
+
+Moved and extra are tolerable. They are counted apart.
+
+| Conv | weight 1e-07 | weight 1e-05 | bias 1e-07 | bias 1e-05 | act 1e-07 | act 1e-05 | acc 1e-07 | acc 1e-05 |
+|---|---|---|---|---|---|---|---|---|
+| L00 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 1.8 ± 0.4 | 7.3 ± 0.4 | 3.8 ± 0.4 | 27.5 ± 2.5 |
+| L02 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.3 ± 0.4 | 4.5 ± 1.4 | 1.5 ± 1.4 | 14.4 ± 5.4 |
+| L04 | 0.0 ± 0.0 | 3.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 4.0 ± 2.1 | 0.8 ± 1.1 | 7.1 ± 0.7 |
+| L06 | 0.0 ± 0.0 | 4.8 ± 0.4 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 3.3 ± 2.5 | 0.3 ± 0.4 | 5.8 ± 2.5 |
+| L08 | 0.0 ± 0.0 | 3.3 ± 1.8 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.3 ± 0.4 | 3.0 ± 0.7 | 0.3 ± 0.4 | 5.3 ± 1.8 |
+| L10 | 0.5 ± 0.7 | 2.5 ± 0.7 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 1.3 ± 0.4 | 0.0 ± 0.0 | 2.8 ± 1.1 |
+| L12 | 0.0 ± 0.0 | 1.5 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.5 ± 0.0 | 0.5 ± 0.0 | 6.6 ± 0.7 |
+| L13 | 0.0 ± 0.0 | 0.8 ± 0.4 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 1.8 ± 0.4 |
+| L14 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+
+Critical images in % (a fault-free person lost, among the images with a person).
+
+| Rank | By critical images | By mAP loss |
+|---|---|---|
+| 1 | L00 (5.1 %) | L00 |
+| 2 | L02 (2.6 %) | L02 |
+| 3 | L04 (1.9 %) | L04 |
+| 4 | L06 (1.8 %) | L06 |
+| 5 | L08 (1.5 %) | L14 |
+| 6 | L12 (1.1 %) | L08 |
+| 7 | L10 (0.9 %) | L10 |
+| 8 | L13 (0.3 %) | L12 |
+| 9 | L14 (0.0 %) | L13 |
+
+| Bit | weight | bias | act | acc |
+|---|---|---|---|---|
+| 0 | 1.3 ± 0.6 | 2.7 ± 0.8 | 1.9 ± 0.8 | 0.2 ± 0.3 |
+| 1 | 1.9 ± 0.3 |  | 2.4 ± 0.8 |  |
+| 2 | 2.5 ± 0.5 |  | 2.2 ± 1.1 |  |
+| 3 | 2.0 ± 0.9 |  | 2.2 ± 0.8 |  |
+| 4 | 1.7 ± 1.3 | 3.0 ± 0.5 | 3.0 ± 1.8 | 0.0 ± 0.0 |
+| 5 | 3.4 ± 0.6 |  | 3.5 ± 2.5 |  |
+| 6 | 3.9 ± 1.5 |  | 7.4 ± 1.1 |  |
+| 7 | 4.0 ± 2.3 |  | 10.3 ± 0.6 |  |
+| 8 |  | 5.7 ± 2.5 |  | 2.4 ± 1.1 |
+| 12 |  | 29.5 ± 13.7 |  | 2.9 ± 0.6 |
+| 16 |  | 100.0 ± 0.0 |  | 10.4 ± 1.2 |
+| 20 |  | 100.0 ± 0.0 |  | 10.9 ± 0.8 |
+| 24 |  | 100.0 ± 0.0 |  | 11.6 ± 1.3 |
+| 28 |  | 100.0 ± 0.0 |  | 11.6 ± 1.3 |
+| 31 |  | 99.2 ± 1.5 |  | 10.8 ± 1.1 |
+
+Critical images in % for one flip at that bit.
+
+| Site | Critical images | Persons lost | Persons moved | Extra boxes / image |
+|---|---|---|---|---|
+| weight | 1.43 % | 0.65 % | 4.28 % | 0.01 |
+| bias | 20.00 % | 19.45 % | 2.86 % | 0.01 |
+| act | 2.27 % | 1.06 % | 6.18 % | 0.01 |
+| acc | 5.15 % | 2.59 % | 12.73 % | 0.02 |
+
+Mean over every run of the site (all grids).
+
+**mAP loss and critical images per bit** (bit grid: 100 flips per image for `act` /
+`acc`, 100 per model for `weight` / `bias`; mean over 3 seeds):
+
+| Site, bit | mAP loss (points) | Critical images |
+|---|---|---|
+| act bit 6 | 0.05 | 7.4 % |
+| act bit 7 | 1.31 | 10.3 % |
+| acc bits 16-28 | 0.36-0.56 | 10.4-11.6 % |
+| acc bit 31 | 1.37 | 10.8 % |
+| bias bit 12 | 2.79 | 29.5 % |
+| bias bits 16-31 | 54.7-57.7 | 99-100 % |
+| weight bit 7 | -0.03 | 4.0 % |
+
+**Findings**:
+- **The mAP hides the critical faults of the accumulators and activations.**
+  - A high accumulator bit costs under 0.6 mAP points but loses a person on 10-12 % of
+    the images.
+  - At BER 1e-5, `act` on L00 *raises* the mAP on both seeds (+0.13 and +0.19 points)
+    while 7.3 % of the images lose a person. `acc` on L12 moves the mAP by −0.45 to
+    +0.23 points, with 6.6 % critical. The mAP averages over every class and every
+    score, so a lost person weighs little against small gains elsewhere.
+
+  So the T25.1 mAP figures cannot size the budget of T31.3. The critical-image share
+  can.
+- **The layer ranking barely changes.** It is L00 > L02 > L04 > L06 for both criteria.
+  The exception is **L14**, the linear output conv: it is 5th by mAP loss (0.05 points)
+  but has 0 critical images. Its faults move scores and add low boxes (extras) without
+  ever dropping a person above 0.25. The early layers stay the ones to protect, which
+  is the choice of T25.4.
+- **The bias splits in two.**
+  - Bits ≤ 8 are tolerable (3-6 % critical).
+  - Bit 12 is critical on 30 % of the images.
+  - Bits ≥ 16 kill every person.
+
+  Weights cost little: 1-4 % critical, at most 4.8 % for one conv at BER 1e-5. Their
+  int8 range bounds the damage.
+- **Moved boxes come before lost persons.** The accumulators move 12.7 % of the persons
+  for 2.6 % lost. A person criterion with a localisation tolerance (IoU 0.5) is
+  therefore much looser than "output unchanged", which every fault in the bit grid
+  breaks.
+
+Not run: CrowdHuman (data not on the PC, row in
+[long-runs.md](../docs/tasks/long-runs.md)), which has many more persons per image and
+small persons.
 
 ## T25.9: faults in the failure monitor
 
