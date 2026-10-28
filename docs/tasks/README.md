@@ -285,7 +285,7 @@ progress per milestone here.
 | M36 | 12 | 3 (T36.0 explanation target, `backward(keep=)`; T36.3 exact integer split on 12,080 neurons, z⁺ LRP conserving through the integer chain; T36.1-T36.9 code and tests written, reduced runs open) |
 | M37 | 7 | 2 (T37.0 notebooks; T37.2 VOC out-of-domain mAP: YOLOv5n 69.48, YOLOv7-tiny 79.74, YOLOv8n 79.64; T37.6 smoke passes, `make ci` waits for the TrashNet count) |
 | M38 | 12 | 7 (T38.0-T38.6: data chain with empty and worker frames cut apart, 7,003 frames, 0 CSV disagreement; loader with per-camera splits; notebooks, stats, Drive; out-of-domain person AP50 on test: v4-tiny 89.9, v7-tiny 89.7, v3-tiny 63.7, v2-tiny 25.5, CAM2 worst; T38.7 GPU open; the M27 tools exist, T38.8-T38.10 wait for the T38.7 checkpoint) |
-| M39 | 7 | 0 (T39.0 labels and T39.1 heads at the T27.2 point on PREWID, COCO, ExDark: miss AUROC 0.84-0.97 against ≈ 0.6 for the max score; CrowdHuman pending) |
+| M39 | 7 | 1 (T39.4: on COCO, label smoothing doubles the ECE and worsens the head AURC 0.222 → 0.26 against an ε = 0 fine-tune, so Zhu 2024 holds on a detector; T39.0 labels and T39.1 heads at the T27.2 point on PREWID, COCO, ExDark: miss AUROC 0.84-0.97 against ≈ 0.6 for the max score; CrowdHuman pending) |
 | M40 | 4 | 0 |
 | M41 | 10 | 1 (T41.2 labeller check: `grounding-dino-tiny` at 0.5 for factory CCTV) |
 | M42 | 8 | 0 |

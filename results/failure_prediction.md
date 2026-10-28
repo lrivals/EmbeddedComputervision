@@ -42,8 +42,15 @@ images. CrowdHuman, `tiny-yolov3-crowdhuman` and the joint training (T39.2) are 
 - **Calibration (T39.4)**:
   - Temperature scaling (T ≈ 1.1-1.2) barely moves the ECE: it is slightly better on COCO and
     worse on PREWID.
-  - It is monotone, so the failure AUROC and AURC cannot change. Whether label smoothing
-    degrades failure prediction (Zhu 2024) waits for its fine-tune.
+  - It is monotone, so the failure AUROC and AURC cannot change.
+  - Label smoothing (2026-10-28, YOLOv4-tiny, ε = 0.1 against an ε = 0 fine-tune) was
+    run on COCO and does not help:
+    - the ECE doubles (0.008 → 0.018);
+    - the head AURC worsens (0.222 → 0.257-0.265);
+    - the max-score AUROC does not move.
+    
+    The fine-tune itself is what calibrates (COCO ECE 0.037 → 0.008). See
+    [T39.4: label smoothing](#label-smoothing-against-failure-prediction-t394-tiny-yolov4-coco).
 - **Three stages (T39.5)**:
   - The integer head (zero point and standardization folded, int8 weights) takes 51 KB,
     against 197 KB in float32.
@@ -425,3 +432,90 @@ over all test images.
 | failure (miss, int) | learned | 0.842 | 0.662 | 2.9 % | 19.3 % | 66.3 % | 58.3 % | 196,868 B | 49,184 |
 | failure (tcp, int) | learned | 0.818 | 0.487 | 6.3 % | 16.4 % | 65.1 % | 58.3 % | 196,868 B | 49,184 |
 <!-- /m39:monitors-tiny-yolov4-coco_exdark-test-int -->
+
+<!-- m39:calib-ls-tiny-yolov4-coco -->
+## Label smoothing against failure prediction (T39.4): tiny-yolov4-coco
+
+**Detector:** YOLOv4-tiny at the T27.2 point (threshold 0.0953).
+
+**Fine-tunes:** two of them, run from `weights/yolov4-tiny.weights` with the same recipe:
+- COCO `calib2017` (500 annotated train images; train2017 is not on the PC);
+- 200 iterations, batch 8, lr 1e-4;
+- label smoothing ε = 0.1 (`tools/train.py --label-smoothing 0.1`) against **ε = 0, the
+  control**.
+
+Without the control, the effect of fine-tuning on COCO would be mixed with the effect of
+the smoothing. Each fine-tuned detector has its own INT8 scales (`tools/calibrate.py`), its
+own labels, and its own heads (`failure_prediction.py fit`).
+
+**Metrics:**
+- the temperature is fitted by NLL on the fit split;
+- the ECE uses 15 bins on the test split;
+- AUROC and AURC are computed on the test images (lower AURC is better).
+
+**Pipeline:** `tools/m39_label_smoothing.sh` (2026-10-28, about 5 h on the PC CPU).
+
+**Miss rates** (persons missed, integer stage):
+
+| Detector | PREWID test | COCO val2017 persons |
+|---|---|---|
+| original | 5.4 % | 47.0 % |
+| fine-tune ε = 0 | 6.1 % | 45.8 % |
+| fine-tune ε = 0.1 | 5.2 % | 49.4 % |
+
+**COCO val2017 persons, ε = 0 against ε = 0.1** (test split: 538 images, about 250 with a
+miss):
+
+| Detector | Stage | Calibration | T | ECE person score | AUROC max score | AURC max score | AUROC head | AURC head |
+|---|---|---|---|---|---|---|---|---|
+| original | float | none | 1.00 | 0.0373 | 0.578 | 0.407 | 0.828 | 0.226 |
+| original | int | none | 1.00 | 0.0336 | 0.597 | 0.406 | 0.840 | 0.221 |
+| ε = 0 | float | none | 1.00 | 0.0083 | 0.630 | 0.376 | 0.833 | 0.222 |
+| ε = 0 | float | temperature | 1.07 | 0.0056 | 0.630 | 0.376 | 0.833 | 0.222 |
+| ε = 0 | int | none | 1.00 | 0.0084 | 0.625 | 0.380 | 0.822 | 0.222 |
+| ε = 0 | int | temperature | 1.04 | 0.0074 | 0.625 | 0.380 | 0.822 | 0.222 |
+| ε = 0.1 | float | none | 1.00 | 0.0182 | 0.629 | 0.429 | 0.829 | 0.265 |
+| ε = 0.1 | float | temperature | 1.01 | 0.0187 | 0.629 | 0.429 | 0.829 | 0.265 |
+| ε = 0.1 | int | none | 1.00 | 0.0182 | 0.643 | 0.398 | 0.814 | 0.257 |
+| ε = 0.1 | int | temperature | 0.98 | 0.0178 | 0.643 | 0.398 | 0.814 | 0.257 |
+
+**PREWID test, ε = 0 against ε = 0.1** (test split: 119 frames, only 3-4 with a miss, so
+the AUROC / AURC columns are noise there):
+
+| Detector | Stage | Calibration | T | ECE person score | AUROC max score | AURC max score | AUROC head | AURC head |
+|---|---|---|---|---|---|---|---|---|
+| original | float | none | 1.00 | 0.0486 | 0.522 | 0.022 | 0.880 | 0.005 |
+| original | int | none | 1.00 | 0.0430 | 0.572 | 0.015 | 0.937 | 0.002 |
+| ε = 0 | float | none | 1.00 | 0.0264 | 0.528 | 0.022 | 0.865 | 0.006 |
+| ε = 0 | float | temperature | 0.92 | 0.0223 | 0.528 | 0.022 | 0.865 | 0.006 |
+| ε = 0 | int | none | 1.00 | 0.0241 | 0.580 | 0.015 | 0.940 | 0.002 |
+| ε = 0 | int | temperature | 0.88 | 0.0213 | 0.580 | 0.015 | 0.940 | 0.002 |
+| ε = 0.1 | float | none | 1.00 | 0.0228 | 0.546 | 0.016 | 0.894 | 0.004 |
+| ε = 0.1 | float | temperature | 0.74 | 0.0129 | 0.546 | 0.016 | 0.894 | 0.004 |
+| ε = 0.1 | int | none | 1.00 | 0.0221 | 0.505 | 0.023 | 0.704 | 0.014 |
+| ε = 0.1 | int | temperature | 0.70 | 0.0103 | 0.505 | 0.023 | 0.704 | 0.014 |
+
+**Findings**:
+- **Fine-tuning, not smoothing, is what calibrates.** The ε = 0 fine-tune alone divides
+  the COCO ECE by 4 (0.037 → 0.008) and the PREWID ECE by 2 (0.049 → 0.026). Against
+  the original detector, every gain in the "label smoothing" comparison comes from this
+  fine-tune.
+- **On COCO, smoothing harms calibration and failure prediction.** Against the control,
+  ε = 0.1 doubles the ECE (0.008 → 0.018), and temperature scaling does not bring it back.
+  The head AURC worsens from 0.222 to 0.265 (float) and to 0.257 (integer), and the
+  AUROC of the head drops by 0.004-0.008. Part of the AURC loss comes from the detector,
+  which misses 3.6 points more persons. The max-score AUROC does not move (0.629-0.643
+  against 0.625-0.630). So on a detector, label smoothing does not help failure
+  prediction, as Zhu 2024 finds on classifiers. It makes the head's ranking a little
+  worse, and here it does not even improve the ECE.
+- **On PREWID, temperature after smoothing halves the ECE** (0.022 → 0.010-0.013, with
+  T = 0.70-0.74: the smoothed scores are too low and must be sharpened). The failure
+  columns cannot be read there: 3-4 failing test frames. The integer head AUROC of
+  0.704 is one or two frames.
+- **Temperature scaling stays monotone.** The AUROC and AURC are the same with and
+  without it on every row, as in the reduced run.
+
+Not run: the fine-tune on CrowdHuman (Colab row in
+[long-runs.md](../docs/tasks/long-runs.md)), which would test the same question with a
+detector trained for persons.
+<!-- /m39:calib-ls-tiny-yolov4-coco -->

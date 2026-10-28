@@ -168,7 +168,7 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
     results.
   - **Not run**: KGFP itself.
 
-### [ ] T39.4 — Calibration against failure prediction
+### [x] T39.4 — Calibration against failure prediction
 - **Spec**: §8 · **Depends on**: T39.1 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `results/failure_prediction.md` section
 - **Acceptance**: temperature scaling and label smoothing applied to the detector; ECE of
@@ -182,7 +182,22 @@ with persons the max score is better (0.94 against 0.87); integer == C-sim on th
     `tools/train.py --label-smoothing`; `tools/failure_prediction.py calib [--smoothed]`.
   - **Reduced run**: temperature 1.1-1.2 changes the ECE by less than 0.006. The failure AUROC
     and AURC cannot move, since temperature scaling is monotone.
-  - **Not run**: the label-smoothing fine-tune, which is the actual test of Zhu 2024.
+  - **Done** (2026-10-28, `tools/m39_label_smoothing.sh`, about 5 h on the PC). Results are in
+    [results/failure_prediction.md](../../results/failure_prediction.md).
+  - **Setup**: two fine-tunes of YOLOv4-tiny on COCO `calib2017` (train2017 is not on
+    the PC), with label smoothing ε = 0.1 and ε = 0 as a control. Each gets its own INT8
+    scales, labels at the T27.2 point, and heads.
+  - **COCO** (538 test images): the ε = 0 fine-tune alone takes the ECE from 0.037 to
+    0.008. Against that control, ε = 0.1:
+    - doubles the ECE (0.018), and temperature does not fix it;
+    - worsens the head AURC from 0.222 to 0.257-0.265, with an AUROC 0.004-0.008 lower;
+    - leaves the max-score AUROC unchanged;
+    - misses 3.6 points more persons.
+
+    So Zhu 2024 holds on a detector: label smoothing does not help failure prediction.
+  - **PREWID**: temperature after smoothing halves the ECE (0.022 → 0.010, T ≈ 0.7). The
+    test split has only 3-4 failing frames, so its failure columns are noise.
+  - **Open**: the same question on a CrowdHuman detector (Colab row).
 
 ### [ ] T39.5 — Failure monitor at the three stages
 - **Spec**: §9, §10.2 · **Depends on**: T39.1, T28.0 · **Runs on**: PC (float, integer,
