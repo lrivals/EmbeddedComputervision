@@ -3,7 +3,7 @@
 Every computation of more than a few minutes that is still open in the milestone files
 (training, full-split mAP, C-sim passes, sweeps, labelling, campaigns, large transfers),
 with its command, its prerequisites and a duration, so the runs can be scheduled: nights on
-the PC, Colab sessions. State on 2026-10-27.
+the PC, Colab sessions. State on 2026-10-28.
 
 - Out of scope: what needs Vitis, Vivado or the KV260, listed in
   [deferred/](deferred/README.md).
@@ -13,6 +13,24 @@ the PC, Colab sessions. State on 2026-10-27.
   the reference speeds below and marked *(est.)*, with the arithmetic in the **Basis**
   column. "unmeasured" means no speed exists to compute it from.
 - When a run is done, fold the result into the task's **Done** and remove its row here.
+
+## Running now (started 2026-10-28 evening)
+
+Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the progress at
+22:37, on a shared CPU (22 cores, every unit pinned with `taskset`).
+
+| Unit | Task | Steps | Progress at 22:37 | ETA |
+|---|---|---|---|---|
+| `t35-3` | [T35.3](M35-yolov8n.md) | YOLOv8n COCO mAP at 640, then 416 | 640: 3,800 / 5,000 | ≈ 23:15 |
+| `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal`: PREWID `lab`, then MOT17 train (300 frames × 6 faults × 2 seeds each) | PREWID: 1 / 6 faults (≈ 7 min per fault) | PREWID ≈ 23:10, MOT17 ≈ 00:10 |
+| `t36-7` | [T36.7](M36-explanation.md) | two recorder runs side by side (clean, corrupt5), 250 it, then `explain.py record` | it 72 / 250 (≈ 28 s/it) | ≈ 00:00 |
+| `t36-8` | [T36.8](M36-explanation.md) | `explain.py cka --run …/clean` | waits for `t36-7` | ≈ 00:15 |
+| `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` started | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
+| `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | waits for `t35-3` | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
+| `t36-5ch` | [T36.5](M36-explanation.md) | `explain.py misses --dataset crowdhuman` (500 images × 3 networks) | waits for `t11-1` | ≈ 04:00 |
+| `t15-10` | [T15.10](M15-campagne-entrainement.md) | VisDrone val mAP of `b16-sall`, with and without `--no-ignore` | waits for `t36-5ch` | ≈ 04:15 |
+| `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | waits for `t25-8` | ≈ 09:00 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
+| `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
 
 ## Reference speeds
 
@@ -31,7 +49,9 @@ the PC, Colab sessions. State on 2026-10-27.
 | C-sim `yolo_bench` | VOC 4,952 images ≈ 40 min (22 threads), i.e. ≈ 0.5 s/image; COCO 5,000 with v4-tiny ≈ 1.5 h (18 cores) | [M12](M12-profils-pc.md), [M24](M24-yolov4-tiny.md) |
 | Grounding DINO tiny, PC CPU | ≈ 5 s/image with 1-2 prompts (5.2 s on Pet, 2026-10-27); 3 processes × 6 threads: 8-15 s/image per process, 4-5 s/image of throughput | [M22](M22-autolabel.md), [M32](M32-trashnet-pets.md) |
 | Fault campaign, 500 images, 16 jobs (10 jobs on a shared CPU: 60-130 s, 9.1 h for the 393 runs of T25.1) | ≈ 50 s per run | `build/m25/faults/log.txt` |
-| Drive transfers | sizes in [donnees-drive.md](donnees-drive.md); no speed measured; > 10 GB is slow and sometimes freezes | [donnees-drive.md](donnees-drive.md) |
+| Drive transfers | pull: CrowdHuman 10.5 GiB in 4 min 24 s (≈ 40 MiB/s), then extraction; push: `pets.tar` 761 MiB in 14 min with rclone retries (3.7 GiB sent), `trashnet.tar` 47 MiB in 17 s | `build/longruns/{ch-pull,T32.11*}.log`, 2026-10-28 |
+| PC evaluation, COCO val2017, more networks | v3-tiny float + int 394 ms/image with 6 jobs (5,000 in 34 min); YOLOv8n at 640, `--preset v8`, 4 jobs: 438-474 ms/image (≈ 4.6 GB per process: 6 processes overflow 22 GB) | `build/longruns/T11.1-coco-int.log`, `T35.3-640.log`, 2026-10-28 |
+| C-sim `yolo_bench`, YOLOv7-tiny | 18 s per image on one core (`ACC_NO_APINT`, 416) | `build/m26/v7-smoke`, 2026-10-28 |
 
 Unmeasured: training and evaluation speed of YOLOv8n; training speed of YOLOv5n and
 YOLOv7-tiny is in the table above (T33.7); YOLOv4-tiny training on the T4 (taken as
