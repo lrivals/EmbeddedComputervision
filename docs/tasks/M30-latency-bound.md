@@ -41,7 +41,7 @@ dominates (0.52 s). T30.1 co-sim, T30.2 and T30.3 need Vitis or the board.
     limit), an input for M29 and M31.
   - **Tests**: `test_perf_model.py`.
 
-### [ ] T30.1 — Cycle distribution in simulation (C-sim part done)
+### [x] T30.1 — Cycle distribution in simulation (C-sim; co-sim deferred)
 - **Spec**: §10.3 · **Depends on**: T30.0 · **Size**: M
   · **Runs on**: PC (C-sim gcc); PC + Vitis for the co-sim cycles
 - **Deliverables**: cycle counters of the C-sim (and of the co-sim when Vitis is available)
@@ -57,7 +57,17 @@ dominates (0.52 s). T30.1 co-sim, T30.2 and T30.3 need Vitis or the board.
     adds the adversarial input "every cell and every class passes". Its cycles are ≤ the
     static bound, and the tables, scan and decode terms and the v3 candidate count are
     reached exactly (`test_postproc_bound_vs_adversarial_csim`).
-  - **Remaining**: the run over ≥ 10,000 real images.
+  - **Real images** (2026-10-28, `tools/m30_cycles.sh`, `tools/m30_cycles.py`):
+    - `tiny-yolov2-voc` with `--hw-post` on 10,544 images (VOC test, COCO val, PREWID
+      test), threshold 0.005.
+    - **Post-processing cycles**: median 14,494, p99.9 77,689, max 124,114 (0.62 ms
+      at 200 MHz). That is 1.42 % of the static bound (8.7 M) and 1.7 % of the
+      accelerator.
+    - **NMS**: it takes 74 % of the slowest image.
+    - **Overflow**: 3 images fill the 256 NMS slots, with 42-163 boxes dropped in
+      stream order.
+
+    Results are in [results/latency_bound.md](../../results/latency_bound.md).
 - **Deferred** (Vitis): [deferred/M30](deferred/M30-latency-bound.md) — T30.1, co-sim cycles.
 
 ### [ ] T30.2 — End-to-end latency on the board

@@ -93,7 +93,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
 | [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |
 | [T27.1](M27-safety-metrics.md) C-sim column | `make_inputs.py --split val --subset 100`, `bench_sim.sh` with `EXTRA="--conf 0.001"`, `person_safety.py csim` | CrowdHuman val, 100 frames with persons | ≈ 3 min *(est.)* | 100 PREWID frames took ≈ 3 min (v4, 10 jobs, 2026-10-26) | T27.1 |
-| [T30.1](M30-latency-bound.md) | cycle distribution over ≥ 10,000 real images | e.g. VOC test + COCO val | ≈ 1.5 h *(est.)* | 10,000 × 0.5 s | — |
 
 ## Colab (GPU training, CPU evaluation)
 
