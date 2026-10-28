@@ -62,6 +62,7 @@ ls -l data_archives/                 # must be identical
 | asl | 1.2 GB | `asl/annotations_val.json` | ✓ (2026-10-27) | M21: output of `tools/prep_datasets.py asl` (hand pseudo-boxes, hard links, settings of T21.3); 1,214,136,320 bytes, same size on the Drive |
 | prewid | 1.1 GB | `prewid/annotations_val.json` | ✓ (2026-10-26) | M38: output of `tools/prep_datasets.py prewid` (hard links, all splits including `lab` and leave-one-camera-out); the lab mp4 stays out |
 | trashnet | 50 MB | `trashnet/annotations_val.json` | ✓ (2026-10-28) | M32: output of `tools/prep_datasets.py trashnet` (M22 boxes, 70 / 15 / 15 split, `autolabel.json` cache); 49,039,360 bytes, same size on the Drive |
+| pets | 771 MB | `pets/annotations_val.json` | ✓ (2026-10-28) | M32: output of `tools/prep_datasets.py pets` (whole-body boxes from the trimaps; the trimaps stay out); 798,126,080 bytes, same size on the Drive |
 
 The sizes are those of `du -shL` on the PC. Together, the ten datasets uploaded make about
 43 GB. That is more than the free Drive (15 GB), but the project account has 100 GB. Check

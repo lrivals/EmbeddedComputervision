@@ -119,7 +119,7 @@ These share the CPU with the table above: one at a time, at night.
 | [T21.11](M21-asl-alphabet.md) | `SIZE=224x224 tools/m11.sh asl-prep`, `asl-train` | ASL | ≈ 1 h *(est.)* | 3.4× fewer MACs than 416 + eval | T21.9 |
 | [T24.6](M24-yolov4-tiny.md) | `notebooks/<ds>/tiny-yolov4-<ds>_{sweep,train,infer}.ipynb` with `INT8` and `HW` stages | the 11 `TRAINABLE` datasets | ≈ 30-35 h *(est.)* | per dataset ≈ 3 h (sweep, long run, evals); C-sim stage on the PC | — |
 | [M24](M24-yolov4-tiny.md) QAT | QAT of v4-tiny (integer model loses 1.3 AP50) | COCO | unmeasured | — | — |
-| [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | `push pets` (T32.11) |
+| [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | — (data on the Drive 2026-10-28) |
 | [T38.7](M38-prewid.md) | `notebooks/prewid/tiny-yolov3-prewid_{sweep,train}.ipynb` (`prewid-prep` done): from COCO and from CrowdHuman, then leave-one-camera-out × 4 and `lab` added to training | PREWID 2,821 train | ≈ 12 h *(est.)* | sweep 1 h + 3 long runs × 1 h 45 + 4 LOCO × 1 h 20 + evals (test 592, lab 3,000 at 46 ms/image, 8 jobs) | CrowdHuman recipe: T15.14 |
 | [T41.8](M41-safe-unsafe-behaviours.md), [T42.6](M42-soda.md), [T43.5](M43-construction-ppe.md) | `tools/m11.sh <dataset>-prep`, `_train` notebook per dataset, then the cross-domain evaluations on PREWID test | Safe and Unsafe (T41.3 count), SODA ≈ 14,000 train *(est.)*, Construction-PPE ≈ 1,000 train | ≈ 8-10 h GPU *(est.)* | 3 × (long run 1 h 45 + evals); SODA longer at full split | T41.6, T42.4, T43.3 |
 | [T39.2](M39-failure-prediction.md) | `tools/train.py --net <crowdhuman cfg> --dataset crowdhuman --init <crowdhuman final.weights> --failure --failure-conf <T27.2> [--failure-freeze-after K] --out build/m39/joint`, then `tools/failure_labels.py label --checkpoint build/m39/joint/checkpoint.npz …` and `tools/failure_prediction.py eval --joint build/m39/joint/checkpoint.npz --write`, `kgfp_baseline.py metric --joint …` | CrowdHuman train 15,000 | ≈ 3-4 h GPU *(est.)* | fine-tune length of T15.14; labels recomputed per batch: one decode + NMS per image; CPU smoke run with the term 4 s/it at batch 4 (2026-10-26) | T39.1 at T27.2, CrowdHuman weights |
@@ -132,7 +132,6 @@ These share the CPU with the table above: one at a time, at night.
 |---|---|---|---|---|
 | [T16.14](M16-presentation-jeux.md), T11.2, T11.4 | finish KITTI `training/image_2` (`data/kitti/data_object_image_2.zip.part` incomplete) | ≈ 12 GB | unmeasured | — |
 | [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
-| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (trashnet done 2026-10-28) | 798 MB | unmeasured | — (T32.1 done) |
 
 ## Totals and order
 
@@ -148,7 +147,6 @@ Suggested order, unblockers first:
 
 ```mermaid
 graph LR
-  PETS["push pets"] --> T3212
   T1514[T15.14] --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
   T251[T25.1] --> T256[T25.6] --> T258[T25.8]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]

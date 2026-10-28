@@ -370,10 +370,11 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   `notebooks/pets/pets_stats.ipynb` run with their outputs; sections in
   [stats-jeux.md](stats-jeux.md).
 
-### [ ] T32.11 — Drive upload
-- **In progress** (2026-10-28): `push trashnet` done (`trashnet.tar`, 49 MB, same size on the
-  Drive). The `push pets` of 2026-10-20 had never reached the Drive. It was started again
-  on 2026-10-28.
+### [x] T32.11 — Drive upload
+- **Done** (2026-10-28): `push trashnet` (`trashnet.tar`, 49,039,360 bytes) and `push pets`
+  (`pets.tar`, 798,126,080 bytes), each the same size on the Drive. The `push pets` of
+  2026-10-20 had never reached the Drive. The new one took 14 min, with rclone retries
+  (3.7 GiB sent for a 761 MiB file).
 - **Depends on**: T32.1, T32.5 · **Size**: S
 - **Deliverables**: `tools/get_datasets.sh push trashnet`, `push pets`; rows in
   [donnees-drive.md](donnees-drive.md).
