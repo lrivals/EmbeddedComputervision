@@ -254,12 +254,14 @@ def test_prep_trashnet(tmp_path):
     P.prep_trashnet(src, out, fake, jobs=1)
     recs = {s: json.loads((out / f"annotations_{s}.json").read_text())
             for s in ("train", "val", "test")}
-    assert [len(recs[s]) for s in ("train", "val", "test")] == [5, 1, 1]  # metal only
-    e = recs["train"][0]
+    assert [len(recs[s]) for s in ("train", "val", "test")] == [10, 2, 2]  # glass, metal
+    glass = next(e for e in recs["train"] if e["class"] == "glass")
+    np.testing.assert_allclose(glass["boxes"][0], [0, 0, 64, 48])  # full frame: kept
+    e = next(e for e in recs["train"] if e["class"] == "metal")
     assert e["class"] == "metal" and e["labels"] == ["metal"] and e["score"] == 0.8
     np.testing.assert_allclose(e["boxes"][0], [16, 12, 48, 36])
     why = {r["reason"] for r in json.loads((out / "rejected.json").read_text())}
-    assert why == {"whole image", "no box"}
+    assert why == {"no box"}
     prov = json.loads((out / "autolabel.json").read_text())
     assert len(prov["images"]) == 21 and prov["prompts"][-1] == "object"
     rec = next(r for r in prov["images"].values() if len(r["raw"]["labels"]) == 2)
@@ -271,11 +273,11 @@ def test_prep_trashnet(tmp_path):
     assert json.loads((out / "annotations_train.json").read_text()) == recs["train"]
     from yolo.data import datasets as D
 
-    assert len(D.load("trashnet", out)) == 1
+    assert len(D.load("trashnet", out)) == 2
     P.trashnet_preview(out, tmp_path / "preview.png")
     # Hand check: the corrected label of a train image gives its IoU.
-    P.trashnet_handcheck(out, tmp_path / "check", n=1)
-    assert len(list((tmp_path / "check").iterdir())) == 1
+    P.trashnet_handcheck(out, tmp_path / "check", n=2)  # one per class
+    assert len(list((tmp_path / "check").iterdir())) == 2
     lab = tmp_path / "result" / "labels"
     lab.mkdir(parents=True)
     (lab / f"{Path(e['image']).stem}.txt").write_text("1 0.5 0.5 0.5 0.25\n")

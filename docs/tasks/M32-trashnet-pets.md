@@ -31,14 +31,13 @@ This milestone comes out of T22.11 (ranks 2 and 3 of the datasets worth labellin
   `get_datasets.sh`, registry, notebooks, `autolabel_eval.py --map`).
 - **Pet**: boxed and loaded. Anchors and cfg written (`tools/m11.sh pets-prep`);
   `pets_stats` run.
-- **TrashNet**: downloaded and labelled (2026-10-28). 88.2 % of the images are kept, under
-  the 95 % target, because full-frame boxes are rejected as `whole image` (cardboard
-  48.6 %). Whether to keep full-frame boxes is open (T32.1).
+- **TrashNet**: downloaded and labelled (2026-10-28): 2522 of 2527 images boxed
+  (99.8 %), split 1765 / 378 / 379.
 
 ## Summary
 
 Numbers from the dataset pages (2026-10-20). The counts after preprocessing come from T32.5
-for Pet; the TrashNet counts are to be filled in by T32.1.
+for Pet; the TrashNet counts after preprocessing come from T32.1.
 
 ### TrashNet
 
@@ -50,6 +49,7 @@ for Pet; the TrashNet counts are to be filled in by T32.1.
 | Classes | 6: glass 501, paper 594, cardboard 403, plastic 482, metal 410, trash 137 |
 | Objects per image | 1, roughly centred, on a white or light plain background |
 | Official split | none |
+| After prep (T32.1) | 2522 boxed images (5 paper images with no box left out); train 1765, val 378, test 379 (stratified 70 / 15 / 15); test: cardboard 60, glass 75, metal 62, paper 89, plastic 72, trash 21 |
 | Existing boxes | third-party: [OctavDM/Trashnet_annotations](https://github.com/OctavDM/Trashnet_annotations), 2521 images (6 removed), licence to check |
 | Pre-trained mapping | none worth it (COCO `bottle`, `cup` cover a fraction of glass / plastic only) |
 
@@ -92,8 +92,8 @@ tools/get_datasets.sh check                   # "trashnet : prêt", "pets : prê
   class written is the folder's.
 - **Box**: the best-scoring box of the image over all its prompts, if its score is
   ≥ `TRASHNET_CONF` (start at 0.3: one object per image, so a low threshold costs little
-  precision). Sanity check: a box covering more than 98 % of the image (the labeller
-  boxed the whole photo) is rejected, reason `whole image`.
+  precision). A box over the whole photo is kept: in TrashNet it is a close-up where the
+  object fills the frame (T32.1 dropped an earlier 98 % `whole image` check for this).
 - **Rejects**: no box or a rejected box → the image is left out and listed with its
   reason in `data/trashnet/rejected.json` (as ASL); never kept as a negative.
 - **Split**: no official split. Stratified by class, fixed seed: 70 % train, 15 % val,
@@ -185,42 +185,27 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 - **Acceptance**: `tools/get_datasets.sh check` gives `trashnet : prêt` after the prep;
   the 6 folders hold 2527 images.
 
-### [ ] T32.1 — Boxes from the M22 labeller
-- **Progress** (2026-10-28): `prep_trashnet` written and tested with a fake labeller
-  (`test_prep_trashnet`):
-  - prompts `TRASHNET_PROMPTS` plus `object`, best box, `whole image` check, rejects;
+### [x] T32.1 — Boxes from the M22 labeller
+- **Done** (2026-10-28): `prep_trashnet` is written and tested with a fake labeller
+  (`test_prep_trashnet`). It has:
+  - prompts `TRASHNET_PROMPTS` plus `object`, best box, rejects;
   - 70 / 15 / 15 split stratified by class;
   - cache in the `autolabel_io` format, written every 100 images;
   - hard links, `--preview`, and `--handcheck` / `--handcheck-iou` for T32.3.
 
-  The labelling run is done: all 2527 images are in `data/trashnet/autolabel.json`,
-  3 processes × 6 threads, about 3 h with other jobs running. A second run rebuilds the
-  annotations from the cache in 2.5 s, without the labeller. The preview is in
-  `build/trashnet_preview.png` and the 100 hand-check images in
-  `build/trashnet_handcheck`.
+  All 2527 images are labelled into `data/trashnet/autolabel.json`. The run used
+  3 processes × 6 threads and took about 3 h with other jobs running. A second run
+  rebuilds the annotations from the cache in 2.5 s, without the labeller.
 
-  **The acceptance is not met** with the `whole image` rule:
+  **2522 of 2527 images keep a box (99.8 %)**. Per class: cardboard, glass, metal,
+  plastic and trash 100 %, paper 99.2 %. The 5 rejects are paper with no box ≥ 0.3.
+  The split is 1765 / 378 / 379. The preview is `build/trashnet_preview.png`, and the
+  100 hand-check images are in `build/trashnet_handcheck`.
 
-  | | Kept | Cardboard | Glass | Metal | Paper | Plastic | Trash |
-  |---|---|---|---|---|---|---|---|
-  | `whole image` rejected (current) | 2228 / 2527 (88.2 %) | 48.6 % | 97.6 % | 97.6 % | 90.6 % | 97.7 % | 97.8 % |
-  | full-frame boxes kept | 2522 / 2527 (99.8 %) | 100 % | 100 % | 100 % | 99.2 % | 100 % | 100 % |
-
-  The current rule gives 1551 / 335 / 342 train / val / test images.
-
-  Of the 299 rejects, 294 are `whole image` (cardboard 207, paper 51, glass 12,
-  plastic 11, metal 10, trash 3) and 5 are `no box` (all paper). On a sample of 16 of
-  them, the labeller is not wrong: the photo is a close-up and the object fills the
-  frame (a cardboard side, a flyer, the inside of a can). So the box over the whole image
-  is the right box. The 98 % check assumed every object has background around it, and
-  TrashNet breaks that for flat objects.
-
-  To decide:
-  - **Option 1:** keep these images with the full-frame box.
-  - **Option 2:** keep the rule and accept 48.6 % for cardboard.
-
-  Either way, the annotations rebuild from the cache in seconds. Option 1 also teaches
-  "fills the frame" boxes, which the webcam demo will not see often.
+  The first rule rejected any box over 98 % of the image as `whole image`, and it kept
+  only 88.2 % (cardboard 48.6 %). A sample of 16 of those 294 rejects showed close-ups
+  where the object fills the frame: a cardboard side, a flyer, the inside of a can. So
+  the full-frame box was right, and the rule was dropped.
 - **Depends on**: T32.0, T22.10 · **Size**: M
 - **Deliverables**: `tools/prep_datasets.py trashnet` (prompts, best box, sanity check,
   rejects, stratified split, `autolabel.json` cache, hard links, report);

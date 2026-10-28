@@ -71,7 +71,7 @@ GPU (T12.11-e).
 | [T39.4](M39-failure-prediction.md) | `tools/failure_prediction.py calib --labels … --smoothed <labels of the smoothed detector> --write` | same sets | ≈ 5 min *(est.)* | one labelling pass of the smoothed detector | T39.0 at T27.2, label-smoothing fine-tune (Colab row) |
 | [T39.5](M39-failure-prediction.md) | `tools/failure_prediction.py stages --labels … --check --write` | same sets | ≈ 1 min | g++ build + scoring, measured | T39.0 at T27.2 |
 | [T29.1](M29-runtime-monitors.md), [T29.2](M29-runtime-monitors.md) CrowdHuman | monitors on CrowdHuman val, T27.3 sets, ExDark; `person_safety.py conformal --dataset crowdhuman` (PREWID done 2026-10-27) | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
-| [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | T32.1 |
+| [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | — (T32.1 done) |
 | [T41.1](M41-safe-unsafe-behaviours.md) calibration | labeller on every frame of 20 clips (dense reference), then the sampling settings | 20 clips at 24 fps | unmeasured, ≈ 3-6 h *(est.)* | clip length unknown; at 10 s per clip: 20 × 240 frames × 4-5 s of throughput ≈ 6 h | T41.0 |
 | [T41.3](M41-safe-unsafe-behaviours.md) | `python tools/autolabel.py --folder data/safe_unsafe/frames --classes person --resume …` | 691 clips after sampling | unmeasured, ≈ 10-15 h *(est.)* | assumed ≈ 15 kept frames per clip: ≈ 10,000 × 4-5 s of throughput (3 processes); to recompute from T41.1 | T41.1, T41.2 |
 | [T42.3](M42-soda.md), [T43.2](M43-construction-ppe.md) | completeness check, labeller on 100 test images each | SODA, Construction-PPE | ≈ 20 min *(est.)* | 2 × 100 × 5-7 s | T42.2, T43.1 |
@@ -137,7 +137,7 @@ These share the CPU with the table above: one at a time, at night.
 | [T16.14](M16-presentation-jeux.md), T11.2, T11.4 | finish KITTI `training/image_2` (`data/kitti/data_object_image_2.zip.part` incomplete) | ≈ 12 GB | unmeasured | — |
 | [T11.6](M11-jeux-de-donnees.md), T25.6, T27 | CrowdHuman to the PC (`tools/get_datasets.sh pull crowdhuman`) | 11 GB | unmeasured | — |
 | [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
-| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | T32.1 for trashnet |
+| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | — (T32.1 done) |
 
 ## Totals and order
 
@@ -153,7 +153,7 @@ Suggested order, unblockers first:
 
 ```mermaid
 graph LR
-  T321["T32.1 TrashNet labels"] --> T3210[T32.10] --> T3212[T32.12]
+  T3210[T32.10] --> T3212[T32.12]
   PETS["push pets"] --> T3212
   CH["pull CrowdHuman"] --> T116[T11.6] & T1514[T15.14]
   T1514 --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]

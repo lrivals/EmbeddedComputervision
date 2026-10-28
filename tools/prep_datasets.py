@@ -42,7 +42,8 @@
 - **trashnet** (TrashNet, `data/TrashNet/dataset-resized/<class>/`, M32): one object per
   image, boxed by the M22 labeller (Grounding DINO tiny, `pip install -e
   "python[autolabel]"`) with the prompt of its class folder plus `object`; the best box is
-  kept if its score is ≥ `TRASHNET_CONF` and it does not cover the whole photo. The raw
+  kept if its score is ≥ `TRASHNET_CONF`, a box over the whole photo included (close-ups,
+  T32.1). The raw
   predictions are cached in `data/trashnet/autolabel.json` (format of
   tools/autolabel_io.py); the annotations are rebuilt from it at each run. Split 70 / 15 /
   15 stratified by class. See docs/tasks/M32-trashnet-pets.md.
@@ -690,7 +691,6 @@ TRASHNET_PROMPTS = {"cardboard": "cardboard", "glass": "glass bottle or jar",
 TRASHNET_GENERIC = "object"
 TRASHNET_LABELLER = "grounding-dino-tiny"
 TRASHNET_CONF = 0.3     # best box kept if its score is ≥ this
-TRASHNET_WHOLE = 0.98   # a box over this share of the image boxed the whole photo
 TRASHNET_SPLIT = (0.7, 0.15, 0.15)  # train, val, test, stratified by class
 TRASHNET_THREADS = 6    # torch threads per labeller process
 
@@ -789,7 +789,8 @@ def trashnet_autolabel(files, cache, factory, jobs=None, every=100):
 
 def trashnet_box(record, conf=TRASHNET_CONF):
     """Best raw box of an image over all its prompts → (continuous corners, score) and the
-    reason it is dropped (`no box`, `whole image`) or None."""
+    reason it is dropped (`no box`) or None. A box over the whole photo is kept: in
+    TrashNet it is a close-up where the object fills the frame (T32.1)."""
     raw, w, h = record["raw"], record["width"], record["height"]
     if not raw["scores"]:
         return None, None, "no box"
@@ -801,8 +802,6 @@ def trashnet_box(record, conf=TRASHNET_CONF):
     box = [round(v, 2) for v in box]
     if score < conf:
         return box, score, "no box"
-    if (box[2] - box[0]) * (box[3] - box[1]) > TRASHNET_WHOLE * w * h:
-        return box, score, "whole image"
     return box, score, None
 
 

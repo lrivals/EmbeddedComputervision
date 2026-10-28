@@ -283,8 +283,9 @@ FICHES = {
                    "`object`); the class is the folder",
         "notes": ["the boxes are auto-labels: val and test measure agreement with the "
                   "labeller, not with a human (hand-checked val subset: T32.3)",
-                  "images with no box ≥ TRASHNET_CONF or a box over the whole photo left "
-                  "out (`data/trashnet/rejected.json`)",
+                  "images with no box ≥ TRASHNET_CONF left out "
+                  "(`data/trashnet/rejected.json`); boxes over the whole photo kept "
+                  "(close-ups where the object fills the frame)",
                   "no official split: 70 / 15 / 15 stratified by class, fixed seed; photos "
                   "of one object from several angles may sit on both sides"],
     },
