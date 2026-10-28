@@ -215,15 +215,23 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 - **Notes**: run as 3 processes on class folders if the CPU time hurts (T22.10). Fill
   the counts of the Summary.
 
-### [ ] T32.2 — Loader
-- **In progress** (2026-10-20): `TRASHNET_CLASSES`, `load_trashnet`, `DATASETS["trashnet"]`
-  and `test_trashnet` done; the acceptance waits for T32.1.
+### [x] T32.2 — Loader
+- **Done** (2026-10-28): `TRASHNET_CLASSES`, `load_trashnet`, `DATASETS["trashnet"]` and
+  `test_trashnet`. `load("trashnet")` gives train 1765, val 378 and test 379 (cardboard 60,
+  glass 75, metal 62, paper 89, plastic 72, trash 21), the counts of the Summary.
 - **Depends on**: T32.1 · **Size**: S
 - **Deliverables**: `TRASHNET_CLASSES`, `load_trashnet`, `DATASETS["trashnet"]`
   (evaluation on `test`, calibration and fine-tuning on `train`); `test_trashnet`.
 - **Acceptance**: `load("trashnet")` gives the test counts of the Summary.
 
 ### [ ] T32.3 — Box check: preview and reference
+- **Progress** (2026-10-28):
+  - The preview is `build/trashnet_preview.png` and the 100 val images to check are in
+    `build/trashnet_handcheck` (both from T32.1).
+  - OctavDM/Trashnet_annotations has no licence on GitHub (API `license: null`, so all
+    rights are reserved): the IoU against its 2521 boxes is not computed.
+  - **Left**: the hand correction of the 100 images in `make autolabel` ("Folder" tab), then
+    the median IoU.
 - **Depends on**: T32.1 · **Size**: S
 - **Deliverables**: preview (2 images per class); 100 val images checked and corrected
   by hand in the M22 editor (`make autolabel`, "Folder" tab), kept as a hand-checked
@@ -318,8 +326,12 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   `QUESTIONS` of `tools/notebooks/gabarits.py`.
 - **Done** (2026-10-20): all three, for both datasets (`GROUND`: close-up views).
 
-### [ ] T32.9 — Matrix, profiles, notebook generation
-- **In progress** (2026-10-20):
+### [x] T32.9 — Matrix, profiles, notebook generation
+- **Done** (2026-10-28): `SPLIT_IMAGES["trashnet"] = 379`;
+  `python -m tools.notebooks trashnet` rewrote the three TrashNet notebooks and the README;
+  `python -m tools.notebooks all --check` passes (165 files up to date, 40 archived);
+  `tools/data_stats.py --dataset trashnet --sample 8` passes.
+- **Before** (2026-10-20):
   - `matrice.py` entries done (`SPLIT_IMAGES` of TrashNet waits for T32.1), plus the
     `trashnet-*` / `pets-*` profiles of `tools/m11.sh`.
   - `python -m tools.notebooks trashnet pets` wrote `notebooks/trashnet/` (7) and

@@ -37,7 +37,7 @@ TRAIN_INPUT = {"flir": {"channels": 1}, "hituav": {"channels": 1}}
 SPLIT_IMAGES = {"voc": 4952, "coco": 5000, "kitti": 1496, "visdrone": 548,
                 "crowdhuman": 4370, "exdark": 2563, "flir": 1144, "auair": 4943,
                 "dronevehicle": 2608, "hituav": 571, "uavdt": 16592, "asl": 6538,
-                "pets": 3662, "prewid": 592}
+                "pets": 3662, "prewid": 592, "trashnet": 379}
 
 # Fichier témoin de chaque jeu (celui de `tools/get_datasets.sh check`, VOC : get_voc.sh).
 DATA_MARKERS = {"voc": "data/VOCdevkit/VOC2007/ImageSets/Main/test.txt",
