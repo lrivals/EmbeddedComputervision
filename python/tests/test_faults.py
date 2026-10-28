@@ -255,3 +255,26 @@ def test_hls_buffer_faults_match_python_reference():
         assert np.array_equal(outside, clean), f"{net} L{layer} flip {r['flip']}: leak"
         checked += 1
     assert checked == len(rows)
+
+
+# --- failure head (T25.9) ------------------------------------------------------------------
+
+def test_head_faults():
+    from tests.test_failure import _int_head
+
+    _, ih, p, _ = _int_head()
+    s0, det = F.head_forward(ih, p)
+    assert np.array_equal(s0, ih.score(p)) and not det.any()
+    # Weight, bias and accumulator faults that change the score are all seen by the ABFT check.
+    for site, layer in (("weight", 0), ("bias", 0), ("acc", 0), ("weight", 1), ("acc", 1)):
+        s, det = F.head_forward(ih, p, [F.Fault(site, "flip", layer, bit=6)], seed=3)
+        assert det[s != s0].all(), (site, layer)
+    # A hidden activation fault is downstream of the hidden check and inside the output one.
+    s, det = F.head_forward(ih, p, [F.Fault("act", "flip", 0, bit=6)], seed=3)
+    assert (s != s0).any() and not det.any()
+    # Transient faults: one element per image; reproducible from the seed.
+    a = F.head_forward(ih, p, [F.Fault("acc", "flip", 0, bit=20)], seed=1)
+    b = F.head_forward(ih, p, [F.Fault("acc", "flip", 0, bit=20)], seed=1)
+    assert np.array_equal(a[0], b[0]) and a[1].all()
+    with pytest.raises(ValueError):
+        F.head_forward(ih, p, [F.Fault("act", "flip", 1)])

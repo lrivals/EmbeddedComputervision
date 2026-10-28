@@ -115,3 +115,29 @@ def test_report_and_markdown():
     md = fc.markdown(rep)
     assert "| act | 39.00 ± 1.41 |" in md and "| L00 | -11.00 |" in md
     assert "Fault-free mAP: **50.00**" in md
+
+
+def test_person_match():
+    ref = [[0.5, 0.5, 0.2, 0.4], [0.2, 0.2, 0.1, 0.1]]
+    same = fc.person_match(ref, ref)
+    assert same == (0, 0, 0)
+    # Second person gone, a box slightly shifted (IoU ≈ 0.82: moved), one extra box.
+    out = [[0.51, 0.51, 0.2, 0.4], [0.9, 0.9, 0.1, 0.1]]
+    assert fc.person_match(ref, out) == (1, 1, 1)
+    # Moved too far (IoU < 0.5): lost, and the faulty box is an extra.
+    assert fc.person_match(ref[:1], [[0.6, 0.6, 0.2, 0.4]]) == (1, 1, 0)
+    # One faulty box cannot cover two fault-free persons.
+    assert fc.person_match([ref[0], ref[0]], ref[:1]) == (1, 0, 0)
+    assert fc.person_match([], ref) == (0, 2, 0) and fc.person_match(ref, []) == (2, 0, 0)
+
+
+def test_campaign_person_criterion(setup):
+    d, samples, qm, cache, meta = setup
+    fc._setup(qm, cache, abft=False, conf=1e-4, iou=0.45, person=14, person_conf=1e-4)
+    specs = fc.grid("ber", sorted(qm.convs), sites=("acc",), bers=(1e-2,))
+    base, acc = fc.campaign(specs, samples, meta, 20, d / "p.jsonl", _serial)
+    assert base["critical"] == base["lost"] == base["extra"] == 0
+    assert base["person_images"] > 0
+    assert 0 <= acc["critical"] <= 1 and acc["changed"] > 0
+    rep = fc.report([base, acc])
+    assert rep["person"] and "Critical images" in fc.markdown(rep)

@@ -11,6 +11,10 @@
     python tools/fault_campaign.py report build/m25/faults/*.jsonl
     # ABFT checksum widths and cost of the extra lane (T25.2)
     python tools/fault_campaign.py widths model/tiny-yolov2-voc model/tiny-yolov3-coco
+    # T25.6: also the share of images that lose a fault-free person
+    python tools/fault_campaign.py run --grid layer --criterion person --out …
+    # T25.9: faults in the integer failure head (T39.5) on the stored features of T39.0
+    python tools/fault_campaign.py monitor build/m39/labels/tiny-yolov4-coco_prewid-lab.npz
 
 Fault model: `yolo.quant.faults` (T25.0). Same preprocessing and thresholds as
 `eval_quant.py --variants int --resize stretch` (conf 0.005, NMS 0.45, VOC07 mAP): the
@@ -25,6 +29,12 @@ not detected (silent data corruption).
 - The quantized inputs and the fault-free heads of the subset are cached once in
   `build/m25/cache/<net>_<N>/` (500 images: about 260 MB).
 - `run` appends one JSON line per run to `--out` and skips the runs already there (resume).
+
+T25.6, `--criterion person`: each run also compares, per image, the person boxes (score ≥
+`--person-conf`) of the faulty output with those of the fault-free output. A fault-free person
+with no faulty box at IoU ≥ 0.5 is **lost**, and an image with a lost person is **critical**.
+Extra boxes and boxes moved (matched below IoU 0.9) are tolerable and counted apart. The
+reference is the fault-free model, not the ground truth: without a fault, critical = 0.
 """
 
 import argparse
@@ -49,6 +59,8 @@ LAYER_BERS = (1e-7, 1e-5)
 BITS = {"weight": tuple(range(8)), "act": tuple(range(8)),
         "bias": tuple(range(0, 32, 4)) + (31,), "acc": tuple(range(0, 32, 4)) + (31,)}
 CONF, IOU = 0.005, 0.45
+PERSON_CONF = 0.25  # T25.6: operating threshold of the person criterion (Darknet default)
+MATCH_IOU, MOVED_IOU = 0.5, 0.9
 
 _W = {}
 
@@ -86,6 +98,27 @@ def grid(name, convs, sites=SITES, bers=BERS, layer_bers=LAYER_BERS, bits=None, 
             else:
                 raise ValueError(f"unknown grid {name!r}")
     return out
+
+
+def person_match(ref, out, iou_thr=MATCH_IOU, moved_iou=MOVED_IOU):
+    """T25.6: fault-free person boxes `ref` against the faulty ones `out` ((cx, cy, w, h)),
+    matched one to one by decreasing IoU → (lost, extra, moved): `ref` boxes with no `out` box
+    at IoU ≥ `iou_thr`, `out` boxes left unmatched, matched pairs below `moved_iou`."""
+    from yolo.infer.boxes import iou
+
+    ref, out = np.reshape(ref, (-1, 4)), np.reshape(out, (-1, 4))
+    if not len(ref) or not len(out):
+        return len(ref), len(out), 0
+    m = iou(ref, out)
+    pairs = sorted(((m[i, j], i, j) for i, j in zip(*np.nonzero(m >= iou_thr))), reverse=True)
+    used_r, used_o, moved = set(), set(), 0
+    for v, i, j in pairs:
+        if i in used_r or j in used_o:
+            continue
+        used_r.add(i)
+        used_o.add(j)
+        moved += v < moved_iou
+    return len(ref) - len(used_r), len(out) - len(used_o), moved
 
 
 # ------------------------------------------------------------------------- model, cache
@@ -164,7 +197,7 @@ def _init(*args):
         _W["error"] = exc
 
 
-def _setup(qm, cache, abft=True, conf=CONF, iou=IOU):
+def _setup(qm, cache, abft=True, conf=CONF, iou=IOU, person=None, person_conf=PERSON_CONF):
     from yolo.quant.abft import AbftMonitor
     from yolo.quant.int_model import IntNetwork, head_luts
 
@@ -178,12 +211,14 @@ def _setup(qm, cache, abft=True, conf=CONF, iou=IOU):
             if (cache / f"head_{i}.npy").exists()}
     _W.clear()
     _W.update(qm=qm, inet=inet, mon=mon, luts=head_luts(qm), inputs=inputs, refs=refs,
-              sizes=F.conv_sizes(qm, inputs.shape[1:]), conf=conf, iou=iou, run=None)
+              sizes=F.conv_sizes(qm, inputs.shape[1:]), conf=conf, iou=iou, run=None,
+              person=person, person_conf=person_conf, ref_persons={})
 
 
 def _image(task):
     """One image of one run → (labels, scores, boxes (cx, cy, w, h) normalized, flips,
-    changed, detected)."""
+    changed, detected, persons): `persons` = (fault-free persons, lost, extra, moved) with
+    the person criterion (T25.6), None otherwise."""
     from yolo.infer.nms import postprocess_int
 
     if "error" in _W:
@@ -209,8 +244,22 @@ def _image(task):
                                             _W["iou"])[0]
     flips = sum(inj.flips.values()) + _W["nparam"]
     detected = bool(mon is not None and mon.detected)
+    persons = None
+    if _W["person"] is not None:
+        if k not in _W["ref_persons"]:
+            ref = {i: np.asarray(_W["refs"][i][k:k + 1]) for i in _W["refs"]}
+            _W["ref_persons"][k] = _persons(*postprocess_int(ref, _W["qm"].net, _W["luts"],
+                                                             _W["conf"], _W["iou"])[0])
+        ref = _W["ref_persons"][k]
+        persons = (len(ref), *person_match(ref, _persons(boxes, scores, labels)))
     return (np.asarray(labels).tolist(), np.asarray(scores, np.float64).tolist(),
-            np.asarray(boxes, np.float64).reshape(-1, 4).tolist(), flips, changed, detected)
+            np.asarray(boxes, np.float64).reshape(-1, 4).tolist(), flips, changed, detected,
+            persons)
+
+
+def _persons(boxes, scores, labels):  # person boxes above the operating threshold
+    keep = (np.asarray(labels) == _W["person"]) & (np.asarray(scores) >= _W["person_conf"])
+    return np.asarray(boxes, np.float64).reshape(-1, 4)[keep]
 
 
 # ------------------------------------------------------------------------- one run
@@ -220,7 +269,13 @@ def score(results, samples, meta, n_classes):
 
     per = {c: ([], [], []) for c in range(n_classes)}
     flips = changed = detected = sdc = n_det = 0
-    for k, (labels, scores, boxes, fl, ch, de) in enumerate(results):
+    pers = np.zeros(5)  # images with persons, critical images, persons, lost, moved
+    extra = 0
+    for k, (labels, scores, boxes, fl, ch, de, *rest) in enumerate(results):
+        if rest and rest[0] is not None:
+            n_ref, lost, ext, mov = rest[0]
+            pers += (n_ref > 0, lost > 0, n_ref, lost, mov)
+            extra += ext
         px = to_voc_pixels(boxes, meta["width"][k], meta["height"][k])
         for c, s, b in zip(labels, scores, px):
             per[c][0].append(meta["ids"][k])
@@ -234,9 +289,14 @@ def score(results, samples, meta, n_classes):
     dets = {c: (d[0], np.array(d[1]), np.array(d[2]).reshape(-1, 4)) for c, d in per.items()}
     _, m = evaluate(dets, samples, n_classes, use_07=True)
     n = max(len(results), 1)
-    return {"map": float(m), "images": len(results), "flips": int(flips),
-            "changed": changed / n, "detected": detected / n, "sdc": sdc / n,
-            "dets_per_image": n_det / n}
+    out = {"map": float(m), "images": len(results), "flips": int(flips),
+           "changed": changed / n, "detected": detected / n, "sdc": sdc / n,
+           "dets_per_image": n_det / n}
+    if results and len(results[0]) > 6 and results[0][6] is not None:
+        out.update(person_images=int(pers[0]), critical=pers[1] / max(pers[0], 1),
+                   lost=pers[3] / max(pers[2], 1), moved=pers[4] / max(pers[2], 1),
+                   extra=extra / n)
+    return out
 
 
 def done_keys(out):
@@ -281,11 +341,17 @@ def aggregate(rows):
     out = []
     for (g, site, layer, bit, rate), rs in sorted(groups.items(), key=lambda kv: str(kv[0])):
         maps = np.array([r["map"] for r in rs])
-        out.append({"grid": g, "site": site, "layer": layer, "bit": bit, "rate": rate,
-                    "seeds": len(rs), "map": float(maps.mean()),
-                    "std": float(maps.std(ddof=1)) if len(rs) > 1 else 0.0,
-                    **{k: float(np.mean([r[k] for r in rs]))
-                       for k in ("changed", "detected", "sdc", "flips")}})
+        a = {"grid": g, "site": site, "layer": layer, "bit": bit, "rate": rate,
+             "seeds": len(rs), "map": float(maps.mean()),
+             "std": float(maps.std(ddof=1)) if len(rs) > 1 else 0.0,
+             **{k: float(np.mean([r[k] for r in rs]))
+                for k in ("changed", "detected", "sdc", "flips")}}
+        if all("critical" in r for r in rs):  # person criterion (T25.6)
+            a.update({k: float(np.mean([r[k] for r in rs]))
+                      for k in ("critical", "lost", "moved", "extra")})
+            a["critical_std"] = (float(np.std([r["critical"] for r in rs], ddof=1))
+                                 if len(rs) > 1 else 0.0)
+        out.append(a)
     return out
 
 
@@ -306,6 +372,14 @@ def report(rows):
                                 key=lambda t: -t[1])
     else:
         rep["ranking"] = []
+    # T25.6: the same ranking by the share of critical images (person lost).
+    crit = {}
+    for a in rep["layer"]:
+        if "critical" in a:
+            crit.setdefault(a["layer"], []).append(a["critical"])
+    rep["person_ranking"] = sorted(([int(i), float(np.mean(c))] for i, c in crit.items()),
+                                   key=lambda t: -t[1])
+    rep["person"] = any("critical" in a for g in ("ber", "layer", "bit") for a in rep[g])
     # ABFT: share of the runs' changed images that were detected, per site.
     abft = {}
     for r in rows:
@@ -377,10 +451,76 @@ def markdown(rep):
                              f"| {'—' if dg is None else f'{dg * 100:.1f} %'} | "
                              f"{a['sdc'] * 100:.1f} % |")
         lines.append("")
+    if rep.get("person"):
+        lines += person_markdown(rep)
     return "\n".join(lines)
 
 
+def _crit(a):
+    s = f"{a['critical'] * 100:.1f}"
+    if a["seeds"] > 1:
+        s += f" ± {a['critical_std'] * 100:.1f}"
+    return s
+
+
+def person_markdown(rep):
+    """T25.6 tables: critical images (a fault-free person lost) per layer and per bit, and
+    the two rankings of the layers."""
+    lines = []
+    layer = [a for a in rep["layer"] if "critical" in a]
+    if layer:
+        cols = sorted({(a["site"], a["rate"]) for a in layer},
+                      key=lambda t: (SITES.index(t[0]), t[1]))
+        lines += ["| Conv | " + " | ".join(f"{s} {r:.0e}" for s, r in cols) + " |",
+                  "|---|" + "---|" * len(cols)]
+        for i in sorted({a["layer"] for a in layer}):
+            cells = {(a["site"], a["rate"]): _crit(a) for a in layer if a["layer"] == i}
+            lines.append(f"| L{i:02d} | " + " | ".join(cells.get(c, "") for c in cols) + " |")
+        rank_map = [i for i, _ in rep["ranking"]]
+        lines += ["", "Critical images in % (a fault-free person lost, among the images with a "
+                  "person).", "",
+                  "| Rank | By critical images | By mAP loss |", "|---|---|---|"]
+        for r, (i, c) in enumerate(rep["person_ranking"]):
+            j = rank_map[r] if r < len(rank_map) else None
+            lines.append(f"| {r + 1} | L{i:02d} ({c * 100:.1f} %) | "
+                         + ("—" if j is None else f"L{j:02d}") + " |")
+        lines.append("")
+    bit = [a for a in rep["bit"] if "critical" in a]
+    if bit:
+        sites = [s for s in SITES if any(a["site"] == s for a in bit)]
+        lines += ["| Bit | " + " | ".join(sites) + " |", "|---|" + "---|" * len(sites)]
+        for b in sorted({a["bit"] for a in bit}):
+            cells = {a["site"]: _crit(a) for a in bit if a["bit"] == b}
+            lines.append(f"| {b} | " + " | ".join(cells.get(s, "") for s in sites) + " |")
+        lines += ["", "Critical images in % for one flip at that bit.", ""]
+    rows = [a for g in ("ber", "layer", "bit") for a in rep[g] if "critical" in a]
+    if rows:
+        lines += ["| Site | Critical images | Persons lost | Persons moved | Extra boxes / "
+                  "image |", "|---|---|---|---|---|"]
+        for s in SITES:
+            rs = [a for a in rows if a["site"] == s]
+            if rs:
+                lines.append(f"| {s} | " + " | ".join(
+                    f"{np.mean([a[k] for a in rs]) * (100 if k != 'extra' else 1):.2f}"
+                    + (" %" if k != "extra" else "")
+                    for k in ("critical", "lost", "moved", "extra")) + " |")
+        lines += ["", "Mean over every run of the site (all grids).", ""]
+    return lines
+
+
 # ------------------------------------------------------------------------- main
+def _person_index(args):
+    from yolo.data import datasets
+    from yolo.models.tiny_yolo import load_cfg
+
+    if args.criterion != "person":
+        return None
+    names = list(datasets.eval_view(args.dataset, load_cfg(args.net)["classes"]).names)
+    if "person" not in names:
+        raise SystemExit(f"--criterion person: no person class in {args.dataset}")
+    return names.index("person")
+
+
 def _samples(args):
     from yolo.data import datasets
     from yolo.models.tiny_yolo import load_cfg
@@ -425,13 +565,12 @@ def cmd_run(args):
     if args.layers:
         keep = {int(i) for i in args.layers.split(",")}
         specs = [s for s in specs if s.get("layer") is None or s["layer"] in keep]
-    abft = not args.no_abft
+    setup = (qm, cache, not args.no_abft, CONF, IOU, _person_index(args), args.person_conf)
     if args.jobs <= 1:
-        _setup(qm, cache, abft)
+        _setup(*setup)
         campaign(specs, samples, meta, n_classes, args.out, lambda t: [_image(x) for x in t])
         return
-    with mp.get_context("spawn").Pool(args.jobs, initializer=_init,
-                                      initargs=(qm, cache, abft)) as pool:
+    with mp.get_context("spawn").Pool(args.jobs, initializer=_init, initargs=setup) as pool:
         campaign(specs, samples, meta, n_classes, args.out,
                  lambda t: pool.map(_image, t, chunksize=max(1, len(t) // (4 * args.jobs))))
 
@@ -452,6 +591,87 @@ def cmd_plan(args):
     for g in ("ber", "layer", "bit"):
         n = len(grid(g, sorted(qm.convs), seeds=seeds))
         print(f"  {g:6s} {n:5d} runs  ≈ {n * run_s / 3600:.1f} h")
+
+
+# ------------------------------------------------------------------------- monitor (T25.9)
+MON_BERS = (1e-5, 1e-4, 1e-3)
+
+
+def monitor_runs(ih, p, flag0, thr, missed, trials=50, bers=MON_BERS):
+    """T25.9 rows: per site, layer and bit (one flip, per image for act / acc, per head for
+    weight / bias over `trials` draws) and per BER, the shares of the images flagged without
+    fault that are no longer flagged (silenced), of those with a missed person (silenced_miss),
+    of the unflagged images now flagged (false alarm), and of the silenced ones that the ABFT
+    check sees."""
+    rows = []
+    for (site, layer) in F.head_sizes(ih):
+        width = F.WIDTH[site]
+        bits = BITS[site] if width == 32 else tuple(range(width))
+        specs = [("flip", b, 0.0) for b in bits] + [("ber", None, r) for r in bers]
+        for kind, bit, rate in specs:
+            acc = np.zeros(4)  # silenced, silenced with a miss, false alarms, silenced+ABFT
+            for t in range(trials if site in F.PERSISTENT or kind == "ber" else 1):
+                s, det = F.head_forward(ih, p, [F.Fault(site, kind, layer, bit, rate)], seed=t)
+                flag = s > thr
+                sil = flag0 & ~flag
+                acc += (sil.sum(), (sil & missed).sum(), (~flag0 & flag).sum(),
+                        (sil & det).sum())
+                n = t + 1
+            rows.append({"site": site, "layer": layer, "kind": kind, "bit": bit, "rate": rate,
+                         "draws": n, "silenced": acc[0] / (n * max(flag0.sum(), 1)),
+                         "silenced_miss": acc[1] / (n * max((flag0 & missed).sum(), 1)),
+                         "false_alarm": acc[2] / (n * max((~flag0).sum(), 1)),
+                         "abft_silenced": acc[3] / acc[0] if acc[0] else None})
+    return rows
+
+
+def monitor_markdown(name, rows, info):
+    lines = [f"`{name}`: {info['images']} images, {info['flagged']} flagged without fault "
+             f"(5 % alarm rate on val), {info['flagged_miss']} of them with a missed person; "
+             f"head {info['memory']:,} B.", "",
+             "| Site | Layer | Bit / BER | Silenced | Silenced (with a miss) | False alarms | "
+             "Silenced caught by ABFT |", "|---|---|---|---|---|---|---|"]
+    for r in rows:
+        if not (r["silenced"] or r["false_alarm"]):
+            continue
+        what = f"bit {r['bit']}" if r["kind"] == "flip" else f"BER {r['rate']:.0e}"
+        ab = "—" if r["abft_silenced"] is None else f"{r['abft_silenced'] * 100:.0f} %"
+        lines.append(f"| {r['site']} | {'hidden' if r['layer'] == 0 else 'output'} | {what} | "
+                     f"{r['silenced'] * 100:.2f} % | {r['silenced_miss'] * 100:.2f} % | "
+                     f"{r['false_alarm'] * 100:.2f} % | {ab} |")
+    lines += ["", "Rows with no effect at all are left out. One flip per image (act, acc) or "
+              f"per head over {info['trials']} draws (weight, bias); BER over {info['trials']} "
+              "draws.", ""]
+    return "\n".join(lines)
+
+
+def cmd_monitor(args):
+    from failure_labels import Labels
+    from failure_prediction import head_path, load_head
+
+    from yolo.infer.failure import alarm_threshold
+    from yolo.quant.int_failure import IntFailureHead
+
+    out = ROOT / "build" / "m25" / "monitor"
+    out.mkdir(parents=True, exist_ok=True)
+    for path in args.labels:
+        L = Labels(path)
+        h, _ = load_head(head_path(L, "float", "miss"))
+        p = L.feat_int.astype(np.int64)
+        ih = IntFailureHead.from_float(h, L.scales, p[L.split == 0])
+        s0, det0 = F.head_forward(ih, p)
+        assert np.array_equal(s0, ih.score(p)) and not det0.any()
+        thr = alarm_threshold(s0[L.split == 1], 0.05)
+        flag0, missed = s0 > thr, L.miss_int > 0
+        t0 = time.time()
+        rows = monitor_runs(ih, p, flag0, thr, missed, args.trials)
+        info = {"images": len(p), "flagged": int(flag0.sum()),
+                "flagged_miss": int((flag0 & missed).sum()), "memory": ih.memory_bytes,
+                "trials": args.trials, "seconds": round(time.time() - t0, 1)}
+        (out / f"{L.name}.json").write_text(json.dumps({"info": info, "rows": rows},
+                                                       indent=1) + "\n")
+        print(monitor_markdown(L.name, rows, info))
+        print(f"→ {out / f'{L.name}.json'} ({info['seconds']:.0f} s)")
 
 
 TM, TN = 32, 24  # KV260 tiles (hls/kernels/accel_config.hpp)
@@ -525,13 +745,21 @@ def main():
             p.add_argument("--flips", type=int, default=100,
                            help="bit grid: flips per image (act, acc) or per model")
             p.add_argument("--out", type=Path, required=True)
+            p.add_argument("--criterion", choices=("map", "person"), default="map",
+                           help="person: also critical images, a fault-free person lost (T25.6)")
+            p.add_argument("--person-conf", type=float, default=PERSON_CONF,
+                           help="operating threshold of the person criterion")
     p = sub.add_parser("widths", help="ABFT checksum widths and lane cost (T25.2)")
     p.add_argument("model_dirs", nargs="+")
+    p = sub.add_parser("monitor", help="faults in the failure head of T39.1 (T25.9)")
+    p.add_argument("labels", nargs="+", help="labels of T39.0 (build/m39/labels/*.npz)")
+    p.add_argument("--trials", type=int, default=50)
     p = sub.add_parser("report")
     p.add_argument("files", nargs="+")
     p.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
-    {"run": cmd_run, "plan": cmd_plan, "report": cmd_report, "widths": cmd_widths}[args.cmd](args)
+    {"run": cmd_run, "plan": cmd_plan, "report": cmd_report, "widths": cmd_widths,
+     "monitor": cmd_monitor}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -325,3 +325,74 @@ def hls_buffer_reference(x, qc, g, pool, tn, fold):
                     s = min(max((g["pcol0"] + pc) * ps - lo + v, 0), C - 1) - col
                     out[:, pr, pc] = np.maximum(out[:, pr, pc], q[:, r, s])
     return to, g["prow0"], g["pcol0"], out.astype(np.int8)
+
+
+# ------------------------------------------------------------------ failure head (T25.9)
+HEAD_SITES = {0: ("weight", "bias", "act", "acc"), 1: ("weight", "bias", "acc")}
+
+
+def head_sizes(ih):
+    """{(site, layer): elements} of the `IntFailureHead` `ih` (T39.5): layer 0 is the hidden
+    layer (d → h, as a 1×1 conv), layer 1 the output (h → 1, whose int32 accumulator is the
+    score: no `act` site)."""
+    h, d = ih.qW1.shape
+    return {("weight", 0): h * d, ("bias", 0): h, ("act", 0): h, ("acc", 0): h,
+            ("weight", 1): h, ("bias", 1): 1, ("acc", 1): 1}
+
+
+def _wrap32(v):
+    return to_signed(to_unsigned(v, 32), 32)
+
+
+def _transient(rng, fault, v):
+    """`v` (N, m) with `fault` drawn independently for each of the N images (rows)."""
+    n, m = v.shape
+    if fault.single:  # one element per image
+        idx = (rng.integers(m, size=n) if fault.index is None else np.full(n, fault.index))
+        bits = (rng.integers(fault.width, size=n) if fault.bit is None
+                else np.full(n, fault.bit))
+        return hit(v, fault, np.arange(n) * m + idx, bits)
+    d = draw(rng, fault, n * m)  # BER over all rows = an independent BER per row
+    return v if d is None else hit(v, fault, *d)
+
+
+def head_forward(ih, p, faults=(), seed=0):
+    """Scores (N,) of the `IntFailureHead` `ih` on the integer features `p` (N, d) under the
+    `faults` (`Fault.layer`: 0 hidden, 1 output; None draws nothing), and (N,) whether the
+    ABFT check of either layer (T25.2: Σ_i acc_i against the checksum row Σ_i W_i of the
+    fault-free weights, plus Σ_i b_i) saw an error. `weight` / `bias` faults are drawn once
+    (persistent), `act` / `acc` faults for each image (transient), from (seed, 0) and
+    (seed, 1). The accumulators wrap modulo 2³² as the hardware register."""
+    from yolo.quant.int_layers import requantize
+
+    rng_p, rng_t = np.random.default_rng((seed, 0)), np.random.default_rng((seed, 1))
+    qW1, qb1 = ih.qW1.astype(np.int64), ih.qb1.astype(np.int64)
+    qW2, qb2 = ih.qW2.astype(np.int64), np.array([ih.qb2], np.int64)
+    by = {}
+    for f in faults:
+        if f.layer not in HEAD_SITES or f.site not in HEAD_SITES[f.layer]:
+            raise ValueError(f"no {f.site} site on layer {f.layer} of the failure head")
+        by.setdefault((f.site, f.layer), []).append(f)
+
+    def persistent(v, key):
+        for f in by.get(key, ()):
+            d = draw(rng_p, f, v.size)
+            if d is not None:
+                v = hit(v, f, *d)
+        return v
+
+    def transient(v, key):
+        for f in by.get(key, ()):
+            v = _transient(rng_t, f, v)
+        return v
+
+    fW1, fb1 = persistent(qW1, ("weight", 0)), persistent(qb1, ("bias", 0))
+    fW2, fb2 = persistent(qW2, ("weight", 1)), persistent(qb2, ("bias", 1))
+    x = np.asarray(p, np.int64) - ih.zp
+    acc1 = transient(_wrap32(x @ fW1.T + fb1), ("acc", 0))
+    det = (acc1.sum(1) != x @ qW1.sum(0) + qb1.sum())
+    hid = np.clip(requantize(acc1[:, :, None, None], ih.M0, ih.n)[:, :, 0, 0], 0, 127)
+    hid = transient(hid, ("act", 0))
+    acc2 = transient(_wrap32(hid @ fW2 + fb2)[:, None], ("acc", 1))[:, 0]
+    det |= acc2 != hid @ qW2 + qb2[0]
+    return ih.sign * acc2, det
