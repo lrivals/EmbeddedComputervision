@@ -268,8 +268,15 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **Not run**: the 200-image runs (250 iterations, clean and 5 % corrupted, ≈ 1 h each
     alone) were stopped at iteration 50.
 
-### [ ] T36.8 — Representation dynamics
-- **Running** (2026-10-28, times CET): unit `t36-8`, queued behind `t36-7`: `explain.py cka --run build/explain/record/clean`; ETA ≈ 00:15, then `make figures`. Log `build/longruns/T36.8-cka.log`.
+### [x] T36.8 — Representation dynamics
+- **Done** (2026-10-29, [results/explain.md](../../results/explain.md#t368-representation-dynamics-cka)):
+  - CKA float / integer ≥ 0.99 on every conv of v2. It drops below at **L15 for v3 (0.9900)
+    and L29 for v4 (0.9887)**, the head convs of the second scale.
+  - Every conv is at CKA ≥ 0.98 to the last checkpoint of the T36.7 clean run from
+    iteration 50: a short fine-tuning from the Darknet weights barely moves the
+    representations (head and convs 1-3 move most).
+  - The three figures are regenerated (`python -m tools.figures explain_cka_float_int
+    explain_cka_checkpoints explain_gradcam_strip`).
 - **Spec**: §7, §9 · **Depends on**: T36.1, T36.7 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/cka.py` (linear CKA, Kornblith 2019, on pooled
   maps); figures in `tools/figures/` (M13 registry): CKA layer × checkpoint, float against

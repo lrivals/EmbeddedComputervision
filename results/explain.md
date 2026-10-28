@@ -211,5 +211,35 @@ Linear CKA on the outputs of every conv, pooled over 2 × 2 cells, over 64 VOC t
 - float against integer (dequantized), per layer;
 - each checkpoint of the T36.7 clean run against its last one.
 
+**Results** (2026-10-29, `tools/explain.py cka --run build/explain/record/clean`, 2 jobs;
+4 jobs overflowed a 12 GB cap):
+- **Float against integer**: CKA ≥ 0.99 on every conv of Tiny-YOLOv2. Tiny-YOLOv3 reaches
+  0.9900 at L15 and YOLOv4-tiny drops to 0.9887 at L29, the head convs of their
+  second scale: the deepest, widest maps lose the most to int8, as the per-layer error
+  of T28.0 grows along the network.
+- **Across the checkpoints**: every conv is at CKA ≥ 0.98 to the last checkpoint from
+  iteration 50. A 250-iteration fine-tuning from the Darknet weights barely moves the
+  representations; the last conv (L14, the head) and the middle convs 1-3 move most, at
+  iteration 100. A run from scratch would be needed to see which layers settle first.
+- Figures (T13.60): `build/figures/resultats/explain_cka_float_int.png`,
+  `explain_cka_checkpoints.png`, `explain_gradcam_strip.png`.
+
 <!-- explain:cka:begin -->
+Probe: 64 VOC test images, maps pooled over 2 × 2 cells.
+
+| net | convs | min CKA float / int (layer) | layers < 0.99 |
+|---|---|---|---|
+| v2 | 9 | 0.9977 (L14) | none |
+| v3 | 13 | 0.9900 (L15) | L15 |
+| v4 | 21 | 0.9887 (L29) | L29 |
+
+CKA of each conv to the last checkpoint, run `build/explain/record/clean`:
+
+| iteration | conv 0 | conv 1 | conv 2 | conv 3 | conv 4 | conv 5 | conv 6 | conv 7 | conv 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| 50 | 0.99 | 1.00 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 | 0.98 |
+| 100 | 0.99 | 0.98 | 0.98 | 0.98 | 0.99 | 0.99 | 0.99 | 0.99 | 0.98 |
+| 150 | 1.00 | 1.00 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 |
+| 200 | 1.00 | 1.00 | 0.99 | 0.98 | 0.99 | 0.99 | 0.99 | 0.99 | 0.99 |
+| 250 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
 <!-- explain:cka:end -->
