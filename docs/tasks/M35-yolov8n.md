@@ -129,6 +129,7 @@ M33 (BN $\varepsilon = 10^{-3}$, SiLU). All downsampling by 3×3 / 2 convs.
     the 3 images: boxes within 2.3·10⁻¹³ px and scores within 2·10⁻¹⁶, at 640 and at 416.
 
 ### [ ] T35.3 — Float network and COCO mAP
+- **Running** (2026-10-28, times CET): unit `t35-3` since 22:09: COCO val2017 at 640 (4 jobs, ≈ 0.45 s/image, 3,800 / 5,000 at 22:37), then 416; ETA ≈ 23:15. Log `build/longruns/T35.3-{640,416}.log`.
 - **Spec**: §8 · **Depends on**: T35.2 · **Size**: M
 - **Deliverables**: trainable network from the description (`models/ul_net.py` of T33.3);
   COCO val2017 mAP at 640 and 416; row in `results/map_coco.md`; `yolov8n-coco_infer`

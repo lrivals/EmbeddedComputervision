@@ -71,6 +71,7 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   unchanged.
 
 ### [ ] T11.1 — COCO val2017
+- **Running** (2026-10-28, times CET): unit `t11-1` since 22:02: `coco-int` done (int AP 16.20 / AP50 36.57 against float 16.75 / 37.22, 34 min), then `coco-calib` and `coco-fpga` (C-sim 5,000 on 6 cores); ETA ≈ 03:00. Logs `build/longruns/T11.1-coco-*.log`.
 - **Spec**: §8.3, §10.4 · **Depends on**: T11.0, T4.5 · **Size**: M
 - **Deliverables**: `python/yolo/infer/coco_eval.py` (AP@[.5:.95], AP50, AP75, AP per
   size, 101-point interpolation); `results/map_coco.md`

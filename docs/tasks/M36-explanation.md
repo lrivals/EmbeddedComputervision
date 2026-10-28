@@ -79,6 +79,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     `test_targets.py` green.
 
 ### [ ] T36.1 — Gradient attributions
+- **Running** (2026-10-28, times CET): unit `t36-run` since 22:26: `explain.py sanity --jobs 4` (the 6-job run hit the 14 GB cap); ETA ≈ 00:30. Log `build/longruns/T36.1-sanity.log`.
 - **Spec**: — · **Depends on**: T36.0 · **Runs on**: PC (GPU via `yolo.backend` if
   available) · **Size**: M
 - **Deliverables**: `python/yolo/explain/gradient.py`: saliency (|δx|, max over the
@@ -101,6 +102,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     processes), not run yet.
 
 ### [ ] T36.2 — Perturbation attributions (black box)
+- **Running** (2026-10-28, times CET): unit `t36-run`, after `sanity`: `explain.py stages --jobs 4`; ETA ≈ 03:30. Log `build/longruns/T36.2-stages.log`.
 - **Spec**: §9, §10.2 · **Depends on**: T36.0 · **Runs on**: PC (C-sim gcc for the third
   stage) · **Size**: M
 - **Deliverables**: `python/yolo/explain/perturb.py`: occlusion (sliding grey patch) and
@@ -149,6 +151,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
+- **Running** (2026-10-28, times CET): unit `t36-run`, after `stages`: `explain.py evaluate --jobs 4` (50 images × 3 networks); ETA ≈ 11:30 on 2026-10-29. Log `build/longruns/T36.4-evaluate.log`.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`
@@ -169,6 +172,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **To run**: 50 images × 3 networks, ≈ 2 h with 16 processes; not run yet.
 
 ### [ ] T36.5 — Miss causes
+- **Running** (2026-10-28, times CET): unit `t36-5ch`, queued behind `t11-1`: `explain.py misses --dataset crowdhuman` (500 images × 3 networks); start ≈ 03:00, ETA ≈ 04:00. ExDark done at 22:20 (results in `build/explain/misses.json`). Log `build/longruns/T36.5-crowdhuman.log`.
 - **Spec**: §8 · **Depends on**: T36.0, T27.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/misses.py`: for each missed person, its cause,
   computed from the head outputs and the post-processing: **no anchor** (no anchor shape
@@ -230,6 +234,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     `dark` and `fog` are synthetic until T27.3, and occluded is the VOC `truncated` flag.
 
 ### [ ] T36.7 — Training recorder
+- **Running** (2026-10-28, times CET): unit `t36-7` since 22:03: the clean and corrupt5 runs side by side (≈ 28 s/it, it 72 / 250 at 22:37), then `explain.py record`; ETA ≈ 00:00. Logs `build/longruns/T36.7-*.log`.
 - **Spec**: §7 · **Depends on**: T2.7 · **Runs on**: PC, Colab · **Size**: M
 - **Deliverables**: `python/yolo/explain/recorder.py`, a `Trainer.fit` callback writing
   every N iterations, per layer: weight norm, gradient norm, update / weight ratio, share of
@@ -257,6 +262,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     alone) were stopped at iteration 50.
 
 ### [ ] T36.8 — Representation dynamics
+- **Running** (2026-10-28, times CET): unit `t36-8`, queued behind `t36-7`: `explain.py cka --run build/explain/record/clean`; ETA ≈ 00:15, then `make figures`. Log `build/longruns/T36.8-cka.log`.
 - **Spec**: §7, §9 · **Depends on**: T36.1, T36.7 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/cka.py` (linear CKA, Kornblith 2019, on pooled
   maps); figures in `tools/figures/` (M13 registry): CKA layer × checkpoint, float against

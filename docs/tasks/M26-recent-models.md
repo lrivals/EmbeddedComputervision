@@ -31,6 +31,7 @@ The from-scratch, torch-free versions (weight reading, backward passes, loss, tr
 - **T26.5** waits for T26.0, T26.3 and T26.4.
 
 ### [ ] T26.0 — YOLOv7-tiny
+- **Running** (2026-10-28, times CET): unit `t26-0`, queued behind `t35-3`: v7-tiny float + int COCO val2017 and C-sim of the 5,000 images (`build/longruns/t26-0.sh`, 6 cores, 18 s per image per core); start ≈ 23:15, ETA ≈ 04:00. Log `build/longruns/T26.0.log`.
 - **Spec**: §3, §4.4, §10.3 · **Depends on**: T24.5 · **Size**: L
 - **Deliverables**: cfg and weights (`tiny-yolov7-coco`), float model, integer model,
   export, golden, C-sim; mAP at the three stages
@@ -72,8 +73,6 @@ The from-scratch, torch-free versions (weight reading, backward passes, loss, tr
     of the export) and the C-sim (`yolo_bench`, sim backend, `ACC_NO_APINT`) give the same
     boxes and scores to the last bit (131, 2 and 188 detections). C-sim: 18 s per image on
     one core.
-  - **Running**: integer and C-sim COCO val2017 on 5,000 images
-    (`build/longruns/t26-0.sh`, ≈ 4 h on 6 cores).
 
 ### [x] T26.1 — Offline PyTorch weight converter
 - **Spec**: §9.1 · **Depends on**: — · **Size**: M

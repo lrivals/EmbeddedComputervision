@@ -205,6 +205,7 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
   - cost per iteration ×2.1 at 608, ×4 at 832.
 
 ### [ ] T15.10 — Ignored regions of VisDrone
+- **Running** (2026-10-28, times CET): unit `t15-10`, queued behind `t36-5ch`: VisDrone val mAP of `b16-sall` with and without `--no-ignore` (`build/m15/t15-10/`); ETA ≈ 04:15. Logs `build/longruns/T15.10-*.log`.
 - **Spec**: §8.3 · **Depends on**: — · **Size**: M
 - **Deliverables**: ignored regions (category 0 of the annotations) read by the VisDrone
   loader and excluded from the evaluation
