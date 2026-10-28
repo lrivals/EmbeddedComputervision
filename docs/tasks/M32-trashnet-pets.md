@@ -31,8 +31,9 @@ This milestone comes out of T22.11 (ranks 2 and 3 of the datasets worth labellin
   `get_datasets.sh`, registry, notebooks, `autolabel_eval.py --map`).
 - **Pet**: boxed and loaded. Anchors and cfg written (`tools/m11.sh pets-prep`);
   `pets_stats` run.
-- **TrashNet**: downloaded; labelling stopped at 100 of 2 527 images (cache
-  `data/trashnet/autolabel.json`, resumed by the next run).
+- **TrashNet**: downloaded and labelled (2026-10-28). 88.2 % of the images are kept, under
+  the 95 % target, because full-frame boxes are rejected as `whole image` (cardboard
+  48.6 %). Whether to keep full-frame boxes is open (T32.1).
 
 ## Summary
 
@@ -172,11 +173,11 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 
 ## A. TrashNet data
 
-### [ ] T32.0 — Download and `tools/get_datasets.sh`
-- **In progress** (2026-10-20): `MARKER`, `HOWTO`, the `trashnet` command (download,
-  unzip, prep) and `check` written. `dataset-resized.zip` (43 MB) downloaded from GitHub
-  into `data/TrashNet/`; the 6 folders hold 2527 images. `trashnet : prêt` waits for the
-  prep (T32.1).
+### [x] T32.0 — Download and `tools/get_datasets.sh`
+- **Done** (2026-10-28): `MARKER`, `HOWTO`, the `trashnet` command (download, unzip, prep)
+  and `check` written. `dataset-resized.zip` (43 MB) downloaded from GitHub into
+  `data/TrashNet/`; the 6 folders hold 2527 images. After the T32.1 prep,
+  `tools/get_datasets.sh check` gives `trashnet : prêt (trashnet/annotations_val.json)`.
 - **Depends on**: T11.0 · **Size**: S
 - **Deliverables**: `MARKER[trashnet]=trashnet/annotations_val.json`, `HOWTO`, a
   `trashnet` command (download of `dataset-resized.zip` into `data/TrashNet/`, then the
@@ -185,16 +186,41 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   the 6 folders hold 2527 images.
 
 ### [ ] T32.1 — Boxes from the M22 labeller
-- **In progress** (2026-10-20): `prep_trashnet` written:
+- **Progress** (2026-10-28): `prep_trashnet` written and tested with a fake labeller
+  (`test_prep_trashnet`):
   - prompts `TRASHNET_PROMPTS` plus `object`, best box, `whole image` check, rejects;
   - 70 / 15 / 15 split stratified by class;
-  - cache in the `autolabel_io` format, written every 100 images so a stopped run resumes;
+  - cache in the `autolabel_io` format, written every 100 images;
   - hard links, `--preview`, and `--handcheck` / `--handcheck-iou` for T32.3.
 
-  Tested with a fake labeller (`test_prep_trashnet`). The run (3 processes × 6 threads,
-  about 8 s per image per process) was stopped at 100 of 2527 images; to resume, run
-  `python tools/prep_datasets.py trashnet --preview build/trashnet_preview.png
-  --handcheck build/trashnet_handcheck`.
+  The labelling run is done: all 2527 images are in `data/trashnet/autolabel.json`,
+  3 processes × 6 threads, about 3 h with other jobs running. A second run rebuilds the
+  annotations from the cache in 2.5 s, without the labeller. The preview is in
+  `build/trashnet_preview.png` and the 100 hand-check images in
+  `build/trashnet_handcheck`.
+
+  **The acceptance is not met** with the `whole image` rule:
+
+  | | Kept | Cardboard | Glass | Metal | Paper | Plastic | Trash |
+  |---|---|---|---|---|---|---|---|
+  | `whole image` rejected (current) | 2228 / 2527 (88.2 %) | 48.6 % | 97.6 % | 97.6 % | 90.6 % | 97.7 % | 97.8 % |
+  | full-frame boxes kept | 2522 / 2527 (99.8 %) | 100 % | 100 % | 100 % | 99.2 % | 100 % | 100 % |
+
+  The current rule gives 1551 / 335 / 342 train / val / test images.
+
+  Of the 299 rejects, 294 are `whole image` (cardboard 207, paper 51, glass 12,
+  plastic 11, metal 10, trash 3) and 5 are `no box` (all paper). On a sample of 16 of
+  them, the labeller is not wrong: the photo is a close-up and the object fills the
+  frame (a cardboard side, a flyer, the inside of a can). So the box over the whole image
+  is the right box. The 98 % check assumed every object has background around it, and
+  TrashNet breaks that for flat objects.
+
+  To decide:
+  - **Option 1:** keep these images with the full-frame box.
+  - **Option 2:** keep the rule and accept 48.6 % for cardboard.
+
+  Either way, the annotations rebuild from the cache in seconds. Option 1 also teaches
+  "fills the frame" boxes, which the webcam demo will not see often.
 - **Depends on**: T32.0, T22.10 · **Size**: M
 - **Deliverables**: `tools/prep_datasets.py trashnet` (prompts, best box, sanity check,
   rejects, stratified split, `autolabel.json` cache, hard links, report);
