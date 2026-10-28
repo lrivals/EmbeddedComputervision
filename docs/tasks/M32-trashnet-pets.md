@@ -384,6 +384,10 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 - **In progress** (2026-10-20): `tools/m11.sh pets-prep` done: anchors
   `results/anchors_pets.md` (k = 6, mean IoU 0.824: large boxes, 151 to 383 px at 416),
   cfg `build/m11/cfg/tiny-yolov3-pets.cfg`.
+  `tools/m11.sh trashnet-prep` done (2026-10-28): anchors `results/anchors_trashnet.md`
+  (k = 6, mean IoU 0.805 against 0.671 for the Darknet anchors; 101 to 386 px at 416), cfg
+  `build/m11/cfg/tiny-yolov3-trashnet.cfg`. Left: the Colab `_sweep` and `_train` runs once
+  `pets.tar` is on the Drive.
 - **Depends on**: T32.10, T32.11 · **Size**: L
 - **Deliverables**: `tools/m11.sh trashnet-prep` / `pets-prep` (anchors, cfg), then the
   `_sweep` and `_train` notebooks, tracked in [M15](M15-campagne-entrainement.md); mAP on
