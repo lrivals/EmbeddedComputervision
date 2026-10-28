@@ -21,14 +21,14 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
-| `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal`: PREWID `lab`, then MOT17 train (300 frames × 6 faults × 2 seeds each) | PREWID: 1 / 6 faults (≈ 7 min per fault) | PREWID ≈ 23:10, MOT17 ≈ 00:10 |
+| `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal --net tiny-yolov4-coco`: PREWID `lab`, then MOT17 train (300 frames × 6 faults × 2 seeds each) | restarted 23:22 with v4-tiny (v2 VOC: no person to lose) | PREWID ≈ 00:15, MOT17 ≈ 01:15 |
 | `t36-7` | [T36.7](M36-explanation.md) | two recorder runs side by side (clean, corrupt5), 250 it, then `explain.py record` | it 72 / 250 (≈ 28 s/it) | ≈ 00:00 |
 | `t36-8` | [T36.8](M36-explanation.md) | `explain.py cka --run …/clean` | waits for `t36-7` | ≈ 00:15 |
-| `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` started | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
+| `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` done (int AP 16.21), `coco-fpga` running | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
 | `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
 | `t36-5ch` | [T36.5](M36-explanation.md) | `explain.py misses --dataset crowdhuman` (500 images × 3 networks) | waits for `t11-1` | ≈ 04:00 |
 | `t15-10` | [T15.10](M15-campagne-entrainement.md) | VisDrone val mAP of `b16-sall`, with and without `--no-ignore` | waits for `t36-5ch` | ≈ 04:15 |
-| `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | waits for `t25-8` | ≈ 09:00 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
+| `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
 | `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
 
 ## Reference speeds

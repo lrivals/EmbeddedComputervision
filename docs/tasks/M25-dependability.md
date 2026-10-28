@@ -146,7 +146,7 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 ≈ 70 % of the critical errors.
 
 ### [ ] T25.6 — Critical error for a person detector
-- **Running** (2026-10-28, times CET): unit `t25-6ch`, queued behind `t25-8`: layer and bit grids on CrowdHuman val 500 (Tiny-YOLOv2 VOC, 10 jobs); start ≈ 00:10, ETA ≈ 09:00 (the VOC run took 6 h at 14 jobs). Log `build/longruns/T25.6-crowdhuman.log`.
+- **Running** (2026-10-28, times CET): unit `t25-6ch` since 23:22: layer and bit grids on CrowdHuman val 500 (Tiny-YOLOv2 VOC, the T25.1 network, 10 jobs); ETA ≈ 08:30 (the VOC run took 6 h at 14 jobs). Log `build/longruns/T25.6-crowdhuman.log`.
 - **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/fault_campaign.py --criterion person`; section in
   `results/faults.md`
@@ -198,7 +198,7 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 - **Deferred** (Vivado, board): [deferred/M25](deferred/M25-dependability.md) — T25.7, configuration-memory upsets (SEM IP).
 
 ### [ ] T25.8 — Fault detection by temporal coherence
-- **Running** (2026-10-28, times CET): unit `t25-8` since 22:09: PREWID `lab` (≈ 7 min per fault, 6 faults), then MOT17 train; ETA ≈ 23:10 for PREWID, ≈ 00:10 for MOT17. Log `build/longruns/T25.8-{prewid,mot17}.log`.
+- **Running** (2026-10-28, times CET): unit `t25-8` since 23:22 with **YOLOv4-tiny COCO** integer: PREWID `lab`, then MOT17 train; ETA ≈ 00:15 for PREWID, ≈ 01:15 for MOT17. Log `build/longruns/T25.8-{prewid,mot17}.log`. A first run with Tiny-YOLOv2 VOC was stopped: 0 critical run in 2,400 on PREWID, since that network barely sees the workers (person AP50 25.5 on PREWID test, T38.6), so it has no person to lose.
 - **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/faults.md`
 - **Acceptance**: on a video, the critical faults of T25.6 injected in one frame: share
@@ -216,8 +216,8 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
       frames (m = 1, 2, 3, IoU ≥ 0.3) has no box in the current frame. The ABFT is the
       `AbftMonitor` of T25.2.
     - The false alarms are the same check on the fault-free frame.
-  - Runs: PREWID `lab` and MOT17 train, 300 frames each, seeds 0 and 1 (Tiny-YOLOv2 VOC
-    integer).
+  - Runs: PREWID `lab` and MOT17 train, 300 frames each, seeds 0 and 1 (YOLOv4-tiny COCO
+    integer, the network of T29.3).
 
 The two tasks below come from the thesis draft (ARCYS, 2026-10): a learned monitor
 ([M39](M39-failure-prediction.md)) shares the chip with the detector, and the draft separates
