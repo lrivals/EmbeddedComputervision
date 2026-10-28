@@ -202,6 +202,20 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 - **Acceptance**: on a video, the critical faults of T25.6 injected in one frame: share
   detected by the temporal vote of [T29.3](M29-runtime-monitors.md), by the ABFT of T25.2,
   and by both; false alarms of the temporal check without faults
+- **Progress** (2026-10-28):
+  - **Code**: `tools/fault_campaign.py temporal`, with `stable_tracks`, `temporal_alarm`
+    and `temporal_points`, and tests in `test_fault_campaign.py`.
+    - Injection frames are drawn among the frames that hold a ground-truth person and have
+      3 contiguous previous frames.
+    - The previous frames are fault-free, and the faulty frame gets one of 6 transient
+      critical faults of T25.6 (act / acc at BER 1e-5 on L00 / L02, 100 flips of act bit 7
+      and of acc bits 24 and 31).
+    - The coherence check raises an alarm when a person track linked over the m previous
+      frames (m = 1, 2, 3, IoU ≥ 0.3) has no box in the current frame. The ABFT is the
+      `AbftMonitor` of T25.2.
+    - The false alarms are the same check on the fault-free frame.
+  - **Running**: PREWID `lab` and MOT17 train, 300 frames each, seeds 0 and 1 (Tiny-YOLOv2
+    VOC integer).
 
 The two tasks below come from the thesis draft (ARCYS, 2026-10): a learned monitor
 ([M39](M39-failure-prediction.md)) shares the chip with the detector, and the draft separates

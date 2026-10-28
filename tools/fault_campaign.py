@@ -15,6 +15,8 @@
     python tools/fault_campaign.py run --grid layer --criterion person --out …
     # T25.9: faults in the integer failure head (T39.5) on the stored features of T39.0
     python tools/fault_campaign.py monitor build/m39/labels/tiny-yolov4-coco_prewid-lab.npz
+    # T25.8: critical faults in one video frame, seen by temporal coherence and by the ABFT
+    python tools/fault_campaign.py temporal --dataset mot17 --split train --points 300
 
 T25.4, `--grid protect`: every site faulty at once at each BER, minus what a protection
 scheme (`SCHEMES`) masks. A fault seen by the ABFT check is assumed reloaded and recomputed
@@ -584,7 +586,8 @@ def _samples(args):
 
 
 def _cache_dir(args, n):
-    return ROOT / "build" / "m25" / "cache" / f"{args.net}_{n}"
+    tag = "" if args.dataset == "voc" else f"_{args.dataset}"
+    return ROOT / "build" / "m25" / "cache" / f"{args.net}{tag}_{n}"
 
 
 def _parse_floats(s):
@@ -726,6 +729,168 @@ def cmd_monitor(args):
         print(f"→ {out / f'{L.name}.json'} ({info['seconds']:.0f} s)")
 
 
+# ------------------------------------------------------------------------- temporal (T25.8)
+# Transient faults of one frame, among the critical ones of T25.6 (VOC person criterion).
+TEMPORAL_FAULTS = (
+    {"site": "act", "kind": "ber", "layer": 0, "rate": 1e-5},
+    {"site": "acc", "kind": "ber", "layer": 0, "rate": 1e-5},
+    {"site": "acc", "kind": "ber", "layer": 2, "rate": 1e-5},
+    {"site": "act", "kind": "flip", "bit": 7, "flips": 100},
+    {"site": "acc", "kind": "flip", "bit": 24, "flips": 100},
+    {"site": "acc", "kind": "flip", "bit": 31, "flips": 100},
+)
+STABLE = (1, 2, 3)  # previous frames a person track must span to raise the alarm
+TRACK_IOU = 0.3  # association between frames, as `temporal.vote`
+
+
+def stable_tracks(prev, m, iou_thr=TRACK_IOU):
+    """Boxes of the last previous frame that link back, frame by frame (IoU ≥ `iou_thr`), over
+    the `m` last frames of `prev` (list of (n, 4) person boxes (cx, cy, w, h), oldest first)."""
+    from yolo.infer.boxes import iou
+
+    if len(prev) < m:
+        raise ValueError(f"need {m} previous frames, got {len(prev)}")
+    keep = []
+    for b in np.reshape(prev[-1], (-1, 4)):
+        cur = b
+        for j in range(2, m + 1):
+            other = np.reshape(prev[-j], (-1, 4))
+            if not len(other):
+                break
+            ov = iou(cur[None], other)[0]
+            if ov.max() < iou_thr:
+                break
+            cur = other[int(np.argmax(ov))]
+        else:
+            keep.append(b)
+    return np.reshape(keep, (-1, 4))
+
+
+def temporal_alarm(prev, cur, m, iou_thr=TRACK_IOU):
+    """T25.8 coherence check at one frame: alarm when a person track present in each of the
+    `m` previous frames has no box at IoU ≥ `iou_thr` in the current frame `cur`."""
+    from yolo.infer.boxes import iou
+
+    tracks, cur = stable_tracks(prev, m, iou_thr), np.reshape(cur, (-1, 4))
+    if not len(tracks):
+        return False
+    if not len(cur):
+        return True
+    return bool((iou(tracks, cur).max(axis=1) < iou_thr).any())
+
+
+def temporal_points(samples, person, n, window, seed=0):
+    """`n` injection frames (indices into `samples`) with a ground-truth person and
+    `window` − 1 contiguous previous frames, drawn at random; and their windows."""
+    from dreaded_event import contiguous_runs
+
+    pos = {s["id"]: i for i, s in enumerate(samples)}
+    cand = [[pos[s["id"]] for s in run[t - window + 1:t + 1]]
+            for run in contiguous_runs(samples) for t in range(window - 1, len(run))
+            if (np.asarray(run[t]["labels"]) == person).any()]
+    rng = np.random.default_rng(seed)
+    pick = rng.choice(len(cand), min(n, len(cand)), replace=False)
+    return [cand[i] for i in sorted(pick)]
+
+
+def temporal_markdown(name, rows, info):
+    ms = info["stable"]
+    lines = [f"`{name}`: {info['points']} injection frames ({info['frames']} frames with "
+             f"their {info['window'] - 1} previous ones), seeds {info['seeds']}. "
+             "False alarms of the coherence check without fault, per frame: "
+             + ", ".join(f"m = {m}: {info['false_alarm'][str(m)] * 100:.1f} %" for m in ms)
+             + ".", "",
+             "| Fault | Critical | " + " | ".join(f"Temporal m = {m}" for m in ms)
+             + f" | ABFT | Both (m = {info['both_m']}) | Either | Missed |",
+             "|---" * (6 + len(ms)) + "|"]
+    for r in rows:
+        f = r["fault"]
+        what = (f"{f['site']} L{f['layer']:02d} BER {f['rate']:.0e}" if f["kind"] == "ber"
+                else f"{f['site']} bit {f['bit']} × {f['flips']}")
+        c = max(r["critical"], 1)
+        pct = lambda v: f"{v / c * 100:.0f} %"  # noqa: E731
+        lines.append(f"| {what} | {r['critical']} / {r['runs']} | "
+                     + " | ".join(pct(r["temporal"][str(m)]) for m in ms)
+                     + f" | {pct(r['abft'])} | {pct(r['both'])} | {pct(r['either'])} | "
+                     f"{pct(r['critical'] - r['either'])} |")
+    lines += ["", "Shares of the critical runs (a fault-free person lost in the faulty frame). "
+              f"Temporal m: a person track linked over the m previous fault-free frames "
+              f"(IoU ≥ {TRACK_IOU}) has no box in the faulty frame.", ""]
+    return "\n".join(lines)
+
+
+def cmd_temporal(args):
+    from yolo.data.letterbox import input_size
+    from yolo.models.tiny_yolo import load_cfg
+
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    args.criterion = "person"
+    person = _person_index(args)
+    samples, _ = _samples(args)
+    window = max(STABLE) + 1
+    points = temporal_points(samples, person, args.points, window)
+    frames = sorted({i for w in points for i in w})
+    sel = [samples[i] for i in frames]
+    k_of = {i: k for k, i in enumerate(frames)}
+    qm = load_qm(args.net, args.weights, args.calib, args.model_dir)
+    name = f"{args.net}_{args.dataset}-{datasets_split(args)}"
+    cache = ROOT / "build" / "m25" / "cache" / f"temporal_{name}_{len(points)}"
+    prepare(cache, sel, qm, input_size(load_cfg(args.net), None), args.jobs)
+    setup = (qm, cache, True, CONF, IOU, person, args.person_conf)
+    seeds = tuple(int(s) for s in args.seeds.split(","))
+    base = {"grid": "baseline", "site": None, "seed": 0}
+    t0 = time.time()
+    with mp.get_context("spawn").Pool(args.jobs, initializer=_init, initargs=setup) as pool:
+        def run(spec, ks):
+            return pool.map(_image, [(spec_key(spec), spec, k) for k in ks],
+                            chunksize=max(1, len(ks) // (4 * args.jobs)))
+
+        def persons(res):
+            lab, sc, bx = (np.asarray(v) for v in res[:3])
+            keep = (lab == person) & (sc >= args.person_conf)
+            return np.reshape(bx, (-1, 4))[keep]
+
+        ref = [persons(r) for r in run(base, range(len(frames)))]
+        prev = [[ref[k_of[i]] for i in w[:-1]] for w in points]
+        cur = [k_of[w[-1]] for w in points]
+        fa = {str(m): float(np.mean([temporal_alarm(p, ref[k], m) for p, k in zip(prev, cur)]))
+              for m in STABLE}
+        rows = []
+        for f in TEMPORAL_FAULTS:
+            acc = {"runs": 0, "critical": 0, "abft": 0, "both": 0, "either": 0,
+                   "temporal": {str(m): 0 for m in STABLE}}
+            for seed in seeds:
+                spec = {"grid": "temporal", "seed": seed, **f}
+                for p, r in zip(prev, run(spec, cur)):
+                    acc["runs"] += 1
+                    if not r[6][1]:  # no fault-free person lost
+                        continue
+                    acc["critical"] += 1
+                    seen = {m: temporal_alarm(p, persons(r), m) for m in STABLE}
+                    for m in STABLE:
+                        acc["temporal"][str(m)] += seen[m]
+                    acc["abft"] += r[5]
+                    acc["both"] += r[5] and seen[args.both_m]
+                    acc["either"] += r[5] or seen[args.both_m]
+            rows.append({"fault": f, **acc})
+            print(f"{f}: {acc}  {time.time() - t0:.0f} s", flush=True)
+    info = {"points": len(points), "frames": len(frames), "window": window, "seeds": list(seeds),
+            "stable": list(STABLE), "both_m": args.both_m, "false_alarm": fa,
+            "person_conf": args.person_conf, "seconds": round(time.time() - t0, 1)}
+    out = ROOT / "build" / "m25" / "temporal"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{name}.json").write_text(json.dumps({"info": info, "rows": rows}, indent=1) + "\n")
+    print(temporal_markdown(name, rows, info))
+    print(f"→ {out / f'{name}.json'} ({info['seconds']:.0f} s)")
+
+
+def datasets_split(args):
+    from yolo.data import datasets
+
+    return datasets.split_of(args)
+
+
 TM, TN = 32, 24  # KV260 tiles (hls/kernels/accel_config.hpp)
 
 
@@ -807,12 +972,25 @@ def main():
     p = sub.add_parser("monitor", help="faults in the failure head of T39.1 (T25.9)")
     p.add_argument("labels", nargs="+", help="labels of T39.0 (build/m39/labels/*.npz)")
     p.add_argument("--trials", type=int, default=50)
+    p = sub.add_parser("temporal", help="one-frame critical faults on video (T25.8)")
+    p.add_argument("--net", default="tiny-yolov2-voc")
+    p.add_argument("--weights", type=Path, default=None)
+    p.add_argument("--calib", type=Path, default=None)
+    p.add_argument("--model-dir", type=Path, default=None, help="exported integer model")
+    datasets.add_args(p)
+    p.add_argument("--subset", type=int, default=0)
+    p.add_argument("--points", type=int, default=300, help="injection frames")
+    p.add_argument("--seeds", default="0,1")
+    p.add_argument("--jobs", type=int, default=8)
+    p.add_argument("--person-conf", type=float, default=PERSON_CONF)
+    p.add_argument("--both-m", type=int, default=2, choices=STABLE,
+                   help="temporal check used in the Both and Either columns")
     p = sub.add_parser("report")
     p.add_argument("files", nargs="+")
     p.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     {"run": cmd_run, "plan": cmd_plan, "report": cmd_report, "widths": cmd_widths,
-     "monitor": cmd_monitor}[args.cmd](args)
+     "monitor": cmd_monitor, "temporal": cmd_temporal}[args.cmd](args)
 
 
 if __name__ == "__main__":

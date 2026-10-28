@@ -131,6 +131,33 @@ def test_person_match():
     assert fc.person_match([], ref) == (0, 2, 0) and fc.person_match(ref, []) == (2, 0, 0)
 
 
+def test_temporal_alarm():
+    a, b = [0.5, 0.5, 0.2, 0.4], [0.2, 0.2, 0.1, 0.1]
+    seen = [[a, b], [a, b], [a]]  # b missing in the last previous frame
+    # A track present in the m previous frames and gone now raises the alarm.
+    assert fc.temporal_alarm(seen, [b], 1) and fc.temporal_alarm(seen, [], 3)
+    assert not fc.temporal_alarm(seen, [[0.51, 0.5, 0.2, 0.4]], 3)
+    # b is not in the last previous frame: never a stable track, its absence is no alarm.
+    assert len(fc.stable_tracks(seen, 1)) == 1
+    # A track broken in an older frame is stable for small m only.
+    broken = [[b], [a], [a]]
+    assert fc.temporal_alarm(broken, [], 2) and not fc.temporal_alarm(broken, [], 3)
+    assert not fc.temporal_alarm([[], [], []], [], 1)
+    with pytest.raises(ValueError):
+        fc.stable_tracks([[a]], 2)
+
+
+def test_temporal_points():
+    lab = lambda p: np.array([0] if p else [], int)  # noqa: E731
+    samples = [{"id": f"s{i}", "sequence": "A", "frame": i, "labels": lab(i % 2)}
+               for i in range(6)]
+    samples += [{"id": "t0", "sequence": "B", "frame": 0, "labels": lab(1)}]
+    pts = fc.temporal_points(samples, 0, 10, 3)
+    # Frames 3 and 5 of A: a person and 2 contiguous previous frames; B is too short.
+    assert pts == [[1, 2, 3], [3, 4, 5]]
+    assert len(fc.temporal_points(samples, 0, 1, 3)) == 1
+
+
 def test_campaign_person_criterion(setup):
     d, samples, qm, cache, meta = setup
     fc._setup(qm, cache, abft=False, conf=1e-4, iou=0.45, person=14, person_conf=1e-4)
