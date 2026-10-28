@@ -21,7 +21,7 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
-| `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal --net tiny-yolov4-coco`: PREWID `lab`, then MOT17 train (300 frames × 6 faults × 2 seeds each) | restarted 23:22 with v4-tiny (v2 VOC: no person to lose) | PREWID ≈ 00:15, MOT17 ≈ 01:15 |
+| `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal --net tiny-yolov4-coco`, MOT17 train (PREWID done) | started 00:36 | ≈ 01:40 |
 | `t36-8` | [T36.8](M36-explanation.md) | `explain.py cka --run …/clean` | started ≈ 00:50 | ≈ 00:15 |
 | `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` done (int AP 16.21), `coco-fpga` running | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
 | `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |

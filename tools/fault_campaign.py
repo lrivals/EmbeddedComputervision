@@ -990,6 +990,9 @@ def main():
     p.add_argument("--calib", type=Path, default=None)
     p.add_argument("--model-dir", type=Path, default=None, help="exported integer model")
     datasets.add_args(p)
+    # video sequences (MOT17) live in the evaluation-only registry
+    p._option_string_actions["--dataset"].choices = sorted({**datasets.DATASETS,
+                                                            **datasets.EVAL_ONLY})
     p.add_argument("--subset", type=int, default=0)
     p.add_argument("--points", type=int, default=300, help="injection frames")
     p.add_argument("--seeds", default="0,1")

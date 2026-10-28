@@ -2,7 +2,7 @@
 
 The first section is the sensitivity campaign on the integer model (T25.1), 2026-10-27.
 The others come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20.
-T25.4 (selective protection), T25.6 (person criterion) and T25.9 (faults in the failure monitor) were added on 2026-10-28.
+T25.4 (selective protection), T25.6 (person criterion) and T25.9 (faults in the failure monitor) were added on 2026-10-28, T25.8 (temporal coherence) on 2026-10-29.
 
 ## T25.1: sensitivity of the integer model
 
@@ -402,6 +402,57 @@ Mean over every run of the site (all grids).
 Not run: CrowdHuman (data not on the PC, row in
 [long-runs.md](../docs/tasks/long-runs.md)), which has many more persons per image and
 small persons.
+
+## T25.8: fault detection by temporal coherence
+
+`tools/fault_campaign.py temporal --net tiny-yolov4-coco --dataset <set> --points 300`,
+2026-10-28/29.
+
+**Setup:**
+- YOLOv4-tiny COCO integer, the network of T29.3 (calibration
+  `build/quant/tiny-yolov4-coco/calib.json`), person score ≥ 0.25;
+- 300 injection frames per set, drawn among the frames with a ground-truth person and 3
+  contiguous previous frames, seeds 0 and 1;
+- the 3 previous frames are fault-free. The injection frame gets one transient fault among
+  the critical ones of T25.6: activations or accumulators at BER 1e-5 on L00 / L02, or 100
+  flips per image of `act` bit 7 or `acc` bits 24 and 31;
+- a run is **critical** when a fault-free person of that frame is lost (T25.6 matching);
+- **temporal check, m**: an alarm when a person track linked over the m previous frames
+  (greedy IoU ≥ 0.3, as `temporal.vote`) has no box at IoU ≥ 0.3 in the current frame;
+- **ABFT**: the checksum check of T25.2 (`AbftMonitor`) on the same faulty frame.
+
+**PREWID `lab`** (one 3,000-frame CCTV sequence):
+
+`tiny-yolov4-coco_prewid-lab`: 300 injection frames (898 frames with their 3 previous ones), seeds [0, 1]. False alarms of the coherence check without fault, per frame: m = 1: 1.3 %, m = 2: 1.0 %, m = 3: 1.0 %.
+
+| Fault | Critical | Temporal m = 1 | Temporal m = 2 | Temporal m = 3 | ABFT | Both (m = 2) | Either | Missed |
+|---|---|---|---|---|---|---|---|---|
+| act L00 BER 1e-05 | 6 / 600 | 33 % | 33 % | 33 % | 0 % | 0 % | 33 % | 67 % |
+| acc L00 BER 1e-05 | 15 / 600 | 80 % | 80 % | 73 % | 100 % | 80 % | 100 % | 0 % |
+| acc L02 BER 1e-05 | 8 / 600 | 62 % | 50 % | 38 % | 100 % | 50 % | 100 % | 0 % |
+| act bit 7 × 100 | 11 / 600 | 64 % | 55 % | 55 % | 0 % | 0 % | 55 % | 45 % |
+| acc bit 24 × 100 | 10 / 600 | 50 % | 40 % | 30 % | 100 % | 40 % | 100 % | 0 % |
+| acc bit 31 × 100 | 12 / 600 | 50 % | 50 % | 50 % | 100 % | 50 % | 100 % | 0 % |
+
+Shares of the critical runs (a fault-free person lost in the faulty frame). Temporal m: a person track linked over the m previous fault-free frames (IoU ≥ 0.3) has no box in the faulty frame.
+
+Over the 62 critical runs: the temporal check at m = 2 detects **34 (55 %)**, the ABFT 45
+(73 %), either of them **53 (85 %)**. False alarms: 1.0 % of the fault-free frames at
+m = 2, 1.3 % at m = 1.
+
+**Findings (PREWID):**
+- **The two checks see different faults.** The ABFT sees every accumulator fault and no
+  activation fault (as in T25.1). The temporal check is the only one to see the activation
+  faults: 8 of their 17 critical runs at m = 2.
+- **The temporal check alone is below Rech 2024** (≈ 70 % of the critical errors, another
+  network and fault model): 55 % here. Its misses are probably persons whose track was not linked
+  over the previous frames (just entered, or missed by the fault-free detector itself), so
+  their loss looks like an ordinary miss.
+- **A longer history does not help**: m = 3 detects fewer than m = 1 (they need a longer
+  track), for the same false-alarm rate (1.0-1.3 %).
+- **Critical one-frame faults are rare** on this network: 0.2-2.5 % of the runs.
+
+**MOT17 train**: running (2026-10-29).
 
 ## T25.9: faults in the failure monitor
 
