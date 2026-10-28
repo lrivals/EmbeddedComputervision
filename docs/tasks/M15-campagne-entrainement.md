@@ -360,12 +360,33 @@ mAP for the sweep, full split afterwards).
   | CrowdHuman | `tiny-yolov2-voc` | 1 | 26.29 | |
   | CrowdHuman | `tiny-yolov3-crowdhuman` `b32-sall` | 1 | 30.61 | |
   | CrowdHuman | `tiny-yolov3-crowdhuman` `b16-sall` | 1 | 35.87 (sweep) | |
+  | CrowdHuman | `tiny-yolov3-crowdhuman` `long-416` | 1 | | 30.44 |
 
   Sweeps and inferences done on 50 images (rev. `35e949b`, details:
   [resultats-balayages.md](resultats-balayages.md#exdark)); ExDark: fine-tuning useful
-  against VOC, not against COCO. What remains is the full split, the inference of
-  `b16-sall` (`COMPARE = True`) and, for CrowdHuman, the recall of `person` and the NMS
-  overflows.
+  against VOC, not against COCO. What remains is the full split of the out-of-domain
+  weights, the inference of `b16-sall` (`COMPARE = True`) and, for CrowdHuman, the recall
+  of `person` and the NMS overflows.
+- **CrowdHuman long run** (2026-10-28, Colab T4, rev. `70058a0`):
+  `tiny-yolov3-crowdhuman_train` with `ITERS = 6000`, `BATCH = 16`, `BURN_IN = 200`,
+  `SAVE_EVERY = 500`, `SUBSET = 0`, `OUT = …/tiny-yolov3-crowdhuman/runs/long-416`
+  (≈ 6.4 epochs on 15,000 images); 3,789 s of training (0.63 s/iteration), final loss
+  35.4. AP50 `person` **30.44** on the full val (4,370 images, stretch 416, VOC 11
+  points). The loss is flat from ≈ 1,000 iterations on and the LR stays at 1e-3 until
+  the end: the CrowdHuman `_train` template has no `STEPS` / `SCALES` (only
+  `gabarits.VISDRONE_TRAIN` does), so the T15.4 decay at 4,800 and 5,400 was not
+  applied. The k-means anchors of the Colab run are those of the local
+  `build/m11/cfg/tiny-yolov3-crowdhuman.cfg`. Outputs pulled to
+  `build/notebooks/crowdhuman/tiny-yolov3-crowdhuman/runs/long-416/` (`final.weights`,
+  `checkpoint.npz`, `loss.csv`, `dets/`): these are the CrowdHuman weights that T27.1,
+  T38.7, T39.0-T39.4 and T25.6 wait for. Not comparable yet with the 50-image column;
+  the full-split mAP of `tiny-yolov3-coco` (`tools/m11.sh crowdhuman`, T11.6) gives the
+  reference.
+- **Colab pitfall**: an interrupted extraction of `crowdhuman.tar` leaves
+  `annotation_val.odgt` (first member, the readiness marker) without
+  `annotation_train.odgt` (last member); the notebook then fails in `kmeans_anchors.py`.
+  Fix: `rm -rf data/crowdhuman`, then `tools/get_datasets.sh unpack
+  /content/drive/MyDrive/EmbeddedCV/data crowdhuman`.
 
 ## Out of scope
 
