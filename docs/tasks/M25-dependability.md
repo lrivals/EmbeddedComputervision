@@ -23,7 +23,7 @@ engineering, to be cited from the dependability literature when written up.
   - T25.1 sensitivity campaign (2026-10-27, [results/faults.md](../../results/faults.md)).
   - T25.3 ABFT lane in the HLS kernel and T25.7 faults in the HLS buffers, in C-sim
     ([results/faults.md](../../results/faults.md)).
-- **Remaining**: T25.4, T25.6 (run on VOC; CrowdHuman left), T25.8 and T25.10; the
+- **Remaining**: T25.6 (run on VOC; CrowdHuman left), T25.8 and T25.10; the
   synthesis costs are deferred. T25.9
   done: one output-bias flip silences the failure monitor, ABFT sees it, hidden activations stay blind.
 
@@ -98,13 +98,33 @@ engineering, to be cited from the dependability literature when written up.
   - **Packing**: the lane is outside the Tm filters, so the Tm count stays even.
 - **Deferred** (Vitis): [deferred/M25](deferred/M25-dependability.md) — T25.3, DSP and cycles after synthesis.
 
-### [ ] T25.4 — Selective protection
+### [x] T25.4 — Selective protection
 - **Spec**: §10.4 · **Depends on**: T25.1, T25.2 · **Size**: S
   · **Runs on**: PC (perf_model estimates); PC + Vitis for the exact BRAM and DSP
 - **Deliverables**: section in `results/faults.md`
 - **Acceptance**: for the most sensitive layers of T25.1, mAP under faults and cost (DSP,
   BRAM, cycles) of: ABFT, ECC on the weights in BRAM, duplication of the sensitive layers;
   recommendation
+- **Done** (PC part, 2026-10-28, `tools/m25.sh protect`). Results are in
+  [results/faults.md](../../results/faults.md).
+  - **Run**: every site faulty at once at BER 1e-5 and 1e-4, 3 seeds, Tiny-YOLOv2 VOC on
+    500 images.
+  - **mAP under faults** (fault-free 57.73):
+
+    | Scheme | BER 1e-5 | BER 1e-4 |
+    |---|---|---|
+    | none | 49.1 | 14.2 |
+    | ECC on weights and biases | 50.2 | 17.5 |
+    | ABFT on every conv | 57.0 | 51.0 |
+    | ABFT on the first 3 convs only | unstable (± 8.5) | |
+    | duplication of L00-L04 | 55.4 | 41.3 |
+    | ABFT + duplication | **57.5** | **54.5** |
+
+  - **Costs** (`perf_model`): ABFT +24 DSP (+3 %), 0 exposed cycles; duplication +28.1 %
+    cycles. The weights are not in BRAM: they sit in 768 register banks, where SECDED
+    costs +62.5 % bits, against +12.5 % for (72,64) on DDR.
+  - **Recommendation**: ABFT on every conv plus the duplication of L00-L04, or ABFT alone
+    if the 28 % do not fit T30.
 - **Deferred** (Vitis): [deferred/M25](deferred/M25-dependability.md) — T25.4, exact BRAM and DSP.
 
 ### [x] T25.5 — Out-of-distribution monitor

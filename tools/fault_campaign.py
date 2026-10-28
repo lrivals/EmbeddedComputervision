@@ -478,7 +478,7 @@ def markdown(rep):
             lines.append(f"| {b} | " + " | ".join(cells.get(s, "") for s in sites) + " |")
         lines += ["", "mAP change in points for one flip at that bit (per image for act / acc, "
                   "per model for weight / bias).", ""]
-    if rep["abft"]:
+    if any(s in rep["abft"] for s in SITES):  # the protect grid has only site "all"
         lines += ["| Site | Images changed | Flagged by ABFT | Changed and flagged | Silent "
                   "(changed, not flagged) |", "|---|---|---|---|---|"]
         for s in SITES:

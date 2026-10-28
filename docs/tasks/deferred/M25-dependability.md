@@ -20,9 +20,12 @@ configuration-memory faults need the tools or the board. Index: [README.md](READ
 
 ### [ ] T25.4 — Exact cost of the protections
 - **Condition**: Vitis · **Needs first**: T25.4 (PC part), T6.0
-- **To do**: exact BRAM and DSP of ABFT, ECC on the weights in BRAM and duplication of the
-  sensitive layers, in the section of `results/faults.md`, in place of the `perf_model`
-  estimates.
+- **To do**: exact BRAM, DSP and LUT of the schemes of the T25.4 section of
+  `results/faults.md` (2026-10-28), in place of the `perf_model` estimates:
+  - the ABFT lane (`ACC_ABFT = 1`, projected +24 DSP);
+  - SECDED on the `w_a` / `w_b` banks (768 × 9 int8, projected +62.5 % bits plus
+    encoders and decoders), and whether the decoder keeps II = 1;
+  - the duplication of L00-L04 (in time: +28.1 % cycles in the co-sim).
 
 ### [ ] T25.7 — Configuration-memory upsets
 - **Condition**: Vivado, Board · **Needs first**: T7.4

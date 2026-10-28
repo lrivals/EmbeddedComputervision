@@ -12,6 +12,7 @@
 #   ood                   T25.5  OOD monitor: features, fit, evaluation (M)
 #   person                T25.6  layer and bit grids with the person criterion (N, ≈ 4 h)
 #   monitor               T25.9  faults in the failure head of T39.1, PREWID and COCO (R)
+#   protect               T25.4  mAP under faults with ECC, ABFT, duplication (M, ≈ 45 min)
 #
 # Outputs in build/m25/<profile>/ (log.txt, JSONL of the runs; monitor: build/m25/monitor/
 # *.json); nothing is written in results/. Variables: JOBS (default 16), SUBSET (default 500), SEEDS (default 0,1,2),
@@ -89,6 +90,12 @@ person)
     --out "$M25/person/bit.jsonl"
   step python tools/fault_campaign.py report "$M25"/person/*.jsonl
   ;;
+protect)
+  setup faults
+  campaign protect
+  step python tools/fault_campaign.py report "$M25"/faults/protect.jsonl \
+    --out "$M25"/faults/report_protect.json
+  ;;
 monitor)
   setup monitor
   step python tools/fault_campaign.py monitor build/m39/labels/tiny-yolov4-coco_prewid-test.npz \
@@ -102,7 +109,7 @@ ood)
   step python tools/ood_monitor.py eval
   ;;
 *)
-  sed -n '2,18p' "$0"
+  sed -n '2,19p' "$0"
   exit 1
   ;;
 esac

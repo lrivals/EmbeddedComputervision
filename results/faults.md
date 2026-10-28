@@ -2,7 +2,7 @@
 
 The first section is the sensitivity campaign on the integer model (T25.1), 2026-10-27.
 The others come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20.
-T25.6 (person criterion) and T25.9 (faults in the failure monitor) were added on 2026-10-28.
+T25.4 (selective protection), T25.6 (person criterion) and T25.9 (faults in the failure monitor) were added on 2026-10-28.
 
 ## T25.1: sensitivity of the integer model
 
@@ -214,6 +214,71 @@ Per flip, a buffer fault does at most 1 % to 7 % of the damage of the same fault
 
 Configuration-memory upsets are out of reach in C-sim:
 [deferred/M25](../docs/tasks/deferred/M25-dependability.md).
+
+## T25.4: selective protection
+
+`tools/m25.sh protect` (`tools/fault_campaign.py run --grid protect`), 2026-10-28.
+
+**Setup:**
+- integer Tiny-YOLOv2 VOC on the 500-image T25.1 subset, fault-free mAP 57.73;
+- at each BER, **every site is faulty at once**: weights and biases (persistent),
+  activations and accumulators (transient), 3 seeds;
+- a protection scheme removes from the injection what it masks, so it is modelled as
+  perfect: ECC corrects, and ABFT detects then reloads or recomputes.
+
+**Schemes:** the sensitive layers are the first 3 convs (L00, L02, L04), the top of the
+T25.1 and T25.6 rankings.
+- ECC on every weight and bias word;
+- ABFT (T25.2) on every conv or on the first 3 only (`-sel`). It sees weight, bias and
+  accumulator faults, never activation faults (T25.1);
+- duplication of the first 3 convs (`dup-sel`), which covers their activations and
+  accumulators.
+
+| Scheme | Faulty sites | BER 1e-05 | BER 1e-04 |
+|---|---|---|---|
+| none | weight, bias, act, acc | 49.12 ± 1.94 | 14.22 ± 2.02 |
+| ecc | act, acc | 50.17 ± 1.33 | 17.53 ± 0.81 |
+| abft-sel | weight (not the first convs), bias (not the first convs), act, acc (not the first convs) | 51.68 ± 8.52 | 35.58 ± 15.84 |
+| abft | act | 57.02 ± 0.74 | 51.04 ± 0.20 |
+| dup-sel | weight, bias, act (not the first convs), acc (not the first convs) | 55.40 ± 1.50 | 41.29 ± 5.60 |
+| ecc+dup-sel | act (not the first convs), acc (not the first convs) | 56.49 ± 0.24 | 48.59 ± 1.38 |
+| abft+dup-sel | act (not the first convs) | 57.47 ± 0.14 | 54.54 ± 0.32 |
+
+mAP (mean ± std over 3 seeds) with every site faulty at once at that BER, minus the masked
+sites.
+
+**Costs** (`tools/perf_model.py`, Tiny-YOLOv2, kernel Tm = 32, Tn = 24, 800 DSP; exact
+figures wait for Vitis):
+
+| Scheme | DSP | On-chip memory | Cycles |
+|---|---|---|---|
+| ABFT (every conv) | +24 (+3 %): one checksum lane of Tn products | 2,352 B of checksum lanes and sums, 13,824 register bits of checksum weights | 0 exposed (`abft_cost`: the lane's weights load under the longer of `in_buf` / `w_buf`); a detection costs a reload and recompute of the tile |
+| ECC on the weights | 0 | the weights are not in BRAM: they stream from DDR into `w_a` / `w_b`, partitioned into 768 banks of 9 int8 (`conv_pe.cpp`). SECDED per int8 is (13,8), **+62.5 % bits** on those banks, plus the encoders and decoders on 768 read ports. On DDR, SECDED (72,64) is **+12.5 %**. Biases: (39,32), +22 % | 0 if the decoder fits in the II = 1 loop |
+| Duplication of L00-L04 | 0 if in time (the same PE twice), ×2 the PE DSP if in space | none in time | **+28.1 %** in time (2,089,436 of the 7,443,739 kernel cycles are L00-L04) |
+| ABFT + duplication of L00-L04 | +24 | as ABFT | +28.1 % |
+
+**Findings**:
+- **ECC alone barely helps** (+1.1 points at 1e-5, +3.3 at 1e-4). Most of the damage
+  of a full-site fault load comes from the activations and accumulators, which ECC does
+  not cover.
+- **ABFT on every conv is the best single scheme**: 57.02 at 1e-5, within 0.7 points of
+  the fault-free mAP, and 51.04 at 1e-4. It covers weights, biases and accumulators for
+  +3 % DSP and no exposed cycle.
+- **ABFT on the first 3 convs only is unstable** (± 8.5 and ± 15.8 points). One seed
+  out of three falls to 41.9 at 1e-5. The persistent faults of the later convs remain:
+  a high bias bit is enough (T25.1, T25.6). So ABFT has to be on every conv: its cost
+  does not depend on how many convs use it, since the lane is in the shared PE.
+- **Duplicating the first 3 convs is worth its cycles.** Alone, it raises 1e-4 from
+  14.2 to 41.3: the transient faults of the early layers weigh most. Adding it to ABFT
+  closes the activation gap: **57.47 at 1e-5 (−0.26) and 54.54 at 1e-4 (−3.2)**.
+- **Recommendation: ABFT on every conv, plus the duplication of L00-L04**, at +24 DSP
+  and +28 % kernel cycles. ECC brings nothing more once ABFT is there. If the 28 % do not
+  fit the frame budget (T30), keep ABFT alone: −0.7 points at 1e-5.
+- **Limit of the model**: at BER 1e-4, ABFT flags 100 % of the images, so every image
+  would recompute tiles. The masked-fault model hides that time cost, which is real. The
+  recompute rate at the BER expected in the field is left to measure.
+
+Exact BRAM, DSP and LUT of these schemes: [deferred/M25](../docs/tasks/deferred/M25-dependability.md).
 
 ## T25.6: critical errors for a person detector
 
