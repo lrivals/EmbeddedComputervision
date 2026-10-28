@@ -25,7 +25,7 @@ that depend on them are marked *to measure*.
 | ARM post-processing | < 0.02 ms on x86 (T7.3); A53 *to measure* | same | same (`yolo_post` in hardware: not supported, `scale_x_y`) |
 | Power | *to measure* (chip: `power.rpt`; SOM: INA260) | — | — |
 | LUT / DSP / BRAM | *after synthesis*; roofline model: 896 DSP, 112 BRAM18 | — | — |
-| mAP VOC2007 test | float 56.30, integer 55.66, **FPGA (C-sim) 55.66** ([map_stades.md](map_stades.md)) | (COCO, not evaluated) | COCO val2017 AP50: float 41.4, integer 40.1, FPGA (C-sim) *to run* (notebook `coco/tiny-yolov4-coco_infer`, `HW = True`) ([map_coco.md](map_coco.md)) |
+| mAP VOC2007 test | float 56.30, integer 55.66, **FPGA (C-sim) 55.66** ([map_stades.md](map_stades.md)) | (COCO, not evaluated) | COCO val2017 AP50: float 41.4, integer 40.1, **FPGA (C-sim) 40.1**, 5,000 / 5,000 images identical to the integer model ([map_coco.md](map_coco.md)) |
 
 Bit-exactness is checked end to end. On the **4,952 images** of VOC2007 test, the ARM
 driver driving the C-sim kernel produces detections **identical** to those of the Python

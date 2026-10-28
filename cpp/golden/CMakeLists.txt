@@ -3,6 +3,10 @@ project(yolo_golden CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# No fused multiply-add: the float box decode must round as NumPy does. With
+# -march=native (build/sw-fast), and always on aarch64, GCC fused σ·α − (α − 1)/2 and
+# moved boxes by 1 ULP on 5 of the 5,000 COCO images (T24.5).
+add_compile_options(-ffp-contract=off)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()

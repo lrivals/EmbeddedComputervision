@@ -98,15 +98,26 @@ Not measured yet: the full split is a CPU run of about 45 min per size
 `stretch` preprocessing. The integer model uses the calibration on 500 COCO train2017
 images ([calibration_tiny-yolov4-coco.md](calibration_tiny-yolov4-coco.md)). The C-sim
 stage is the HLS kernel in C simulation behind the ARM driver (`yolo_bench`, backend
-`sim`), on the same int8 inputs as the integer model. The full C-sim pass (about 1.5 h on
-18 cores) is to be run from the notebook; a smoke run of the notebook on the first 10 images
-gave detections identical to the integer model on all of them.
+`sim`), on the same int8 inputs as the integer model. The full pass on the 5,000 images
+ran from the notebook on 2026-10-28 (about 1 h 05 for the whole notebook, 15 processes),
+and its detections are identical to the integer model on every image.
 
 | Stage | AP | AP50 | AP75 | APs | APm | APl | Equality with the integer model |
 |---|---|---|---|---|---|---|---|
 | Float (fused BN, NumPy float32) | 21.7 | 41.4 | 20.5 | 9.9 | 26.0 | 30.7 | — |
 | Integer Python (`IntNetwork`, bit-exact) | 20.5 | 40.1 | 18.8 | 8.6 | 24.4 | 29.0 | reference |
-| FPGA, C-sim | *to run* | | | | | | 10 / 10 images identical (smoke run, first 10 images) |
+| FPGA, C-sim | 20.5 | 40.1 | 18.8 | 8.6 | 24.4 | 29.0 | **5,000 / 5,000 images identical** |
+
+**Fix found on the way**: the first full pass gave 4,995 / 5,000 identical images.
+- **Cause**: on the 5 others, one box coordinate differed by 1 ULP of float64. The fast
+  bench is built with `-march=native`, so GCC fused `σ·α − (α − 1)/2` of the `scale_x_y`
+  decode into an FMA, which rounds once where NumPy rounds twice. The integer heads were
+  identical.
+- **Fix**: `-ffp-contract=off` in `sw/CMakeLists.txt` and `cpp/golden/CMakeLists.txt`.
+  This also matters on the board, since GCC fuses by default on aarch64.
+- **Check**: the 5 chunks of 10 images that held them were recomputed with the fixed build
+  and match the integer model on all 50 images. The other 4,950 images were already
+  identical; the fused and unfused decodes give the same double on them.
 
 **Integer vs float: −1.2 AP, −1.3 AP50**, above the 1-point target of T24.5. QAT (as in
 [M9.3](../docs/tasks/M9.3-quant-4bits.md), T9.3.6) is left as follow-up. On 200 images, fake-quantizing

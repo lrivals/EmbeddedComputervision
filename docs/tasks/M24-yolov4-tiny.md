@@ -135,10 +135,17 @@ and [voc/tiny-yolov4-voc_train](../../notebooks/voc/tiny-yolov4-voc_train.ipynb)
   notebooks (export, golden, C-sim, `map_stades.py --subset`) found that `yolo_bench`
   decoded the heads without `scale_x_y` (`sw/postproc/heads.cpp`, fixed): C-sim == integer
   on 10 / 10 images after the fix.
-- **Remaining**: the C-sim pass on the 5,000 images from
-  `notebooks/coco/tiny-yolov4-coco_infer.ipynb` (`SUBSET = 0`, `INT8 = True`, `HW = True`;
-  ≈ 1.5 h on 18 cores), then the C-sim row of `map_coco.md` and `rapport.md`.
-  Projection 51.8 ms, 19.3 img/s, 133.3 GOPS on network MACs, 52.3 % MAC efficiency. GOPS
+- **C-sim pass** (2026-10-28): run on the 5,000 images from
+  `notebooks/coco/tiny-yolov4-coco_infer.ipynb` (`SUBSET = 0`, `INT8 = True`, `HW = True`),
+  in 1 h 05. **C-sim AP50 40.1, 5,000 / 5,000 images identical to the integer model**.
+  - **FMA fix**: the first pass gave 4,995. The `-march=native` fast bench fused the
+    `scale_x_y` decode into an FMA, which moved a box coordinate by 1 ULP.
+    `-ffp-contract=off` is now set in `sw/` and `cpp/golden/` (GCC also fuses by default
+    on aarch64). The 5 affected chunks were recomputed with the fix.
+  - **Rows**: `map_coco.md` and `rapport.md` filled.
+  - **Open in the acceptance**: the integer gap of −1.3 AP50, which needs QAT. It is
+    kept open, so the task stays unchecked.
+- Projection 51.8 ms, 19.3 img/s, 133.3 GOPS on network MACs, 52.3 % MAC efficiency. GOPS
   are counted on the network MACs (`perf_model.useful_macs`), the efficiency on the
   computed MACs.
 

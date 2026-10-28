@@ -90,7 +90,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T12.9](M12-profils-pc.md) | `make bench-sim` | VOC 4,952 | ≈ 40 min | stated | — |
 | [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-fpga` | COCO 5,000 | ≈ 45 min *(est.)* | Tiny-YOLOv3 ≈ VOC v2 rate, 5,000 × 0.5 s | `coco-int` |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | CrowdHuman data |
-| [T24.5](M24-yolov4-tiny.md) | `notebooks/coco/tiny-yolov4-coco_infer.ipynb`, `SUBSET = 0`, `INT8 = True`, `HW = True` | COCO 5,000 | ≈ 1.5 h | stated | — |
 | [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
 | [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |
 | [T27.1](M27-safety-metrics.md) C-sim column | `make_inputs.py --split val --subset 100`, `bench_sim.sh` with `EXTRA="--conf 0.001"`, `person_safety.py csim` | CrowdHuman val, 100 frames with persons | ≈ 3 min *(est.)* | 100 PREWID frames took ≈ 3 min (v4, 10 jobs, 2026-10-26) | T27.1 |
@@ -145,7 +144,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 | Machine | Total | Largest items |
 |---|---|---|
 | PC CPU | ≈ 43 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
-| PC C-sim | ≈ 12 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h, T24.5 ≈ 1.5 h |
+| PC C-sim | ≈ 10.5 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h |
 | Colab | ≈ 125-135 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h, T39.2 + T39.4 fine-tunes ≈ 5-6 h |
 
 Suggested order, unblockers first:
