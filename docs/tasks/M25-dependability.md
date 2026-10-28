@@ -23,7 +23,8 @@ engineering, to be cited from the dependability literature when written up.
   - T25.1 sensitivity campaign (2026-10-27, [results/faults.md](../../results/faults.md)).
   - T25.3 ABFT lane in the HLS kernel and T25.7 faults in the HLS buffers, in C-sim
     ([results/faults.md](../../results/faults.md)).
-- **Remaining**: T25.4, T25.6, T25.8, T25.9 and T25.10; the synthesis costs are deferred.
+- **Remaining**: T25.4, T25.6, T25.8 and T25.10; the synthesis costs are deferred. T25.9
+  done: one output-bias flip silences the failure monitor, ABFT sees it, hidden activations stay blind.
 
 ### [x] T25.0 — Fault model and injector
 - **Spec**: §9.3 · **Depends on**: T4.5 · **Runs on**: PC · **Size**: M
@@ -169,7 +170,7 @@ The two tasks below come from the thesis draft (ARCYS, 2026-10): a learned monit
 ([M39](M39-failure-prediction.md)) shares the chip with the detector, and the draft separates
 three families of dreaded events (perception error, execution anomaly, missed deadline).
 
-### [ ] T25.9 — Faults in the failure monitor
+### [x] T25.9 — Faults in the failure monitor
 - **Spec**: §9.3 · **Depends on**: T25.0, T39.1 · **Runs on**: PC · **Size**: S
 - **Deliverables**: fault sites on the failure head of [T39.1](M39-failure-prediction.md)
   (weights, activations, accumulators) in `faults.py`; section in `results/faults.md`
@@ -178,6 +179,17 @@ three families of dreaded events (perception error, execution anomaly, missed de
   share of the silencing faults caught by the ABFT of T25.2 when the head is a conv
 - **Notes**: CoDANN II gives the monitor the same assurance level as the function it
   watches; a monitor that fails silent is the case to measure.
+- **Done** (2026-10-28, [results/faults.md](../../results/faults.md#t259-faults-in-the-failure-monitor)):
+  `faults.head_forward` (weight, bias, act, acc on both layers of the `IntFailureHead`, ABFT
+  of both layers), `fault_campaign.py monitor`, `tools/m25.sh monitor`. Measured on PREWID
+  `test`, `lab` and COCO with YOLOv4-tiny:
+  - one high-bit flip (16-28) of the output bias moves the score past its whole range.
+    The monitor then silences every alarm on PREWID, where the bias is negative, or raises
+    100 % alarms on COCO, where it is positive.
+  - ABFT sees 99-100 % of the silencing weight, bias and accumulator faults, and none of
+    the hidden-activation faults. A sign-bit flip there silences up to 49 % of the alarms,
+    so a range check on the ReLU output is needed.
+  - At BER ≤ 1e-5, every site stays under 0.8 % silenced.
 
 ### [ ] T25.10 — Three families of dreaded events
 - **Spec**: §8.3 · **Depends on**: T25.2, T29.1, T29.5 · **Runs on**: PC · **Size**: M

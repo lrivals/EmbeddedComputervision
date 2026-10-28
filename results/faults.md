@@ -2,6 +2,7 @@
 
 The first section is the sensitivity campaign on the integer model (T25.1), 2026-10-27.
 The others come from the HLS kernel in C-sim (T25.3, T25.7), 2026-10-20.
+T25.9 (faults in the failure monitor) was added on 2026-10-28.
 
 ## T25.1: sensitivity of the integer model
 
@@ -213,3 +214,66 @@ Per flip, a buffer fault does at most 1 % to 7 % of the damage of the same fault
 
 Configuration-memory upsets are out of reach in C-sim:
 [deferred/M25](../docs/tasks/deferred/M25-dependability.md).
+
+## T25.9: faults in the failure monitor
+
+`tools/m25.sh monitor` (`tools/fault_campaign.py monitor`, `yolo.quant.faults.head_forward`),
+2026-10-28. Monitor: the integer `miss` head of T39.1 / T39.5 (1,536 → 32 ReLU → 1, 50,981 B)
+on the stored integer features of YOLOv4-tiny (T39.0 labels at the T27.2 point). The alarm
+threshold is set to 5 % alarms on the val split without fault. A fault **silences** the
+monitor on an image that it flags without fault and no longer flags. It raises a **false
+alarm** on an image that it newly flags. Draws:
+- one flip per image for `act` / `acc` (transient);
+- one flip per head over 50 draws for `weight` / `bias` (persistent);
+- BER 1e-5 to 1e-3 over 50 draws.
+
+The ABFT check of T25.2 is applied to both layers as 1×1 convs.
+
+| Set | Images | Flagged without fault | of which with a missed person |
+|---|---|---|---|
+| PREWID `test` | 592 | 47 | 26 |
+| PREWID `lab` | 3,000 | 146 | 94 |
+| COCO val2017 (person images) | 2,693 | 144 | 138 |
+
+Worst single flip per site (share of the flagged images silenced / false alarms among the
+others):
+
+| Site | PREWID `test` | PREWID `lab` | COCO | ABFT sees the silencing faults |
+|---|---|---|---|---|
+| weight, hidden | 0.6 / 0.1 % | 0.5 / 0.0 % | 2.1 / 0.1 % | 100 % |
+| bias, hidden (bit 31) | 7.2 / 4.8 % | 31.6 / 1.1 % | 40.4 / 7.2 % | 100 % |
+| act, hidden (bits 6-7) | 12.8 / 3.5 % | 37.7 / 7.2 % | 48.6 / 18.4 % | **0 %** |
+| acc, hidden (bit 31) | 12.8 / 5.0 % | 29.5 / 0.6 % | 43.1 / 7.1 % | 100 % |
+| weight, output (bit 7) | 3.3 / 2.4 % | 10.2 / 0.3 % | 17.1 / 0.5 % | 100 % |
+| bias, output (bits 16-28) | **100** / 0.0 % | **100** / 0.0 % | 0.0 / **100** % | 100 % |
+| acc, output (bit 31) | 68.1 / 100 % | 100 / 91.7 % | 100 / 55.8 % | 100 % |
+
+At BER 1e-3, the parameters silence the most:
+- hidden weights: 5.1 / 7.0 / 26.7 %;
+- hidden biases: 6.0 / 12.0 / 11.4 %.
+
+At BER ≤ 1e-5, every site stays under 0.8 % of silenced alarms. Full tables (every bit and
+BER): `build/m25/monitor/*.json`.
+
+- **The monitor fails silent on one bit.** One flip of a high bit (16 to 28) of the output
+  bias moves the score by 2^b, beyond its whole range (|score| < 46,000).
+  - On PREWID, where the bias is negative (−11, −42), the bit is set and the flip
+    subtracts: **every alarm is gone**, for as long as the bias stays corrupted (a
+    persistent fault).
+  - On COCO, where the bias is positive (+24), the same flip adds instead: 100 % alarms.
+  - Which way the head fails depends on the sign of one stored word, not on the design.
+  - The output accumulator has the same weak point, but only for one image (transient).
+- **The ABFT check sees every silencing weight, bias and accumulator fault** (99-100 %, the
+  1 % gap at BER 1e-3 is two flips cancelling in the sum). As in the detector (T25.1), it
+  never sees the hidden activations. These are the residual hole: up to 49 % of the alarms
+  silenced by one sign-bit flip, with no flag.
+- **Effect on the misses**: the alarms on the images with a missed person are silenced at
+  the same rate as the others (`silenced_miss` in the JSON, e.g. 13.2 % against 13.7 % on
+  PREWID `lab` for a hidden-bias flip). So the monitor loses the very alarms it exists for,
+  which is the case CoDANN II warns about.
+- **Protection**, an input for T25.4 and T31.3:
+  - the 40 bytes of the output layer (32 int8 weights, the int32 bias and accumulator) are cheap to
+    duplicate or to hold in ECC;
+  - the ABFT lane on the hidden layer covers weights, biases and accumulators;
+  - the 32 hidden activations need a parity bit or a range check (ReLU output in
+    [0, 127]: a set sign bit is itself an error, which catches the worst act flips for free).
