@@ -353,8 +353,13 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
 
 ## D. Runs
 
-### [ ] T32.10 — `stats` notebook runs
-- **In progress** (2026-10-20):
+### [x] T32.10 — `stats` notebook runs
+- **Done** (2026-10-28): `notebooks/trashnet/trashnet_stats.ipynb` run with its outputs
+  (`jupyter nbconvert --execute`, under a minute); "TrashNet" section in
+  [stats-jeux.md](stats-jeux.md), filled by `tools/data_stats.py --report`, with the answer:
+  the box covers a median 54 % of the photo (q10 18 %, q90 100 %), and only paper loses
+  images to the labeller (5 of 594, `no box`).
+- **Before** (2026-10-20):
   - `notebooks/pets/pets_stats.ipynb` run with its outputs; "Oxford-IIIT Pet" section in
     [stats-jeux.md](stats-jeux.md), with the answer to the question.
   - The body box is a median 3.7 times the head box in area (q10 1.8, q90 9.3), and
@@ -366,8 +371,9 @@ out-of-domain notebooks of the pre-trained networks, through `MAPPINGS`.
   [stats-jeux.md](stats-jeux.md).
 
 ### [ ] T32.11 — Drive upload
-- **In progress** (2026-10-20): `tools/get_datasets.sh push pets` started
-  (`data_archives/pets.tar`, 798 MB); TrashNet waits for T32.1.
+- **In progress** (2026-10-28): `push trashnet` done (`trashnet.tar`, 49 MB, same size on the
+  Drive). The `push pets` of 2026-10-20 had never reached the Drive. It was started again
+  on 2026-10-28.
 - **Depends on**: T32.1, T32.5 · **Size**: S
 - **Deliverables**: `tools/get_datasets.sh push trashnet`, `push pets`; rows in
   [donnees-drive.md](donnees-drive.md).

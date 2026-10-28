@@ -57,20 +57,19 @@ GPU (T12.11-e).
 | [T36.1](M36-explanation.md) | `tools/explain.py sanity --jobs 12` | VOC07 test, 20 images × 3 networks | ≈ 40 min *(est.)* | per image 5 methods × 4 networks (original + 3 randomizations); IG 2 × 130 passes, SmoothGrad 50, at ≈ 0.3 s/pass | — |
 | [T36.2](M36-explanation.md) | `tools/explain.py stages --jobs 12` | VOC07 test, 20 images × 3 networks; golden on 5 | ≈ 1 h *(est.)* | per image D-RISE 300 + occlusion 145 inferences, float 0.28 s and int 0.6 s each (measured 2026-10-22, one thread); golden 100 masks × 2.7 s on 5 images | `build/golden/golden_run`, `model/<net>/` |
 | [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | ≈ 2 h *(est.)*, full ≈ 20 h | 14 method × stage pairs ≈ 600 s per image | — |
-| [T36.5](M36-explanation.md) | `tools/explain.py misses` on CrowdHuman val, the T27.3 sets and ExDark (VOC done 2026-10-27) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | CrowdHuman data, T27.3 |
+| [T36.5](M36-explanation.md) | `tools/explain.py misses` on CrowdHuman val, the T27.3 sets and ExDark (VOC done 2026-10-27) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | T27.3 |
 | [T36.7](M36-explanation.md) | `tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --subset 200 --batch 8 --iters 250 --lr 1e-4 --burn-in 20 --record --record-every 10 --snap-every 50 [--corrupt 0.05] --out build/explain/record/{clean,corrupt5}`, then `tools/explain.py record --runs …` | VOC trainval, 200 images | ≈ 1 h per run alone *(est.)*; 2 runs side by side ≈ 2 h | 15-30 s/iteration measured with the other runs sharing the CPU | — |
 | [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
-| [T25.6](M25-dependability.md) | `tools/m25.sh person` with a CrowdHuman net and set (VOC person class done on 2026-10-28) | CrowdHuman | ≈ 6 h on the PC (measured on VOC, 500 images, 14 jobs) | same grids as T25.1 | CrowdHuman data |
+| [T25.6](M25-dependability.md) | `tools/m25.sh person` with a CrowdHuman net and set (VOC person class done on 2026-10-28) | CrowdHuman | ≈ 6 h on the PC (measured on VOC, 500 images, 14 jobs) | same grids as T25.1 | — |
 | [T25.8](M25-dependability.md) | faults injected on video, temporal coherence | video | unmeasured | — | T29.3 (T25.6 critical faults known on VOC) |
-| [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py infer --dataset crowdhuman --split val` for tiny-yolov3-crowdhuman, v3-coco, v4-coco, then `report --write` | CrowdHuman val 4,370 | ≈ 25 min *(est.)* | float + int 0.11 s/image with 20 jobs (measured on PREWID, 2026-10-26): 3 × 4,370 × 0.11 s | T15.14, CrowdHuman data |
-| [T27.3](M27-safety-metrics.md) | `tools/person_safety.py infer --degrade all`, then `degrade-report --write`; ExDark `--dataset exdark` | CrowdHuman val, ExDark test | ≈ 2.5 h *(est.)* | 18 × 4,370 × 0.11 s (float + int, 20 jobs, measured on PREWID) | T27.1, CrowdHuman data |
+| [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py infer --dataset crowdhuman --split val` for tiny-yolov3-crowdhuman, v3-coco, v4-coco, then `report --write` | CrowdHuman val 4,370 | ≈ 25 min *(est.)* | float + int 0.11 s/image with 20 jobs (measured on PREWID, 2026-10-26): 3 × 4,370 × 0.11 s | T15.14 |
+| [T27.3](M27-safety-metrics.md) | `tools/person_safety.py infer --degrade all`, then `degrade-report --write`; ExDark `--dataset exdark` | CrowdHuman val, ExDark test | ≈ 2.5 h *(est.)* | 18 × 4,370 × 0.11 s (float + int, 20 jobs, measured on PREWID) | T27.1 |
 | [T38.8-T38.10](M38-prewid.md) float, int | the M27 commands with `--net <T38.7 cfg> --weights <ckpt>` (`person_safety.py infer`, `--degrade all`, grayscale variant, `dreaded_event.py`) | PREWID test 592, lab 3,000 | ≈ 30 min *(est.)* | measured 2026-10-26 with v4-tiny: test 592 + lab 3,000 + 18 degradations × 592 in ≈ 25 min (float + int, 0.11 s/image, 20 jobs) | T38.7 |
-| [T39.0, T39.1](M39-failure-prediction.md) CrowdHuman | `tools/failure_labels.py label --net <crowdhuman cfg> --weights … --calib … --set crowdhuman:val --conf <T27.2>` (PREWID `test`, `lab` and COCO done 2026-10-27 at 0.0953); then `tools/failure_labels.py report`, `tools/failure_prediction.py fit` and `eval --write`, `tools/ood_monitor.py compare --labels … --failure … --write` | CrowdHuman val 4,370, PREWID test 592, COCO val2017 ≈ 2,700 person images | ≈ 15-20 min *(est.)* | labels measured 2026-10-26: 0.11 s/image (500 COCO in 55 s, 592 PREWID in 70 s, 12 jobs); head fit ≈ 10 s | T27.2, CrowdHuman data and weights (T15.14) |
+| [T39.0, T39.1](M39-failure-prediction.md) CrowdHuman | `tools/failure_labels.py label --net <crowdhuman cfg> --weights … --calib … --set crowdhuman:val --conf <T27.2>` (PREWID `test`, `lab` and COCO done 2026-10-27 at 0.0953); then `tools/failure_labels.py report`, `tools/failure_prediction.py fit` and `eval --write`, `tools/ood_monitor.py compare --labels … --failure … --write` | CrowdHuman val 4,370, PREWID test 592, COCO val2017 ≈ 2,700 person images | ≈ 15-20 min *(est.)* | labels measured 2026-10-26: 0.11 s/image (500 COCO in 55 s, 592 PREWID in 70 s, 12 jobs); head fit ≈ 10 s | T27.2, CrowdHuman weights (T15.14) |
 | [T39.5](M39-failure-prediction.md) | `tools/failure_prediction.py stages --labels … --check --write` | same sets | ≈ 1 min | g++ build + scoring, measured | T39.0 at T27.2 |
 | [T29.1](M29-runtime-monitors.md), [T29.2](M29-runtime-monitors.md) CrowdHuman | monitors on CrowdHuman val, T27.3 sets, ExDark; `person_safety.py conformal --dataset crowdhuman` (PREWID done 2026-10-27) | — | unmeasured, ≈ 1 h *(est.)* | reuses the T27 outputs | T27.2, T27.3 |
-| [T32.10](M32-trashnet-pets.md) | `trashnet_stats` notebook | TrashNet | unmeasured, R | — | — (T32.1 done) |
 | [T41.1](M41-safe-unsafe-behaviours.md) calibration | labeller on every frame of 20 clips (dense reference), then the sampling settings | 20 clips at 24 fps | unmeasured, ≈ 3-6 h *(est.)* | clip length unknown; at 10 s per clip: 20 × 240 frames × 4-5 s of throughput ≈ 6 h | T41.0 |
 | [T41.3](M41-safe-unsafe-behaviours.md) | `python tools/autolabel.py --folder data/safe_unsafe/frames --classes person --resume …` | 691 clips after sampling | unmeasured, ≈ 10-15 h *(est.)* | assumed ≈ 15 kept frames per clip: ≈ 10,000 × 4-5 s of throughput (3 processes); to recompute from T41.1 | T41.1, T41.2 |
 | [T42.3](M42-soda.md), [T43.2](M43-construction-ppe.md) | completeness check, labeller on 100 test images each | SODA, Construction-PPE | ≈ 20 min *(est.)* | 2 × 100 × 5-7 s | T42.2, T43.1 |
@@ -89,7 +88,7 @@ These share the CPU with the table above: one at a time, at night.
 |---|---|---|---|---|---|
 | [T12.9](M12-profils-pc.md) | `make bench-sim` | VOC 4,952 | ≈ 40 min | stated | — |
 | [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-fpga` | COCO 5,000 | ≈ 45 min *(est.)* | Tiny-YOLOv3 ≈ VOC v2 rate, 5,000 × 0.5 s | `coco-int` |
-| [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | CrowdHuman data |
+| [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | — |
 | [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
 | [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |
 | [T27.1](M27-safety-metrics.md) C-sim column | `make_inputs.py --split val --subset 100`, `bench_sim.sh` with `EXTRA="--conf 0.001"`, `person_safety.py csim` | CrowdHuman val, 100 frames with persons | ≈ 3 min *(est.)* | 100 PREWID frames took ≈ 3 min (v4, 10 jobs, 2026-10-26) | T27.1 |
@@ -120,7 +119,7 @@ These share the CPU with the table above: one at a time, at night.
 | [T21.11](M21-asl-alphabet.md) | `SIZE=224x224 tools/m11.sh asl-prep`, `asl-train` | ASL | ≈ 1 h *(est.)* | 3.4× fewer MACs than 416 + eval | T21.9 |
 | [T24.6](M24-yolov4-tiny.md) | `notebooks/<ds>/tiny-yolov4-<ds>_{sweep,train,infer}.ipynb` with `INT8` and `HW` stages | the 11 `TRAINABLE` datasets | ≈ 30-35 h *(est.)* | per dataset ≈ 3 h (sweep, long run, evals); C-sim stage on the PC | — |
 | [M24](M24-yolov4-tiny.md) QAT | QAT of v4-tiny (integer model loses 1.3 AP50) | COCO | unmeasured | — | — |
-| [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | T32.10, T32.11 |
+| [T32.12](M32-trashnet-pets.md) | `tools/m11.sh trashnet-prep`, `_sweep` and `_train` for TrashNet and Pet | TrashNet ≈ 1,770 train, Pet 3,302 | ≈ 6 h *(est.)* | 2 × (sweep 1 h + long 1 h 45 + evals) | `push pets` (T32.11) |
 | [T38.7](M38-prewid.md) | `notebooks/prewid/tiny-yolov3-prewid_{sweep,train}.ipynb` (`prewid-prep` done): from COCO and from CrowdHuman, then leave-one-camera-out × 4 and `lab` added to training | PREWID 2,821 train | ≈ 12 h *(est.)* | sweep 1 h + 3 long runs × 1 h 45 + 4 LOCO × 1 h 20 + evals (test 592, lab 3,000 at 46 ms/image, 8 jobs) | CrowdHuman recipe: T15.14 |
 | [T41.8](M41-safe-unsafe-behaviours.md), [T42.6](M42-soda.md), [T43.5](M43-construction-ppe.md) | `tools/m11.sh <dataset>-prep`, `_train` notebook per dataset, then the cross-domain evaluations on PREWID test | Safe and Unsafe (T41.3 count), SODA ≈ 14,000 train *(est.)*, Construction-PPE ≈ 1,000 train | ≈ 8-10 h GPU *(est.)* | 3 × (long run 1 h 45 + evals); SODA longer at full split | T41.6, T42.4, T43.3 |
 | [T39.2](M39-failure-prediction.md) | `tools/train.py --net <crowdhuman cfg> --dataset crowdhuman --init <crowdhuman final.weights> --failure --failure-conf <T27.2> [--failure-freeze-after K] --out build/m39/joint`, then `tools/failure_labels.py label --checkpoint build/m39/joint/checkpoint.npz …` and `tools/failure_prediction.py eval --joint build/m39/joint/checkpoint.npz --write`, `kgfp_baseline.py metric --joint …` | CrowdHuman train 15,000 | ≈ 3-4 h GPU *(est.)* | fine-tune length of T15.14; labels recomputed per batch: one decode + NMS per image; CPU smoke run with the term 4 s/it at batch 4 (2026-10-26) | T39.1 at T27.2, CrowdHuman weights |
@@ -132,9 +131,8 @@ These share the CPU with the table above: one at a time, at night.
 | Task | Transfer | Size | Estimate | Waits for |
 |---|---|---|---|---|
 | [T16.14](M16-presentation-jeux.md), T11.2, T11.4 | finish KITTI `training/image_2` (`data/kitti/data_object_image_2.zip.part` incomplete) | ≈ 12 GB | unmeasured | — |
-| [T11.6](M11-jeux-de-donnees.md), T25.6, T27 | CrowdHuman to the PC (`tools/get_datasets.sh pull crowdhuman`) | 11 GB | unmeasured | — |
 | [T15.13](M15-campagne-entrainement.md) | FLIR to the Drive from Colab | 12 GB | unmeasured | — |
-| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (running on 2026-10-20), then `push trashnet` | 798 MB + small | unmeasured | — (T32.1 done) |
+| [T32.11](M32-trashnet-pets.md) | `tools/get_datasets.sh push pets` (trashnet done 2026-10-28) | 798 MB | unmeasured | — (T32.1 done) |
 
 ## Totals and order
 
@@ -150,10 +148,8 @@ Suggested order, unblockers first:
 
 ```mermaid
 graph LR
-  T3210[T32.10] --> T3212[T32.12]
   PETS["push pets"] --> T3212
-  CH["pull CrowdHuman"] --> T116[T11.6] & T1514[T15.14]
-  T1514 --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
+  T1514[T15.14] --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
   T251[T25.1] --> T256[T25.6] --> T258[T25.8]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
   T152[T15.2] --> T151["T15.1 VOC"] --> T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]

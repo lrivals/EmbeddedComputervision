@@ -29,6 +29,7 @@ anchors of the dataset's fine-tuning cfg. Pixels on 200 images per split (seed 0
 | hituav | 4 | 2,579 | 22,298 | 6 | 84.2 % | 44.6 % | 7.76 % | 0 | 125 | 0.698 |
 | uavdt | 3 | 40,735 | 798,795 | 15 | 96.9 % | 56.9 % | 14.68 % | 0 | 97 | 0.711 |
 | asl | 28 | 76,522 | 73,522 | 1 | 0.0 % | 0.0 % | 0.00 % | 0 | 132 | 0.768 |
+| trashnet | 6 | 2,144 | 2,144 | 1 | 0.0 % | 0.0 % | 0.00 % | 0 | 163 | 0.671 |
 | pets | 37 | 6,964 | 6,964 | 1 | 0.0 % | 0.0 % | 0.00 % | 0 | 114 | 0.824 |
 | prewid | 1 | 3,413 | 1,924 | 1 | 38.5 % | 0.4 % | 0.16 % | 0 | 138 | 0.777 |
 <!-- /data_stats:comparatif -->
@@ -176,6 +177,31 @@ always enough for the ground truth. The bottleneck is the grid: **19.8 %** of th
 are lost by collision. **22.5 %** of the boxes are `difficult` (`mask` and `ignore`).
 77,738 `fbox` boxes overflow the image: they are clipped by the loader, 15 become empty
 and are removed.
+
+## TrashNet
+
+<!-- data_stats:trashnet -->
+Revision `70058a0`, input 416×416 (letterbox), cfg `tiny-yolov3-coco`, pixels on 200 images (seed 0). Command: `python tools/data_stats.py --dataset trashnet --split train,test --sample 200`.
+
+| part | images | objects | difficult | empty images | objects/image (med. / max) | small < 32² at 416×416 | smaller than a cell | lost targets | images > 256 / > 1,024 |
+|---|---|---|---|---|---|---|---|---|---|
+| train | 1,765 | 1,765 | 0 | 0 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| test | 379 | 379 | 0 | 0 | 1 / 1 | 0.3 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+| all | 2,144 | 2,144 | 0 | 0 | 1 / 1 | 0.0 % | 13x13 0.0 % · 26x26 0.0 % | 0.00 % | 0 / 0 |
+
+| split | images | objects | official |  |
+|---|---|---|---|---|
+| train | 1,765 | 1,765 | — / — | ok |
+| test | 379 | 379 | — / — | ok |
+<!-- /data_stats:trashnet -->
+
+**Question (T32.8): how much of the image does one piece of waste cover, and which classes
+lose the most images to the labeller?** The box of the M22 labeller covers a median **54 %**
+of the photo (q10 18 %, q90 100 %): one object on a plain background, often photographed
+close, so at least one image in ten has a box over the whole frame (close-ups kept, T32.1).
+Only **paper** loses images, 5 of 594 (0.8 %), all for `no box` (no box scored ≥ 0.3);
+the five other classes keep every image. So the labeller does not bias the class balance;
+the small class is `trash` (137 images, 21 in test) by itself.
 
 ## Oxford-IIIT Pet
 
