@@ -47,6 +47,33 @@ The from-scratch, torch-free versions (weight reading, backward passes, loss, tr
     (graph, tensor flow, datasheet, memory, output, calibration, per-layer error). The
     network is 2.89 GMAC (`make count-macs`); the export counts 2.916 GMAC, as it copies the
     SPP input by two identity 1×1 convs and chains the 5×5 pools.
+- **Study** (2026-10-28, written before any kernel change; result: none is needed):
+  - **Concats of 4 sources**: the export already uses `layout: "contiguous"`. Each of the
+    9 four-source routes (L07, L15, L23, L31, L41, L55, L67, L76, L85) has its own buffer
+    (`R`, `R1` … `R13`), and every source conv writes its channels end to end at its offset
+    in it. The route is a no-op for the engine and the driver: no segment, so
+    `MAX_SEGMENTS = 2` and the 31-word `LayerDesc` stay as they are.
+  - **SPP**: the stride-1 5 × 5 pool is in the output stage (`PK_MAX = 5`,
+    `LayerDesc::pool_lo`, commit 7db966a). The 9 × 9 and 13 × 13 pools are chained 5 × 5
+    pools (SPPF identity), so no pool runs on the ARM.
+  - **Cycles** (`tools/perf_model.py --manifest`, KV260 kernel, 416 × 416):
+
+    | Network | MACs | Cycles | ms | fps | MAC efficiency |
+    |---|---|---|---|---|---|
+    | tiny-yolov4-coco | 4.16 G | 10.36 M | 51.8 | 19.3 | 52 % |
+    | tiny-yolov7-coco | 3.93 G | 16.60 M | 83.0 | 12.0 | 31 % |
+
+    v7-tiny has fewer MACs than v4-tiny but takes 60 % more cycles. Its ELAN blocks are
+    mostly 1 × 1 convs with 32 to 64 channels, which fill the Tm × Tn = 32 × 24 array badly.
+    A gain would come from the tiling (a smaller Tn for the 1 × 1 layers), not from the
+    concat or the SPP.
+  - **Equality**: on 3 COCO images (`build/m26/v7-smoke`), the integer Python model
+    (`eval_quant.py --calib build/quant/tiny-yolov7-coco/calib-coco.json`, the calibration
+    of the export) and the C-sim (`yolo_bench`, sim backend, `ACC_NO_APINT`) give the same
+    boxes and scores to the last bit (131, 2 and 188 detections). C-sim: 18 s per image on
+    one core.
+  - **Running**: integer and C-sim COCO val2017 on 5,000 images
+    (`build/longruns/t26-0.sh`, ≈ 4 h on 6 cores).
 
 ### [x] T26.1 — Offline PyTorch weight converter
 - **Spec**: §9.1 · **Depends on**: — · **Size**: M
