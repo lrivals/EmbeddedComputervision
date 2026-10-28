@@ -105,13 +105,14 @@ Weights per notebook:
   T37.0 changed their template
 - **Acceptance**:
   - the full-split mAP of each notebook equals the CLI value of its task, same parameters:
-    YOLOv5n 28.1 AP at 640 (T33.4), YOLOv7-tiny 34.3 AP at 416 (T34.2), YOLOv8n the T35.3
-    value;
+    YOLOv5n 28.1 AP at 640 (T33.4), YOLOv7-tiny 34.3 AP at 416 (T34.2), YOLOv8n 37.3 AP at
+    640 (T35.3);
   - the notebook prints the equivalent `tools/eval_voc.py` command.
 - **Notes**:
   - Float only: the integer sections wait for T37.5.
   - Cost: COCO val2017 at 640 with `--preset v5` and 5 jobs is ≈ 5 min (v5n) to ≈ 16 min
-    (v7-tiny) ([long-runs.md](long-runs.md#reference-speeds)); YOLOv8n is unmeasured.
+    (v7-tiny) ([long-runs.md](long-runs.md#reference-speeds)); YOLOv8n ≈ 35 min at 640 with 4
+    jobs (T35.3).
     Ship with a tier R `SUBSET` and run the full split once for the acceptance.
 
 ### [x] T37.2 — VOC out-of-domain inference

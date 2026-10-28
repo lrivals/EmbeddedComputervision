@@ -89,9 +89,17 @@ official `yolov8n.pt` (v8.2.0) read without torch:
 python tools/eval_voc.py --net yolov8n-coco --dataset coco --preset v8 --size 640
 ```
 
-Not measured yet: the full split is a CPU run of about 45 min per size
-([long-runs.md](../docs/tasks/long-runs.md)). The published value is 37.3 AP at 640
-(Ultralytics README, val2017).
+Full val2017 (5,000 images), 2026-10-28: 35 min at 640 and 12 min at 416 on 4 to 5
+processes of the PC CPU (`--jobs 4 --blas-threads 1` at 640: 4.6 GB per process).
+
+| Model | Input | AP | AP50 | AP75 | APs | APm | APl | AR100 | Published AP |
+|---|---|---|---|---|---|---|---|---|---|
+| **YOLOv8n** (`yolov8n-coco`) | 640 | **37.3** | **52.5** | 40.6 | 18.7 | 41.0 | 53.3 | 59.3 | 37.3 |
+| YOLOv8n | 416 | 32.7 | 46.7 | 35.2 | 11.9 | 35.0 | 54.6 | 52.5 | — |
+
+Published: Ultralytics README (val2017, 640). The NumPy network reproduces it to the tenth
+of a point. At 416 the loss is on the small objects (APs 18.7 → 11.9); APl even gains a
+point, as with the other networks.
 
 ## YOLOv4-tiny: float, integer, FPGA C-sim (T24.5)
 

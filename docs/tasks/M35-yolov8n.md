@@ -22,9 +22,8 @@ ARM post-processing), [M3](M3-inference-evaluation.md) (NMS, mAP),
     decoded boxes equal the torch boxes to 2·10⁻¹³ px.
   - T35.4: the task-aligned assigner equals the Ultralytics one on real predictions.
   - T35.5: the BCE + CIoU + DFL loss equals `v8DetectionLoss` to 5·10⁻⁷, with gradchecks.
+  - T35.3: COCO val2017 37.3 AP at 640, the published value (32.7 at 416).
 - **Code done, check open**:
-  - T35.3: the network equals torch to 1.7·10⁻¹³, but the COCO val2017 mAP (≈ 45 min per
-    size on the CPU) is not run yet.
   - T35.6: the v8 recipe (loss, `optimizer=auto`, `close_mosaic`, bias prior) and its
     tests are written; the VOC fine-tuning is in [long-runs.md](long-runs.md).
 - **Open**: T35.7, which waits for the integer model of T33.8.
@@ -128,8 +127,11 @@ M33 (BN $\varepsilon = 10^{-3}$, SiLU). All downsampling by 3×3 / 2 convs.
     expectation gradcheck; 8,400 / 3,549 points. Against the Ultralytics `Detect` output on
     the 3 images: boxes within 2.3·10⁻¹³ px and scores within 2·10⁻¹⁶, at 640 and at 416.
 
-### [ ] T35.3 — Float network and COCO mAP
-- **Running** (2026-10-28, times CET): unit `t35-3` since 22:09: COCO val2017 at 640 (4 jobs, ≈ 0.45 s/image, 3,800 / 5,000 at 22:37), then 416; ETA ≈ 23:15. Log `build/longruns/T35.3-{640,416}.log`.
+### [x] T35.3 — Float network and COCO mAP
+- **Done** (2026-10-28): COCO val2017, 5,000 images, `--preset v8`: **37.3 AP / 52.5 AP50
+  at 640**, the published 37.3 exactly; 32.7 / 46.7 at 416. Table in
+  [map_coco.md](../../results/map_coco.md#yolov8n-yolov8-protocol-t353). 35 min at 640
+  (4 jobs; 6 jobs overflowed a 22 GB cap), 12 min at 416 (5 jobs).
 - **Spec**: §8 · **Depends on**: T35.2 · **Size**: M
 - **Deliverables**: trainable network from the description (`models/ul_net.py` of T33.3);
   COCO val2017 mAP at 640 and 416; row in `results/map_coco.md`; `yolov8n-coco_infer`
@@ -153,8 +155,6 @@ M33 (BN $\varepsilon = 10^{-3}$, SiLU). All downsampling by 3×3 / 2 convs.
     max 300). The smoke run on the first 50 COCO images gives 43.4 AP (YOLOv5n: 32.7) in
     27 s at 640.
   - **Notebooks**: in [M37](M37-notebooks-recent-models.md).
-- **Remaining**: the full COCO val2017 mAP at 640 and 416 ([long-runs.md](long-runs.md),
-  ≈ 45 min each) and its row in `results/map_coco.md`.
 
 ### [x] T35.4 — Task-aligned assigner
 - **Spec**: §5 · **Depends on**: T35.3 · **Size**: M
