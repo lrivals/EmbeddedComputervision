@@ -16,6 +16,11 @@
     # T25.9: faults in the integer failure head (T39.5) on the stored features of T39.0
     python tools/fault_campaign.py monitor build/m39/labels/tiny-yolov4-coco_prewid-lab.npz
 
+T25.4, `--grid protect`: every site faulty at once at each BER, minus what a protection
+scheme (`SCHEMES`) masks. A fault seen by the ABFT check is assumed reloaded and recomputed
+without fault, a single flip per ECC word corrected, and a duplicated layer recomputed on a
+mismatch, so a masked fault is simply not injected.
+
 Fault model: `yolo.quant.faults` (T25.0). Same preprocessing and thresholds as
 `eval_quant.py --variants int --resize stretch` (conf 0.005, NMS 0.45, VOC07 mAP): the
 `baseline` row (no fault) gives back its mAP on the same subset (first N images of the split).
@@ -59,6 +64,20 @@ LAYER_BERS = (1e-7, 1e-5)
 BITS = {"weight": tuple(range(8)), "act": tuple(range(8)),
         "bias": tuple(range(0, 32, 4)) + (31,), "acc": tuple(range(0, 32, 4)) + (31,)}
 CONF, IOU = 0.005, 0.45
+PROTECT_BERS = (1e-5, 1e-4)
+SENSITIVE = 3  # T25.4: the first convs protected by the selective schemes (T25.1 ranking)
+# Scheme → {site: "all" | "sel"}: the sites masked on every conv or on the sensitive ones.
+# ECC (SECDED on the weight and bias words) masks the parameters; the ABFT check (T25.2)
+# sees the weight, bias and accumulator faults; duplication sees act and acc.
+SCHEMES = {
+    "none": {},
+    "ecc": {"weight": "all", "bias": "all"},
+    "abft-sel": {"weight": "sel", "bias": "sel", "acc": "sel"},
+    "abft": {"weight": "all", "bias": "all", "acc": "all"},
+    "dup-sel": {"act": "sel", "acc": "sel"},
+    "ecc+dup-sel": {"weight": "all", "bias": "all", "act": "sel", "acc": "sel"},
+    "abft+dup-sel": {"weight": "all", "bias": "all", "acc": "all", "act": "sel"},
+}
 PERSON_CONF = 0.25  # T25.6: operating threshold of the person criterion (Darknet default)
 MATCH_IOU, MOVED_IOU = 0.5, 0.9
 
@@ -73,6 +92,9 @@ def spec_key(spec):
 
 def faults_of(spec):
     """Faults of a run spec ({} : baseline, no fault)."""
+    if "hit" in spec:  # protect grid: a BER on every (site, conv) left unmasked
+        return [F.Fault(site, "ber", layer, rate=spec["rate"]) for site, layers in
+                sorted(spec["hit"].items()) for layer in layers]
     if spec.get("site") is None:
         return []
     f = F.Fault(spec["site"], spec["kind"], spec.get("layer"), spec.get("bit"),
@@ -80,10 +102,22 @@ def faults_of(spec):
     return [f] * spec.get("flips", 1)
 
 
+def protected_hit(scheme, convs, sites=SITES, sensitive=SENSITIVE):
+    """{site: convs left faulty} under a protection scheme."""
+    sel = set(sorted(convs)[:sensitive])
+    masks = SCHEMES[scheme]
+    return {site: [c for c in sorted(convs) if not (
+        masks.get(site) == "all" or (masks.get(site) == "sel" and c in sel))] for site in sites}
+
+
 def grid(name, convs, sites=SITES, bers=BERS, layer_bers=LAYER_BERS, bits=None, seeds=(0,),
          flips=100):
-    """Run specs of a grid (`ber`, `layer`, `bit`), the baseline first."""
+    """Run specs of a grid (`ber`, `layer`, `bit`, `protect`), the baseline first."""
     out = [{"grid": "baseline", "site": None, "seed": 0}]
+    if name == "protect":
+        return out + [{"grid": name, "site": "all", "scheme": sc, "kind": "ber", "rate": r,
+                       "seed": seed, "hit": protected_hit(sc, convs, sites)}
+                      for seed in seeds for sc in SCHEMES for r in bers]
     for seed in seeds:
         for site in sites:
             if name == "ber":
@@ -336,16 +370,20 @@ def aggregate(rows):
     """Mean and standard deviation over the seeds, per (grid, site, layer, bit, rate)."""
     groups = {}
     for r in rows:
-        k = (r["grid"], r.get("site"), r.get("layer"), r.get("bit"), r.get("rate"))
+        k = (r["grid"], r.get("site"), r.get("layer"), r.get("bit"), r.get("rate"),
+             r.get("scheme"))
         groups.setdefault(k, []).append(r)
     out = []
-    for (g, site, layer, bit, rate), rs in sorted(groups.items(), key=lambda kv: str(kv[0])):
+    for (g, site, layer, bit, rate, scheme), rs in sorted(groups.items(),
+                                                          key=lambda kv: str(kv[0])):
         maps = np.array([r["map"] for r in rs])
         a = {"grid": g, "site": site, "layer": layer, "bit": bit, "rate": rate,
              "seeds": len(rs), "map": float(maps.mean()),
              "std": float(maps.std(ddof=1)) if len(rs) > 1 else 0.0,
              **{k: float(np.mean([r[k] for r in rs]))
                 for k in ("changed", "detected", "sdc", "flips")}}
+        if scheme is not None:
+            a["scheme"] = scheme
         if all("critical" in r for r in rs):  # person criterion (T25.6)
             a.update({k: float(np.mean([r[k] for r in rs]))
                       for k in ("critical", "lost", "moved", "extra")})
@@ -361,7 +399,7 @@ def report(rows):
     base = [a for a in agg if a["grid"] == "baseline"]
     rep = {"baseline": base[0]["map"] if base else None,
            "images": rows[0]["images"] if rows else 0}
-    for g in ("ber", "layer", "bit"):
+    for g in ("ber", "layer", "bit", "protect"):
         rep[g] = [a for a in agg if a["grid"] == g]
     # Ranking of the layers: mean mAP drop over the sites and rates of the layer grid.
     if rep["layer"] and rep["baseline"] is not None:
@@ -451,6 +489,19 @@ def markdown(rep):
                              f"| {'—' if dg is None else f'{dg * 100:.1f} %'} | "
                              f"{a['sdc'] * 100:.1f} % |")
         lines.append("")
+    if rep.get("protect"):
+        rates = sorted({a["rate"] for a in rep["protect"]})
+        lines += ["| Scheme | Faulty sites | " + " | ".join(f"BER {r:.0e}" for r in rates)
+                  + " |", "|---|---|" + "---|" * len(rates)]
+        for sc, masks in SCHEMES.items():
+            cells = {a["rate"]: _pm(a) for a in rep["protect"] if a["scheme"] == sc}
+            if cells:
+                left = ", ".join(f"{s}{'' if s not in masks else ' (not the first convs)'}"
+                                 for s in SITES if masks.get(s) != "all")
+                lines.append(f"| {sc} | {left or '—'} | "
+                             + " | ".join(cells.get(r, "") for r in rates) + " |")
+        lines += ["", f"mAP with every site faulty at once at that BER, minus the masked "
+                  f"sites (sel: the first {SENSITIVE} convs).", ""]
     if rep.get("person"):
         lines += person_markdown(rep)
     return "\n".join(lines)
@@ -559,7 +610,8 @@ def _context(args):
 def cmd_run(args):
     samples, n_classes, qm, cache, meta = _context(args)
     sites = tuple(args.sites.split(","))
-    specs = grid(args.grid, sorted(qm.convs), sites, _parse_floats(args.bers) or BERS,
+    bers = PROTECT_BERS if args.grid == "protect" else BERS
+    specs = grid(args.grid, sorted(qm.convs), sites, _parse_floats(args.bers) or bers,
                  _parse_floats(args.layer_bers) or LAYER_BERS, None,
                  tuple(int(s) for s in args.seeds.split(",")), args.flips)
     if args.layers:
@@ -736,7 +788,8 @@ def main():
         p.add_argument("--seeds", default="0,1,2")
         p.add_argument("--no-abft", action="store_true", help="no ABFT check (faster)")
         if name == "run":
-            p.add_argument("--grid", choices=("ber", "layer", "bit"), required=True)
+            p.add_argument("--grid", choices=("ber", "layer", "bit", "protect"),
+                           required=True)
             p.add_argument("--sites", default=",".join(SITES))
             p.add_argument("--bers", default=None, help=f"ber grid (default {BERS})")
             p.add_argument("--layer-bers", default=None,

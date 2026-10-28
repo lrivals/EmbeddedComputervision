@@ -141,3 +141,23 @@ def test_campaign_person_criterion(setup):
     assert 0 <= acc["critical"] <= 1 and acc["changed"] > 0
     rep = fc.report([base, acc])
     assert rep["person"] and "Critical images" in fc.markdown(rep)
+
+
+def test_protect_grid(setup):
+    d, samples, qm, cache, meta = setup
+    convs = sorted(qm.convs)
+    hit = fc.protected_hit("abft+dup-sel", convs)
+    assert hit["weight"] == hit["bias"] == hit["acc"] == []
+    assert hit["act"] == convs[fc.SENSITIVE:]
+    assert fc.protected_hit("none", convs)["act"] == convs
+    specs = fc.grid("protect", convs, bers=(1e-3,))
+    assert len(specs) == 1 + len(fc.SCHEMES)
+    none = next(s for s in specs if s.get("scheme") == "none")
+    assert len(fc.faults_of(none)) == len(fc.SITES) * len(convs)
+    fc._setup(qm, cache, abft=False, conf=1e-4, iou=0.45)
+    keep = [specs[0], none, next(s for s in specs if s.get("scheme") == "abft+dup-sel")]
+    keep.append({**keep[-1], "scheme": "all", "hit": {s: [] for s in fc.SITES}})
+    base, _, _, masked = fc.campaign(keep, samples, meta, 20, d / "protect.jsonl", _serial)
+    assert masked["flips"] == 0 and masked["map"] == base["map"]
+    rows = [json.loads(line) for line in (d / "protect.jsonl").read_text().splitlines()]
+    assert "| none |" in fc.markdown(fc.report(rows))
