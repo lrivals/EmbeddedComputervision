@@ -131,6 +131,27 @@ def test_person_match():
     assert fc.person_match([], ref) == (0, 2, 0) and fc.person_match(ref, []) == (2, 0, 0)
 
 
+def test_person_index_is_model_class():
+    """The labels of `_image` are the model's: on CrowdHuman the VOC network's person is 14,
+    not the index 0 of the dataset view (bug of the first T25.8 run)."""
+    import argparse
+
+    def idx(ds, net):
+        return fc._person_index(argparse.Namespace(dataset=ds, net=net, criterion="person"))
+
+    assert idx("voc", "tiny-yolov2-voc") == 14
+    assert idx("crowdhuman", "tiny-yolov2-voc") == 14
+    assert idx("prewid", "tiny-yolov4-coco") == 0
+    lut = np.full(20, -1)
+    lut[14] = 0
+    meta = {"ids": ["a"], "width": [100], "height": [100]}
+    samples = [{"id": "a", "xyxy": np.array([[11., 11., 50., 50.]]), "labels": np.array([0]),
+                "difficult": np.array([False]), "width": 100, "height": 100}]
+    res = [([14, 3], [0.9, 0.8], [[0.3, 0.3, 0.4, 0.4], [0.5, 0.5, 0.2, 0.2]], 0, False,
+            False, None)]
+    assert fc.score(res, samples, meta, 1, lut)["map"] > 0.99  # class 3 is not scored
+
+
 def test_temporal_alarm():
     a, b = [0.5, 0.5, 0.2, 0.4], [0.2, 0.2, 0.1, 0.1]
     seen = [[a, b], [a, b], [a]]  # b missing in the last previous frame

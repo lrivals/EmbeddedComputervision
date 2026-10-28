@@ -146,7 +146,7 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 ≈ 70 % of the critical errors.
 
 ### [ ] T25.6 — Critical error for a person detector
-- **Running** (2026-10-28, times CET): unit `t25-6ch` since 23:22: layer and bit grids on CrowdHuman val 500 (Tiny-YOLOv2 VOC, the T25.1 network, 10 jobs); ETA ≈ 08:30 (the VOC run took 6 h at 14 jobs). Log `build/longruns/T25.6-crowdhuman.log`.
+- **Running** (2026-10-28, times CET): unit `t25-6ch` since 23:45: layer and bit grids on CrowdHuman val 500 (Tiny-YOLOv2 VOC, the T25.1 network, 10 jobs); ETA ≈ 09:00 (the VOC run took 6 h at 14 jobs). Log `build/longruns/T25.6-crowdhuman.log`. The first start crashed on the same class bug (VOC label 14 scored on the 1-class CrowdHuman view).
 - **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/fault_campaign.py --criterion person`; section in
   `results/faults.md`
@@ -198,7 +198,7 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
 - **Deferred** (Vivado, board): [deferred/M25](deferred/M25-dependability.md) — T25.7, configuration-memory upsets (SEM IP).
 
 ### [ ] T25.8 — Fault detection by temporal coherence
-- **Running** (2026-10-28, times CET): unit `t25-8` since 23:22 with **YOLOv4-tiny COCO** integer: PREWID `lab`, then MOT17 train; ETA ≈ 00:15 for PREWID, ≈ 01:15 for MOT17. Log `build/longruns/T25.8-{prewid,mot17}.log`. A first run with Tiny-YOLOv2 VOC was stopped: 0 critical run in 2,400 on PREWID, since that network barely sees the workers (person AP50 25.5 on PREWID test, T38.6), so it has no person to lose.
+- **Running** (2026-10-28, times CET): unit `t25-8` since 23:22 with **YOLOv4-tiny COCO** integer: PREWID `lab`, then MOT17 train; ETA ≈ 00:15 for PREWID, ≈ 01:15 for MOT17. Log `build/longruns/T25.8-{prewid,mot17}.log`. A first run with Tiny-YOLOv2 VOC was stopped after 2,400 runs with 0 critical: `_person_index` returned the person index of the dataset view (0) where the detections carry the model's classes (VOC person = 14), so it tracked `aeroplane`. Fixed (model class, and `score` maps the labels through `eval_view().det_lut`; `test_person_index_is_model_class`). The VOC results of T25.6 are not affected: there the view is the model.
 - **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/faults.md`
 - **Acceptance**: on a video, the critical faults of T25.6 injected in one frame: share

@@ -299,8 +299,9 @@ def _persons(boxes, scores, labels):  # person boxes above the operating thresho
 
 
 # ------------------------------------------------------------------------- one run
-def score(results, samples, meta, n_classes):
-    """mAP (VOC07) and counters of a run from the per-image results."""
+def score(results, samples, meta, n_classes, det_lut=None):
+    """mAP (VOC07) and counters of a run from the per-image results. `det_lut`: model class
+    → dataset class (−1: not scored), when the dataset is not the model's (`eval_view`)."""
     from yolo.infer.metrics import evaluate, to_voc_pixels
 
     per = {c: ([], [], []) for c in range(n_classes)}
@@ -314,6 +315,10 @@ def score(results, samples, meta, n_classes):
             extra += ext
         px = to_voc_pixels(boxes, meta["width"][k], meta["height"][k])
         for c, s, b in zip(labels, scores, px):
+            if det_lut is not None:
+                c = int(det_lut[c])
+                if c < 0:
+                    continue
             per[c][0].append(meta["ids"][k])
             per[c][1].append(s)
             per[c][2].append(b)
@@ -342,7 +347,7 @@ def done_keys(out):
             if line.strip()}
 
 
-def campaign(specs, samples, meta, n_classes, out, mapper):
+def campaign(specs, samples, meta, n_classes, out, mapper, det_lut=None):
     """Runs every spec not yet in `out`; `mapper(tasks)` → per-image results in order."""
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -354,7 +359,7 @@ def campaign(specs, samples, meta, n_classes, out, mapper):
         t0 = time.time()
         key = spec_key(spec)
         res = mapper([(key, spec, k) for k in range(len(samples))])
-        row = {"key": key, **spec, **score(res, samples, meta, n_classes),
+        row = {"key": key, **spec, **score(res, samples, meta, n_classes, det_lut),
                "seconds": round(time.time() - t0, 1)}
         with out.open("a") as fh:
             fh.write(json.dumps(row) + "\n")
@@ -562,16 +567,21 @@ def person_markdown(rep):
 
 
 # ------------------------------------------------------------------------- main
-def _person_index(args):
+def _view(args):
     from yolo.data import datasets
     from yolo.models.tiny_yolo import load_cfg
 
+    return datasets.eval_view(args.dataset, load_cfg(args.net)["classes"])
+
+
+def _person_index(args):
+    """Model class of `person` (the labels of `_image` are the model's classes)."""
     if args.criterion != "person":
         return None
-    names = list(datasets.eval_view(args.dataset, load_cfg(args.net)["classes"]).names)
-    if "person" not in names:
+    view = _view(args)
+    if "person" not in view.names:
         raise SystemExit(f"--criterion person: no person class in {args.dataset}")
-    return names.index("person")
+    return int(np.flatnonzero(np.asarray(view.det_lut) == view.names.index("person"))[0])
 
 
 def _samples(args):
@@ -623,11 +633,13 @@ def cmd_run(args):
     setup = (qm, cache, not args.no_abft, CONF, IOU, _person_index(args), args.person_conf)
     if args.jobs <= 1:
         _setup(*setup)
-        campaign(specs, samples, meta, n_classes, args.out, lambda t: [_image(x) for x in t])
+        campaign(specs, samples, meta, n_classes, args.out, lambda t: [_image(x) for x in t],
+                 _view(args).det_lut)
         return
     with mp.get_context("spawn").Pool(args.jobs, initializer=_init, initargs=setup) as pool:
         campaign(specs, samples, meta, n_classes, args.out,
-                 lambda t: pool.map(_image, t, chunksize=max(1, len(t) // (4 * args.jobs))))
+                 lambda t: pool.map(_image, t, chunksize=max(1, len(t) // (4 * args.jobs))),
+                 _view(args).det_lut)
 
 
 def cmd_plan(args):
