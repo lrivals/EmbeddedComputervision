@@ -172,7 +172,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **To run**: 50 images × 3 networks, ≈ 2 h with 16 processes; not run yet.
 
 ### [ ] T36.5 — Miss causes
-- **Running** (2026-10-28, times CET): unit `t36-5ch`, queued behind `t11-1`: `explain.py misses --dataset crowdhuman` (500 images × 3 networks); start ≈ 03:00, ETA ≈ 04:00. ExDark done at 22:20 (results in `build/explain/misses.json`). Log `build/longruns/T36.5-crowdhuman.log`.
+- **Running** (2026-10-28, times CET): unit `t36-5ch`, queued behind `t11-1`: `explain.py misses --dataset crowdhuman` (500 images × 3 networks); start ≈ 03:00, ETA ≈ 04:00. Log `build/longruns/T36.5-crowdhuman.log`.
 - **Spec**: §8 · **Depends on**: T36.0, T27.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/misses.py`: for each missed person, its cause,
   computed from the head outputs and the post-processing: **no anchor** (no anchor shape
@@ -204,7 +204,10 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **Not run**: CrowdHuman, T27.3 and ExDark (CrowdHuman is not in `data/`).
   - **ExDark** (2026-10-27): `tools/explain.py misses --dataset exdark` written (ground truth
     through `MAPPINGS`, `People` → `person`; results under `<net>@exdark` in
-    `build/explain/misses.json`, the VOC entries kept); smoke run on 6 images. Full run open.
+    `build/explain/misses.json`, the VOC entries kept); smoke run on 6 images.
+  - **ExDark run** (2026-10-28, 500 images with a person, 1,324 persons, 6 jobs, ≈ 15 min):
+    misses v2 81 %, v3 74 %, v4 54 %; low objectness 77-86 %, and `no_anchor` up to
+    9-12 % (1-3 % on VOC); quantization 1-4 %.
 
 ### [x] T36.6 — Concepts and channels
 - **Spec**: §4 · **Depends on**: T36.1 · **Runs on**: PC · **Size**: M
@@ -233,8 +236,12 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     dark 0.95, fog 0.96, occluded 0.94 (p < 1e-5); small 0.67 (p 0.053, not significant).
     `dark` and `fog` are synthetic until T27.3, and occluded is the VOC `truncated` flag.
 
-### [ ] T36.7 — Training recorder
-- **Running** (2026-10-28, times CET): unit `t36-7` since 22:03: the clean and corrupt5 runs side by side (≈ 28 s/it, it 72 / 250 at 22:37), then `explain.py record`; ETA ≈ 00:00. Logs `build/longruns/T36.7-*.log`.
+### [x] T36.7 — Training recorder
+- **Done** (2026-10-28, [results/explain.md](../../results/explain.md#t367-training-recorder)):
+  the 200-image runs, 250 iterations, clean and with 5 % corrupted labels (2 h 45 side by
+  side, ≈ 28 s/it on a shared CPU). Recorder overhead 3.0 % and 2.8 % (≤ 10 %). Clean run:
+  71 images never learned, 90 forgotten. Corrupted images: AUROC 0.58 by "never learned",
+  **0.78 by the mean loss**.
 - **Spec**: §7 · **Depends on**: T2.7 · **Runs on**: PC, Colab · **Size**: M
 - **Deliverables**: `python/yolo/explain/recorder.py`, a `Trainer.fit` callback writing
   every N iterations, per layer: weight norm, gradient norm, update / weight ratio, share of

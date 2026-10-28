@@ -110,9 +110,17 @@ Baselines: a random map and a centre Gaussian.
 Persons of VOC2007 test (not difficult), at the operating point conf 0.25. Each miss gets
 one cause, by the fixed order of tests of `yolo.explain.misses`.
 
-**Waiting for T27.0.** The shares on CrowdHuman val, on the degraded sets of T27.3 and on
-ExDark wait for the person metrics of T27.0, and CrowdHuman is not in `data/`. One
-Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float: `results/explain/misses_<cause>.png`.
+One Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float:
+`results/explain/misses_<cause>.png`.
+
+**ExDark** (2026-10-28, rows `@exdark`): the first 500 test images with a `People` box
+(1,324 persons, ground truth through `MAPPINGS`). In low light the miss rate doubles or
+more (v2 39 → 81 %, v3 39 → 74 %, v4 18 → 54 %). The miss still comes mostly from low
+objectness (77-86 %), but **no anchor** rises from 1-3 % to 9-12 %: dark scenes hold
+persons whose box shape fits no anchor of the network (far or partial). Quantization adds
+little (1-4 %).
+
+CrowdHuman val is running (2026-10-29); the degraded sets of T27.3 wait for T27.3.
 
 <!-- explain:misses:begin -->
 | net | stage | persons | missed | quantization | no_anchor | low_objectness | class_confusion | below_threshold | nms_suppressed | mislocalized |
@@ -123,6 +131,12 @@ Grad-CAM map per cause, 5 examples, Tiny-YOLOv2 float: `results/explain/misses_<
 | v3 | int | 1085 | 416 (38%) | 5% | 1% | 86% | 2% | 3% | 2% | 1% |
 | v4 | float | 1085 | 191 (18%) | 0% | 2% | 79% | 4% | 4% | 8% | 3% |
 | v4 | int | 1085 | 190 (18%) | 11% | 2% | 72% | 4% | 4% | 7% | 2% |
+| v2@exdark | float | 1324 | 1074 (81%) | 0% | 10% | 83% | 2% | 1% | 1% | 3% |
+| v2@exdark | int | 1324 | 1068 (81%) | 1% | 10% | 83% | 2% | 1% | 1% | 2% |
+| v3@exdark | float | 1324 | 977 (74%) | 0% | 9% | 86% | 2% | 1% | 1% | 1% |
+| v3@exdark | int | 1324 | 976 (74%) | 2% | 9% | 85% | 1% | 1% | 1% | 1% |
+| v4@exdark | float | 1324 | 714 (54%) | 0% | 12% | 80% | 2% | 3% | 1% | 2% |
+| v4@exdark | int | 1324 | 708 (53%) | 4% | 12% | 77% | 2% | 1% | 2% | 2% |
 <!-- explain:misses:end -->
 
 ## T36.6: concepts and channels
@@ -176,7 +190,19 @@ VOC trainval:
 **Learned.** An image is learned in an epoch when its loss is under the median loss of the
 last epoch.
 
+**Results** (2026-10-28, 2 h 45 for both runs side by side on 4 cores):
+- the recorder costs **3 %** of the training time (≤ 10 %: met);
+- 71 of the 200 images are never learned and 90 are forgotten at least once in the clean
+  run: with 10 epochs on 200 images, the median-loss rule still sees many images as hard;
+- the 10 relabelled images are found by their **mean loss** (AUROC 0.78), much less by
+  "never learned" (AUROC 0.58, precision 7 %). On a short fine-tuning the mean loss is the
+  signal to use; "never learned" is too coarse a flag.
+
 <!-- explain:record:begin -->
+| run | images | epochs | recorder overhead | never learned | forgotten | corrupted | AUROC never learned | AUROC mean loss |
+|---|---|---|---|---|---|---|---|---|
+| clean | 200 | 10 | 3.0% | 71 | 90 | – | – | – |
+| corrupt5 | 200 | 10 | 2.8% | 68 | 93 | 10 | 0.58 | 0.78 |
 <!-- explain:record:end -->
 
 ## T36.8: representation dynamics (CKA)

@@ -22,8 +22,7 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
 | `t25-8` | [T25.8](M25-dependability.md) | `fault_campaign.py temporal --net tiny-yolov4-coco`: PREWID `lab`, then MOT17 train (300 frames × 6 faults × 2 seeds each) | restarted 23:22 with v4-tiny (v2 VOC: no person to lose) | PREWID ≈ 00:15, MOT17 ≈ 01:15 |
-| `t36-7` | [T36.7](M36-explanation.md) | two recorder runs side by side (clean, corrupt5), 250 it, then `explain.py record` | it 72 / 250 (≈ 28 s/it) | ≈ 00:00 |
-| `t36-8` | [T36.8](M36-explanation.md) | `explain.py cka --run …/clean` | waits for `t36-7` | ≈ 00:15 |
+| `t36-8` | [T36.8](M36-explanation.md) | `explain.py cka --run …/clean` | started ≈ 00:50 | ≈ 00:15 |
 | `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` done (int AP 16.21), `coco-fpga` running | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
 | `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
 | `t36-5ch` | [T36.5](M36-explanation.md) | `explain.py misses --dataset crowdhuman` (500 images × 3 networks) | waits for `t11-1` | ≈ 04:00 |
@@ -77,8 +76,7 @@ GPU (T12.11-e).
 | [T36.2](M36-explanation.md) | `tools/explain.py stages --jobs 12` | VOC07 test, 20 images × 3 networks; golden on 5 | ≈ 1 h *(est.)* | per image D-RISE 300 + occlusion 145 inferences, float 0.28 s and int 0.6 s each (measured 2026-10-22, one thread); golden 100 masks × 2.7 s on 5 images | `build/golden/golden_run`, `model/<net>/` |
 | [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | ≈ 2 h *(est.)*, full ≈ 20 h | 14 method × stage pairs ≈ 600 s per image | — |
 | [T36.5](M36-explanation.md) | `tools/explain.py misses` on CrowdHuman val, the T27.3 sets and ExDark (VOC done 2026-10-27) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | T27.3 |
-| [T36.7](M36-explanation.md) | `tools/train.py --net tiny-yolov2-voc --init weights/yolov2-tiny-voc.weights --subset 200 --batch 8 --iters 250 --lr 1e-4 --burn-in 20 --record --record-every 10 --snap-every 50 [--corrupt 0.05] --out build/explain/record/{clean,corrupt5}`, then `tools/explain.py record --runs …` | VOC trainval, 200 images | ≈ 1 h per run alone *(est.)*; 2 runs side by side ≈ 2 h | 15-30 s/iteration measured with the other runs sharing the CPU | — |
-| [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | T36.7 |
+| [T36.8](M36-explanation.md) | `tools/explain.py cka --run build/explain/record/clean`, then `make figures` | 64 VOC07 test images | ≈ 10 min *(est.)* | 64 × 3 float + int passes, 6 snapshots | — |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
 | [T25.6](M25-dependability.md) | `tools/m25.sh person` with a CrowdHuman net and set (VOC person class done on 2026-10-28) | CrowdHuman | ≈ 6 h on the PC (measured on VOC, 500 images, 14 jobs) | same grids as T25.1 | — |
