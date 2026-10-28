@@ -455,8 +455,8 @@ evidence came with M25 and M28.
 | 7 | HLS accelerator and SoC integration | proofread (2026-10-27, T17.17) |
 | 8 | Results | proofread (2026-10-27, T17.17) |
 | 9 | Extensions | proofread (2026-10-27, T17.17) |
-| 10 | Dependability | proofread (2026-10-27, T17.17) |
+| 10 | Dependability | up to date at rev. 03dd26f (2026-10-28, T25.6, T25.9) |
 | 11 | Safety evidence | proofread (2026-10-27, T17.17) |
-| 12 | Beyond VOC | proofread (2026-10-27, T17.17) |
-| 13 | Limitations and future work | up to date at rev. 6d62f34 (2026-10-27, M29, T17.18) |
+| 12 | Beyond VOC | up to date at rev. 03dd26f (2026-10-28, T15.15, M32) |
+| 13 | Limitations and future work | up to date at rev. 03dd26f (2026-10-28, M25) |
 | 14 | Reproducibility | proofread (2026-10-27, T17.17) |

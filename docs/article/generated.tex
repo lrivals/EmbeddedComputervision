@@ -19,12 +19,20 @@ https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M33-yolov
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M6-accelerateur-hls.md}
 \expandafter\def\csname artms:M10\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M10-ameliorations.md}
+\expandafter\def\csname artms:M39\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M39-failure-prediction.md}
 \expandafter\def\csname artms:M11\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M11-jeux-de-donnees.md}
 \expandafter\def\csname artms:M15\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M15-campagne-entrainement.md}
 \expandafter\def\csname artms:M16\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M16-presentation-jeux.md}
+\expandafter\def\csname artms:T15.15\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M15-campagne-entrainement.md\#x-t1515--same-geometry-in-training-and-in-evaluation}
+\expandafter\def\csname artms:M32\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M32-trashnet-pets.md}
+\expandafter\def\csname artms:M22\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M22-autolabel.md}
 \expandafter\def\csname artms:M8\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M8-mesures.md}
 \expandafter\def\csname artms:T17.19\endcsname{%
@@ -35,6 +43,8 @@ https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M2-cibles
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M26-recent-models.md}
 \expandafter\def\csname artms:M35\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M35-yolov8n.md}
+\expandafter\def\csname artms:T25.4\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M25-dependability.md\#--t254--selective-protection}
 \expandafter\def\csname artms:M27\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M27-safety-metrics.md}
 \expandafter\def\csname artms:M29\endcsname{%
@@ -65,6 +75,10 @@ https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M17-artic
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M17-article.md\#x-t1718--first-version-and-log}
 \expandafter\def\csname artms:T25.1\endcsname{%
 https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M25-dependability.md\#x-t251--sensitivity-campaign}
+\expandafter\def\csname artms:T25.6\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M25-dependability.md\#--t256--critical-error-for-a-person-detector}
+\expandafter\def\csname artms:T25.9\endcsname{%
+https://github.com/lrivals/EmbeddedComputervision/blob/main/docs/tasks/M25-dependability.md\#x-t259--faults-in-the-failure-monitor}
 % ---- numbers
 \expandafter\def\csname artn:abft.hls.layers\endcsname{%
 103\textsuperscript{C-sim}}  % csim, results/faults.md
@@ -652,7 +666,7 @@ M12 & 11 & 1 & 9\,\% \\
 M11 & 8 & 2 & 25\,\% \\
 M13 & 62 & 62 & 100\,\% \\
 M14 & 12 & 8 & 67\,\% \\
-M15 & 16 & 1 & 6\,\% \\
+M15 & 16 & 2 & 12\,\% \\
 M16 & 20 & 19 & 95\,\% \\
 M17 & 21 & 19 & 90\,\% \\
 M18 & 11 & 10 & 91\,\% \\
@@ -662,30 +676,30 @@ M21 & 12 & 9 & 75\,\% \\
 M22 & 12 & 11 & 92\,\% \\
 M23 & 6 & 6 & 100\,\% \\
 M24 & 7 & 5 & 71\,\% \\
-M25 & 11 & 6 & 55\,\% \\
+M25 & 11 & 7 & 64\,\% \\
 M26 & 6 & 2 & 33\,\% \\
 M27 & 8 & 5 & 62\,\% \\
 M28 & 7 & 6 & 86\,\% \\
 M29 & 6 & 2 & 33\,\% \\
 M30 & 5 & 1 & 20\,\% \\
 M31 & 6 & 6 & 100\,\% \\
-M32 & 14 & 5 & 36\,\% \\
+M32 & 14 & 7 & 50\,\% \\
 M33 & 9 & 7 & 78\,\% \\
 M34 & 6 & 2 & 33\,\% \\
 M35 & 8 & 5 & 62\,\% \\
 M36 & 12 & 3 & 25\,\% \\
 M37 & 7 & 2 & 29\,\% \\
 M38 & 12 & 7 & 58\,\% \\
-M39 & 7 & 0 & 0\,\% \\
+M39 & 7 & 1 & 14\,\% \\
 M40 & 4 & 0 & 0\,\% \\
 M41 & 10 & 1 & 10\,\% \\
 M42 & 8 & 0 & 0\,\% \\
 M43 & 7 & 0 & 0\,\% \\
 \midrule
-\textbf{Total} & \textbf{458} & \textbf{283} & \textbf{62\,\%} \\
+\textbf{Total} & \textbf{458} & \textbf{288} & \textbf{63\,\%} \\
 \bottomrule
 \end{tabular}}
-\newcommand\articleetatresume{283 of 458 tasks done across 48 milestones, 8 milestones complete}
+\newcommand\articleetatresume{288 of 458 tasks done across 48 milestones, 8 milestones complete}
 \newcommand\articlestatuslist{%
 {\raggedright
 \begin{itemize}
@@ -694,4 +708,4 @@ M43 & 7 & 0 & 0\,\% \\
 \item \textbf{tier-R} (9): \texttt{balayage.crowdhuman.meilleur.map}, \texttt{balayage.exdark.meilleur.map}, \texttt{balayage.flir.meilleur.map}, \texttt{balayage.kitti.meilleur.map}, \texttt{balayage.visdrone.meilleur.map}, \texttt{balayage.voc.meilleur.map}, \texttt{balayages.meilleurs}, \texttt{quant.sensitive.gap}, \texttt{quant.sensitive.layer}
 \item \textbf{csim} (6): \texttt{abft.hls.layers}, \texttt{abft.hls.outputs}, \texttt{equiv.table}, \texttt{map.voc.csim}, \texttt{map.voc.identical}, \texttt{verif.hwpp.cases}
 \end{itemize}\par}}
-\newcommand\articlerev{rev.~\texttt{488c4bc-dirty}, 2026-10-28}
+\newcommand\articlerev{rev.~\texttt{03dd26f-dirty}, 2026-10-28}

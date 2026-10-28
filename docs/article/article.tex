@@ -554,6 +554,29 @@ detection, and the first layers are the most sensitive. The \gls{abft} check fla
 bias and accumulator fault that changes a result, and no activation fault: the checksum is
 computed on the corrupted input.
 
+\paragraph{Critical faults for a person detector.} A person detector must not lose a person,
+and the \gls{map} does not tell when it does. A second criterion matches the fault-free person
+boxes at the operating threshold to the faulty ones: a person with no faulty box at an
+\gls{iou} of 0.5 is lost and makes the image \emph{critical} (198 of the 500 images hold a
+person, \repo{results/faults.md}). The \gls{map} hides these faults: a high accumulator bit
+costs less than one point of \gls{map} but loses a person on 10 to 12\,\% of the images, and
+an int32 bias flip makes 30\,\% of them critical at bit 12 and all of them from bit 16. The
+layers rank as for the \gls{map}, except the output convolution, which never loses a person.
+This run uses the person class of \gls{voc}; the same run on CrowdHuman is pending.
+
+\paragraph{Faults in the failure monitor.} A learned failure monitor (\ms{M39}), a two-layer
+integer head on the YOLOv4-tiny features that flags the images where a person is likely
+missed, shares the chip with the detector and gets the same faults. One flip of a high bit
+(16 to 28) of its output bias moves the score beyond its whole range. On PREWID, where that
+bias is negative, every alarm is gone for as long as the bias stays corrupted; on \gls{coco},
+where it is positive, every image raises one. The monitor loses the alarms on the missed
+persons at the same rate as the others. The \gls{abft} check of both layers sees every
+silencing weight, bias and accumulator fault and, as in the detector, no hidden-activation
+fault: one sign-bit flip there silences up to 49\,\% of the alarms. A range check on the
+\gls{relu} output, where a set sign bit is itself an error, closes that hole for free, and the
+output layer is small enough to duplicate. At an error rate of $10^{-5}$ or less, no site
+silences more than one alarm in a hundred.
+
 \paragraph{Exact checksum (ABFT).} The sum of the output channels of a convolution equals the
 convolution of its input by the sum of its filters. Before \gls{requant} everything is an
 integer, so the check holds exactly modulo $2^{32}$: no tolerance and no false alarm. The
@@ -655,12 +678,18 @@ these 50 images than on the full split, which gives the order of magnitude of th
 \end{table}
 
 The scores of Table~\ref{tab:sweeps} show that none of these runs has converged. On
-VisDrone, objects are tiny at 416 pixels, many targets collide in the same cell, and the
-50-image ranking does not hold on the full split; the \ms{M15} campaign replaces the sweep by
-longer runs, matching resize between training and evaluation, and \glspl{tile}. \gls{flir} uses the
+VisDrone, objects are tiny at 416 pixels and many targets collide in the same cell. Scored
+on the full split with a direct resize, the runs lose the 50-image ranking; scored in
+\gls{letterbox}, the geometry they were trained in, five of the six score higher and the run
+first on 50 images is first again (\ms{T15.15}). The reversal was partly an artefact of the
+geometry. The \ms{M15} campaign replaces the sweep by longer runs, trained and evaluated in
+\gls{letterbox}, and \glspl{tile}. \gls{flir} uses the
 \gls{coco} metric, which does not compare with the 11-point \gls{ap} of the others. The sweep figures
 (\texttt{balayage}, \texttt{balayages}) are not yet published in
 \repo{results/figures/} and will be cited here once they are.
+TrashNet (\ms{M32}), single-object photos with a class label only, now has boxes from the
+open-vocabulary labeller of \ms{M22}: 2522 of its 2527 images keep one, in a split by class;
+no network is trained on it yet.
 Figure~\ref{fig:detections} shows detections of the three \gls{voc} stages.
 
 \articlefig{detections}
@@ -684,7 +713,9 @@ weights; the datasets beyond \gls{voc} have only been explored at \gls{tier} R
 quantization-aware training to come within one point. YOLOv7-tiny, YOLOv5n and YOLOv8n
 have their float \gls{coco} accuracy (\repo{results/map\_coco.md}) and their training recipes
 in NumPy, but no integer model yet (\ms{M26}, \ms{M33} to \ms{M35}). The fault campaign covers
-Tiny-YOLOv2 only, and the \gls{abft} lane of the kernel is not synthesized. The equivalence evidence and the
+Tiny-YOLOv2 and the failure head only, its person criterion runs on the \gls{voc} person class
+until CrowdHuman is on the PC, the protection schemes (\gls{ecc}, duplication) are coded but
+not yet compared (\ms{T25.4}), and the \gls{abft} lane of the kernel is not synthesized. The equivalence evidence and the
 latency bound of Section~\ref{sec:safety} stop at the \gls{csim}: the \gls{cosim} and
 board rows, the measured \gls{burst} latency and the latency distribution on the board are
 pending. The person-detection safety metrics (\ms{M27}) are measured on the industrial
@@ -799,6 +830,10 @@ v6 & 2026-10-27 & First update after a milestone moved (\ms{T17.18}): conformal 
   threshold and temporal vote of \ms{M29} in the limitations; no number changed. \\
 v7 & 2026-10-27 & Fault campaign of \ms{T25.1} in the fault-injection paragraph and the
   limitations. \\
+v8 & 2026-10-28 & Person criterion of the fault campaign (\ms{T25.6}) and faults in the
+  failure monitor (\ms{T25.9}) in the dependability section; VisDrone scored in \gls{letterbox}
+  (\ms{T15.15}) and TrashNet boxed (\ms{M32}) beyond \gls{voc}; limitations updated. No key
+  changed. \\
 \bottomrule
 \end{tabularx}
 \end{center}
