@@ -215,8 +215,8 @@ Linear CKA on the outputs of every conv, pooled over 2 × 2 cells, over 64 VOC t
 4 jobs overflowed a 12 GB cap):
 - **Float against integer**: CKA ≥ 0.99 on every conv of Tiny-YOLOv2. Tiny-YOLOv3 reaches
   0.9900 at L15 and YOLOv4-tiny drops to 0.9887 at L29, the head convs of their
-  second scale: the deepest, widest maps lose the most to int8, as the per-layer error
-  of T28.0 grows along the network.
+  second scale: the deepest maps lose the most to int8 (not yet cross-checked with the
+  per-layer LSB of T28.0).
 - **Across the checkpoints**: every conv is at CKA ≥ 0.98 to the last checkpoint from
   iteration 50. A 250-iteration fine-tuning from the Darknet weights barely moves the
   representations; the last conv (L14, the head) and the middle convs 1-3 move most, at
