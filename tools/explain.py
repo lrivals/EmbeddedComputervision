@@ -309,8 +309,18 @@ def _evaluate(task):
 
 
 def cmd_evaluate(args):
-    save("evaluate", run_pool(args, _evaluate, {n: [(n, s) for s in samples(args.n)]
-                                                for n in args.nets}))
+    """Saved after each network, and a network already in `evaluate.json` with the same
+    `--n` is skipped: a crash (OOM) loses one network, not the run."""
+    path = OUT / "evaluate.json"
+    res = json.loads(path.read_text()) if path.exists() else {}
+    meta = res.pop("_n", {})
+    for n in args.nets:
+        if n in res and meta.get(n) == args.n:
+            print(f"{n}: already in {path.name}, skipped", flush=True)
+            continue
+        res.update(run_pool(args, _evaluate, {n: [(n, s) for s in samples(args.n)]}))
+        meta[n] = args.n
+        save("evaluate", {**res, "_n": meta})
 
 
 # ------------------------------------------------------------------ T36.5 misses

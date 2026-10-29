@@ -108,7 +108,7 @@ def intattr(d):
 def evaluate(d):
     rows, bins, rank = [], [], defaultdict(list)
     for net, res in d.items():
-        if not res:
+        if net.startswith("_") or not res:  # `_n`: --n of each network (resume)
             continue
         for key in res[0]["rows"]:
             r = [x["rows"][key] for x in res]
