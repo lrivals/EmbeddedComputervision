@@ -70,8 +70,12 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   of 56.30 in float (`eval_voc.py`, then `eval_quant.py`) and of 55.66 in integer,
   unchanged.
 
-### [ ] T11.1 — COCO val2017
-- **Running** (2026-10-28, times CET): unit `t11-1` since 22:02: `coco-int` done (int AP 16.20 / AP50 36.57 against float 16.75 / 37.22, 34 min), then `coco-calib` and `coco-fpga` (C-sim 5,000 on 6 cores); ETA ≈ 03:00. Logs `build/longruns/T11.1-coco-*.log`.
+### [x] T11.1 — COCO val2017
+- **Done** (2026-10-29, [map_coco.md](../../results/map_coco.md#tiny-yolov3-float-integer-fpga-c-sim-t111)):
+  `tiny-yolov3-coco` on val2017, `stretch`: float 16.75 AP / 37.22 AP50, integer 16.20 /
+  36.57, **FPGA C-sim 16.20 / 36.57, 5,000 / 5,000 images identical** to the integer model.
+  COCO calibration (500 train2017) against VOC: 16.21 / 36.69, the same. Runs: 34 min
+  (float + int, 6 jobs), 21 min (calibration + int), 2 h 54 (C-sim, 6 cores).
 - **Spec**: §8.3, §10.4 · **Depends on**: T11.0, T4.5 · **Size**: M
 - **Deliverables**: `python/yolo/infer/coco_eval.py` (AP@[.5:.95], AP50, AP75, AP per
   size, 101-point interpolation); `results/map_coco.md`
@@ -93,9 +97,6 @@ less. For comparison, the FPGA stage of M8 in C-sim (`make bench-sim`) takes ≈
   `tiny-yolov3-coco` in [map_coco.md](../../results/map_coco.md) (AP 16.7, AP50 37.2 in
   stretch; 33.1 published, gap discussed there). Remaining: integer and FPGA stages of
   `tiny-yolov3-coco`, and the VOC against COCO calibration study.
-- **Remaining**: the integer and FPGA C-sim stages (`tools/m11.sh coco-int | coco-calib |
-  coco-fpga`), the image-by-image comparison and the calibration study in
-  `results/map_coco.md`.
 
 ### [~] T11.2 — Domain shift without retraining
 - **Spec**: §9.2, §11 · **Depends on**: T11.0 · **Size**: S

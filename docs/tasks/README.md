@@ -258,7 +258,7 @@ progress per milestone here.
 | M9.4 | 3 | 3 (estimates; synthesis pending) |
 | M10 | 14 (+ pointer T10.12) | 0 |
 | M12 | 11 | 1 |
-| M11 | 8 (+ pointer T11.8) | 2 (T11.0 generic adapter, T11.3 ExDark; T11.2 partial: KITTI rows pending) |
+| M11 | 8 (+ pointer T11.8) | 3 (T11.0 generic adapter, T11.1 COCO v3-tiny float 16.75 / int 16.20 AP, C-sim identical on 5,000 images, VOC calibration as good as COCO; T11.3 ExDark; T11.2 partial: KITTI rows pending) |
 | M13 | 62 | 62 (data pending: Vitis syntheses for T13.24, `make test-durations` for T13.30) |
 | M14 | 12 | 8 (T14.5, T14.6, T14.8, T14.9 open: out-of-domain (VOC, ExDark, VisDrone equal the CLI; KITTI pending), training, Colab GPU, smoke run) |
 | M15 | 16 | 2 (T15.3, T15.15; T15.1: VisDrone done, KITTI and VOC ready for Colab; T15.2 ready for Colab; VisDrone T15.8, T15.10, T15.16: tooling ready) |

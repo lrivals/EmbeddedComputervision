@@ -21,9 +21,8 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
-| `t11-1` | [T11.1](M11-jeux-de-donnees.md) | `coco-int` (done: int AP 16.20), `coco-calib`, `coco-fpga` (C-sim 5,000) | `coco-calib` done (int AP 16.21), `coco-fpga` running | ≈ 03:00 *(est.: C-sim 5,000 × ≈ 15 s / 6 cores)* |
 | `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
-| `t36-5ch` | [T36.5](M36-explanation.md) | `explain.py misses --dataset crowdhuman` (500 images × 3 networks) | waits for `t11-1` | ≈ 04:00 |
+| `t36-5ch` | [T36.5](M36-explanation.md) | `explain.py misses --dataset crowdhuman` (500 images × 3 networks) | started ≈ 02:15 | ≈ 04:00 |
 | `t15-10` | [T15.10](M15-campagne-entrainement.md) | VisDrone val mAP of `b16-sall`, with and without `--no-ignore` | waits for `t36-5ch` | ≈ 04:15 |
 | `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
 | `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
@@ -47,6 +46,7 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 | Fault campaign, 500 images, 16 jobs (10 jobs on a shared CPU: 60-130 s, 9.1 h for the 393 runs of T25.1) | ≈ 50 s per run | `build/m25/faults/log.txt` |
 | Drive transfers | pull: CrowdHuman 10.5 GiB in 4 min 24 s (≈ 40 MiB/s), then extraction; push: `pets.tar` 761 MiB in 14 min with rclone retries (3.7 GiB sent), `trashnet.tar` 47 MiB in 17 s | `build/longruns/{ch-pull,T32.11*}.log`, 2026-10-28 |
 | PC evaluation, COCO val2017, more networks | v3-tiny float + int 394 ms/image with 6 jobs (5,000 in 34 min); YOLOv8n at 640, `--preset v8`, 4 jobs: 438-474 ms/image (≈ 4.6 GB per process: 6 processes overflow 22 GB) | `build/longruns/T11.1-coco-int.log`, `T35.3-640.log`, 2026-10-28 |
+| C-sim `yolo_bench`, Tiny-YOLOv3 COCO | 5,000 images in 2 h 54 on 6 cores (≈ 12.5 s per image per core) | `build/longruns/T11.1-coco-fpga.log`, 2026-10-29 |
 | C-sim `yolo_bench`, YOLOv7-tiny | 18 s per image on one core (`ACC_NO_APINT`, 416) | `build/m26/v7-smoke`, 2026-10-28 |
 
 Unmeasured: training and evaluation speed of YOLOv8n; training speed of YOLOv5n and
@@ -67,7 +67,6 @@ GPU (T12.11-e).
 | [T12.10](M12-profils-pc.md) | `tools/m12.sh repetition` (`COUNT=100`) | — | M | stated | — |
 | [T12.11](M12-profils-pc.md) | `make test-py`, `make test-slow-gpu`, speed on the RTX 1000 Ada | — | unmeasured | — | NVIDIA driver, `pip install cupy-cuda12x` |
 | [T13.30](M13-figures.md) | `make test-durations` (whole suite, slow tests included) | — | N | stated | — |
-| [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-int`, `coco-calib` | COCO val2017 5,000 + calib2017 500 | ≈ 30 min *(est.)* | 5,000 × 0.12-0.3 s + calibration | — |
 | [T11.2](M11-jeux-de-donnees.md), [T14.5](M14-notebooks.md) | `HD_SETS=kitti tools/m11.sh hors-domaine` (VOC, ExDark, VisDrone done and compared with the notebooks 2026-10-27) | KITTI val 1,496; VOC and COCO weights; float and int | ≈ 15 min *(est.)* | 1,496 images × 4 passes × 0.15 s (VisDrone measured: 155 ms/image, 16 jobs) | `data/kitti` image_2 |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman` (`int`, `int-hwpp`, capacities 256 and 1,024) | CrowdHuman val 4,370 | ≈ 35-45 min *(est.)* | 4 × 4,370 × 0.12-0.15 s | — (`data/crowdhuman` on the PC) |
 | [T36.1](M36-explanation.md) | `tools/explain.py sanity --jobs 12` | VOC07 test, 20 images × 3 networks | ≈ 40 min *(est.)* | per image 5 methods × 4 networks (original + 3 randomizations); IG 2 × 130 passes, SmoothGrad 50, at ≈ 0.3 s/pass | — |
@@ -99,7 +98,6 @@ These share the CPU with the table above: one at a time, at night.
 | Task | Run | Data | Estimate | Basis | Waits for |
 |---|---|---|---|---|---|
 | [T12.9](M12-profils-pc.md) | `make bench-sim` | VOC 4,952 | ≈ 40 min | stated | — |
-| [T11.1](M11-jeux-de-donnees.md) | `tools/m11.sh coco-fpga` | COCO 5,000 | ≈ 45 min *(est.)* | Tiny-YOLOv3 ≈ VOC v2 rate, 5,000 × 0.5 s | `coco-int` |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | — |
 | [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
 | [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |

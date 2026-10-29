@@ -101,6 +101,32 @@ Published: Ultralytics README (val2017, 640). The NumPy network reproduces it to
 of a point. At 416 the loss is on the small objects (APs 18.7 → 11.9); APl even gains a
 point, as with the other networks.
 
+## Tiny-YOLOv3: float, integer, FPGA C-sim (T11.1)
+
+`tools/m11.sh coco-int`, `coco-calib`, `coco-fpga`, 2026-10-28. `stretch` preprocessing at
+416, conf 0.005, NMS 0.45; same stages as YOLOv4-tiny below. The integer model uses the
+current calibration (500 VOC2007 trainval images), as the export `model/tiny-yolov3-coco`.
+
+| Stage | AP | AP50 | AP75 | Equality with the integer model |
+|---|---|---|---|---|
+| Float (fused BN, NumPy float32) | 16.75 | 37.22 | 12.75 | — |
+| Integer Python (`IntNetwork`, bit-exact), VOC calibration | 16.20 | 36.57 | 12.01 | reference |
+| FPGA, C-sim (`yolo_bench`, sim backend, `ACC_NO_APINT`) | 16.20 | 36.57 | 12.01 | **5,000 / 5,000 images identical** |
+| Integer Python, COCO calibration (500 train2017 images) | 16.21 | 36.69 | 12.14 | — (other scales) |
+
+**Findings:**
+- **Integer loss: −0.55 AP, −0.65 AP50**, the same order as YOLOv4-tiny (−1.2 AP).
+  Per class, at most −2.4 AP (train).
+- **The C-sim equals the integer model on every image**, with the `-ffp-contract=off`
+  build of T24.5: the second network after YOLOv4-tiny to pass the full COCO split
+  bit for bit.
+- **Calibrating on COCO instead of VOC gains almost nothing** (+0.01 AP, +0.12 AP50). The
+  activation scales of the 13 layers differ by −1 to +17 % (median +3 %) between the two
+  sets ([calibration_tiny-yolov3-coco-coco.md](calibration_tiny-yolov3-coco-coco.md)), so
+  the VOC calibration of the export can stay.
+- Costs: float + int 34 min (6 jobs, 394 ms/image), C-sim 2 h 54 on 6 cores (≈ 12.5 s per
+  image per core).
+
 ## YOLOv4-tiny: float, integer, FPGA C-sim (T24.5)
 
 `stretch` preprocessing. The integer model uses the calibration on 500 COCO train2017
