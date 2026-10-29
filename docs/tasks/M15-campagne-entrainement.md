@@ -126,6 +126,23 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
   `SEEDS = [1, 2]`, `SUBSET = 50` (4 runs ≈ 40 min of GPU; the 50-image comparison also
   re-evaluates the 6 existing runs, a few minutes); then step 2 of T15.1. The rerun
   notebook replaces the archive: its table lists the 10 runs.
+- **Progress** (Colab T4, 2026-10-28, rev. `70058a0`): the 4 seed runs trained (b16
+  347-373 s, b32 683-746 s; final losses 15.95-16.49 and 14.39-14.84, same range as seed
+  0). On the 50 images of the sweep:
+
+  | cell | seed 0 | seed 1 | seed 2 | mean ± sd (ddof 1) |
+  |---|---|---|---|---|
+  | `b16-sall` | 34.70 | 32.11 | 34.24 | 33.68 ± 1.38 |
+  | `b32-sall` | 36.27 | 28.98 | 39.92 | 35.06 ± 5.57 |
+
+  The seed alone moves a 600-iteration run by up to 11 points (b32: 28.98 to 39.92), and
+  the gap between the two cells (1.4 points of mean) is well within that noise. The
+  50-image ranking of the sweeps (b32 first on 4 datasets) is therefore not significant:
+  decisions wait for the full split. Archive: executed
+  [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb); outputs in
+  `build/notebooks/voc/tiny-yolov3-voc/{runs,eval}/b{16,32}-sall-g{1,2}/`.
+- **Remaining**: the full-split standard deviation of the acceptance, given by step 2 of
+  T15.1 (`voc/tiny-yolov3-voc_infer`, 10 runs).
 
 ### [x] T15.3 — GPU duration in the sweep plan
 - **Spec**: — · **Depends on**: — · **Size**: S

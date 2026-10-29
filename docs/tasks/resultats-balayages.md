@@ -86,6 +86,20 @@ effects of the batch and of the subset):
 
 Duration: about 10 min per batch-32 run on the Colab GPU (624 s for b32-sall).
 
+### Noise of a run (T15.2, Colab 2026-10-28, rev. `70058a0`)
+
+Same cells rerun with `--seed 1` and `--seed 2` (reinitialised heads, batch draws,
+multiscale), same 50 images:
+
+| cell | seed 0 | seed 1 | seed 2 | mean ± sd (ddof 1) |
+|---|---|---|---|---|
+| `b16-sall` | 34.70 | 32.11 | 34.24 | 33.68 ± 1.38 |
+| `b32-sall` | 36.27 | 28.98 | 39.92 | 35.06 ± 5.57 |
+
+Up to 11 points between two seeds of `b32-sall`: the gaps of the table above between the
+`sall` runs are within the noise of a 600-iteration run on 50 images. Full-split values:
+T15.1.
+
 ### Inference on the same 50 images
 
 | model | weights | classes evaluated | mAP |
