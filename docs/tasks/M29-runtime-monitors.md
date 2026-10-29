@@ -115,7 +115,12 @@ CrowdHuman and the degraded sets pending.
     15-97 %, above α under every degradation. Even severity 1 doubles it (fog 15 %, low light
     29 %): the guarantee is lost as soon as the data shifts, as the task expected.
 
-### [ ] T29.3 — Temporal vote
+### [x] T29.3 — Temporal vote
+- **Done** (2026-10-29): the T25.8 part is in
+  ([results/faults.md](../../results/faults.md#t258-fault-detection-by-temporal-coherence)).
+  Temporal incoherence (a track linked over the 2 previous frames and gone) detects 55 % of
+  the critical one-frame faults on PREWID `lab` and 52 % on MOT17, at 1 % and 24 % of false
+  alarms per fault-free frame; with the ABFT, 85-86 %.
 - **Spec**: §8 · **Depends on**: T27.4 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/infer/temporal.py` (k-of-n persistence per zone, simple
   IoU association, no Re-ID); `results/person_safety.md` section
@@ -124,7 +129,7 @@ CrowdHuman and the degraded sets pending.
   [T25.8](M25-dependability.md) by temporal incoherence
 - **Notes**: Rech 2024 reports ≈ 70 % of critical errors detected by temporal coherence
   (other work, not comparable).
-- **Progress** (2026-10-27; the T25.8 part waits for T25.8):
+- **Progress** (2026-10-27):
   - **Code**: `python/yolo/infer/temporal.py` (k-of-n per IoU-associated track, the last box
     held); `tools/dreaded_event.py --votes k/n,…` (each vote at the T27.4 threshold and at a
     threshold re-tuned to 0.1 FPPI after the vote, events counted as T27.4, added latency

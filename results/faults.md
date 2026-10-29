@@ -452,7 +452,39 @@ m = 2, 1.3 % at m = 1.
   track), for the same false-alarm rate (1.0-1.3 %).
 - **Critical one-frame faults are rare** on this network: 0.2-2.5 % of the runs.
 
-**MOT17 train**: running (2026-10-29).
+**MOT17 train** (7 sequences at 14-30 frames/s, crowds):
+
+`tiny-yolov4-coco_mot17-train`: 300 injection frames (1119 frames with their 3 previous ones), seeds [0, 1]. False alarms of the coherence check without fault, per frame: m = 1: 32.3 %, m = 2: 24.3 %, m = 3: 21.3 %.
+
+| Fault | Critical | Temporal m = 1 | Temporal m = 2 | Temporal m = 3 | ABFT | Both (m = 2) | Either | Missed |
+|---|---|---|---|---|---|---|---|---|
+| act L00 BER 1e-05 | 76 / 600 | 62 % | 51 % | 51 % | 0 % | 0 % | 51 % | 49 % |
+| acc L00 BER 1e-05 | 155 / 600 | 61 % | 49 % | 46 % | 100 % | 49 % | 100 % | 0 % |
+| acc L02 BER 1e-05 | 97 / 600 | 64 % | 51 % | 48 % | 100 % | 51 % | 100 % | 0 % |
+| act bit 7 × 100 | 119 / 600 | 63 % | 52 % | 50 % | 0 % | 0 % | 52 % | 48 % |
+| acc bit 24 × 100 | 106 / 600 | 58 % | 50 % | 46 % | 100 % | 50 % | 100 % | 0 % |
+| acc bit 31 × 100 | 127 / 600 | 66 % | 57 % | 54 % | 100 % | 57 % | 100 % | 0 % |
+
+Shares of the critical runs (a fault-free person lost in the faulty frame). Temporal m: a person track linked over the m previous fault-free frames (IoU ≥ 0.3) has no box in the faulty frame.
+
+Over the 680 critical runs: the temporal check at m = 2 detects **351 (52 %)**, the ABFT
+485 (71 %), both 250, either **586 (86 %)**. But the check fires on **24 %** of the
+fault-free frames at m = 2 (32 % at m = 1).
+
+**Findings (both sets):**
+- **ABFT + temporal check catch 85-86 % of the critical one-frame faults** on both sets:
+  the ABFT takes every accumulator fault, the temporal check about half of the activation
+  faults, which nothing else sees.
+- **The temporal check alone sees about half of them** (52-55 % at m = 2), under the
+  ≈ 70 % of Rech 2024.
+- **Its false alarms decide where it is usable.** On a fixed CCTV view with a few workers
+  (PREWID) it fires on 1 % of the fault-free frames. In MOT17 crowds the fault-free
+  detector itself drops linked persons from frame to frame, and the check fires on 24 % of
+  the frames: there it cannot tell a fault from an ordinary miss.
+- **Critical one-frame faults are 10× more frequent in crowds** (11-26 % of the runs on
+  MOT17 against 1-2.5 % on PREWID): more persons per frame to lose.
+- A longer history (m = 3) lowers the false alarms only a little (21 % on MOT17) and
+  detects fewer faults.
 
 ## T25.9: faults in the failure monitor
 

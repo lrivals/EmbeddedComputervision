@@ -197,9 +197,19 @@ by an IoU threshold on the boxes and reports that temporal coherence between fra
     covered.
 - **Deferred** (Vivado, board): [deferred/M25](deferred/M25-dependability.md) — T25.7, configuration-memory upsets (SEM IP).
 
-### [ ] T25.8 — Fault detection by temporal coherence
-- **Running** (2026-10-29, times CET): unit `t25-8` since 00:36, MOT17 train; ETA ≈ 01:40. Log `build/longruns/T25.8-mot17.log`. The first MOT17 start failed: `mot17` is in `EVAL_ONLY`, now accepted by `--dataset`.
-- **PREWID `lab` done** (2026-10-29, YOLOv4-tiny COCO integer, [results/faults.md](../../results/faults.md#t258-fault-detection-by-temporal-coherence)): 62 critical runs out of 3,600. The temporal check (m = 2) detects 34 (55 %), the ABFT 45 (73 %), either 53 (85 %); 1.0 % false alarms per fault-free frame. The ABFT sees every accumulator fault and no activation fault; the temporal check is the only one to see the activation faults (8 of 17).
+### [x] T25.8 — Fault detection by temporal coherence
+- **Done** (2026-10-29, [results/faults.md](../../results/faults.md#t258-fault-detection-by-temporal-coherence)),
+  YOLOv4-tiny COCO integer, 300 injection frames × 6 critical faults × 2 seeds per set:
+
+  | Set | Critical runs | Temporal (m = 2) | ABFT | Either | False alarms (no fault) |
+  |---|---|---|---|---|---|
+  | PREWID `lab` | 62 / 3,600 | 55 % | 73 % | 85 % | 1.0 % of the frames |
+  | MOT17 train | 680 / 3,600 | 52 % | 71 % | 86 % | 24 % of the frames |
+
+  The ABFT sees every accumulator fault and no activation fault; the temporal check is the
+  only one to see the activation faults (about half). In crowds its false alarms make it
+  unusable alone. 45 min (PREWID) and 51 min (MOT17) on 4 jobs.
+- **PREWID `lab`** (2026-10-29, YOLOv4-tiny COCO integer, [results/faults.md](../../results/faults.md#t258-fault-detection-by-temporal-coherence)): 62 critical runs out of 3,600. The temporal check (m = 2) detects 34 (55 %), the ABFT 45 (73 %), either 53 (85 %); 1.0 % false alarms per fault-free frame. The ABFT sees every accumulator fault and no activation fault; the temporal check is the only one to see the activation faults (8 of 17).
 - A first run with Tiny-YOLOv2 VOC was stopped after 2,400 runs with 0 critical: `_person_index` returned the person index of the dataset view (0) where the detections carry the model's classes (VOC person = 14), so it tracked `aeroplane`. Fixed (model class, and `score` maps the labels through `eval_view().det_lut`; `test_person_index_is_model_class`). The VOC results of T25.6 are not affected: there the view is the model.
 - **Spec**: §8 · **Depends on**: T25.6, T29.3 · **Runs on**: PC · **Size**: S
 - **Deliverables**: section in `results/faults.md`
