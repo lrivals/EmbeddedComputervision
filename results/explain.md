@@ -165,7 +165,121 @@ Measures, for each method and stage:
 Baselines: a random map and a centre Gaussian.
 
 <!-- explain:evaluate:begin -->
+| net | method @ stage | images | pointing | energy in box | deletion AUC ↓ | insertion AUC ↑ | passes | s / map |
+|---|---|---|---|---|---|---|---|---|
+| v2 | saliency@float | 38 | 0.97 | 0.74 | 0.055 | 0.575 | 2 | 0.9 |
+| v2 | smoothgrad@float | 38 | 1.00 | 0.77 | 0.043 | 0.620 | 50 | 24.1 |
+| v2 | ig_black@float | 38 | 1.00 | 0.73 | 0.089 | 0.111 | 130 | 102.0 |
+| v2 | ig_blur@float | 38 | 0.97 | 0.78 | 0.055 | 0.264 | 130 | 101.1 |
+| v2 | gradcam@float | 38 | 0.92 | 0.90 | 0.155 | 0.314 | 2 | 0.8 |
+| v2 | occlusion@float | 38 | 1.00 | 0.73 | 0.046 | 0.652 | 145 | 43.9 |
+| v2 | drise@float | 38 | 0.66 | 0.34 | 0.117 | 0.354 | 300 | 91.0 |
+| v2 | lrp_float@float | 38 | 1.00 | 0.76 | 0.091 | 0.118 | 2 | 2.4 |
+| v2 | lrp_int@int | 38 | 1.00 | 0.76 | 0.087 | 0.114 | 2 | 5.2 |
+| v2 | drise@int | 38 | 0.63 | 0.34 | 0.114 | 0.349 | 300 | 181.1 |
+| v2 | random@float | 38 | 0.16 | 0.33 | 0.113 | 0.181 | 0 | 0.0 |
+| v2 | centre@float | 38 | 0.82 | 0.47 | 0.097 | 0.510 | 0 | 0.0 |
+| v2 | random@int | 38 | 0.16 | 0.33 | 0.111 | 0.177 | 0 | 0.0 |
+| v2 | centre@int | 38 | 0.82 | 0.47 | 0.092 | 0.481 | 0 | 0.0 |
+| v3 | saliency@float | 31 | 1.00 | 0.62 | 0.037 | 0.546 | 2 | 0.7 |
+| v3 | smoothgrad@float | 31 | 1.00 | 0.65 | 0.028 | 0.585 | 50 | 21.5 |
+| v3 | ig_black@float | 31 | 0.97 | 0.62 | 0.089 | 0.109 | 130 | 86.7 |
+| v3 | ig_blur@float | 31 | 1.00 | 0.70 | 0.045 | 0.289 | 130 | 88.1 |
+| v3 | gradcam@float | 31 | 1.00 | 0.76 | 0.104 | 0.362 | 2 | 0.8 |
+| v3 | occlusion@float | 31 | 0.97 | 0.64 | 0.036 | 0.651 | 145 | 45.6 |
+| v3 | drise@float | 31 | 0.84 | 0.20 | 0.073 | 0.385 | 300 | 92.5 |
+| v3 | lrp_float@float | 31 | 0.97 | 0.68 | 0.087 | 0.095 | 2 | 2.0 |
+| v3 | lrp_int@int | 31 | 1.00 | 0.68 | 0.097 | 0.096 | 2 | 3.8 |
+| v3 | drise@int | 31 | 0.84 | 0.20 | 0.066 | 0.351 | 300 | 175.5 |
+| v3 | random@float | 31 | 0.06 | 0.19 | 0.112 | 0.171 | 0 | 0.0 |
+| v3 | centre@float | 31 | 0.61 | 0.30 | 0.103 | 0.432 | 0 | 0.0 |
+| v3 | random@int | 31 | 0.06 | 0.19 | 0.109 | 0.168 | 0 | 0.0 |
+| v3 | centre@int | 31 | 0.61 | 0.30 | 0.092 | 0.390 | 0 | 0.0 |
+| v4 | saliency@float | 43 | 1.00 | 0.70 | 0.042 | 0.608 | 2 | 0.9 |
+| v4 | smoothgrad@float | 43 | 1.00 | 0.73 | 0.034 | 0.644 | 50 | 24.9 |
+| v4 | ig_black@float | 43 | 1.00 | 0.70 | 0.139 | 0.189 | 130 | 111.5 |
+| v4 | ig_blur@float | 43 | 1.00 | 0.75 | 0.060 | 0.394 | 130 | 111.0 |
+| v4 | gradcam@float | 43 | 0.95 | 0.75 | 0.090 | 0.419 | 2 | 0.9 |
+| v4 | occlusion@float | 43 | 0.98 | 0.68 | 0.038 | 0.663 | 145 | 44.1 |
+| v4 | drise@float | 43 | 0.81 | 0.27 | 0.081 | 0.408 | 300 | 94.4 |
+| v4 | lrp_float@float | 43 | 0.95 | 0.77 | 0.116 | 0.172 | 2 | 2.6 |
+| v4 | lrp_int@int | 43 | 1.00 | 0.77 | 0.152 | 0.186 | 2 | 4.5 |
+| v4 | drise@int | 43 | 0.79 | 0.27 | 0.084 | 0.388 | 300 | 188.4 |
+| v4 | random@float | 43 | 0.16 | 0.27 | 0.147 | 0.210 | 0 | 0.0 |
+| v4 | centre@float | 43 | 0.60 | 0.38 | 0.127 | 0.480 | 0 | 0.0 |
+| v4 | random@int | 43 | 0.16 | 0.27 | 0.146 | 0.209 | 0 | 0.0 |
+| v4 | centre@int | 43 | 0.60 | 0.38 | 0.121 | 0.446 | 0 | 0.0 |
+
+Pointing rate per box size (images):
+
+| net | method @ stage | small | medium | large |
+|---|---|---|---|---|
+| v2 | saliency@float | – | 0.80 (5) | 1.00 (33) |
+| v2 | smoothgrad@float | – | 1.00 (5) | 1.00 (33) |
+| v2 | ig_black@float | – | 1.00 (5) | 1.00 (33) |
+| v2 | ig_blur@float | – | 0.80 (5) | 1.00 (33) |
+| v2 | gradcam@float | – | 0.80 (5) | 0.94 (33) |
+| v2 | occlusion@float | – | 1.00 (5) | 1.00 (33) |
+| v2 | drise@float | – | 1.00 (5) | 0.61 (33) |
+| v2 | lrp_float@float | – | 1.00 (5) | 1.00 (33) |
+| v2 | lrp_int@int | – | 1.00 (5) | 1.00 (33) |
+| v2 | drise@int | – | 1.00 (5) | 0.58 (33) |
+| v2 | random@float | – | 0.00 (5) | 0.18 (33) |
+| v2 | centre@float | – | 0.60 (5) | 0.85 (33) |
+| v2 | random@int | – | 0.00 (5) | 0.18 (33) |
+| v2 | centre@int | – | 0.60 (5) | 0.85 (33) |
+| v3 | saliency@float | 1.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | smoothgrad@float | 1.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | ig_black@float | 1.00 (1) | 1.00 (5) | 0.96 (25) |
+| v3 | ig_blur@float | 1.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | gradcam@float | 1.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | occlusion@float | 0.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | drise@float | 1.00 (1) | 0.80 (5) | 0.84 (25) |
+| v3 | lrp_float@float | 1.00 (1) | 1.00 (5) | 0.96 (25) |
+| v3 | lrp_int@int | 1.00 (1) | 1.00 (5) | 1.00 (25) |
+| v3 | drise@int | 1.00 (1) | 0.80 (5) | 0.84 (25) |
+| v3 | random@float | 0.00 (1) | 0.00 (5) | 0.08 (25) |
+| v3 | centre@float | 0.00 (1) | 0.40 (5) | 0.68 (25) |
+| v3 | random@int | 0.00 (1) | 0.00 (5) | 0.08 (25) |
+| v3 | centre@int | 0.00 (1) | 0.40 (5) | 0.68 (25) |
+| v4 | saliency@float | 1.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | smoothgrad@float | 1.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | ig_black@float | 1.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | ig_blur@float | 1.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | gradcam@float | 1.00 (1) | 0.89 (9) | 0.97 (33) |
+| v4 | occlusion@float | 0.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | drise@float | 1.00 (1) | 1.00 (9) | 0.76 (33) |
+| v4 | lrp_float@float | 1.00 (1) | 0.89 (9) | 0.97 (33) |
+| v4 | lrp_int@int | 1.00 (1) | 1.00 (9) | 1.00 (33) |
+| v4 | drise@int | 1.00 (1) | 1.00 (9) | 0.73 (33) |
+| v4 | random@float | 0.00 (1) | 0.00 (9) | 0.21 (33) |
+| v4 | centre@float | 0.00 (1) | 0.33 (9) | 0.70 (33) |
+| v4 | random@int | 0.00 (1) | 0.00 (9) | 0.21 (33) |
+| v4 | centre@int | 0.00 (1) | 0.33 (9) | 0.70 (33) |
+
+Ranking by insertion − deletion, mean over the networks: occlusion@float (0.615), smoothgrad@float (0.581), saliency@float (0.532), centre@float (0.365), centre@int (0.337), drise@float (0.292), drise@int (0.275), ig_blur@float (0.262), gradcam@float (0.249), random@float (0.063), random@int (0.063), ig_black@float (0.031), lrp_float@float (0.030), lrp_int@int (0.020).
 <!-- explain:evaluate:end -->
+
+Reading (2026-10-29, 50 VOC test images, 38 / 31 / 43 explained boxes for v2 / v3 / v4,
+3 h 10 at 8 processes):
+- **Ranking**: occlusion, SmoothGrad and saliency are the only methods above the centre
+  baseline on insertion − deletion, on all three networks. D-RISE, IG with a blurred
+  baseline and Grad-CAM fall between the centre and the random maps. IG with a black
+  baseline and LRP (float and integer) score at the random level on that metric: their
+  insertion AUC is 0.10-0.19, so the pixels they rank first do not bring the box back.
+- **The metric favours fine maps**: the score is the D-RISE weight after greying or
+  blurring pixels in map order, so pixel-level maps (occlusion, saliency) are measured on
+  the same kind of perturbation that built them. Grad-CAM, coarse at the head resolution,
+  has the highest energy in the box (0.75-0.90) yet a middling AUC.
+- **Pointing game separates little**: 91 of the 112 boxes are large, the centre map already
+  points right 0.60-0.82, and every gradient or LRP method reaches 0.92-1.00. Only D-RISE
+  is below 0.85 (0.63-0.84). The small bin has 2 images, so no size conclusion is drawn.
+- **Integer stage**: the integer maps follow the float ones. D-RISE int / float differ by
+  at most 0.034 on insertion and 0.007 on deletion; LRP int / float by at most 0.036
+  (v4 deletion 0.152 against 0.116).
+- **Cost per map**: 2 passes and under 1 s for saliency and Grad-CAM, 2.0-5.2 s for LRP,
+  50 passes and 22-25 s for SmoothGrad, 145 passes and 44-46 s for occlusion, 130 passes
+  and 87-112 s for IG, 300 passes and 91-94 s for D-RISE (175-188 s at the integer stage).
 
 ## T36.5: causes of the missed persons
 

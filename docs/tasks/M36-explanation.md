@@ -109,11 +109,13 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **To run**: `tools/explain.py sanity` (20 images × 3 networks, ≈ 40 min with 12
     processes), not run yet.
 
-### [ ] T36.2 — Perturbation attributions (black box)
-- **Run** (2026-10-29, 3 h 11 at 5 jobs, [results/explain.md](../../results/explain.md#t362-perturbation-maps-at-the-three-stages)):
+### [x] T36.2 — Perturbation attributions (black box)
+- **Done** (2026-10-29, 3 h 11 at 5 jobs, [results/explain.md](../../results/explain.md#t362-perturbation-maps-at-the-three-stages)):
   Spearman float / int 0.98-0.99 for D-RISE and 0.63-0.74 for occlusion; integer == golden
-  bit for bit on 3 / 2 / 5 images (100 masks), weights and maps. **Left for the acceptance**:
-  the deletion and insertion AUC, from the T36.4 run.
+  bit for bit on 3 / 2 / 5 images (100 masks), weights and maps. Deletion / insertion AUC
+  from the T36.4 run (50 images): occlusion 0.036-0.046 / 0.651-0.663, D-RISE float
+  0.073-0.117 / 0.354-0.408 and integer 0.066-0.114 / 0.349-0.388
+  ([results/explain.md](../../results/explain.md#t364-evaluation-of-the-maps)).
 - **Spec**: §9, §10.2 · **Depends on**: T36.0 · **Runs on**: PC (C-sim gcc for the third
   stage) · **Size**: M
 - **Deliverables**: `python/yolo/explain/perturb.py`: occlusion (sliding grey patch) and
@@ -162,7 +164,16 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
-- **Running** (2026-10-29, times CET): unit `t36-4` restarted at 09:30 with `--jobs 8` on cores 0-15, 36 GB cap. The first run (5 jobs, 15 GB) was killed by the OOM killer at 09:21 during v4, and `evaluate` only saved at the end, so v2 and v3 (5 h) were lost. `cmd_evaluate` now saves after each network and skips those already done with the same `--n`. v2 done at 10:33 in 62 min (3 h 29 in the first run), saved; v3 then v4 running, ETA ≈ 12:30 if they speed up by the same factor. Memory peak 21 GB of 36. Log `build/longruns/T36.4-evaluate.log`.
+- **Run at 50 images** (2026-10-29, 3 h 10 at 8 processes, unit `t36-4`, peak 21 GB;
+  [results/explain.md](../../results/explain.md#t364-evaluation-of-the-maps)):
+  - 38 / 31 / 43 explained boxes for v2 / v3 / v4, 14 method × stage pairs, random and
+    centre baselines, size bins, cost in passes and seconds per map;
+  - ranking by insertion − deletion: occlusion 0.615, SmoothGrad 0.581, saliency 0.532,
+    then the centre baseline 0.365; D-RISE, IG blur and Grad-CAM below it; IG black and
+    LRP at the random level (0.02-0.03);
+  - integer maps within 0.04 AUC of the float ones (D-RISE, LRP).
+  - **Left for the acceptance**: the 500-image run (`--n 500`, ≈ 32 h at 8 processes from
+    this run's speed). The per-network save lets it run in several sessions.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`

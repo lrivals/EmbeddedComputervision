@@ -14,14 +14,12 @@ the PC, Colab sessions. State on 2026-10-28.
   column. "unmeasured" means no speed exists to compute it from.
 - When a run is done, fold the result into the task's **Done** and remove its row here.
 
-## Running now (2026-10-29, 09:30)
+## Running now (2026-10-29, 12:40)
 
 Long runs in `systemd --user` units (logs in `build/longruns/`). The other units of the
 night (2026-10-28/29) are done, and their results are in their tasks.
 
-| Unit | Task | Steps | Progress at 08:47 | ETA |
-|---|---|---|---|---|
-| `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --jobs 8` (50 VOC images × 3 networks), cores 0-15, 36 GB cap, restarted 09:30 after an OOM kill at 09:21 (v2, v3 lost; now saved per network) | v2 done 10:33 (62 min), v3 running, then v4 | ≈ 12:30 |
+No unit running.
 
 ## Reference speeds
 
@@ -65,7 +63,7 @@ GPU (T12.11-e).
 | [T13.30](M13-figures.md) | `make test-durations` (whole suite, slow tests included) | — | N | stated | — |
 | [T11.2](M11-jeux-de-donnees.md), [T14.5](M14-notebooks.md) | `HD_SETS=kitti tools/m11.sh hors-domaine` (VOC, ExDark, VisDrone done and compared with the notebooks 2026-10-27) | KITTI val 1,496; VOC and COCO weights; float and int | ≈ 15 min *(est.)* | 1,496 images × 4 passes × 0.15 s (VisDrone measured: 155 ms/image, 16 jobs) | `data/kitti` image_2 |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman` (`int`, `int-hwpp`, capacities 256 and 1,024) | CrowdHuman val 4,370 | ≈ 35-45 min *(est.)* | 4 × 4,370 × 0.12-0.15 s | — (`data/crowdhuman` on the PC) |
-| [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | ≈ 2 h *(est.)*, full ≈ 20 h | 14 method × stage pairs ≈ 600 s per image | — |
+| [T36.4](M36-explanation.md) | `tools/explain.py evaluate --jobs 16`; full size `--n 500` | VOC07 test, 50 images × 3 networks (full 500) | 50 images 3 h 10 at 8 jobs (v2 62 min, v3 52, v4 76), full ≈ 32 h | 14 method × stage pairs ≈ 600 s per image | — |
 | [T36.5](M36-explanation.md) | `tools/explain.py misses` on the T27.3 sets (VOC, ExDark and CrowdHuman done 2026-10-29) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | T27.3 |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
