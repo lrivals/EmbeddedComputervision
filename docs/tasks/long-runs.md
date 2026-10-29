@@ -109,8 +109,8 @@ These share the CPU with the table above: one at a time, at night.
 
 | Task | Run | Data | Estimate | Basis | Waits for |
 |---|---|---|---|---|---|
-| [T15.1](M15-campagne-entrainement.md) | `_infer` notebooks, `SUBSET=0`, `COMPARE=True`, `INT8=False` (regenerate with `python -m tools.notebooks <ds>/tiny-yolov3-<ds>_infer --force`) | VOC, KITTI (VisDrone done 2026-10-06) | VOC ≈ 3 h 40 (10 runs: the 6 of the grid and the 4 seed runs of T15.2, done 2026-10-28), KITTI ≈ 40 min | stated | VOC: — ; KITTI: `image_2` on the Drive |
-| [T15.4](M15-campagne-entrainement.md), [T2.9](M2-cibles-perte-entrainement.md) | VOC long run: batch 32, 6,000 it, `--burn-in 200 --steps 4800,5400 --scales 0.1,0.1`, `SAVE_EVERY=500` | VOC07+12 | ≈ 1 h 45 GPU + ≈ 22 min eval; + ≈ 4 h to extend to 20,000 *(est.)* | stated; 14,000 it × 1 s | T15.1 |
+| [T15.1](M15-campagne-entrainement.md) | `_infer` notebooks, `SUBSET=0`, `COMPARE=True`, `INT8=False` (regenerate with `python -m tools.notebooks <ds>/tiny-yolov3-<ds>_infer --force`) | KITTI (VisDrone done 2026-10-06, VOC 2026-10-29) | ≈ 40 min | stated | KITTI `image_2` on the Drive |
+| [T15.4](M15-campagne-entrainement.md), [T2.9](M2-cibles-perte-entrainement.md) | VOC long run: batch 32, 6,000 it, `--burn-in 200 --steps 4800,5400 --scales 0.1,0.1`, `SAVE_EVERY=500` | VOC07+12 | ≈ 1 h 45 GPU + ≈ 22 min eval; + ≈ 4 h to extend to 20,000 *(est.)* | stated; 14,000 it × 1 s | `STEPS` / `SCALES` in the VOC `_train` template (VisDrone only for now) |
 | [T15.5](M15-campagne-entrainement.md) | LR {5e-4, 1e-3, 2e-3} × burn-in {100, 500} | VOC | ≈ 1 h GPU | stated | code: `LRS` / `BURN_INS`, `run_name` |
 | [T15.6](M15-campagne-entrainement.md) | batch 64 against batch 32 | VOC | ≈ 20 min at 600 it, ≈ 3.5 h at 6,000 *(est.)* | ≈ 2 s/it at batch 64 | T15.4 |
 | [T15.7](M15-campagne-entrainement.md) | `_infer`, `INT8=True` on the selected run | VOC test | ≈ 30 min *(est.)* | 4,952 × 0.27 s + int | T15.4-T15.6 |
@@ -122,9 +122,9 @@ These share the CPU with the table above: one at a time, at night.
 | [T15.12](M15-campagne-entrainement.md), [T11.4](M11-jeux-de-donnees.md), [T14.6](M14-notebooks.md), [T14.8](M14-notebooks.md) | long runs at 416 letterbox and 640×192 (kill and resume once for T14.8); sweep `SIZE='640x192'`; rerun the 416 sweep with Run All | KITTI 5,985 / 1,496 | ≈ 3 h long runs + 2 × 1 h sweeps + 7 min per eval *(est.)* | 6,000 it ≈ 1 h 45 at 416, ≈ 0.7× at 640×192; sweep 6 × 10 min stated | — |
 | [T15.13](M15-campagne-entrainement.md), [T11.7](M11-jeux-de-donnees.md) | 3-channel sweep, `COMPARE` of `b8-sall`, `b16-sall`; long runs `CH=1` and 3 channels; full-split AP | FLIR 10,742 / 1,144 | ≈ 1 h + 10 min + 3.5 h + 10 min *(est.)* | sweep 6 runs, 2 × 1 h 45, 1,144 × 0.27 s | — (FLIR on the Drive since 2026-10-07) |
 | [T15.14](M15-campagne-entrainement.md) | full-split mAP of COCO and VOC weights (fine-tuned `long-416` done 2026-10-28: AP50 30.44); `b16-sall` inference; `tools/m11.sh crowdhuman` person recall | ExDark, CrowdHuman val 4,370 | ≈ 2 h CPU *(est.)* | 3 weights × (≈ 2,500 + 4,370) × 0.27 s + one pass | — |
-| [T9.3.6](M9.3-quant-4bits.md) | long 4-bit QAT: several epochs at 4 bits, 8→6→4 ramp, float baseline; full VOC07 test mAP | VOC07+12 | ≈ 5 h *(est.)* | ≈ 10 min per epoch (16,551 × 0.033 s) × 3 variants × 10 epochs; QAT speed on GPU unmeasured | T15.1 |
+| [T9.3.6](M9.3-quant-4bits.md) | long 4-bit QAT: several epochs at 4 bits, 8→6→4 ramp, float baseline; full VOC07 test mAP | VOC07+12 | ≈ 5 h *(est.)* | ≈ 10 min per epoch (16,551 × 0.033 s) × 3 variants × 10 epochs; QAT speed on GPU unmeasured | — (T15.1 VOC done 2026-10-29) |
 | [T10.10](M10-ameliorations.md) | per-layer QAT (mixed precision) | VOC | unmeasured, ≈ 1-2 h *(est.)* | — | — |
-| [T10.11, T10.15](M10-ameliorations.md) | long fine-tune of the r30, r50, r70 exports (`tools/prune_study.sh`), full VOC07 mAP | VOC | ≈ 5 h + ≈ 1 h *(est.)* | 3 × 6,000 it × 1 s; 3 × 22 min | T15.1 |
+| [T10.11, T10.15](M10-ameliorations.md) | long fine-tune of the r30, r50, r70 exports (`tools/prune_study.sh`), full VOC07 mAP | VOC | ≈ 5 h + ≈ 1 h *(est.)* | 3 × 6,000 it × 1 s; 3 × 22 min | — (T15.1 VOC done 2026-10-29) |
 | [T18.10](M18-jeux-drone.md) | `_infer` with VOC and COCO weights, `_sweep`, `_train` | auair, dronevehicle, hituav, uavdt (subsample frames) | ≈ 14 h *(est.)* | per dataset: sweep 1 h + long run 1 h 45 + evals ≤ 45 min | — |
 | [T21.9](M21-asl-alphabet.md) | `tools/m11.sh asl-prep`, `_sweep` and `_train`; mAP on val 6,538 and the 28 test images | ASL | ≈ 3.5 h *(est.)* | sweep 1 h + long 1 h 45 + 6,538 × 0.27 s | — |
 | [T21.11](M21-asl-alphabet.md) | `SIZE=224x224 tools/m11.sh asl-prep`, `asl-train` | ASL | ≈ 1 h *(est.)* | 3.4× fewer MACs than 416 + eval | T21.9 |
@@ -161,8 +161,7 @@ graph LR
   T1514[T15.14] --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
   T251[T25.1] --> T256[T25.6]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
-  T151["T15.1 VOC"] --> T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
-  T151 --> T936[T9.3.6] & T1011["T10.11, T10.15"]
+  T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
   T158[T15.8] --> T159["T15.9, T15.10, T15.16"]
   T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]

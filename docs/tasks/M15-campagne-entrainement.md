@@ -107,9 +107,18 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
 - **Progress**: VisDrone done (6 runs on the 548 val images, Colab 2026-10-06, rev.
   `17b4a47`): `b16-sall` first with 2.61, `b32-sall` drops to 1.37
   ([resultats-balayages.md](resultats-balayages.md#full-split-t151-548-images-colab-on-2026-10-06-rev-17b4a47)).
-- **Remaining**: KITTI (step 1), then VOC after T15.2 (step 2).
+- **Progress**: VOC done (10 runs on the 4,952 test images, Colab 2026-10-29,
+  `voc/tiny-yolov3-voc_infer` with `SUBSET = 0`, `COMPARE = True`, `RUN = 'b32-sall'`):
+  `b32-sall` confirmed first with **26.60**, then `b16-sall` 22.19, `b32-s500` 18.46,
+  `b8-s500` 16.22, `b16-s500` 15.60, `b8-sall` 12.02; Spearman ρ = 0.83 between the
+  50-image and the full-split rankings. Every run loses 0.4 to 13.9 points from 50 images
+  to the full split (the 50 images are easier, as for Tiny-YOLOv2 VOC: 63.51 against
+  56.30). Full split of `b32-sall` per class: person 54.6, cat 45.2, train 39.1; sheep
+  9.4, bottle 10.6, boat 12.8. Inference at 64-83 ms/image
+  ([resultats-balayages.md](resultats-balayages.md#full-split-t151-4952-images-colab-on-2026-10-29)).
+- **Remaining**: KITTI (step 1; `image_2` not on the Drive).
 
-### [ ] T15.2 — Noise of a run
+### [x] T15.2 — Noise of a run
 - **Spec**: §7 · **Depends on**: T15.1 · **Size**: S
 - **Deliverables**: standard deviation of the mAP over 3 seeds
 - **Acceptance**: `b32-sall` and `b16-sall` of VOC rerun with `--seed 1` and `--seed 2`,
@@ -141,8 +150,19 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
   decisions wait for the full split. Archive: executed
   [tiny-yolov3-voc_sweep](../../notebooks/voc/tiny-yolov3-voc_sweep.ipynb); outputs in
   `build/notebooks/voc/tiny-yolov3-voc/{runs,eval}/b{16,32}-sall-g{1,2}/`.
-- **Remaining**: the full-split standard deviation of the acceptance, given by step 2 of
-  T15.1 (`voc/tiny-yolov3-voc_infer`, 10 runs).
+- **Done** (full split, T15.1 step 2, Colab 2026-10-29):
+
+  | cell | seed 0 | seed 1 | seed 2 | mean ± sd (ddof 1) | 50 images |
+  |---|---|---|---|---|---|
+  | `b16-sall` | 22.19 | 18.51 | 24.94 | **21.88 ± 3.23** | 33.68 ± 1.38 |
+  | `b32-sall` | 26.60 | 21.35 | 31.65 | **26.53 ± 5.15** | 35.06 ± 5.57 |
+
+  Significance threshold for M15: a 600-iteration run moves by 3 to 5 points of full-split
+  mAP (10 points between the extreme seeds of b32). The b32 − b16 gap (4.65 points) is
+  not significant on 3 seeds (Welch t ≈ 1.3); b32 stays the default on its mean and on the
+  other datasets. In the grid, only the gaps above ≈ 5 points count: `sall` against `s500`
+  for b32 and b16, `b8-sall` last. Long runs are expected to reduce this noise; to check
+  with a second seed of T15.4 if a comparison depends on it.
 
 ### [x] T15.3 — GPU duration in the sweep plan
 - **Spec**: — · **Depends on**: — · **Size**: S

@@ -97,8 +97,28 @@ multiscale), same 50 images:
 | `b32-sall` | 36.27 | 28.98 | 39.92 | 35.06 ± 5.57 |
 
 Up to 11 points between two seeds of `b32-sall`: the gaps of the table above between the
-`sall` runs are within the noise of a 600-iteration run on 50 images. Full-split values:
-T15.1.
+`sall` runs are within the noise of a 600-iteration run on 50 images. Full-split values below.
+
+### Full split (T15.1, 4,952 images, Colab on 2026-10-29)
+
+`voc/tiny-yolov3-voc_infer` with `SUBSET = 0`, `COMPARE = True` (VOC2007 test, 416×416
+stretch, conf 0.005, NMS 0.45, 11-point AP):
+
+| run | mAP (50 images) | rank | mAP (full split) | rank |
+|---|---|---|---|---|
+| **b32-sall** | 36.27 | 1 | **26.60** | 1 |
+| b16-sall | 34.70 | 2 | 22.19 | 2 |
+| b32-s500 | 24.01 | 5 | 18.46 | 3 |
+| b8-s500 | 30.14 | 3 | 16.22 | 4 |
+| b16-s500 | 25.58 | 4 | 15.60 | 5 |
+| b8-sall | 12.41 | 6 | 12.02 | 6 |
+
+Spearman ρ = 0.83: on VOC the 50-image ranking mostly holds (unlike VisDrone), `b32-sall`
+stays first. Seeds (T15.2): `b16-sall` 22.19 / 18.51 / 24.94 (21.88 ± 3.23), `b32-sall`
+26.60 / 21.35 / 31.65 (26.53 ± 5.15): gaps under ≈ 5 points are noise. AP of `b32-sall`:
+person 54.6, cat 45.2, train 39.1, horse 37.5, car 36.1; sheep 9.4, bottle 10.6, boat
+12.8, pottedplant 13.2. Still 30 points under Tiny-YOLOv2 VOC (56.30): 600 iterations
+(1.16 epochs) are not a training; the long run is T15.4.
 
 ### Inference on the same 50 images
 
