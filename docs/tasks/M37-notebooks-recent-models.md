@@ -98,7 +98,7 @@ Weights per notebook:
     weights only): add them as `V5_NOTEBOOKS` rows with the `coco` family, as
     `yolov5n-coco_infer`.
 
-### [ ] T37.1 — COCO inference notebooks
+### [x] T37.1 — COCO inference notebooks
 - **Spec**: §8 · **Depends on**: T37.0, T35.3 · **Size**: S
 - **Deliverables**: `notebooks/coco/yolov8n-coco_infer.ipynb` executed in full;
   `yolov5n-coco_infer` and `tiny-yolov7-coco_infer` regenerated and executed again if
@@ -114,15 +114,19 @@ Weights per notebook:
     (v7-tiny) ([long-runs.md](long-runs.md#reference-speeds)); YOLOv8n ≈ 35 min at 640 with 4
     jobs (T35.3).
     Ship with a tier R `SUBSET` and run the full split once for the acceptance.
-- **Progress** (2026-10-29):
-  - `yolov8n-coco_infer` run on the full split (a copy with `SUBSET = 0`, output
-    `build/m37/yolov8n-coco_infer-full.ipynb`, 28 min on 4 cores, no error):
-    **37.3 AP / 52.5 AP50 at 640**, the CLI value of T35.3, with the same parameters
-    (conf 0.001, NMS 0.7, max 300).
-  - The executed copy is not committed: its `SUBSET` differs from the generated notebook,
-    so `--check` would reject it (same choice as the full `tiny-yolov4-coco_infer` run).
-  - **Left**: the full-split runs of `yolov5n-coco_infer` (28.1 AP at 640) and
-    `tiny-yolov7-coco_infer` (34.3 AP at 416).
+- **Done** (2026-10-29): the three notebooks run on the full split (copies with
+  `SUBSET = 0`, outputs `build/m37/<name>-full.ipynb`, no error), each equal to the CLI
+  value of its task with the same parameters:
+
+  | Notebook | Input | AP | AP50 | CLI (task) | Time (4-5 cores) |
+  |---|---|---|---|---|---|
+  | `yolov8n-coco_infer` | 640 | 37.3 | 52.5 | 37.3 (T35.3) | 28 min |
+  | `yolov5n-coco_infer` | 640 | 28.1 | 45.6 | 28.1 (T33.4) | 17 min |
+  | `tiny-yolov7-coco_infer` | 416 | 34.3 | 51.6 | 34.3 (T34.2) | 13 min |
+
+  Each prints its equivalent `tools/eval_voc.py` command. The executed copies are not
+  committed: their `SUBSET` differs from the generated notebooks, which stay at the tier R
+  default so `--check` passes (same choice as the full `tiny-yolov4-coco_infer` run).
 
 ### [x] T37.2 — VOC out-of-domain inference
 - **Spec**: §8 · **Depends on**: T37.0 · **Size**: S
