@@ -14,12 +14,14 @@ the PC, Colab sessions. State on 2026-10-28.
   column. "unmeasured" means no speed exists to compute it from.
 - When a run is done, fold the result into the task's **Done** and remove its row here.
 
-## Running now (2026-10-29, 12:40)
+## Running now (2026-10-29, 12:48)
 
 Long runs in `systemd --user` units (logs in `build/longruns/`). The other units of the
 night (2026-10-28/29) are done, and their results are in their tasks.
 
-No unit running.
+| Unit | Task | Steps | Progress | ETA |
+|---|---|---|---|---|
+| `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --n 500 --jobs 16` (500 VOC images × 3 networks), cores 0-15, 46 GB cap, started 12:48; the 50-image results kept in `build/explain/evaluate-n50.json` | v2 running, memory peak 37 GB at startup | ≈ 2026-10-30 06:30 (v2 ≈ 5.5 h, v3 ≈ 4.5 h, v4 ≈ 7 h) |
 
 ## Reference speeds
 
