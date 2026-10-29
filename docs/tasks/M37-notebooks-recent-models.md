@@ -114,6 +114,15 @@ Weights per notebook:
     (v7-tiny) ([long-runs.md](long-runs.md#reference-speeds)); YOLOv8n ≈ 35 min at 640 with 4
     jobs (T35.3).
     Ship with a tier R `SUBSET` and run the full split once for the acceptance.
+- **Progress** (2026-10-29):
+  - `yolov8n-coco_infer` run on the full split (a copy with `SUBSET = 0`, output
+    `build/m37/yolov8n-coco_infer-full.ipynb`, 28 min on 4 cores, no error):
+    **37.3 AP / 52.5 AP50 at 640**, the CLI value of T35.3, with the same parameters
+    (conf 0.001, NMS 0.7, max 300).
+  - The executed copy is not committed: its `SUBSET` differs from the generated notebook,
+    so `--check` would reject it (same choice as the full `tiny-yolov4-coco_infer` run).
+  - **Left**: the full-split runs of `yolov5n-coco_infer` (28.1 AP at 640) and
+    `tiny-yolov7-coco_infer` (34.3 AP at 416).
 
 ### [x] T37.2 — VOC out-of-domain inference
 - **Spec**: §8 · **Depends on**: T37.0 · **Size**: S
