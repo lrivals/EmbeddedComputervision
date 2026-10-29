@@ -172,7 +172,6 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **To run**: 50 images × 3 networks, ≈ 2 h with 16 processes; not run yet.
 
 ### [ ] T36.5 — Miss causes
-- **Running** (2026-10-28, times CET): unit `t36-5ch`, queued behind `t11-1`: `explain.py misses --dataset crowdhuman` (500 images × 3 networks); start ≈ 03:00, ETA ≈ 04:00. Log `build/longruns/T36.5-crowdhuman.log`.
 - **Spec**: §8 · **Depends on**: T36.0, T27.0 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/misses.py`: for each missed person, its cause,
   computed from the head outputs and the post-processing: **no anchor** (no anchor shape
@@ -208,6 +207,10 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - **ExDark run** (2026-10-28, 500 images with a person, 1,324 persons, 6 jobs, ≈ 15 min):
     misses v2 81 %, v3 74 %, v4 54 %; low objectness 77-86 %, and `no_anchor` up to
     9-12 % (1-3 % on VOC); quantization 1-4 %.
+  - **CrowdHuman run** (2026-10-29, first 500 val images, 11,131 persons, 34 min): misses
+    v2 77 %, v3 72 %, v4 61 %; `no_anchor` 26-30 %, low objectness 53-68 %, NMS 2-3 %,
+    quantization 2 % ([results/explain.md](../../results/explain.md#t365-causes-of-the-missed-persons)).
+  - **Left**: the degraded sets of T27.3 (they wait for T27.3).
 
 ### [x] T36.6 — Concepts and channels
 - **Spec**: §4 · **Depends on**: T36.1 · **Runs on**: PC · **Size**: M

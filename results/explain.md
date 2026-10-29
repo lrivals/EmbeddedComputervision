@@ -120,7 +120,17 @@ objectness (77-86 %), but **no anchor** rises from 1-3 % to 9-12 %: dark scenes 
 persons whose box shape fits no anchor of the network (far or partial). Quantization adds
 little (1-4 %).
 
-CrowdHuman val is running (2026-10-29); the degraded sets of T27.3 wait for T27.3.
+**CrowdHuman val** (2026-10-29, rows `@crowdhuman`): the first 500 val images, 11,131
+persons (full boxes, not `difficult`), 34 min with 6 jobs. The VOC and COCO networks miss
+**61 % (v4) to 77 % (v2)** of the persons. The causes differ from VOC:
+- **no anchor** goes up to **26-30 %** (1-3 % on VOC, 9-12 % on ExDark): crowds hold many
+  small, partly hidden persons whose box shape is close to no anchor;
+- low objectness stays first (53-68 %);
+- NMS removes only 2-3 %: in crowds the persons are lost before the NMS, not by it;
+- quantization adds 2 %, as on ExDark.
+The cause points at the anchors (k-means on CrowdHuman, T15.14) rather than at the NMS.
+
+The degraded sets of T27.3 wait for T27.3.
 
 <!-- explain:misses:begin -->
 | net | stage | persons | missed | quantization | no_anchor | low_objectness | class_confusion | below_threshold | nms_suppressed | mislocalized |
@@ -137,6 +147,12 @@ CrowdHuman val is running (2026-10-29); the degraded sets of T27.3 wait for T27.
 | v3@exdark | int | 1324 | 976 (74%) | 2% | 9% | 85% | 1% | 1% | 1% | 1% |
 | v4@exdark | float | 1324 | 714 (54%) | 0% | 12% | 80% | 2% | 3% | 1% | 2% |
 | v4@exdark | int | 1324 | 708 (53%) | 4% | 12% | 77% | 2% | 1% | 2% | 2% |
+| v2@crowdhuman | float | 11131 | 8554 (77%) | 0% | 27% | 57% | 0% | 1% | 3% | 11% |
+| v2@crowdhuman | int | 11131 | 8453 (76%) | 2% | 28% | 53% | 1% | 1% | 3% | 13% |
+| v3@crowdhuman | float | 11131 | 8016 (72%) | 0% | 26% | 68% | 0% | 1% | 2% | 3% |
+| v3@crowdhuman | int | 11131 | 7972 (72%) | 2% | 26% | 67% | 0% | 0% | 2% | 3% |
+| v4@crowdhuman | float | 11131 | 6832 (61%) | 0% | 30% | 62% | 1% | 1% | 3% | 4% |
+| v4@crowdhuman | int | 11131 | 6766 (61%) | 2% | 30% | 60% | 1% | 1% | 2% | 4% |
 <!-- explain:misses:end -->
 
 ## T36.6: concepts and channels
