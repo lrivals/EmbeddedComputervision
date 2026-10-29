@@ -162,7 +162,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
-- **Running** (2026-10-29, times CET): unit `t36-4` restarted at 09:30 with `--jobs 8` on cores 0-15, 36 GB cap. The first run (5 jobs, 15 GB) was killed by the OOM killer at 09:21 during v4, and `evaluate` only saved at the end, so v2 and v3 (5 h) were lost. `cmd_evaluate` now saves after each network and skips those already done with the same `--n`. ETA ≈ 15:00 (v2 3 h 29 and v3 2 h at 5 jobs on a shared CPU, here 8 jobs on a free CPU). Log `build/longruns/T36.4-evaluate.log`.
+- **Running** (2026-10-29, times CET): unit `t36-4` restarted at 09:30 with `--jobs 8` on cores 0-15, 36 GB cap. The first run (5 jobs, 15 GB) was killed by the OOM killer at 09:21 during v4, and `evaluate` only saved at the end, so v2 and v3 (5 h) were lost. `cmd_evaluate` now saves after each network and skips those already done with the same `--n`. v2 done at 10:33 in 62 min (3 h 29 in the first run), saved; v3 then v4 running, ETA ≈ 12:30 if they speed up by the same factor. Memory peak 21 GB of 36. Log `build/longruns/T36.4-evaluate.log`.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`

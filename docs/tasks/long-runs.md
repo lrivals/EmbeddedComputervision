@@ -21,7 +21,7 @@ night (2026-10-28/29) are done, and their results are in their tasks.
 
 | Unit | Task | Steps | Progress at 08:47 | ETA |
 |---|---|---|---|---|
-| `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --jobs 8` (50 VOC images × 3 networks), cores 0-15, 36 GB cap, restarted 09:30 after an OOM kill at 09:21 (v2, v3 lost; now saved per network) | starting | ≈ 15:00 |
+| `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --jobs 8` (50 VOC images × 3 networks), cores 0-15, 36 GB cap, restarted 09:30 after an OOM kill at 09:21 (v2, v3 lost; now saved per network) | v2 done 10:33 (62 min), v3 running, then v4 | ≈ 12:30 |
 
 ## Reference speeds
 
