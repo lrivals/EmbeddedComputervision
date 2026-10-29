@@ -79,7 +79,15 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     `test_targets.py` green.
 
 ### [ ] T36.1 — Gradient attributions
-- **Running** (2026-10-29, times CET): unit `t36-run` since 22:26: `explain.py sanity --jobs 4` (the 6-job run hit the 14 GB cap). Much slower than estimated: v2 3 h 13, v3 1 h 48, v4 running; ETA ≈ 06:30. Log `build/longruns/T36.1-sanity.log`.
+- **Run** (2026-10-29, 8 h 37 at 4 jobs, [results/explain.md](../../results/explain.md#t361-gradient-maps-sanity-checks)):
+  - only **Grad-CAM passes** the Adebayo check (ρ 0.20 / −0.03 / 0.11 with every conv
+    randomized); saliency, SmoothGrad and IG keep ρ ≥ 0.92 and fail;
+  - for v3 and v4, randomizing the top convs only leaves Grad-CAM unchanged: they are the
+    head of the other scale;
+  - cost per map: Grad-CAM 1.5-2.5 s, SmoothGrad 41-62 s, IG 180-285 s.
+- **Acceptance not met**: IG completeness at 64 steps is 0.7-6.5 % (blurred 0.7-2.0 %,
+  black 2.6-6.5 %), over 1 % except the blurred baseline on v2. Next: the same check at 128
+  and 256 steps (`--steps`, to add), on the 5 images where the error is largest.
 - **Spec**: — · **Depends on**: T36.0 · **Runs on**: PC (GPU via `yolo.backend` if
   available) · **Size**: M
 - **Deliverables**: `python/yolo/explain/gradient.py`: saliency (|δx|, max over the

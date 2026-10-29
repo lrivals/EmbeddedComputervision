@@ -34,7 +34,40 @@ the original network and that of the randomized one. A method that keeps its map
 weights are random (ρ ≥ 0.3) fails.
 
 <!-- explain:sanity:begin -->
+| net | method | images | IG completeness error | ρ top conv | ρ top 3 | ρ all convs | sanity (ρ < 0.3) | passes | s / map |
+|---|---|---|---|---|---|---|---|---|---|
+| v2 | saliency | 17 | – | 0.97 | 0.96 | 0.95 | **fail** | 2 | 2.2 |
+| v2 | smoothgrad | 17 | – | 0.97 | 0.97 | 0.96 | **fail** | 50 | 60.2 |
+| v2 | ig_black | 17 | 0.026 | 0.94 | 0.94 | 0.92 | **fail** | 130 | 284.7 |
+| v2 | ig_blur | 17 | 0.007 | 0.95 | 0.95 | 0.94 | **fail** | 130 | 249.1 |
+| v2 | gradcam | 17 | – | 0.06 | 0.24 | 0.20 | pass | 2 | 2.1 |
+| v3 | saliency | 14 | – | 1.00 | 1.00 | 0.95 | **fail** | 2 | 1.5 |
+| v3 | smoothgrad | 14 | – | 1.00 | 1.00 | 0.96 | **fail** | 50 | 41.3 |
+| v3 | ig_black | 14 | 0.026 | 1.00 | 1.00 | 0.93 | **fail** | 130 | 187.5 |
+| v3 | ig_blur | 14 | 0.016 | 1.00 | 1.00 | 0.95 | **fail** | 130 | 180.6 |
+| v3 | gradcam | 14 | – | 1.00 | 1.00 | -0.03 | pass | 2 | 1.6 |
+| v4 | saliency | 20 | – | 1.00 | 1.00 | 0.96 | **fail** | 2 | 2.3 |
+| v4 | smoothgrad | 20 | – | 1.00 | 1.00 | 0.97 | **fail** | 50 | 61.7 |
+| v4 | ig_black | 20 | 0.065 | 1.00 | 1.00 | 0.94 | **fail** | 130 | 277.1 |
+| v4 | ig_blur | 20 | 0.020 | 1.00 | 1.00 | 0.96 | **fail** | 130 | 281.5 |
+| v4 | gradcam | 20 | – | 0.96 | 0.95 | 0.11 | pass | 2 | 2.5 |
 <!-- explain:sanity:end -->
+
+**Results** (2026-10-29, `tools/explain.py sanity --jobs 4`, 8 h 37 on a shared CPU; the
+first 20 VOC test images, 17 / 14 / 20 with a matched detection):
+- **Only Grad-CAM passes the sanity check.** Once every conv is randomized its map no
+  longer matches (ρ 0.20, −0.03, 0.11). Saliency, SmoothGrad and both IG variants keep
+  ρ ≥ 0.92 with random weights: on these detectors they show the input edges, not what the
+  network uses (Adebayo 2018 found the same on classifiers).
+- **For v3 and v4, randomizing only the top conv or the top three leaves Grad-CAM
+  unchanged** (ρ 1.00, 0.95-0.96). The last convs in file order are the head of the other
+  scale, which the explained box does not go through; only the full cascade reaches the
+  layers it uses.
+- **IG completeness at 64 steps: 0.7 to 6.5 %** (blurred baseline 0.7-2.0 %, black
+  baseline 2.6-6.5 %). The 1 % of the acceptance holds only for the blurred baseline on
+  v2; more steps are needed on the real networks (the tiny net needed 128).
+- **Cost**: Grad-CAM and saliency 1.5-2.5 s per map (2 passes), SmoothGrad 41-62 s
+  (50), IG 180-285 s (130 passes).
 
 ## T36.2: perturbation maps at the three stages
 
