@@ -79,7 +79,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     `test_targets.py` green.
 
 ### [ ] T36.1 — Gradient attributions
-- **Running** (2026-10-28, times CET): unit `t36-run` since 22:26: `explain.py sanity --jobs 4` (the 6-job run hit the 14 GB cap); ETA ≈ 00:30. Log `build/longruns/T36.1-sanity.log`.
+- **Running** (2026-10-29, times CET): unit `t36-run` since 22:26: `explain.py sanity --jobs 4` (the 6-job run hit the 14 GB cap). Much slower than estimated: v2 3 h 13, v3 1 h 48, v4 running; ETA ≈ 06:30. Log `build/longruns/T36.1-sanity.log`.
 - **Spec**: — · **Depends on**: T36.0 · **Runs on**: PC (GPU via `yolo.backend` if
   available) · **Size**: M
 - **Deliverables**: `python/yolo/explain/gradient.py`: saliency (|δx|, max over the
@@ -102,7 +102,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     processes), not run yet.
 
 ### [ ] T36.2 — Perturbation attributions (black box)
-- **Running** (2026-10-28, times CET): unit `t36-run`, after `sanity`: `explain.py stages --jobs 4`; ETA ≈ 03:30. Log `build/longruns/T36.2-stages.log`.
+- **Running** (2026-10-29, times CET): unit `t36-2` from ≈ 04:30 (after the notebooks), in parallel with `sanity`: `explain.py stages --jobs 5` on cores 0-5, 15 GB cap; ETA unknown, ≈ 10 h if it is as far off its estimate as `sanity`. Log `build/longruns/T36.2-stages.log`.
 - **Spec**: §9, §10.2 · **Depends on**: T36.0 · **Runs on**: PC (C-sim gcc for the third
   stage) · **Size**: M
 - **Deliverables**: `python/yolo/explain/perturb.py`: occlusion (sliding grey patch) and
@@ -151,7 +151,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
-- **Running** (2026-10-28, times CET): unit `t36-run`, after `stages`: `explain.py evaluate --jobs 4` (50 images × 3 networks); ETA ≈ 11:30 on 2026-10-29. Log `build/longruns/T36.4-evaluate.log`.
+- **Running** (2026-10-29, times CET): unit `t36-4` from ≈ 04:30, in parallel: `explain.py evaluate --jobs 5` (50 images × 3 networks) on cores 6-11, 15 GB cap; ETA ≈ 1 day at this rate. Log `build/longruns/T36.4-evaluate.log`.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`

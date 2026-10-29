@@ -22,7 +22,9 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
 | `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
-| `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
+| `t36-run` | [T36.1](M36-explanation.md) | `explain.py sanity --jobs 4` (stopped after it by `t36-guard`) | v2 3 h 13, v3 1 h 48, v4 running | ≈ 06:30 |
+| `t36-2` | [T36.2](M36-explanation.md) | `explain.py stages --jobs 5`, cores 0-5 | from ≈ 04:30 | ≈ 15:00 *(sanity ran ≈ 4× over its estimate)* |
+| `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --jobs 5`, cores 6-11 | from ≈ 04:30 | ≈ 2026-10-30 *(same factor)* |
 
 ## Reference speeds
 
