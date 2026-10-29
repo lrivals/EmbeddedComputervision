@@ -127,6 +127,26 @@ current calibration (500 VOC2007 trainval images), as the export `model/tiny-yol
 - Costs: float + int 34 min (6 jobs, 394 ms/image), C-sim 2 h 54 on 6 cores (≈ 12.5 s per
   image per core).
 
+## YOLOv7-tiny: float, integer, FPGA C-sim (T26.0)
+
+`build/longruns/t26-0.sh`, 2026-10-29. `stretch` preprocessing at 416, conf 0.005, NMS
+0.45 (the protocol of the two sections around, not the YOLOv5 one above: 34.3 AP there).
+The integer model is the one of the export `model/tiny-yolov7-coco` (calibration on 500
+COCO train2017 images, [calibration_tiny-yolov7-coco.md](calibration_tiny-yolov7-coco.md)).
+The 4-source concats are written end to end by their source convs (`layout:
+"contiguous"`), and the SPP pools are chained 5 × 5 stride-1 pools of the output stage.
+
+| Stage | AP | AP50 | AP75 | Equality with the integer model |
+|---|---|---|---|---|
+| Float (fused BN, NumPy float32) | 33.14 | 50.69 | 34.65 | — |
+| Integer Python (`IntNetwork`, bit-exact) | 31.51 | 49.93 | 33.37 | reference |
+| FPGA, C-sim (`yolo_bench`, sim backend, `ACC_NO_APINT`) | 31.51 | 49.93 | 33.37 | **5,000 / 5,000 images identical** |
+
+- **Integer loss −1.6 AP, −0.8 AP50**, more than Tiny-YOLOv3 (−0.55 AP) and YOLOv4-tiny
+  (−1.2 AP); per class, person 44.0 → 42.1.
+- **Third network to pass the full split bit for bit**, with no kernel change.
+- C-sim: 3 h 35 on 6 cores (≈ 15.5 s per image per core), against 2 h 54 for Tiny-YOLOv3.
+
 ## YOLOv4-tiny: float, integer, FPGA C-sim (T24.5)
 
 `stretch` preprocessing. The integer model uses the calibration on 500 COCO train2017

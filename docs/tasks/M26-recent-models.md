@@ -19,18 +19,33 @@ The from-scratch, torch-free versions (weight reading, backward passes, loss, tr
 [M33](M33-yolov5n.md) (YOLOv5n), [M34](M34-yolov7-tiny.md) (YOLOv7-tiny) and
 [M35](M35-yolov8n.md) (YOLOv8n); T26.0, T26.3 and T26.4 stay the inference and hardware view.
 
-**State** (2026-10-23):
+**State** (2026-10-29):
 - **Done**: T26.1 (converter, torch-free since T33.0) and T26.2 (SiLU).
-- **T26.0** in progress: cfg, weights, float COCO mAP (T34.2) and the INT8 calibration
-  ([calibration_tiny-yolov7-coco.md](../../results/calibration_tiny-yolov7-coco.md)) are
-  done. The integer mAP, export, golden and C-sim are open.
+- **T26.0** done on the PC (2026-10-29): float, integer and C-sim COCO mAP (33.14 / 31.51 /
+  31.51 AP), C-sim identical to the integer model on the 5,000 images; the board part is in
+  [deferred/M26](deferred/M26-recent-models.md).
 - **T26.3 / T26.4**: the float COCO mAP is measured by M33 (YOLOv5n, T33.4) and M35
   (YOLOv8n, T35.3), see [map_coco.md](../../results/map_coco.md). The integer models,
   export, golden, C-sim, the stride-2 convs and the DFL post-processing on the ARM are open.
   The export, driver and engine wiring of SiLU layers comes with T26.3.
 - **T26.5** waits for T26.0, T26.3 and T26.4.
 
-### [ ] T26.0 — YOLOv7-tiny
+### [x] T26.0 — YOLOv7-tiny
+- **Done** (2026-10-29, PC part, [map_coco.md](../../results/map_coco.md#yolov7-tiny-float-integer-fpga-c-sim-t260)):
+  COCO val2017, 5,000 images, `stretch` 416, conf 0.005, NMS 0.45, integer model of the
+  export (calibration `calib-coco.json`, 500 COCO train2017 images):
+
+  | Stage | AP | AP50 | AP75 |
+  |---|---|---|---|
+  | Float | 33.14 | 50.69 | 34.65 |
+  | Integer Python | 31.51 | 49.93 | 33.37 |
+  | FPGA C-sim | 31.51 | 49.93 | 33.37 |
+
+  **C-sim == integer on 5,000 / 5,000 images**, with no kernel change (study below).
+  Integer loss −1.6 AP, −0.8 AP50. Runs: float + int 38 min (6 jobs), C-sim 3 h 35 on 6
+  cores (`build/longruns/t26-0.sh`).
+- **Deferred** (Vitis, board): [deferred/M26](deferred/M26-recent-models.md) — synthesis
+  with the 5 × 5 pool, co-sim, the COCO pass on the board.
 - **Running** (2026-10-28, times CET): unit `t26-0`, queued behind `t35-3`: v7-tiny float + int COCO val2017 and C-sim of the 5,000 images (`build/longruns/t26-0.sh`, 6 cores, 18 s per image per core); start ≈ 23:15, ETA ≈ 04:00. Log `build/longruns/T26.0.log`.
 - **Spec**: §3, §4.4, §10.3 · **Depends on**: T24.5 · **Size**: L
 - **Deliverables**: cfg and weights (`tiny-yolov7-coco`), float model, integer model,

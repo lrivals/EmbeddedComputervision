@@ -86,6 +86,7 @@ The first useful step on a machine with Vitis is `make csim` (Vitis C-sim must e
 | [M25](M25-dependability.md) | T25.3 | Vitis | ABFT lane cost, `ABFT_ERR` offsets (`check-regmap`) | [ ] |
 | | T25.4 | Vitis | protection costs | [ ] |
 | | T25.7 | Vivado, Board | configuration-memory upsets | [ ] |
+| [M26](M26-recent-models.md) | T26.0 | Vitis, Board | YOLOv7-tiny synthesis (5 × 5 pool), co-sim, COCO on the board | [ ] |
 | [M28](M28-equivalence.md) | T28.0 | Vitis, Board | co-sim and board rows | [ ] |
 | | T28.5 | Board | equivalence on the board | [ ] |
 | [M29](M29-runtime-monitors.md) | T29.4 | Vitis | monitor cost | [ ] |

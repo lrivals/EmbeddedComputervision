@@ -21,7 +21,6 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
-| `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
 | `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
 | `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
 
@@ -97,7 +96,6 @@ These share the CPU with the table above: one at a time, at night.
 |---|---|---|---|---|---|
 | [T12.9](M12-profils-pc.md) | `make bench-sim` | VOC 4,952 | ≈ 40 min | stated | — |
 | [T11.6](M11-jeux-de-donnees.md) | `tools/m11.sh crowdhuman-cycles` (`N=200`) | CrowdHuman | ≈ 5 min *(est.)* | 200 × 0.5 s + build | — |
-| [T26.0](M26-recent-models.md) | YOLOv7-tiny C-sim stage | COCO 5,000 | ≈ 1.5 h *(est.)* | 2.89 GMAC, close to v4-tiny | calibration |
 | [T26.3, T26.4](M26-recent-models.md) | YOLOv5n, YOLOv8n golden and C-sim | COCO 5,000 | ≈ 1 h + 2 h *(est.)* | ≈ 2.3 and 4.4 GMAC at 640 against v4-tiny | T26.1, T26.2 |
 | [T27.1](M27-safety-metrics.md) C-sim column | `make_inputs.py --split val --subset 100`, `bench_sim.sh` with `EXTRA="--conf 0.001"`, `person_safety.py csim` | CrowdHuman val, 100 frames with persons | ≈ 3 min *(est.)* | 100 PREWID frames took ≈ 3 min (v4, 10 jobs, 2026-10-26) | T27.1 |
 
