@@ -162,7 +162,7 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     - Spearman integer LRP / float LRP 0.50 to 0.62, against Grad-CAM ≤ 0.24.
 
 ### [ ] T36.4 — Evaluation of the explanations
-- **Running** (2026-10-29, times CET): unit `t36-4` from ≈ 04:30, in parallel: `explain.py evaluate --jobs 5` (50 images × 3 networks) on cores 6-11, 15 GB cap; ETA ≈ 1 day at this rate. Log `build/longruns/T36.4-evaluate.log`.
+- **Running** (2026-10-29, times CET): unit `t36-4` since 04:12: `explain.py evaluate --jobs 5` (50 images × 3 networks) on cores 6-11, 15 GB cap. v2 done at 07:41 (38 maps, 3 h 29); v3 and v4 running; ETA ≈ 12:30-13:30. Log `build/longruns/T36.4-evaluate.log`.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`
