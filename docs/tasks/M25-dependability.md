@@ -145,8 +145,18 @@ YOLO, and the BRAM are excluded (Libano 2019). Rech 2024 defines a critical dete
 by an IoU threshold on the boxes and reports that temporal coherence between frames detects
 ≈ 70 % of the critical errors.
 
-### [ ] T25.6 — Critical error for a person detector
-- **Running** (2026-10-28, times CET): unit `t25-6ch` since 23:45: layer and bit grids on CrowdHuman val 500 (Tiny-YOLOv2 VOC, the T25.1 network, 10 jobs); ETA ≈ 09:00 (the VOC run took 6 h at 14 jobs). Log `build/longruns/T25.6-crowdhuman.log`. The first start crashed on the same class bug (VOC label 14 scored on the 1-class CrowdHuman view).
+### [x] T25.6 — Critical error for a person detector
+- **Done** (2026-10-29, [results/faults.md](../../results/faults.md#on-crowdhuman-val-2026-10-29)):
+  the T25.1 grids with the person criterion on CrowdHuman val (500 images, 477 with a
+  person), Tiny-YOLOv2 VOC integer (no CrowdHuman weights on the PC yet, T15.14).
+  - Critical rates are **about twice those of VOC**: L00 11.0 % of the images, `acc` 1e-5
+    on L00 54.6 %, high accumulator bits 30-32 %, `act` bit 7 27.4 %.
+  - Meanwhile the person mAP moves by at most 0.16 point per conv.
+  - By critical images the ranking is L00 > L02 > L04 > L06 > L12, against L00 > L02 > L12
+    > L13 by mAP loss, so the mAP ranking is not the one to protect by.
+  - ABFT unchanged: no silent weight, bias or accumulator fault, every activation fault
+    silent.
+  - 248 runs, ≈ 9 h on 10 processes. The first start crashed on a class bug, see T25.8.
 - **Spec**: §8.3 · **Depends on**: T25.1, T27.0 · **Runs on**: PC · **Size**: S
 - **Deliverables**: `tools/fault_campaign.py --criterion person`; section in
   `results/faults.md`

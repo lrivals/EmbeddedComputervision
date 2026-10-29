@@ -403,6 +403,81 @@ Not run: CrowdHuman (data not on the PC, row in
 [long-runs.md](../docs/tasks/long-runs.md)), which has many more persons per image and
 small persons.
 
+### On CrowdHuman val (2026-10-29)
+
+`build/longruns/t25-6ch.sh`: same network, grids and matching as above, on the first 500
+images of CrowdHuman val, 477 of them with a person at score ≥ 0.25 without fault. No
+CrowdHuman-trained weights exist on the PC yet (T15.14), so the VOC network is kept, its
+`person` class scored against the CrowdHuman full boxes (fault-free person mAP 23.73).
+248 runs, ≈ 9 h on 10 processes (CPU shared with other runs).
+
+| Conv | weight 1e-07 | weight 1e-05 | bias 1e-07 | bias 1e-05 | act 1e-07 | act 1e-05 | acc 1e-07 | acc 1e-05 |
+|---|---|---|---|---|---|---|---|---|
+| L00 | +0.00 | +0.00 | +0.00 | +0.00 | +0.02 | -0.07 | -0.04 | -1.17 |
+| L02 | +0.00 | +0.00 | +0.00 | +0.00 | -0.01 | +0.02 | +0.06 | -0.42 |
+| L04 | +0.00 | +0.04 | +0.00 | +0.00 | +0.03 | +0.02 | +0.00 | -0.02 |
+| L06 | +0.00 | +0.08 | +0.00 | +0.00 | -0.00 | +0.01 | +0.01 | +0.09 |
+| L08 | +0.00 | +0.02 | +0.00 | +0.00 | +0.01 | +0.07 | -0.01 | +0.02 |
+| L10 | -0.01 | +0.11 | +0.00 | +0.00 | -0.00 | -0.02 | +0.01 | -0.07 |
+| L12 | -0.04 | +0.07 | +0.00 | +0.00 | -0.00 | -0.01 | -0.01 | -0.14 |
+| L13 | +0.01 | -0.03 | +0.00 | +0.00 | -0.00 | -0.03 | -0.01 | -0.04 |
+| L14 | +0.00 | -0.03 | +0.00 | +0.00 | +0.00 | -0.01 | +0.00 | -0.02 |
+
+Critical images in % (a fault-free person lost, among the images with a person).
+
+| Rank | By critical images | By mAP loss |
+|---|---|---|
+| 1 | L00 (11.0 %) | L00 |
+| 2 | L02 (6.8 %) | L02 |
+| 3 | L04 (5.9 %) | L12 |
+| 4 | L06 (5.8 %) | L13 |
+| 5 | L12 (4.6 %) | L14 |
+| 6 | L08 (4.5 %) | L10 |
+| 7 | L10 (3.9 %) | L04 |
+| 8 | L13 (1.7 %) | L08 |
+| 9 | L14 (0.2 %) | L06 |
+
+| Bit | weight | bias | act | acc |
+|---|---|---|---|---|
+| 0 | +0.01 | +0.12 | +0.07 | -0.01 |
+| 1 | -0.01 |  | +0.02 |  |
+| 2 | +0.01 |  | +0.03 |  |
+| 3 | +0.01 |  | -0.00 |  |
+| 4 | +0.06 | +0.02 | +0.02 | -0.01 |
+| 5 | +0.02 |  | +0.03 |  |
+| 6 | +0.03 |  | -0.03 |  |
+| 7 | +0.05 |  | +0.07 |  |
+| 8 |  | +0.10 |  | +0.04 |
+| 12 |  | -0.45 |  | +0.04 |
+| 16 |  | -20.05 |  | -0.09 |
+| 20 |  | -23.73 |  | -0.16 |
+| 24 |  | -23.73 |  | -0.16 |
+| 28 |  | -23.73 |  | -0.16 |
+
+Critical images in % for one flip at that bit.
+
+| Site | Critical images | Persons lost | Persons moved | Extra boxes / image |
+|---|---|---|---|---|
+| weight | 5.46 % | 0.71 % | 3.79 % | 0.05 |
+| bias | 22.16 % | 19.42 % | 3.06 % | 0.04 |
+| act | 7.77 % | 1.07 % | 5.76 % | 0.08 |
+| acc | 13.74 % | 2.18 % | 11.85 % | 0.19 |
+
+Mean over every run of the site (all grids).
+
+**Findings (CrowdHuman):**
+- **About twice the critical rate of VOC**, on every site: L00 11.0 % of the images against
+  5.1 %, `acc` at BER 1e-5 on L00 54.6 % against 27.5 %, a high accumulator bit 30-32 %
+  against 11-12 %, `act` bit 7 27.4 % against 10.3 %. A crowd gives a fault more persons
+  to lose per image.
+- **The mAP hides it even more than on VOC**: the worst conv moves the person mAP by
+  0.16 point, and every bit except the high bias bits by less than 0.5 point.
+- **The ranking by critical images keeps the order of VOC on the first two convs** (L00,
+  L02), then differs from the mAP ranking: L04 and L06 are 3rd and 4th by critical images
+  but 7th and 9th by mAP loss. The mAP ranking is not a safe guide to what to protect.
+- **The ABFT picture is unchanged**: every weight, bias and accumulator fault that changes
+  the output is flagged, no activation fault is.
+
 ## T25.8: fault detection by temporal coherence
 
 `tools/fault_campaign.py temporal --net tiny-yolov4-coco --dataset <set> --points 300`,

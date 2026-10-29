@@ -21,7 +21,6 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
-| `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
 | `t36-4` | [T36.4](M36-explanation.md) | `explain.py evaluate --jobs 5`, cores 6-11 | from ≈ 04:30 | ≈ 2026-10-30 *(same factor)* |
 
 ## Reference speeds
@@ -70,7 +69,6 @@ GPU (T12.11-e).
 | [T36.5](M36-explanation.md) | `tools/explain.py misses` on the T27.3 sets (VOC, ExDark and CrowdHuman done 2026-10-29) | CrowdHuman val 4,370, T27.3 sets, ExDark | ≈ 30 min *(est.)* | VOC 500 images × 3 networks took 3 min with 12 jobs | T27.3 |
 | [T16.14](M16-presentation-jeux.md) | `notebooks/kitti/kitti_stats.ipynb` | KITTI 5,985 + 1,496 | unmeasured, R-M | — | KITTI `image_2` download |
 | [T22.9](M22-autolabel.md) | capture 300-500 photos, label with GD at 0.55, check 100, then M15 fine-tuning | own photos | ≈ 40 min of labelling + 1 h capture + 1-2 h review | stated | — |
-| [T25.6](M25-dependability.md) | `tools/m25.sh person` with a CrowdHuman net and set (VOC person class done on 2026-10-28) | CrowdHuman | ≈ 6 h on the PC (measured on VOC, 500 images, 14 jobs) | same grids as T25.1 | — |
 | [T27.1](M27-safety-metrics.md) float, int | `tools/person_safety.py infer --dataset crowdhuman --split val` for tiny-yolov3-crowdhuman, v3-coco, v4-coco, then `report --write` | CrowdHuman val 4,370 | ≈ 25 min *(est.)* | float + int 0.11 s/image with 20 jobs (measured on PREWID, 2026-10-26): 3 × 4,370 × 0.11 s | — (CrowdHuman weights `build/notebooks/crowdhuman/tiny-yolov3-crowdhuman/runs/long-416/final.weights`, 2026-10-28) |
 | [T27.3](M27-safety-metrics.md) | `tools/person_safety.py infer --degrade all`, then `degrade-report --write`; ExDark `--dataset exdark` | CrowdHuman val, ExDark test | ≈ 2.5 h *(est.)* | 18 × 4,370 × 0.11 s (float + int, 20 jobs, measured on PREWID) | T27.1 |
 | [T38.8-T38.10](M38-prewid.md) float, int | the M27 commands with `--net <T38.7 cfg> --weights <ckpt>` (`person_safety.py infer`, `--degrade all`, grayscale variant, `dreaded_event.py`) | PREWID test 592, lab 3,000 | ≈ 30 min *(est.)* | measured 2026-10-26 with v4-tiny: test 592 + lab 3,000 + 18 degradations × 592 in ≈ 25 min (float + int, 0.11 s/image, 20 jobs) | T38.7 |
@@ -141,7 +139,7 @@ Rough sums of the estimates above (unmeasured rows not counted):
 
 | Machine | Total | Largest items |
 |---|---|---|
-| PC CPU | ≈ 43 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T25.1 + T25.6 ≈ 10 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
+| PC CPU | ≈ 43 h + 2 nights (T12.7 long, T13.30) | T12.5 QAT grid ≈ 9 h, T12.6 ≈ 4 h, T27.3 ≈ 1.5-7 h |
 | PC C-sim | ≈ 10.5 h | T26.x ≈ 4.5 h, T27.1 ≈ 2.5 h |
 | Colab | ≈ 125-135 h | T24.6 ≈ 33 h, T18.10 ≈ 14 h, T38.7 ≈ 12 h, T15.9 ≈ 11 h, T39.2 + T39.4 fine-tunes ≈ 5-6 h |
 
@@ -150,7 +148,6 @@ Suggested order, unblockers first:
 ```mermaid
 graph LR
   T1514[T15.14] --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
-  T251[T25.1] --> T256[T25.6]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
   T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
   T158[T15.8] --> T159["T15.9, T15.16"]
