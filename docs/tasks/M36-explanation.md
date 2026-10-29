@@ -110,7 +110,10 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
     processes), not run yet.
 
 ### [ ] T36.2 — Perturbation attributions (black box)
-- **Running** (2026-10-29, times CET): unit `t36-2` from ≈ 04:30 (after the notebooks), in parallel with `sanity`: `explain.py stages --jobs 5` on cores 0-5, 15 GB cap; ETA unknown, ≈ 10 h if it is as far off its estimate as `sanity`. Log `build/longruns/T36.2-stages.log`.
+- **Run** (2026-10-29, 3 h 11 at 5 jobs, [results/explain.md](../../results/explain.md#t362-perturbation-maps-at-the-three-stages)):
+  Spearman float / int 0.98-0.99 for D-RISE and 0.63-0.74 for occlusion; integer == golden
+  bit for bit on 3 / 2 / 5 images (100 masks), weights and maps. **Left for the acceptance**:
+  the deletion and insertion AUC, from the T36.4 run.
 - **Spec**: §9, §10.2 · **Depends on**: T36.0 · **Runs on**: PC (C-sim gcc for the third
   stage) · **Size**: M
 - **Deliverables**: `python/yolo/explain/perturb.py`: occlusion (sliding grey patch) and

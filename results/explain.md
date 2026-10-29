@@ -81,7 +81,35 @@ The integer and golden stages share the int8 heads (M28), so their maps must be 
 **bit for bit**; this is checked on the first images with 100 masks.
 
 <!-- explain:stages:begin -->
+| net | method | images | Spearman float / int | passes / map | s / map float | s / map int |
+|---|---|---|---|---|---|---|
+| v2 | drise | 17 | 0.99 | 300 | 198 | 429 |
+| v2 | occlusion | 17 | 0.73 | 145 | 100 | 199 |
+| v3 | drise | 14 | 0.99 | 300 | 199 | 398 |
+| v3 | occlusion | 14 | 0.63 | 145 | 97 | 179 |
+| v4 | drise | 20 | 0.98 | 300 | 193 | 441 |
+| v4 | occlusion | 20 | 0.74 | 145 | 95 | 208 |
+
+Integer against golden, the same masks:
+
+| net | images | masks | weights equal | maps equal (bit for bit) | s / map golden (1 process) |
+|---|---|---|---|---|---|
+| v2 | 3 | 100 | 3 / 3 | 3 / 3 | 601 |
+| v3 | 2 | 100 | 2 / 2 | 2 / 2 | 485 |
+| v4 | 5 | 100 | 5 / 5 | 5 / 5 | 730 |
 <!-- explain:stages:end -->
+
+**Results** (2026-10-29, `tools/explain.py stages --jobs 5`, 3 h 11 on a shared CPU):
+- **D-RISE is stable across the float to integer step** (Spearman 0.98-0.99): the int8
+  model is looking at the same regions as the float one.
+- **Occlusion much less** (0.63-0.74). A 64 px patch moves the score by small steps that
+  the integer requantization rounds differently, and the map has only 145 cells.
+- **Integer == golden bit for bit** on every map checked (3, 2 and 5 images, 100 masks):
+  an explanation computed in Python stands for the circuit as is.
+- **Cost**: the integer stage takes 2× the float one per map; the golden 2.4-3.8 min per
+  100-mask map on one process. A D-RISE map costs 300 inferences, which is fine on the PC
+  and too much for the board.
+- The deletion and insertion AUC per method come from the T36.4 run.
 
 ## T36.3: exact integer attribution
 
