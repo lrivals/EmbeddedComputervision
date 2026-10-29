@@ -29,7 +29,7 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 |---|---|---|
 | PC CPU training, Tiny-YOLOv2/v3, 416, batch 8 | plain fine-tuning ≈ 3.6 s/iteration, ≈ 0.45 s/image (T2.7); QAT and ADMM ≈ 5.3 s/iteration, ≈ 0.66 s/image (600 it: QAT 3,189 s, ADMM 3,157 s in the `seconds` column) | `build/train/{qat-w4a4,admm-mixed6}/loss.csv`, [M12](M12-profils-pc.md) |
 | PC CPU training, pruned models, 300 it | r30 8.2, r50 7.8, r70 2.8 s/iteration | `build/m10/prune/*/train/loss.csv` |
-| Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59 (CrowdHuman long run, 6,000 it: 0.63 s/it, 3,789 s); 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
+| Colab T4 training, Tiny-YOLOv3, multi-scale 320-608 | batch 8: 0.20-0.31 s/it; 16: 0.35-0.59 (long runs, 6,000 it: CrowdHuman 0.63 s/it, 3,789 s; VisDrone stretch 0.69 s/it, 4,161 s); 32: 0.66-1.17 (VisDrone slowest) | `build/notebooks/*/runs/*/loss.csv` |
 | Colab T4, 6,000 iterations at batch 32 | ≈ 1 h 45; ×2.1 per iteration at 608, ×4 at 832 | [M15](M15-campagne-entrainement.md) T15.4, T15.9 |
 | PC evaluation, VOC2007 test (4,952) | float ≈ 170 ms/image (≈ 15 min), int ≈ 120 ms/image (≈ 10 min), float + int 150-300 ms/image (12-25 min), 66 ms/image with 16 jobs | [M12](M12-profils-pc.md), [M14](M14-notebooks.md), `build/eval/*.log` |
 | PC evaluation, ExDark test (2,563) | float + int 94-106 ms/image with 16 jobs (≈ 4.5 min per network) | `build/longruns/T11.3-base.log`, 2026-10-27 |
@@ -104,10 +104,9 @@ These share the CPU with the table above: one at a time, at night.
 | [T15.5](M15-campagne-entrainement.md) | LR {5e-4, 1e-3, 2e-3} × burn-in {100, 500} | VOC | ≈ 1 h GPU | stated | code: `LRS` / `BURN_INS`, `run_name` |
 | [T15.6](M15-campagne-entrainement.md) | batch 64 against batch 32 | VOC | ≈ 20 min at 600 it, ≈ 3.5 h at 6,000 *(est.)* | ≈ 2 s/it at batch 64 | T15.4 |
 | [T15.7](M15-campagne-entrainement.md) | `_infer`, `INT8=True` on the selected run | VOC test | ≈ 30 min *(est.)* | 4,952 × 0.27 s + int | T15.4-T15.6 |
-| [T15.8](M15-campagne-entrainement.md), [T11.5](M11-jeux-de-donnees.md) | `visdrone/tiny-yolov3-visdrone_train`, 6,000 it, batch 16, `OUT=…/runs/long-416` | VisDrone 6,471 / 548 | ≈ 1 h 45 GPU | stated | — |
-| [T15.9](M15-campagne-entrainement.md) | `tools/m11.sh visdrone-size` first; long runs at 608 and 832 | VisDrone | ≈ 10 min, then ≈ 3.7 h and ≈ 7 h | stated (×2.1, ×4) | T15.8 |
+| [T15.9](M15-campagne-entrainement.md) | `tools/m11.sh visdrone-size` first; long runs at 608 and 832 | VisDrone | ≈ 10 min, then ≈ 3.7 h and ≈ 7 h | stated (×2.1, ×4) | — (T15.8 done 2026-10-29, `long-416` weights) |
 | [T15.11](M15-campagne-entrainement.md) | `NET=tiny-yolov2 tools/m11.sh visdrone-prep \| visdrone-train`, same iterations | VisDrone | ≈ 1 h 45 GPU | stated | — |
-| [T15.16](M15-campagne-entrainement.md) | `_train`, `CROP=640` → `long-416-crop640`, then `_infer` with `TILES=640` | VisDrone | ≈ 1 h 45 + ≈ 20 min *(est.)* | ≈ 7 passes × 548 × 0.27 s | T15.8 |
+| [T15.16](M15-campagne-entrainement.md) | `_train`, `CROP=640` → `long-416-crop640`, then `_infer` with `TILES=640` | VisDrone | ≈ 1 h 45 + ≈ 20 min *(est.)* | ≈ 7 passes × 548 × 0.27 s | — (T15.8 done 2026-10-29) |
 | [T15.12](M15-campagne-entrainement.md), [T11.4](M11-jeux-de-donnees.md), [T14.6](M14-notebooks.md), [T14.8](M14-notebooks.md) | long runs at 416 letterbox and 640×192 (kill and resume once for T14.8); sweep `SIZE='640x192'`; rerun the 416 sweep with Run All | KITTI 5,985 / 1,496 | ≈ 3 h long runs + 2 × 1 h sweeps + 7 min per eval *(est.)* | 6,000 it ≈ 1 h 45 at 416, ≈ 0.7× at 640×192; sweep 6 × 10 min stated | — |
 | [T15.13](M15-campagne-entrainement.md), [T11.7](M11-jeux-de-donnees.md) | 3-channel sweep, `COMPARE` of `b8-sall`, `b16-sall`; long runs `CH=1` and 3 channels; full-split AP | FLIR 10,742 / 1,144 | ≈ 1 h + 10 min + 3.5 h + 10 min *(est.)* | sweep 6 runs, 2 × 1 h 45, 1,144 × 0.27 s | — (FLIR on the Drive since 2026-10-07) |
 | [T15.14](M15-campagne-entrainement.md) | full-split mAP of COCO and VOC weights (fine-tuned `long-416` done 2026-10-28: AP50 30.44); `b16-sall` inference; `tools/m11.sh crowdhuman` person recall | ExDark, CrowdHuman val 4,370 | ≈ 2 h CPU *(est.)* | 3 weights × (≈ 2,500 + 4,370) × 0.27 s + one pass | — |
@@ -150,7 +149,6 @@ graph LR
   T1514[T15.14] --> T271[T27.1] --> T273[T27.3] --> T29["T29.1, T29.2"]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
   T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
-  T158[T15.8] --> T159["T15.9, T15.16"]
   T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
   T271 --> T388

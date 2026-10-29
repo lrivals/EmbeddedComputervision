@@ -216,7 +216,7 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
 
 ## C. VisDrone
 
-### [ ] T15.8 — Long run of `tiny-yolov3-visdrone` at 416
+### [x] T15.8 — Long run of `tiny-yolov3-visdrone` at 416
 - **Spec**: §7.1 · **Depends on**: T15.1 · **Size**: M
 - **Deliverables**: `long` run in `build/notebooks/visdrone/tiny-yolov3-visdrone/`
 - **Acceptance**: mAP on the full visdrone val; final loss clearly below 186
@@ -228,6 +228,20 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
   (`gabarits.VISDRONE_TRAIN`: `ITERS = 6000`, `STEPS = '4800,5400'`,
   `SCALES = '0.1,0.1'`, `RESIZE_TRAIN = 'stretch'`, T15.15); `OUT` to set to
   `…/tiny-yolov3-visdrone/runs/long-416` so that `_infer` finds it.
+- **Done** (Colab T4, 2026-10-29, rev. `70058a0`): `_train` with the prepared values plus
+  `BURN_IN = 200`, `SAVE_EVERY = 500`, `SUBSET = 0`,
+  `OUT = …/tiny-yolov3-visdrone/runs/long-416`; 4,161 s of training (0.69 s/iteration).
+  Loss (mean over 100 iterations) 183 at 500, 158 at 2,000, 141 at 4,000, 134 after the
+  first LR drop (4,800), **132** at the end (last batch 123): below 186, acceptance met;
+  still decreasing slowly before the drop. mAP on the full val (548 images, stretch 416,
+  ignored regions excluded) **7.32**, against 2.61 for the best sweep run (×2.8): car
+  19.6, van 10.1, truck 9.9, people 9.8, bus 9.7, pedestrian 6.1; motor 3.0,
+  awning-tricycle 2.3, tricycle 2.1, bicycle 0.7. `car` is now above the out-of-domain
+  COCO weights on the same full split (18.3, [T11.2](M11-jeux-de-donnees.md),
+  `build/m11/hors-domaine/visdrone_tiny-yolov3-coco.json`; 21.5 was on 50 images); their
+  6-class mAP (8.00) does not compare directly with the 10-class one. Outputs in
+  `build/notebooks/visdrone/tiny-yolov3-visdrone/runs/long-416/`: the base of T15.9
+  (608, 832), T15.16 (crop 640) and the `_infer` of the run (`RUN = 'long-416'`).
 
 ### [ ] T15.9 — 608 and 832 inputs
 - **Spec**: §3, §10.2 · **Depends on**: T15.8 · **Size**: L

@@ -168,6 +168,25 @@ that have not converged. For `b32-sall`, `car` drops to 10.0 and the other class
 under 1. These mAPs still count the detections in the ignored regions as false (before
 T15.10).
 
+### Long run `long-416` (T15.8, Colab on 2026-10-29, rev. `70058a0`)
+
+6,000 iterations at batch 16 (≈ 15 epochs), stretch at training and evaluation, burn-in
+200, LR 1e-3 then ×0.1 at 4,800 and 5,400; full val (548 images, ignored regions
+excluded):
+
+| class | AP | | class | AP |
+|---|---|---|---|---|
+| car | 19.6 | | bus | 9.7 |
+| van | 10.1 | | pedestrian | 6.1 |
+| truck | 9.9 | | motor | 3.0 |
+| people | 9.8 | | awning-tricycle | 2.3 |
+| tricycle | 2.1 | | bicycle | 0.7 |
+
+mAP **7.32**, ×2.8 the best sweep run (2.61); final loss 132 (sweep: 186 to 252). `car`
+passes the out-of-domain COCO weights on the same split (18.3). Small and thin classes
+(bicycle, motor, tricycles) stay under 3: the input size (T15.9) and the crops (T15.16)
+are the next levers.
+
 ### Diagnosis and next steps (M15, T15.8, T15.10, T15.15, T15.16)
 
 - **Different resizing**: training was in letterbox, evaluation in stretch; at evaluation,
