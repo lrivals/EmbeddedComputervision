@@ -174,10 +174,11 @@ three Darknet networks (gradcheck green, M1), the `IntNetwork` hooks (T25.0), BN
   - integer maps within 0.04 AUC of the float ones (D-RISE, LRP).
   - **Left for the acceptance**: the 500-image run (`--n 500`, ≈ 32 h at 8 processes from
     this run's speed). The per-network save lets it run in several sessions.
-- **Running** (2026-10-29 12:48 CET): unit `t36-4`, `evaluate --n 500 --jobs 16`, cores
-  0-15, 46 GB cap (peak 37 GB at startup). ETA ≈ 2026-10-30 06:30, from the 50-image
-  speed with a ×1.8 gain for 16 processes. If v4 runs out of memory, rerun it alone with
-  fewer jobs: v2 and v3 stay saved. Log `build/longruns/T36.4-evaluate-500.log`.
+- **Stopped** (2026-10-29 20:20 CET): the 500-image run (`--jobs 16`, cores 0-15) had not
+  finished v2 after 7 h 30, so 16 processes gave no gain over 8 (memory bandwidth bound);
+  the full run would take ≈ 30 h. Stopped by the user before v2 was saved. The 50-image
+  results above stand. To finish the acceptance, run `--n 500` one network at a time
+  (`--nets`), ≈ 10 h each at 8 processes.
 - **Spec**: §8.3 · **Depends on**: T36.1, T36.2, T36.3 · **Runs on**: PC · **Size**: M
 - **Deliverables**: `python/yolo/explain/evaluate.py` (pointing game, energy inside the
   box, deletion and insertion AUC); `tools/explain.py evaluate`; `results/explain.md`
