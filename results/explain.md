@@ -102,8 +102,9 @@ Integer against golden, the same masks:
 **Results** (2026-10-29, `tools/explain.py stages --jobs 5`, 3 h 11 on a shared CPU):
 - **D-RISE is stable across the float to integer step** (Spearman 0.98-0.99): the int8
   model is looking at the same regions as the float one.
-- **Occlusion much less** (0.63-0.74). A 64 px patch moves the score by small steps that
-  the integer requantization rounds differently, and the map has only 145 cells.
+- **Occlusion much less** (0.63-0.74). Not analysed yet; a likely cause is that one 64 px
+  patch moves the score by small steps, which the integer model rounds differently, on a
+  map of only 145 cells.
 - **Integer == golden bit for bit** on every map checked (3, 2 and 5 images, 100 masks):
   an explanation computed in Python stands for the circuit as is.
 - **Cost**: the integer stage takes 2× the float one per map; the golden 2.4-3.8 min per
