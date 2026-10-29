@@ -241,8 +241,19 @@ evaluation ahead on 5 of 6 runs (`b32-sall` 1.38 → 3.24).
     larger input);
   - cost per iteration ×2.1 at 608, ×4 at 832.
 
-### [ ] T15.10 — Ignored regions of VisDrone
-- **Running** (2026-10-28, times CET): unit `t15-10`, queued behind `t36-5ch`: VisDrone val mAP of `b16-sall` with and without `--no-ignore` (`build/m15/t15-10/`); ETA ≈ 04:15. Logs `build/longruns/T15.10-*.log`.
+### [x] T15.10 — Ignored regions of VisDrone
+- **Done** (2026-10-29): `tools/eval_voc.py --dataset visdrone` on `b16-sall` (the best
+  run on the full val split, T15.1), 548 val images, letterbox 416, conf 0.005, NMS 0.45,
+  AP 11 points; markdown in `build/m15/t15-10/`.
+
+  | Ignored regions (1,378 on 340 images) | mAP | car | motor |
+  |---|---|---|---|
+  | excluded (default) | **2.272** | 9.79 | 9.09 |
+  | counted as FP (`--no-ignore`, before T15.10) | 2.268 | 9.77 | 9.09 |
+
+  3.6 % of the 368,674 detections have their centre in an ignored region, but they are low
+  scores: the mAP moves by +0.004 point. At this mAP the earlier VisDrone values stand;
+  to redo on the T15.8 long run once it exists, where the boxes are more confident.
 - **Spec**: §8.3 · **Depends on**: — · **Size**: M
 - **Deliverables**: ignored regions (category 0 of the annotations) read by the VisDrone
   loader and excluded from the evaluation

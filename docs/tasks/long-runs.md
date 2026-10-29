@@ -22,7 +22,6 @@ Long runs in `systemd --user` units (logs in `build/longruns/`). ETA from the pr
 | Unit | Task | Steps | Progress at 22:37 | ETA |
 |---|---|---|---|---|
 | `t26-0` | [T26.0](M26-recent-models.md) | v7-tiny `make_inputs`, float + int COCO, C-sim 5,000, `map_stades` | started ≈ 23:00 | ≈ 04:00 *(C-sim 5,000 × 18 s / 6 cores ≈ 4.2 h)* |
-| `t15-10` | [T15.10](M15-campagne-entrainement.md) | VisDrone val mAP of `b16-sall`, with and without `--no-ignore` | started ≈ 02:50 | ≈ 04:15 |
 | `t25-6ch` | [T25.6](M25-dependability.md) | `--criterion person` layer and bit grids, CrowdHuman val 500, Tiny-YOLOv2 VOC (no CrowdHuman weights yet) | started 23:22 | ≈ 08:30 *(VOC run 6 h at 14 jobs; here 10 jobs, crowded images)* |
 | `t36-run` | [T36.1](M36-explanation.md), [T36.2](M36-explanation.md), [T36.4](M36-explanation.md) | `explain.py sanity`, `stages`, `evaluate` (4 jobs: the 6-job run hit the 14 GB cap) | `sanity` restarted at 22:26 | sanity ≈ 00:30, stages ≈ 03:30, evaluate ≈ 11:30 *(est. scaled from 12-16 jobs to 4)* |
 
@@ -113,7 +112,6 @@ These share the CPU with the table above: one at a time, at night.
 | [T15.7](M15-campagne-entrainement.md) | `_infer`, `INT8=True` on the selected run | VOC test | ≈ 30 min *(est.)* | 4,952 × 0.27 s + int | T15.4-T15.6 |
 | [T15.8](M15-campagne-entrainement.md), [T11.5](M11-jeux-de-donnees.md) | `visdrone/tiny-yolov3-visdrone_train`, 6,000 it, batch 16, `OUT=…/runs/long-416` | VisDrone 6,471 / 548 | ≈ 1 h 45 GPU | stated | — |
 | [T15.9](M15-campagne-entrainement.md) | `tools/m11.sh visdrone-size` first; long runs at 608 and 832 | VisDrone | ≈ 10 min, then ≈ 3.7 h and ≈ 7 h | stated (×2.1, ×4) | T15.8 |
-| [T15.10](M15-campagne-entrainement.md) | mAP with and without `--no-ignore` | VisDrone val | ≈ 5 min *(est.)* | 2 × 2.5 min | T15.8 |
 | [T15.11](M15-campagne-entrainement.md) | `NET=tiny-yolov2 tools/m11.sh visdrone-prep \| visdrone-train`, same iterations | VisDrone | ≈ 1 h 45 GPU | stated | — |
 | [T15.16](M15-campagne-entrainement.md) | `_train`, `CROP=640` → `long-416-crop640`, then `_infer` with `TILES=640` | VisDrone | ≈ 1 h 45 + ≈ 20 min *(est.)* | ≈ 7 passes × 548 × 0.27 s | T15.8 |
 | [T15.12](M15-campagne-entrainement.md), [T11.4](M11-jeux-de-donnees.md), [T14.6](M14-notebooks.md), [T14.8](M14-notebooks.md) | long runs at 416 letterbox and 640×192 (kill and resume once for T14.8); sweep `SIZE='640x192'`; rerun the 416 sweep with Run All | KITTI 5,985 / 1,496 | ≈ 3 h long runs + 2 × 1 h sweeps + 7 min per eval *(est.)* | 6,000 it ≈ 1 h 45 at 416, ≈ 0.7× at 640×192; sweep 6 × 10 min stated | — |
@@ -159,7 +157,7 @@ graph LR
   T251[T25.1] --> T256[T25.6]
   KITTI["KITTI image_2"] --> T112[T11.2] & T1512[T15.12]
   T154[T15.4] --> T155["T15.5, T15.6"] --> T157[T15.7]
-  T158[T15.8] --> T159["T15.9, T15.10, T15.16"]
+  T158[T15.8] --> T159["T15.9, T15.16"]
   T219[T21.9] --> T2111[T21.11]
   T1514 --> T387[T38.7] --> T388["T38.8-T38.10"]
   T271 --> T388
