@@ -217,7 +217,13 @@ Weights per notebook:
   outside M37: `test_data_stats.py::test_split_images_releves` wants a TrashNet test count
   in `tools/notebooks/matrice.py::SPLIT_IMAGES`, and the TrashNet split is not prepared on
   the PC (M32, `tools/prep_datasets.py trashnet`).
-- **Remaining**: the TrashNet count once its split exists, then `make ci` again.
+- **Remaining**: the TrashNet count is in (`SPLIT_IMAGES["trashnet"] = 379`, 2026-10-28), and
+  `test_split_images_releves` passes. `make ci` of 2026-10-29 04:40: lint passes, then
+  `--check` stops on 5 M15 notebooks outside M37. Two are committed after an execution
+  (`voc/tiny-yolov3-voc_infer`, `voc/tiny-yolov3-voc_sweep`, commits 7a6596f and adc759e).
+  Three are modified and not committed (`crowdhuman`, `visdrone` and `prewid` `_train`; the
+  PREWID one is a partial execution). Run `--archive` on the executed ones (or regenerate)
+  in M15, then `make ci` again.
 
 ## Dependencies
 
