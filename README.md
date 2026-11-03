@@ -79,6 +79,9 @@ up once the tools and the board are there.
 - **[M40](docs/tasks/M40-early-alerts.md)**: conservative early alerts: intermediate
   presence heads whose positive raises the alert and whose negative cancels nothing, with
   a static bound on the time to the first suspicion.
+- **[M44](docs/tasks/M44-literature-ideas.md)**: ideas drawn from the literature base
+  (PaperDatabase `bases/fpga/`), each tied to a gap, a sourced number and a measurable
+  acceptance criterion, with a table of this repo against published results.
 
 ## Layout
 
