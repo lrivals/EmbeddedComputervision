@@ -53,6 +53,7 @@ The project follows the six steps of the roadmap of §10.5 of the
 | [M41](M41-safe-unsafe-behaviours.md) | Safe and Unsafe Behaviours (optional) | factory CCTV clips cut into image sequences (sampling without near-duplicates or missed events), `person` boxes from the M22 labeller checked on PREWID and by hand; missed workers per behaviour class |
 | [M42](M42-soda.md) | SODA construction sites (optional) | boxed workers and machines from many sites, licence checked first; annotation completeness by the M22 labeller; cross-domain transfer with PREWID |
 | [M43](M43-construction-ppe.md) | Construction-PPE (optional) | small YOLO set of persons and PPE (AGPL-3.0); person fine-tuning and transfer to PREWID; first PPE detector |
+| [M44](M44-literature-ideas.md) | Ideas from the literature (optional) | 15 ideas from the PaperDatabase `bases/fpga/` base, each with its gap, sourced numbers (paper and chunk id), a proposal (new task or M45+) and an acceptance criterion; this repo against published results |
 
 Work that needs Vitis/Vivado or the KV260, not available yet, is put aside milestone by
 milestone in [deferred/](deferred/README.md), with the order in which to pick it up; the
@@ -180,6 +181,11 @@ graph LR
   M11 --> M43[M43]
   M16 --> M43
   M38 -.-> M43
+  M25 -.-> M44[M44]
+  M27 -.-> M44
+  M29 -.-> M44
+  M30 -.-> M44
+  M39 -.-> M44
 ```
 
 - **M27-M31 (safety)**: tasks drawn from the thesis state of the art (ARCYS, 2026-10): the
@@ -189,6 +195,8 @@ graph LR
 - **M41-M43 (industrial person sets)**: complements to PREWID (M38) from a dataset search
   (2026-10-26); M41 has no box and is labelled by M22, M42 and M43 have boxes and use M22
   as a completeness check.
+- **M44 (ideas, no tasks)**: what the literature base supports and no milestone plans yet;
+  an accepted idea becomes a task in the milestone it names, or a new milestone M45+.
 
 ### Where the safety tasks run (M25, M27-M31, M39-M40)
 
@@ -290,3 +298,4 @@ progress per milestone here.
 | M41 | 10 | 1 (T41.2 labeller check: `grounding-dino-tiny` at 0.5 for factory CCTV) |
 | M42 | 8 | 0 |
 | M43 | 7 | 0 |
+| M44 | — (15 ideas, no tasks) | — |

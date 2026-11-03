@@ -25,7 +25,7 @@ Details: [docs/architecture.md](docs/architecture.md) · conventions:
 
 ## Work plan
 
-The work is split into milestones M0 to M40 in [docs/tasks/](docs/tasks/README.md). Each
+The work is split into milestones M0 to M44 in [docs/tasks/](docs/tasks/README.md). Each
 task gives the section of the spec, its dependencies, its deliverables and a measurable
 acceptance criterion. What needs Vitis/Vivado or the KV260, not available yet, is put aside
 in [docs/tasks/deferred/](docs/tasks/deferred/README.md), with the order in which to pick it
@@ -79,6 +79,9 @@ up once the tools and the board are there.
 - **[M40](docs/tasks/M40-early-alerts.md)**: conservative early alerts: intermediate
   presence heads whose positive raises the alert and whose negative cancels nothing, with
   a static bound on the time to the first suspicion.
+- **[M44](docs/tasks/M44-literature-ideas.md)**: ideas drawn from the literature base
+  (PaperDatabase `bases/fpga/`), each tied to a gap, a sourced number and a measurable
+  acceptance criterion, with a table of this repo against published results.
 
 ## Layout
 
