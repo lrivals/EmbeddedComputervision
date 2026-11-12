@@ -365,7 +365,7 @@ def _train(p, run, resume=False):
                        p["QAT_STEPS"], p["ADMM"], p["ADMM_RHO"], p["ADMM_GROWTH"],
                        p["ADMM_EVERY"], p["ITERS"], p["BATCH"], p["LR"], p["BURN_IN"],
                        p["MULTISCALE"], None, 0, p["SAVE_EVERY"], p["WORKERS"], p["DEVICE"],
-                       p["DATA_ROOT"])
+                       p["DATA_ROOT"], splits=p["TRAIN_SPLITS"], keep_classes=p["KEEP_CLASSES"])
 
 
 def test_gabarit_appelle_cmd_train_comme_le_test():
@@ -374,7 +374,7 @@ def test_gabarit_appelle_cmd_train_comme_le_test():
     assert call.startswith("C.cmd_train(NET, RUN, DATASET, INIT, INIT_NET, resume, QAT, "
                            "QAT_STEPS, ADMM, ADMM_RHO, ADMM_GROWTH, ADMM_EVERY, ITERS, BATCH, "
                            "LR, BURN_IN, MULTISCALE, None, 0, SAVE_EVERY, WORKERS, DEVICE, "
-                           "DATA_ROOT)")
+                           "DATA_ROOT, splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES)")
 
 
 def test_kitti_identique_a_m11():
@@ -407,14 +407,16 @@ def test_sweep_ne_change_que_lot_et_sous_ensemble():
     src = re.sub(r"\s+", " ", "\n".join(_code(render(nb))))
     assert ("C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS, batch=b, "
             "lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE, subset=s, save_every=SAVE_EVERY, "
-            "workers=WORKERS, device=DEVICE, data_root=DATA_ROOT, seed=g)") in src
+            "workers=WORKERS, device=DEVICE, data_root=DATA_ROOT, seed=g, splits=TRAIN_SPLITS, "
+            "keep_classes=KEEP_CLASSES)") in src
     p = _params(render(nb))
     t = _params(render(NOTEBOOKS["kitti/tiny-yolov3-kitti_train"]), ITERS=p["ITERS"], BATCH=8)
     d = f"{nb.train_dir}/runs/{runs.run_name(8, 500)}"
     got = C.cmd_train(p["NET"], d, p["DATASET"], p["INIT"], p["INIT_NET"], False,
                       iters=p["ITERS"], batch=8, lr=p["LR"], burn_in=p["BURN_IN"],
                       multiscale=p["MULTISCALE"], subset=500, save_every=p["SAVE_EVERY"],
-                      workers=p["WORKERS"], device=p["DEVICE"], data_root=p["DATA_ROOT"])
+                      workers=p["WORKERS"], device=p["DEVICE"], data_root=p["DATA_ROOT"],
+                      splits=p["TRAIN_SPLITS"], keep_classes=p["KEEP_CLASSES"])
     want = _train(t, d)
     assert _opts(got)[1] == {**_opts(want)[1], "--subset": 500.0}
     assert d.endswith("/runs/b8-s500") and runs.run_name(16, 0) == "b16-sall"
@@ -690,8 +692,8 @@ def test_notebooks_visdrone_m15():
                                                                        "4800,5400")
     src = re.sub(r"\s+", " ", "\n".join(_code(render(
         NOTEBOOKS["visdrone/tiny-yolov3-visdrone_train"]))))
-    assert ("DEVICE, DATA_ROOT, resize=RESIZE_TRAIN, crop=CROP, steps=STEPS, "
-            "scales=SCALES)") in src
+    assert ("DEVICE, DATA_ROOT, splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES, "
+            "resize=RESIZE_TRAIN, crop=CROP, steps=STEPS, scales=SCALES)") in src
     assert "VOCDataset(samples[:SHOW], train=True, channels=channels, resize=RESIZE_TRAIN" in src
     assert "jobs=JOBS, tiles=CROP))" in src
     inf = _params(render(NOTEBOOKS["visdrone/tiny-yolov3-visdrone_infer"]))
@@ -700,3 +702,18 @@ def test_notebooks_visdrone_m15():
                 "visdrone/tiny-yolov3-visdrone_sweep", "visdrone/tiny-yolov3-coco_infer"):
         code = "\n".join(_code(render(NOTEBOOKS[key])))
         assert "TILES" not in code and "RESIZE_TRAIN" not in code, key
+
+
+def test_train_splits_et_tetes_decoupees():
+    """T38.7 : TRAIN_SPLITS → --splits, KEEP_CLASSES → --keep-classes, ANCHORS_K = 0 → cfg
+    aux ancres de BASE (make_cfg sans --anchors) ; défauts None : commande d'avant."""
+    base = C.cmd_train("m.cfg", "build/r", "prewid", init="weights/yolov4-tiny.weights",
+                       init_net="tiny-yolov4-coco")
+    got = C.cmd_train("m.cfg", "build/r", "prewid", init="weights/yolov4-tiny.weights",
+                      init_net="tiny-yolov4-coco", splits="train,lab", keep_classes="0")
+    assert got[got.index("--splits") + 1] == "train,lab"
+    assert got[got.index("--keep-classes") + 1] == "0"
+    assert [a for a in got if a not in ("--splits", "train,lab", "--keep-classes", "0")] == base
+    assert "--anchors" not in C.cmd_make_cfg("tiny-yolov4-coco", "prewid", None, "n.cfg")
+    p = _params(render(NOTEBOOKS["prewid/tiny-yolov4-prewid_train"]))
+    assert p["KEEP_CLASSES"] is None and p["TRAIN_SPLITS"] is None and p["ANCHORS_K"] == 6

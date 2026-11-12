@@ -6,7 +6,8 @@ import pytest
 from yolo.models.graph import Network
 from yolo.train.optim import SGD, AdamW
 from yolo.train.schedule import StepSchedule, lr_at
-from yolo.train.trainer import MULTISCALE_SIZES, Trainer, copy_matching, multiscale_size
+from yolo.train.trainer import (MULTISCALE_SIZES, Trainer, copy_head_classes, copy_matching,
+                                 multiscale_size)
 
 
 def _quadratic(seed=0, n=5):
@@ -231,3 +232,30 @@ def test_copy_matching_rgb_to_gray():
     a = src.forward(np.repeat(gray, 3, axis=1), all_outputs=True)[0]
     b = dst.forward(gray, all_outputs=True)[0]
     np.testing.assert_allclose(a, b, rtol=1e-12, atol=1e-12)
+
+
+def test_copy_head_classes():
+    # T38.7: a 1-class head cut out of a 2-class one; per anchor, the box, objectness and
+    # class-1 outputs of the source come out unchanged.
+    src = Network(TINY, dtype=np.float64, rng=1)
+    one = dict(TINY, classes=1, layers=TINY["layers"][:4] + [_conv(3 * 6, k=1, act="linear"),
+                                                             TINY["layers"][5]])
+    dst = Network(one, dtype=np.float64, rng=2)
+    assert copy_matching(src, dst) == [4]
+    assert copy_head_classes(src, dst, [1]) == [4]
+    x = np.random.default_rng(0).uniform(0, 1, (1, 3, 32, 32))
+    a = src.forward(x, all_outputs=True)[4].reshape(1, 3, 7, 8, 8)
+    b = dst.forward(x, all_outputs=True)[4].reshape(1, 3, 6, 8, 8)
+    np.testing.assert_allclose(b[:, :, :5], a[:, :, :5], rtol=1e-12)
+    np.testing.assert_allclose(b[:, :, 5], a[:, :, 6], rtol=1e-12)
+
+
+def test_copy_head_classes_checks():
+    src = Network(TINY, dtype=np.float64, rng=1)
+    one = dict(TINY, classes=1, layers=TINY["layers"][:4] + [_conv(3 * 6, k=1, act="linear"),
+                                                             TINY["layers"][5]])
+    with pytest.raises(ValueError, match="classes expected"):
+        copy_head_classes(src, Network(one, dtype=np.float64), [2])
+    other = Network(dict(one, anchors=[[10, 10], [20, 20], [30, 30]]), dtype=np.float64)
+    with pytest.raises(ValueError, match="anchors"):
+        copy_head_classes(src, other, [0])

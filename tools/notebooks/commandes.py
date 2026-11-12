@@ -61,11 +61,13 @@ def cmd_anchors(dataset, size, out, data_root=None):
 
 
 def cmd_make_cfg(base, dataset, anchors, out, size=None, channels=None):
-    """`tools/make_cfg.py` (profil `<jeu>-prep`) ; `anchors` au format « w,h  w,h … »."""
+    """`tools/make_cfg.py` (profil `<jeu>-prep`) ; `anchors` au format « w,h  w,h … », None :
+    celles de `base` (têtes découpées, `KEEP_CLASSES`, T38.7)."""
     cmd = ["python", "tools/make_cfg.py", "--base", base, "--dataset", dataset]
     _opt(cmd, "--size", _size(size))
     _opt(cmd, "--channels", channels)
-    return cmd + ["--anchors", anchors, "--out", str(out)]
+    _opt(cmd, "--anchors", anchors)
+    return cmd + ["--out", str(out)]
 
 
 def init_args(init, init_net=None):
@@ -78,14 +80,16 @@ def cmd_train(net, out, dataset="voc", init="coco", init_net=None, resume=False,
               qat_steps=None, admm=None, admm_rho=None, admm_growth=None, admm_every=None,
               iters=4000, batch=16, lr=1e-3, burn_in=500, multiscale=True, size=None,
               subset=0, save_every=None, workers=4, device="cpu", data_root=None, seed=0,
-              resize="letterbox", crop=0, steps="", scales=""):
+              resize="letterbox", crop=0, steps="", scales="", splits=None, keep_classes=None):
     """`tools/train.py`. Ordre des options : celui de m11.sh (`train`) ; QAT et ADMM à la
     place de `--dataset`, comme m12.sh (`qat`, `admm`). `--dataset voc` (défaut) est omis,
     comme les défauts de train.py `resize` (letterbox), `crop`, `steps` et `scales` (M15)."""
     cmd = ["python", "tools/train.py", "--net", str(net)]
     if dataset != "voc":
         cmd += ["--dataset", dataset]
+    _opt(cmd, "--splits", splits)  # TRAIN_SPLITS (T38.7)
     cmd += init_args(init, init_net)
+    _opt(cmd, "--keep-classes", keep_classes)  # KEEP_CLASSES (T38.7)
     _opt(cmd, "--resume", bool(resume))
     _opt(cmd, "--qat", qat)
     if qat:

@@ -334,10 +334,28 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
   - **Sweep** (600 iterations per run, full `test`): b8-sall 43.2, **b16-sall 50.9**,
     b32-sall 47.9; the `s500` runs (1.3 / 19.3 / 22.5) trained on the flawed first-500
     subset and are to be run again. One seed, short runs: batch 16 kept.
-  - Remaining: `lab` in training, fine-tuning from CrowdHuman (waits for T15.14),
-    leave-one-camera-out, and likely a fine-tuned YOLOv4-tiny to beat 89.9. The template
-    texts in `tools/notebooks/gabarits.py` now say "spread over the split"; the
-    `_train` / `_sweep` notebooks pick it up at their next regeneration.
+  - **Fine-tuned YOLOv4-tiny from COCO** (same recipe, k-means anchors, 4,000
+    iterations, 2,679 s on GPU; rev 17571f4, so its notebook AP of 0.0 is the same
+    artefact): test **88.0**, CAM0 99.8, CAM1 87.2, CAM2 78.8, CAM3 90.5, lab **30.5**.
+    Still below the 89.9 of the same network with no training, and lab collapses again
+    (85.8 before). Sweep (rev 75559aa, spread subsets, 600 iterations, full `test`):
+    b8-s500 43.2, b8-sall 50.0, b16-s500 57.5, b16-sall 45.7, b32-s500 54.1,
+    **b32-sall 63.1**; the notebook's 50-image scores rank them differently (b16-s500:
+    26.4 on 50 images, 57.5 on 592), too few images for a ranking.
+  - **Cause: the heads restart from random.** `copy_matching` copies every COCO layer of
+    the same shape; the two heads (layers 29 and 36, 3 × 85 → 3 × 6 outputs) are
+    reinitialised, so the network relearns detection from the plant frames alone instead
+    of starting from the COCO `person` class (89.9). Hence the low 600-iteration scores
+    and the lost lab workers. Fix: `train.py --keep-classes 0` (`copy_head_classes`)
+    cuts the heads out of the COCO ones (per anchor, the 5 box / objectness rows and
+    the `person` row), with the COCO anchors in the cfg (`ANCHORS_K = 0` in the
+    notebooks, `build/m11/cfg/tiny-yolov4-prewid-coco-anchors.cfg`): before any
+    training, the PREWID network scores **89.9** on `test`, the COCO baseline exactly
+    (heads equal to 2·10⁻⁵ in float32).
+  - Remaining: YOLOv4-tiny with the cut heads (low lr, short), then `lab` in training
+    (`TRAIN_SPLITS = 'train,lab'`), leave-one-camera-out (`TRAIN_SPLITS =
+    'loco_CAM0_train'` etc.), fine-tuning from CrowdHuman (waits for T15.14), and the
+    Tiny-YOLOv3 sweep again for its `s500` runs.
 
 ### [ ] T38.8 — M27 metrics on PREWID
 - **Spec**: §8.3 · **Depends on**: T38.7, T27.0, T27.1 · **Runs on**: PC (float, integer,

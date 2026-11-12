@@ -60,7 +60,7 @@ from yolo.models.tiny_yolo import build  # noqa: E402
 from yolo.quant.fuse_bn import fuse_network  # noqa: E402
 from yolo.train.optim import NO_DECAY, OPTIMIZERS  # noqa: E402
 from yolo.train.schedule import StepSchedule  # noqa: E402
-from yolo.train.trainer import Trainer, copy_matching  # noqa: E402
+from yolo.train.trainer import Trainer, copy_head_classes, copy_matching  # noqa: E402
 
 # Source de `--init coco` : toute cfg Tiny-YOLOv3 (VOC, ou à N classes de tools/make_cfg.py) ;
 # les couches de forme différente (les têtes) restent à l'initialisation de He.
@@ -80,17 +80,27 @@ def failure_term(args, spec):
                        freeze_after=args.failure_freeze_after, seed=args.seed)
 
 
-def init_weights(net, name, init, dtype, init_net=None):
+def init_weights(net, name, init, dtype, init_net=None, keep_classes=None):
     """`init_net` : réseau des poids `init` quand il diffère de `net` (copie partielle,
-    comme `--init coco`)."""
+    comme `--init coco`). `keep_classes` : classes de `init_net` dont les têtes sont
+    découpées au lieu d'être réinitialisées (`copy_head_classes`, T38.7)."""
     if init == "he":
         return
     if init == "coco":
         init_net, init = COCO_WEIGHTS
+    if keep_classes is not None and not init_net:
+        sys.exit("--keep-classes demande --init coco ou --init-net")
     if init_net:
         src = build(init_net, dtype=dtype)
         load_darknet_weights(src, init)
         skipped = copy_matching(src, net)
+        if keep_classes is not None:
+            try:
+                heads = copy_head_classes(src, net, keep_classes)
+            except ValueError as exc:
+                sys.exit(f"--keep-classes : {exc}")
+            print(f"têtes {heads} découpées dans {Path(init).name} (classes {keep_classes})")
+            skipped = [i for i in skipped if i not in heads]
         print(f"poids {Path(init).name} copiés ; couches réinitialisées : {skipped}")
         return
     load_darknet_weights(net, init)
@@ -105,6 +115,9 @@ def main():
                     help="réseau (nom ou cfg) des poids de --init s'il diffère de --net : "
                          "copie des couches de même forme (ex. tiny-yolov2-voc vers une cfg "
                          "Tiny-YOLOv2 à N classes)")
+    ap.add_argument("--keep-classes", default=None,
+                    help="classes de --init gardées dans les têtes, séparées par des virgules "
+                         "(ex. 0 : person de COCO) ; demande les mêmes ancres (T38.7)")
     ap.add_argument("--dataset", choices=sorted(datasets.DATASETS), default="voc")
     ap.add_argument("--data-root", "--devkit", dest="data_root", type=Path, default=None,
                     help="racine du jeu (défaut data/<dossier du jeu>)")
@@ -184,6 +197,8 @@ def main():
             sys.exit(str(exc))
 
     dtype = np.float32
+    keep = ([int(c) for c in args.keep_classes.split(",")] if args.keep_classes is not None
+            else None)
     net = build(args.net, dtype=dtype, rng=args.seed)
     grad_hook = None
     no_decay = NO_DECAY
@@ -191,7 +206,7 @@ def main():
         # Réseau à BN fusionnée (§9.1) : initialisé ici, écrasé par le checkpoint en reprise.
         from yolo.quant.lowbit import qat_from_steps
 
-        init_weights(net, args.net, args.init, dtype, args.init_net)
+        init_weights(net, args.net, args.init, dtype, args.init_net, keep)
         fused = fuse_network(net, dtype=dtype)
         scheme = args.qat or "w8a8"
         steps = json.loads(args.qat_steps.read_text())["log2_steps"] if args.qat_steps else {}
@@ -200,7 +215,7 @@ def main():
         net = qat_from_steps(fused, scheme, steps) if args.qat else fused
         no_decay = NO_DECAY + ("log2_s",)
     elif not args.resume:
-        init_weights(net, args.net, args.init, dtype, args.init_net)
+        init_weights(net, args.net, args.init, dtype, args.init_net, keep)
     if args.device == "gpu":
         net.to_device()  # avant l'ADMM et l'optimiseur : Z, U et moments suivent les paramètres
     if args.admm:

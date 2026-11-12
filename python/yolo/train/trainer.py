@@ -239,3 +239,43 @@ def copy_matching(src, dst):
         for k in dst.state[i]:
             dst.state[i][k][...] = src.state[i][k]
     return skipped
+
+
+def _head_anchors(net, i):
+    """Anchors (w, h) of the yolo layer fed by conv `i`, or None if `i` is not a head."""
+    layers = net.net["layers"]
+    if i + 1 >= len(layers) or layers[i + 1]["type"] != "yolo":
+        return None
+    return [tuple(net.net["anchors"][m]) for m in layers[i + 1]["mask"]]
+
+
+def copy_head_classes(src, dst, keep):
+    """Copies the detection heads of `src` into `dst`, keeping the classes `keep` of `src`.
+
+    Per anchor, the box and objectness outputs (5 rows of W and b) and the rows of the kept
+    classes, in the order of `keep` (`dst` class j ← `src` class keep[j]). Before any
+    training, `dst` thus gives the same scores as `src` on those classes (COCO `person` →
+    a 1-class network, M38 T38.7) instead of a head reinitialised at random. The anchors of
+    both heads must be equal: the box outputs are calibrated on them. Returns the heads
+    copied."""
+    keep = list(keep)
+    cs, cd = src.net["classes"], dst.net["classes"]
+    if len(keep) != cd or not all(0 <= k < cs for k in keep):
+        raise ValueError(f"keep {keep}: {cd} classes expected in 0..{cs - 1}")
+    copied = []
+    for i, (ps, pd) in enumerate(zip(src.params, dst.params)):
+        a_src, a_dst = _head_anchors(src, i), _head_anchors(dst, i)
+        if not pd or a_dst is None:
+            continue
+        if a_src != a_dst:
+            raise ValueError(f"layer {i}: anchors {a_dst} differ from those of the source "
+                             f"{a_src}; build the cfg with the source anchors")
+        rows = [a * (5 + cs) + r for a in range(len(a_dst))
+                for r in [0, 1, 2, 3, 4] + [5 + k for k in keep]]
+        ws = to_numpy(ps["W"])
+        if ws.shape[0] != len(a_src) * (5 + cs) or pd["W"].shape[0] != len(rows):
+            raise ValueError(f"layer {i}: head of {ws.shape[0]} → {pd['W'].shape[0]} outputs")
+        copy_into(pd["W"], ws[rows])
+        copy_into(pd["b"], to_numpy(ps["b"])[rows])
+        copied.append(i)
+    return copied

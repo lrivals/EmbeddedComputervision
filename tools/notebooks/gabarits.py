@@ -207,8 +207,8 @@ TRAIN_RETOUCHES = (
      "train=True, channels=channels,\n" + " " * 21 + "resize=RESIZE_TRAIN, crop=CROP)"),
     ('admm=bool(ADMM), rev=TRACE["rev"])',
      "admm=bool(ADMM), resize=RESIZE_TRAIN,\n" + " " * 16 + 'crop=CROP, rev=TRACE["rev"])'),
-    ("WORKERS, DEVICE, DATA_ROOT),",
-     "WORKERS, DEVICE, DATA_ROOT,\n" + " " * 22
+    ("splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES),",
+     "splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES,\n" + " " * 22
      + "resize=RESIZE_TRAIN, crop=CROP, steps=STEPS, scales=SCALES),"),
     ("markdown=result,\n" + " " * 25 + "jobs=JOBS))",
      "markdown=result,\n" + " " * 25 + "jobs=JOBS, tiles=CROP))"),
@@ -324,11 +324,16 @@ def params(nb):
         base = V4_INIT_NET if v4 else "tiny-yolov3-voc"
         p += [("BASE", base, "base of make_cfg.py"),
               ("CHANNELS", nb.channels, "channels of the cfg (1: thermal)"),
-              ("ANCHORS_K", 6, "anchors of the cfg (6: YOLOv4-tiny)" if v4
-               else "anchors of the cfg (6: Tiny-YOLOv3)"),
+              ("ANCHORS_K", 6, ("anchors of the cfg (6: YOLOv4-tiny" if v4
+                                else "anchors of the cfg (6: Tiny-YOLOv3")
+               + "; 0: those of BASE, no k-means)"),
               ("INIT", nb.weights if v4 else "coco", "coco | he | path of a .weights"),
               ("INIT_NET", V4_INIT_NET if v4 else None,
-               "network of the INIT weights if it differs from NET")]
+               "network of the INIT weights if it differs from NET"),
+              ("KEEP_CLASSES", None, "classes of INIT kept in the heads instead of a random "
+               "head (e.g. '0': COCO person; needs ANCHORS_K = 0, T38.7)"),
+              ("TRAIN_SPLITS", None, "training splits (e.g. 'train,lab'); None: the "
+               "training split of the dataset")]
         if nb.role == "sweep":
             p += [("BATCHES", SWEEP["batches"], "batch sizes tried"),
                   ("TRAIN_SUBSETS", SWEEP["subsets"],
@@ -793,9 +798,11 @@ def _prep_preview_cells():
             print(f"{NET} exists: preparation skipped")
         else:
             anchors = Path(OUT) / f"anchors_{DATASET}{'_' + str(SIZE) if SIZE else ''}.md"
-            C.run(C.cmd_anchors(DATASET, SIZE, anchors, DATA_ROOT))
-            C.run(C.cmd_make_cfg(BASE, DATASET, C.anchors_k(anchors, ANCHORS_K), NET, SIZE,
-                                 CHANNELS))
+            if ANCHORS_K:  # 0: anchors of BASE (KEEP_CLASSES)
+                C.run(C.cmd_anchors(DATASET, SIZE, anchors, DATA_ROOT))
+            C.run(C.cmd_make_cfg(BASE, DATASET,
+                                 C.anchors_k(anchors, ANCHORS_K) if ANCHORS_K else None, NET,
+                                 SIZE, CHANNELS))
         """), md("""
         ## Preview of the targets
 
@@ -961,7 +968,8 @@ def train_body(nb):
         try:
             C.run(C.cmd_train(NET, RUN, DATASET, INIT, INIT_NET, resume, QAT, QAT_STEPS, ADMM,
                               ADMM_RHO, ADMM_GROWTH, ADMM_EVERY, ITERS, BATCH, LR, BURN_IN,
-                              MULTISCALE, None, 0, SAVE_EVERY, WORKERS, DEVICE, DATA_ROOT),
+                              MULTISCALE, None, 0, SAVE_EVERY, WORKERS, DEVICE, DATA_ROOT,
+                              splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES),
                   log=RUN / "log.txt")
         finally:
             stop.set()
@@ -1085,7 +1093,8 @@ def sweep_body(nb):
                 C.run(C.cmd_train(NET, run_dir, DATASET, INIT, INIT_NET, resume, iters=ITERS,
                                   batch=b, lr=LR, burn_in=BURN_IN, multiscale=MULTISCALE,
                                   subset=s, save_every=SAVE_EVERY, workers=WORKERS,
-                                  device=DEVICE, data_root=DATA_ROOT, seed=g),
+                                  device=DEVICE, data_root=DATA_ROOT, seed=g,
+                                  splits=TRAIN_SPLITS, keep_classes=KEEP_CLASSES),
                       log=run_dir / "log.txt")
         finally:
             stop.set()
