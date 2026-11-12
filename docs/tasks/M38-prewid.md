@@ -305,6 +305,39 @@ networks (through `MAPPINGS`), and the fine-tuned `_infer`, `_train`, `_sweep`.
 - **Notes**: about 2,800 plant training frames: start from pre-trained weights, few epochs.
   Horizontal flip on. A large gap between the in-camera and leave-one-camera-out results
   means the model learnt the backgrounds.
+- **Progress** (2026-11-12): first Colab run (GPU, `_train` and `_sweep` notebooks, rev
+  17571f4), runs pulled into `build/notebooks/prewid/tiny-yolov3-prewid/`.
+  - **The notebooks' AP of 0.0 is an artefact**: `--subset 50` took the first 50 frames
+    of `test`, all empty (CAM0, first box at index 94). `train.py --subset 500` had the
+    same flaw (CAM0 only, 438 empty frames, 62 boxes). Fixed: `datasets.subset` now takes
+    n samples spread over the split, used by `eval_voc`, `eval_quant`, `map_stades`,
+    `make_inputs`, `person_safety`, `train` and `train_v5` (`fault_campaign` keeps the
+    first n, so that the stopped T36.4 run resumes on the same images). With it, the
+    `test` s50 subset has 28 boxes on the 4 cameras.
+  - **Fine-tuned Tiny-YOLOv3 from COCO** (k = 6 anchors of T38.4, 4,000 iterations, batch
+    16, lr 1e-3, multiscale, 2,434 s on GPU; re-evaluated on the PC on the full splits,
+    stretch 416, 11-point AP50):
+
+    | Split | fine-tuned | tiny-yolov3-coco (T38.6) | tiny-yolov4-coco (T38.6) |
+    |---|---|---|---|
+    | test | 87.0 | 63.7 | **89.9** |
+    | CAM0 | 97.6 | 53.0 | 89.9 |
+    | CAM1 | 89.7 | 71.9 | 90.5 |
+    | CAM2 | 76.0 | 61.1 | 86.8 |
+    | CAM3 | 85.0 | 72.2 | 90.3 |
+    | lab | **11.1** | 69.7 | 85.8 |
+
+    +23 points on the plant, CAM2 still the worst camera, but below the 89.9 of the
+    acceptance. On `lab` the network collapses (11.1 against 69.7 before fine-tuning):
+    it forgot the large 1920 × 1080 workers it never saw in training; not analysed yet.
+    The `lab` training variant and leave-one-camera-out are the next runs.
+  - **Sweep** (600 iterations per run, full `test`): b8-sall 43.2, **b16-sall 50.9**,
+    b32-sall 47.9; the `s500` runs (1.3 / 19.3 / 22.5) trained on the flawed first-500
+    subset and are to be run again. One seed, short runs: batch 16 kept.
+  - Remaining: `lab` in training, fine-tuning from CrowdHuman (waits for T15.14),
+    leave-one-camera-out, and likely a fine-tuned YOLOv4-tiny to beat 89.9. The template
+    texts in `tools/notebooks/gabarits.py` now say "spread over the split"; the
+    `_train` / `_sweep` notebooks pick it up at their next regeneration.
 
 ### [ ] T38.8 — M27 metrics on PREWID
 - **Spec**: §8.3 · **Depends on**: T38.7, T27.0, T27.1 · **Runs on**: PC (float, integer,
