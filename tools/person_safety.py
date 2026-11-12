@@ -164,7 +164,7 @@ def net_defaults(args):
 
 def load_samples(dataset, split, data_root=None, subset=0):
     s = datasets.load(dataset, data_root, split)
-    return s[:subset] if subset else s
+    return datasets.subset(s, subset)
 
 
 def cmd_infer(args):

@@ -309,7 +309,7 @@ def params(nb):
               ("BATCH", 16, "batch (gradients accumulated to 64)"),
               ("LR", 0.01, "lr0 (final lr: 0.01·lr0)"),
               ("SIZE_TRAIN", 640, "square training input"),
-              ("TRAIN_SUBSET", 0, "first n training images (0: all)"),
+              ("TRAIN_SUBSET", 0, "n training images spread over the split (0: all)"),
               ("WORKERS", 4, None)]
     elif nb.role == "infer" and nb.arch == V5_ARCH:
         pass  # float only: the integer model of YOLOv5n is T33.8
@@ -332,7 +332,7 @@ def params(nb):
         if nb.role == "sweep":
             p += [("BATCHES", SWEEP["batches"], "batch sizes tried"),
                   ("TRAIN_SUBSETS", SWEEP["subsets"],
-                   "training images (first n); 0: the whole split"),
+                   "training images (spread over the split); 0: the whole split"),
                   ("SEEDS", SWEEP["seeds"], "seeds (train.py --seed); T15.2: [1, 2]"),
                   ("ITERS", SWEEP["iters"], "iterations per run (tier N from 600)"),
                   ("SKIP_DONE", True, "skips the runs that already have final.weights")]

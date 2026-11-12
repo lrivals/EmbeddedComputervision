@@ -90,7 +90,7 @@ def main():
                     help="default: the suffix of --net")
     ap.add_argument("--data-root", type=Path, default=None)
     ap.add_argument("--splits", default=None)
-    ap.add_argument("--subset", type=int, default=0, help="first n images only")
+    ap.add_argument("--subset", type=int, default=0, help="n images spread over the split (datasets.subset)")
     ap.add_argument("--epochs", type=int, default=30)
     ap.add_argument("--iters", type=int, default=0, help="stop after n batches (0: all epochs)")
     ap.add_argument("--batch", type=int, default=16)
@@ -140,7 +140,7 @@ def main():
     samples = datasets.load(dataset, args.data_root, args.splits, role="train")
     samples = datasets.remap(samples, datasets.class_lut(dataset, net.net["classes"]))
     if args.subset:
-        samples = samples[:args.subset]
+        samples = datasets.subset(samples, args.subset)
     def make_loader(mosaic):
         return DataLoader(V5Dataset(samples, hyp=None if mosaic else {"mosaic": 0.0}),
                           args.batch, workers=args.workers, seed=args.seed)

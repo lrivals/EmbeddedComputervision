@@ -293,7 +293,7 @@ def cmd_bench_sim(d, model, jobs=None):
 
 
 def cmd_map_stades(net, dataset, d, out, subset=0, data_root=None):
-    """`tools/map_stades.py` sur les `subset` premières images (0 : tout le split)."""
+    """`tools/map_stades.py` sur `subset` images réparties sur le split (datasets.subset) (0 : tout le split)."""
     cmd = ["python", "tools/map_stades.py", "--net", str(net), "--dataset", dataset,
            "--dir", str(d)]
     _opt(cmd, "--subset", subset or None)

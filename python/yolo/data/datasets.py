@@ -783,6 +783,16 @@ def load(name, root=None, split=None, role="test"):
     return ds.load(Path(root) if root else DATA_DIR / ds.root, split or getattr(ds, role))
 
 
+def subset(samples, n):
+    """`n` samples spread evenly over `samples` (all of them if `n` is 0 or ≥ their number).
+
+    Not the first `n`: a split sorted by camera or time (PREWID: the empty frames of CAM0
+    first) gives a first-n subset with no object at all (M38, T38.7)."""
+    if not n or n >= len(samples):
+        return samples
+    return [samples[i * len(samples) // n] for i in range(n)]
+
+
 def add_args(ap, split_help="split(s), séparés par des virgules ; défaut selon le jeu"):
     """Options communes `--dataset`, `--data-root` (alias `--devkit`), `--split`."""
     ap.add_argument("--dataset", choices=sorted(DATASETS), default="voc")

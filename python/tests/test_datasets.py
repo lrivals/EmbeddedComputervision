@@ -468,3 +468,13 @@ def test_construction_ppe(tmp_path):
     for n in (20, 80):
         view = D.eval_view("construction_ppe", n)
         assert view.names == ("person",) and view.gt_lut.tolist() == [0]
+
+
+def test_subset_spread():
+    s = list(range(10))
+    assert D.subset(s, 0) is s and D.subset(s, 10) is s and D.subset(s, 20) is s
+    assert D.subset(s, 5) == [0, 2, 4, 6, 8]
+    assert D.subset(s, 3) == [0, 3, 6]
+    # sorted split, objects only at the end: a first-n subset would miss them all
+    frames = [[]] * 94 + [[1]] * 6
+    assert any(D.subset(frames, 50)[-5:])

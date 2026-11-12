@@ -43,7 +43,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--net", default="tiny-yolov2-voc", help="réseau ou chemin d'un .cfg")
     datasets.add_args(ap)
-    ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
+    ap.add_argument("--subset", type=int, default=0, help="n images réparties sur le split (datasets.subset)")
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="stretch")
     ap.add_argument("--workers", type=int, default=8)
@@ -53,7 +53,7 @@ def main():
 
     samples = datasets.load_args(args)
     if args.subset:
-        samples = samples[:args.subset]
+        samples = datasets.subset(samples, args.subset)
     cfg = load_cfg(args.net)
     size, channels = input_size(cfg, args.size), cfg["input"][0]
     name = Path(args.net).stem

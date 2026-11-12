@@ -110,7 +110,7 @@ def main():
                     help="racine du jeu (défaut data/<dossier du jeu>)")
     ap.add_argument("--splits", default=None,
                     help="défaut : split d'entraînement du jeu (VOC : 2007:trainval,2012:trainval)")
-    ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
+    ap.add_argument("--subset", type=int, default=0, help="n images réparties sur le split (datasets.subset)")
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--iters", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -233,7 +233,7 @@ def main():
     samples = datasets.load(args.dataset, args.data_root, args.splits, role="train")
     samples = datasets.remap(samples, datasets.class_lut(args.dataset, net.net["classes"]))
     if args.subset:
-        samples = samples[:args.subset]
+        samples = datasets.subset(samples, args.subset)
     if args.corrupt:
         from yolo.explain.recorder import corrupt_labels
 

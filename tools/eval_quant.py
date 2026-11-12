@@ -206,7 +206,7 @@ def main():
     datasets.add_args(ap)
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
-    ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
+    ap.add_argument("--subset", type=int, default=0, help="n images réparties sur le split (datasets.subset)")
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--resize", choices=MODES, default="letterbox")
     ap.add_argument("--conf", type=float, default=0.005)
@@ -237,7 +237,7 @@ def main():
     metric = args.metric or datasets.DATASETS[args.dataset].metric
     samples = datasets.load_args(args)
     if args.subset:
-        samples = samples[:args.subset]
+        samples = datasets.subset(samples, args.subset)
     view = datasets.eval_view(args.dataset, load_cfg(args.net)["classes"])
     samples = datasets.remap(samples, view.gt_lut)
     variants = expand(args.variants.split(","), args.net)

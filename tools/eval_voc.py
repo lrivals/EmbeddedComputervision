@@ -244,7 +244,7 @@ def main():
     datasets.add_args(ap)
     ap.add_argument("--metric", choices=("voc", "coco"), default=None,
                     help="défaut : celle du jeu (coco pour coco et flir)")
-    ap.add_argument("--subset", type=int, default=0, help="n premières images seulement")
+    ap.add_argument("--subset", type=int, default=0, help="n images réparties sur le split (datasets.subset)")
     ap.add_argument("--size", type=parse_size, default=None, help="S ou LxH (entrée non carrée, ex. 640x192) ; défaut : entrée de la cfg")
     ap.add_argument("--preset", choices=tuple(PRESETS), default=None,
                     help="v5 : letterbox, seuils et max-det de YOLOv5 / YOLOv7 (T33.4) ; v8 : idem, "
@@ -280,7 +280,7 @@ def main():
     metric = args.metric or datasets.DATASETS[args.dataset].metric
     samples = datasets.load_args(args)
     if args.subset:
-        samples = samples[:args.subset]
+        samples = datasets.subset(samples, args.subset)
     view = datasets.eval_view(args.dataset, description(args.net)["classes"])
     samples = datasets.remap(samples, view.gt_lut)
     where = (f"VOC{split.replace(':', ' ')}" if args.dataset == "voc"
